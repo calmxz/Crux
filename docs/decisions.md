@@ -53,8 +53,9 @@ by `frontend/src/composables/useResource.js`: a private latest-wins core under
   keeps no shadow copy of it.
 - **Nothing visible changes except loading correctness.** Those changes are:
   no duplicate Library rows, a failed Library reload that clears its rows and
-  has a Retry that reloads, a Recall Retry that no longer glues a late page
-  onto a fresh list, and stale guards where there were none. The double
+  has a Retry that reloads, and stale guards where there were none. One of
+  the new guards closes a latent Recall race, where a reload could append a
+  late page onto a fresh list. No current UI path reaches it. The double
   toast-plus-inline error on the three single-object views is left to #404.
 - **Tracer-bullet order.** #406 builds the core and the pager with Recall, the
   hardest pager caller (the #385 dedup and failed-next-page tests). #407 adds
