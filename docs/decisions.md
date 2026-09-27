@@ -3,6 +3,62 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
+
+Architecture review candidate B1. A Check (1-3 Sets) was spread over the
+check service, `pending_check_store`, diagnostic grading and sequencing in
+the routes. One answer click ran up to three commits, `commit=` sat on nine
+functions in four files, and `pending_check_store` existed only to break one
+import cycle. Replaced by one check module, `services/check_service.py`. The
+terms (Check, Set, Item, Close, Recap, Diagnostic) are now in `CONTEXT.md`.
+
+- **One module, not tighten-in-place, not deferred.** The check code had no
+  learner-visible bug; the payoff is locality. Deferring (the G-13 route) was
+  the alternative. Rejected because B4 edits the same routes, and the next
+  check feature would have to re-learn the three-commit sequencing.
+- **The module commits every action itself.** Each action locks the session
+  row, commits, and releases the lock on every return, conflicts included
+  (commit, then raise). Never by rollback: register and the message-id stamp
+  run inside the tutor turn, whose flushed ledger writes must survive. No
+  public function takes `commit=`.
+- **Session end is the one named exception.** Abandon joins the caller's
+  transaction and takes the lock itself, so F-33's single write window in
+  `generate_and_persist` stays. Rejected: callers always commit (moves B-02's
+  commit-before-stream timing back into the routes); abandon commits too
+  (breaks F-33).
+- **Recording a graded answer stays in `learning_event_service`.** It loses
+  `clear_pending` and `commit`, never commits and never touches check state.
+  The mastery and gap rules keep their own direct tests, and a second event
+  source (R5, demand-gated) would call it directly.
+- **Every Close grades.** Complete, Stop and session end share one Close
+  path, and Diagnostic grading runs on each, forced when the learner cuts the
+  Check short. This replaces Complete's "crash-window backstop", whose window
+  #419 removes; it still grades a session stranded before the change.
+- **The Recap freezes only on Close.** The per-click snapshot was never read:
+  both session reads suppress the Recap while its Set is open, and every
+  Close re-froze it under the lock. Dropping it also drops its unlocked write
+  race.
+- **One conflict error with a code.** Codes are unchanged and the routes map
+  it to 409 (C-14). No API or payload change, so F2 #416's converter is
+  unaffected.
+- **Found while grilling: the row lock returned a stale row (#417).**
+  `lock_session_row` emitted `FOR UPDATE`, but when the row was already
+  loaded in the session SQLAlchemy kept the pre-lock attributes. Most write
+  paths load before locking (the route guards; session end loads the profile
+  before its summary LLM call). So on Postgres the lock waited and the code
+  then worked from the old copy: a profile edit during session end was
+  overwritten, and a double Complete could run two follow-ups. Fixed in the
+  helper: flush, then re-read with `populate_existing`. A bare
+  `populate_existing` would drop the caller's own unflushed edits (sessions
+  use `autoflush=False`, and Stop and abandon edit the row, then re-lock).
+  Filed on its own, not inside B1, because it hits profile edits too.
+- **Order: bug fix, Postgres characterisation, behaviour, then the move.**
+  #418 runs five held-lock race cases on the CI Postgres service (SQLite
+  ignores row locks). #419 makes answer and skip one commit and drops the
+  per-click snapshot. #420 merges; it is also blocked by B2 #395, whose
+  prompt builder reads check state from the row. B4 (guards) follows #420,
+  since both edit the check routes.
+
 ## 2026-09-27 - The chat stream is a helper inside the session store (#414, #415, #416)
 
 Architecture review candidate F2. `stores/session.js` (1128 lines, 59
