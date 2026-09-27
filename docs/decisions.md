@@ -3,6 +3,68 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-27 - List and resource loading is one composable module (#406, #407, #408)
+
+Architecture review candidate F3. Six call sites each hand-rolled fetch,
+loading, error and retry, using three error types (`false`, `''`, and a
+string or null) and two pagination styles. The `const seq = ++X` latest-wins
+guard was copied into three loaders, and three had no guard at all. Replaced
+by `frontend/src/composables/useResource.js`: a private latest-wins core under
+`usePagedList` (Recall, the Sessions library, sidebar search) and
+`useResource` (the session profile load, the aggregate profile, the usage tab).
+
+- **Scope stops at page loaders.** The ingestion poller, the start flow,
+  profile and settings writes, and the id-snapshot and stream guards in
+  `SessionView` and the session store stay as they are. Their lifecycles
+  differ (backoff, a state machine, serial writes, session identity). The
+  store's guards belong to F2 and the view's to F4. The card's "43 guard
+  sites" counted these too. Only three loaders used the loader idiom.
+- **Two entry points, one core.** A single composable with a `paged` flag
+  would show every single-object caller `items`, `hasMore` and `loadMore`.
+  Two small interfaces keep each caller honest, and the guard exists once.
+- **The composable watches a `params` getter.** A change restarts from offset
+  0 and drops older replies, so "inputs changed, start over, ignore late
+  answers" is a single rule rather than a dance each view must remember.
+  The Sessions library's failed-reload Retry bug came from getting that dance
+  wrong. Debounce stays in the view, because it is input UX, not loading.
+  A `null` from the getter means idle: drop the in-flight reply, clear, fetch
+  nothing. The sidebar needs this for an empty search box.
+- **Errors are the raw thrown value, `null` when clear.** Views choose the
+  words (`friendlyError` or fixed copy). The status survives for callers that
+  need to tell a 404 from a 503. The composable never decides toasts: the
+  fetcher passes `silent` itself, and toast-versus-inline stays with #404.
+- **The pager requires a `key` and drops repeated rows.** Offset paging
+  shifts when the list changes between pages. The offset advances by raw rows
+  received, so dedup never re-requests a range. An empty page ends paging
+  even when `total` says more.
+- **Pager reloads keep the old rows until the new page lands, and clear
+  them on failure.** Keeping them avoids a flash on every keystroke; clearing
+  on failure avoids showing one filter's rows under another's label. The
+  whole-list failure (`error`, Retry from 0) and the next-page failure
+  (`moreError`, keep rows, retry that page) are separate slots, so the wrong
+  Retry cannot be wired.
+- **`useResource` keeps `data` on failure.** This differs from the pager on
+  purpose. All three callers did this already, and their templates rank the
+  error branch above the data branch. Clearing would add a visible change
+  that nobody asked for.
+- **Store-owned rows go in through `into`.** Sidebar search rows stay in the
+  store's `searchRows`, because rename, pin and end must patch every visible
+  copy of a row (`_observedRows`). The composable writes into that ref and
+  keeps no shadow copy of it.
+- **Nothing visible changes except loading correctness.** Those changes are:
+  no duplicate Library rows, a failed Library reload that clears its rows and
+  has a Retry that reloads, a Recall Retry that no longer glues a late page
+  onto a fresh list, and stale guards where there were none. The double
+  toast-plus-inline error on the three single-object views is left to #404.
+- **Tracer-bullet order.** #406 builds the core and the pager with Recall, the
+  hardest pager caller (the #385 dedup and failed-next-page tests). #407 adds
+  the Library and the sidebar, the users of `into` and `null` idle. #408 adds
+  `useResource` last, on a core three lists have already exercised. Existing
+  view tests pass unchanged as evidence. The only edits allowed are for the
+  deliberate changes above, each named in its PR. There is no ordering
+  dependency on F1 (#400-#403), because F3 sits above the service functions,
+  whose signatures F1 keeps.
+
 ## 2026-09-26 - One HTTP transport core under three thin wrappers (#401, #402, #403)
 
 Architecture review candidate F1. The JSON client (`apiClient.js`), the chat
