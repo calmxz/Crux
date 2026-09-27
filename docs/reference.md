@@ -147,7 +147,7 @@ Wave 4 entry, for the residual-window tradeoff and the TTL value.
 | Tier | Formula | Local/dev default (`backend/config.py`) | Render blueprint (`render.yaml`) |
 |---|---|---|---|
 | Soft | `LLM_SOFT_CAP_USD` | 2.00 | 0.50 |
-| Urgent | `hard_cap * 0.9` (`cost_meter.py:213`) | 2.70 | 0.90 |
+| Urgent | `hard_cap * 0.9` (`cost_meter.py:216`) | 2.70 | 0.90 |
 | Hard | `LLM_HARD_CAP_USD` | 3.00 | 1.00 |
 
 The Render blueprint values are what `render.yaml` pins for the Render

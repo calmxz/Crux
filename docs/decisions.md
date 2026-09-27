@@ -3,6 +3,95 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-27 - LLM calls and their metering are one adapter (#410, #411, #412, #413)
+
+Architecture review candidate B3, reopening G-13 (2026-09-21). Six production
+modules imported `litellm` directly. The metering sequence (price, token-math
+fallback, record, log) was copied per caller with different failure handling:
+46 metering call sites across 8 modules. The cap was checked inline at 7
+sites, stub mode was 4 inline checks, and only embeddings retried. Tests
+patched 16 module-scoped path strings that all resolved to the same global
+module. Replaced by `backend/services/llm.py`: a shell that owns the cap gate,
+retry and cost settlement, around a swappable provider (litellm, the stub, or
+a test fake).
+
+- **G-13 is reopened on purpose.** G-13 declined to split `run_streaming` for
+  readability alone. The payoff now is cost correctness: every new LLM
+  feature copied the metering block, a test fixture had gone stale, and a
+  rollback could erase real spend. #410 writes the characterisation tests
+  G-13 asked for before any production change. They patch the global
+  `litellm` module, so they run unmodified through the refactor. (G-13's
+  `tutor.py:591-600` reference is stale; the guard it meant is the
+  `billed_iters` watermark, which #412 deletes.)
+- **Scope is completions and embeddings.** Removing `cost_holder` needs the
+  embeddings inside. The offline eval judge script stays on raw `litellm`:
+  it has no user to bill.
+- **The adapter gates every call and fails closed.** It checks the user cap
+  and the global ceiling before each call and raises `CostCapExceeded`;
+  callers keep their own reaction (partial persist, mechanical summary, skip).
+  If the spend read itself fails, the model is not called, so a database
+  outage bounds unrecorded spend to calls already in flight. The route gates
+  in chat and upload stay: they refuse before parsing or taking a rate-limit
+  slot, and they own the 429 body. New behaviour: the tutor and the summaries
+  honour the global ceiling, and retrieval embeddings are gated.
+- **The B-05 reservation stays outside the adapter.** A reserve belongs to a
+  request that spans two to six or more calls and the SSE lifecycle, not to
+  one call. This reverses the review card's "reserve moves into adapter".
+  Candidate B4 owns a reserve helper and the follow-up route's missing
+  reserve and shield; it depends on B3 only for the gate and
+  `CostCapExceeded`.
+- **Settlement commits in the adapter's own transaction.** `record_cost`
+  flushed into the caller's transaction, so a caller rollback erased real
+  spend. `cost_holder`, the B-08 re-record and the lost `LlmCallLog` rows
+  all worked around that. Now the ledger row and the log row commit per
+  call. Invariant: no caller holds an uncommitted ledger write across a
+  call, and the adapter sets `lock_timeout` so a violation fails fast
+  instead of hanging. For this reason #411 leaves the `retrieve` tool's
+  embedding on the old path until #412 removes the tutor's own ledger
+  writes.
+- **Settlement never raises.** A failed ledger write is logged at error level
+  with user, purpose, cost and usage, and the caller keeps its result. The
+  vendor has already charged, so throwing the output away (what the
+  summaries did) is the worst outcome. No deferred retry: the ledger is a
+  daily budget reset at midnight, and the log holds the amount. An inline
+  retry was rejected because a streamed call settles synchronously in its
+  exit, where a pause would either block the event loop or need a shield;
+  `pool_pre_ping` already absorbs stale connections.
+- **A streamed call settles itself exactly once on every exit.**
+  `async with stream()` yields typed events. The exit settles the real
+  price, or an estimate on cancel (always) and on error (if output arrived or
+  it was a timeout). The watermark, the prompt snapshots and
+  `_record_partial_cost` go. This supersedes the F-03/B-10 "double-count
+  kept deliberately" rationale on the error path: that re-estimate existed
+  because a rollback could erase recorded spend, which own-transaction
+  settlement ends. An errored turn now bills once.
+- **Retry covers completions too.** 429, 503, 500 and connection errors
+  retry on every call; streams retry only before the first event reaches the
+  user. Completions do not retry timeouts (a 30 s timeout retried twice
+  would keep the user waiting 90 s or more); embeddings still do. A failed
+  attempt with no output settles $0, except a timeout.
+- **One module-level active adapter, one test fake.** `llm.get()` resolves
+  per call. Tests install a fake provider under the real shell, so the gate,
+  retry and settlement run in every test. Explicit injection was rejected
+  for now: it churns signatures across the tutor, the services, the
+  background summary and the ingestion loop, inside G-13's regression
+  surface, and FastAPI `Depends` cannot reach the background paths. If it is
+  wanted later, add an optional `client=` parameter defaulting to
+  `llm.get()`, one function at a time.
+- **The stub is a provider, and it keeps reading the prompt.** This revises
+  the B2 entry's plan to pass the summary as data.
+  `resume-carries-profile.spec.js` asserts `[STUB:resumed:` because the stub
+  sees the summary in the assembled system prompt, so reading the prompt is
+  the e2e oracle, not accidental coupling. The summary label becomes a
+  constant shared by `prompts.py` and the stub, with a render-to-stub test.
+  `complete` and the embeddings raise `LlmUnavailable`, callers keep today's
+  stub-mode output, and stub mode never touches the network. Deterministic
+  fake vectors wait for candidate B5's e2e upload test, their first user.
+- **Tracer-bullet order.** #410 characterisation, then #411 (core plus
+  summary, retrieval and ingestion), #412 (streaming and the tutor), #413
+  (stub). The core is proven on low-risk callers before `run_streaming` is
+  touched. #395 (B2) is a soft ordering only: both edit `routes/chat.py`.
+
 ## 2026-09-27 - List and resource loading is one composable module (#406, #407, #408)
 
 Architecture review candidate F3. Six call sites each hand-rolled fetch,
@@ -158,6 +247,9 @@ a pure `assemble`. The renderer accepts only `PromptState`.
   signature change across 14 test files and about 120 references, inside the
   code G-13 (2026-09-21) declined to restructure without characterisation
   tests. B3 (the LLM adapter) writes those tests and rewrites the stub anyway.
+  **Revised 2026-09-27:** the stub keeps reading the rendered prompt, through
+  a label constant shared with `prompts.py`, because the e2e resume spec
+  relies on it. See the B3 entry.
 
 ## 2026-09-26 - Review is relabelled Recall; the queue stays off Home (#338, #352)
 
