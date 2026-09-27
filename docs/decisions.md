@@ -3,6 +3,55 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-27 - The chat stream is a helper inside the session store (#414, #415, #416)
+
+Architecture review candidate F2. `stores/session.js` (1128 lines, 59
+returned members) mixed the session list and detail with live streaming.
+The chat send and the check follow-up duplicated their setup, SSE switch and
+catch; the check batch mapping was written three times; eleven returned
+members had no production use. Replaced by `stores/chatStream.js`, a factory
+the session store builds once, and `lib/checkBatch.js`, one converter.
+
+- **A helper, not a second store.** `messages` has two writers (detail loads
+  and stream appends) and one retention rule (`MAX_RETAINED_MESSAGES`). Two
+  peer stores would put that rule in one while the other also writes, and
+  would call each other (append one way, abandon the other). The helper gets
+  the refs it writes injected and never imports the store. The store
+  re-exports ten members flat, so `SessionView` does not change before F4.
+- **Stream functions resolve at call time.** Tests spy on `streamChat` after
+  the store exists; a function captured at construction would bypass them.
+- **The check batch stays in the store.** It is session data that only
+  sometimes arrives through the stream: `loadSession` sets it too, and
+  answer and navigation are plain HTTP. The helper writes `pendingCheck` on
+  `check_question` through the shared converter. Moving the batch would make
+  the store reach into the helper for non-stream work.
+- **One turn runner with per-kind hooks.** Send keeps the optimistic row, the
+  401 draft stash (E-05) and the 409 `session_ended` arm; the follow-up keeps
+  the batch restore and `followup_skipped`. These are real differences and
+  stay hook choices. Caps move to the helper because only stream paths set
+  them. The shared `error` slot is injected, because `SessionView` renders
+  one inline error.
+- **Two bugs fixed first, on today's code (#414).** A follow-up network drop
+  discarded text the learner had watched stream. The server persists it on
+  cancel, so a reload brought it back. It now settles through
+  `_settleWithError` like send (E-03's stated intent). `reset()` on sign-out
+  nulled the abort handle without aborting, so the unmount hook could not
+  stop the stream and the server kept billing. `reset()` now abandons first.
+  The dead-stream marker is a sentinel, not `null`, because after `reset()`
+  `currentSessionId` is also `null` and `null !== null` would un-supersede
+  late events.
+- **Order: fixes, then safety net, then pure move.** #415 rewrites the 32
+  test lines that call internals into fake-stream events, with no production
+  change. #416 moves the code, and every existing test must pass unchanged.
+  Fixing first means the move is pinned to the fixed behaviour, not the bug.
+- **Independent of F1 #403.** #403 rewrites inside `chatStreamService.js`
+  and keeps `streamChat({ sessionId, signal, onEvent })`. Either can land
+  first. #414's transport-level E-05 test binds whichever lands second. F4
+  (session page composition) is blocked by #416.
+- **Out of scope.** Unknown SSE events stay ignored (B7 owns the event
+  contract). `libraryLoading` and the list/detail `loading` pair belong to
+  F3/F4. The `!sawTerminal` branch keeps today's behaviour on both paths.
+
 ## 2026-09-27 - LLM calls and their metering are one adapter (#410, #411, #412, #413)
 
 Architecture review candidate B3, reopening G-13 (2026-09-21). Six production
