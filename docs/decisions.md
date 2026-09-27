@@ -31,7 +31,7 @@ the session store builds once, and `lib/checkBatch.js`, one converter.
   stay hook choices. Caps move to the helper because only stream paths set
   them. The shared `error` slot is injected, because `SessionView` renders
   one inline error.
-- **Two bugs fixed first, on today's code (#414).** A follow-up network drop
+- **Three bugs fixed first, on today's code (#414).** A follow-up network drop
   discarded text the learner had watched stream. The server persists it on
   cancel, so a reload brought it back. It now settles through
   `_settleWithError` like send (E-03's stated intent). `reset()` on sign-out
@@ -39,7 +39,11 @@ the session store builds once, and `lib/checkBatch.js`, one converter.
   stop the stream and the server kept billing. `reset()` now abandons first.
   The dead-stream marker is a sentinel, not `null`, because after `reset()`
   `currentSessionId` is also `null` and `null !== null` would un-supersede
-  late events.
+  late events. Also added to #414 after the design review: in-flight loads and
+  mutations that resolve after `reset()` wrote the previous account's data
+  back (only `loadEarlierMessages` was guarded; `_inflight` and
+  `_latestRequestedId` survived reset). `reset()` now bumps an epoch, and
+  every async store action drops its writes when the epoch changed.
 - **Order: fixes, then safety net, then pure move.** #415 rewrites the 32
   test lines that call internals into fake-stream events, with no production
   change. #416 moves the code, and every existing test must pass unchanged.
