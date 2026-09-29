@@ -91,6 +91,6 @@ GitHub does not allow both; enabling default setup would require removing
 Verify or reapply:
 
 ```bash
-gh api repos/calmxz/Project_Apt/branches/dev/protection --jq '.required_status_checks.contexts'
-gh api repos/calmxz/Project_Apt/branches/main/protection/required_signatures --jq '.enabled'
+gh api repos/calmxz/Crux/branches/dev/protection --jq '.required_status_checks.contexts'
+gh api repos/calmxz/Crux/branches/main/protection/required_signatures --jq '.enabled'
 ```

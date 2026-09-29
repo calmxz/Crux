@@ -1,4 +1,4 @@
-name: "Project_Apt CodeQL config"
+name: "Crux CodeQL config"
 paths-ignore:
   - "backend/db/alembic/versions/**"
   - "backend/contracts/**"
