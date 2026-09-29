@@ -6,7 +6,7 @@
 
 Pick a topic, drop in your course PDFs, and chat with a tutor that builds a live model of what you know — strengths, gaps, and the one concept worth working on next. Answers are grounded in your own material via RAG, so the tutor cites the page instead of making things up.
 
-[![CI](https://github.com/calmxz/Project_Apt/actions/workflows/ci.yml/badge.svg)](https://github.com/calmxz/Project_Apt/actions/workflows/ci.yml)
+[![CI](https://github.com/calmxz/Crux/actions/workflows/ci.yml/badge.svg)](https://github.com/calmxz/Crux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3-42b883.svg)](https://vuejs.org/)
@@ -150,8 +150,8 @@ Local development runs the app natively (Postgres + pgvector and Auth are Supaba
 ### 1. Clone the repo
 
 ```bash
-git clone https://github.com/calmxz/Project_Apt.git
-cd Project_Apt
+git clone https://github.com/calmxz/Crux.git
+cd Crux
 ```
 
 ### 2. Create your `.env`
@@ -442,7 +442,7 @@ With the backend running, FastAPI's interactive docs are available at:
 ## Folder Structure
 
 ```
-Project_Apt/
+Crux/
 ├── docs/
 │   ├── superpowers/specs/      Design doc (source of truth)
 │   ├── api/openapi.yaml        API contract (codegen source)
