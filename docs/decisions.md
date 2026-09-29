@@ -3,6 +3,83 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-29 - Session guards are three tiers and paid admission owns one commit (#421, #422, #423, #424, #425)
+
+Architecture review candidate B4. "May this user take this action on this
+session right now" was a convention restated inline: 15 route-level ownership
+404s, 6 `session_ended` 409s, and three paid routes with three guard orders.
+The admission commit (the cost reservation (B-05), `ensure_user`, the
+rate-limit slot) was hidden inside `rate_limit.check_and_increment`, which
+committed on both arms. Replaced by one guard module with three tiers, and
+one stream pump shared by chat and the check follow-ups.
+
+- **Three tiers, not one policy call and not FastAPI dependencies.**
+  `owned_session` (404), `active_session` (adds `session_ended`) and
+  `admit_paid_turn` (caps, `ensure_user`, reserve, slot, one commit, a
+  release handle). Two of three paid routes need code between ownership and
+  admission (upload's free dedupe, the follow-up's Close); tiers leave it as
+  plain code. A policy table would need mid-sequence hooks. Dependencies run
+  before the handler body, so a cost gate there would refuse free
+  re-uploads, stop capped learners closing a Set, and add statements to
+  chat's prepare budget. `velocity_limit` stays a dependency: it needs no
+  session row.
+- **Ownership before the cost cap, on every route.** Report what is wrong
+  with the request's target before what is wrong with the account's budget.
+  A 409 flips the UI to the ended state and restores the draft; a 429 on an
+  ended session left it looking open until midnight. Chat was the only route
+  checking cost first, and its perf budget did not require it: the spend read
+  and the session read are two statements either way, only the check order
+  moves.
+- **The tier owns one explicit commit, and a refusal leaves nothing
+  behind.** `rate_limit.take_slot` only flushes. B3's own-transaction
+  settlement (#411) needs the admission committed before the first model
+  call; that invariant now lives where it is enforced. A refusal rolls back
+  the tier's own writes before raising, because session end, resume and the
+  follow-ups carry on and commit after a refusal. Left pending, the reserve
+  would be published with no handle to release it, and the held ledger row
+  lock would make a concurrent turn's settlement time out. Explicit rollback
+  with an asserted "no pending writes" precondition, not a savepoint: the
+  SQLite test engine lacks the pysqlite begin workaround. Chat's special
+  rate-refusal release goes; a release handle exists only after admission.
+- **Follow-ups are admitted after the Close and skip with a reason.** The
+  Close has already committed, so an HTTP 429 would report a success as a
+  failure, and gating before the Close would stop a capped learner closing a
+  Set (every Close grades). `followup_skipped` already meant "Close done,
+  tutor sat out" at the message cap; the cost caps now use it too
+  (`cost_cap`, `global_cost_cap`), and the frontend picks copy by reason and
+  shows the cap banner. Rejected: the route sending the tutor's `error` event
+  (no contract work, but it calls a succeeded Close an error). A capped
+  follow-up also stops consuming a message slot.
+- **Session end and resume use soft admission.** A refusal gives the
+  mechanical summary, never a 429. With the follow-ups they were the last
+  callers of the committing `check_and_increment`, so one admission path
+  remains. Upload admits with no reserve: it makes no model call in the
+  request, and a reserve belongs to a request spanning several calls and the
+  SSE lifecycle (B3 entry).
+- **One mapper and typed schemas for cap refusals.** The route still owns the
+  429 body (B3): it maps the tier's typed refusal, chat and upload to a 429,
+  the follow-ups to `followup_skipped`. Per-user cost bodies are always full
+  (upload gains three fields); the global body stays `{code, resets_at}`, so
+  service spend is never shown. No wire break: the 429 `detail` already
+  allowed extra fields.
+- **One shared stream pump.** The follow-up's copy of the pump had drifted
+  from chat's: it lacked the shield around cancel, drain and release.
+  Rejected: keeping two copies (that drift caused the bug below); moving
+  disconnect handling into the tutor (puts HTTP in the agent layer).
+- **Found while grilling: a follow-up disconnect lost the partial reply and
+  its cost (#421).** Starlette's cancel is level-triggered, so the
+  follow-up's unshielded `await task` was itself cancelled and the tutor's
+  cancel arm died at its tool-drain await, before saving anything. Probed: 0
+  rows saved with a tool call in flight. The same unshielded-cleanup mistake
+  let chat's prepare-failure release be skipped ($0.02 held until midnight).
+  One fix-first ticket, blocked by nothing.
+- **Order: bug fix, Postgres characterisation, the tiers, the pump, then the
+  contract change.** #422 reuses #418's held-lock harness. The pump (#424)
+  lands before follow-up admission (#425), so the follow-ups hand a release
+  handle to one pump instead of editing a copy. Left to other candidates: the
+  profile routes' double lock and If-Match (B6), `_to_response` (B7), and
+  upload's document 404 (B5).
+
 ## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
 
 Architecture review candidate B1. A Check (1-3 Sets) was spread over the
