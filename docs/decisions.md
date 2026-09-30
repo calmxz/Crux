@@ -3,6 +3,89 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-30 - The learner profile has one reader and one edit recipe (#436, #437, #438, #439, #440, #441, #442)
+
+Architecture review candidate B6. The learner profile is a JSON blob on the
+session row with a tolerant parser. Seven writers hand-wrote the same four
+steps (lock, read, change, save); the profile routes locked twice; the
+session cards read the raw JSON; the aggregate imported the private parser;
+resume copied the blob by hand while `seed_from_prior` had no callers. The
+card was wrong in three places: the lock guards the whole session row, not
+the profile (4 of its 17 call sites never write the profile, and the check
+service holds 5); the two patch paths carry different rules on purpose; and
+the two summaries are different things. There are 117 profile tests, not 115.
+
+- **The session lock gets its own module (#438).** `lock_session_row` moves
+  to `services/session_lock.py` with #417's flush-then-refresh, and every
+  caller uses it through the module so monkeypatch spies still see the
+  calls. Rejected: leaving it in `profile_service` (the check, topic-suggest
+  and document code would keep importing the profile for a row lock, and a
+  profile tidy-up could hide it); B4's guard module (route-facing admission
+  that runs before the handler; the lockers are services mid-turn).
+- **One edit recipe that never commits (#439).** `edit_profile` locks, reads
+  fresh, compares the optional `If-Match` tag (a typed `ProfileChanged` the
+  route maps to 412), applies the change, enforces list caps and stages the
+  write. The learner and tutor doors commit on every return, refusals
+  included (B1's rule). `record_from_answer` and Diagnostic grading join the
+  commit of the answer or Close they run in, and session end keeps its one
+  commit (F-33). The routes' second lock and `save_profile(commit=...)` go.
+  Rejected: keeping the steps hand-written (the order is the rule the #417
+  bug broke); a recipe that always commits (breaks the nested writers and
+  F-33, and needs the commit switch B1 removed). Intended precedence change:
+  a malformed argument with a stale `If-Match` gets 422, not 412.
+- **Two doors, not one patch path.** The card's "the two patch paths become
+  one" is rejected. The learner and tutor rules differ on purpose: evidence
+  for mastery and level, the focus-clear guard (F-02), creating vs only
+  updating subtopics, and the error shape. A "who is asking" switch would
+  weave the tutor's guard rails into learner code. The shared plumbing is
+  the recipe.
+- **The profile module is the only reader and writer of the blob (#440).**
+  The parser goes public. The session cards read through it (a non-dict blob
+  would crash the session list), the aggregate imports the public name, and one
+  new-session function replaces resume's hand copy, so a resumed blob is now
+  normalized rather than byte-copied. `seed_from_prior` is deleted. Rejected:
+  a quick-facts reader for the cards (the aggregate already runs the full
+  parser on every session).
+- **The two summaries stay where they are.** The end-of-session summary
+  (in the profile, learner-visible, carried forward on resume) and the
+  running recap (its own column, tutor-only) are different things. Moving the
+  first out of the profile needs a migration and gains nothing.
+- **The `[auto]` tag goes (#440).** The mechanical fallback summary was
+  stored with an `[auto] ` tag that nothing acted on. One server site and
+  five browser sites hid it, the tutor prompt never did, and it leaked to a
+  learner screen once (F-53). It is now stored plain, the parser cleans old
+  rows, and #440 updates the design doc's two "[auto]" lines. Lost: telling
+  from stored data whether a summary was the fallback; log it at write time
+  if that ever matters.
+- **An ended session's profile is read-only (#441).** A deliberate
+  divergence from B5, which kept file delete allowed on an ended session.
+  Tradeoff: fixing an ended profile takes an extra step (continue the topic,
+  or reopen), in exchange for closing the edit-during-summary window
+  outright (session end commits `ended_at` before the summary model call)
+  instead of relying on #417 alone. `ProfileResponse` gains `ended_at`, and
+  the page goes read-only. Until then the profile routes use
+  `owned_session` in #423.
+- **Found while grilling: one bad entry blanked the whole profile, and the
+  next write saved the blank (#436).** Probed: a profile with a level, two
+  mastered, a gap and a summary, where one mastered entry carried a retired
+  evidence value, loaded as empty. After one learner edit the stored blob held
+  only the new gap. Latent: stored entries have allowed only
+  `declared`/`tested` since slice 8, and every write validates. The trap
+  would spring on the next change that narrows the profile's shape. The
+  parser now salvages per field and per element. Also found: a DELETE route
+  test that always passed (it compared a string with a list of objects) and
+  never checked focus, and untested DELETE guards (both in #437).
+- **Deferred.** The running recap's unlocked update (worst case one duplicate
+  model call; it writes its own columns, never the profile); the
+  `[auto-rolling]` tag (stub mode only); `load_profile` kept (13 callers).
+  Whether the tutor should respect the learner's own edits is parked as #442
+  until after the refactor, since profile features may be cut or changed
+  first.
+- **Order: bug fix, safety net, lock move, edit recipe, readers, then the
+  ended read-only.** #438 waits for #417. #439 waits for #420 (Diagnostic
+  grading moves into the check module) and #423. #441 waits for #408 (the
+  profile page's loading).
+
 ## 2026-09-30 - Reference files are one module and file formats are one table (#430, #431, #432, #433, #434, #435)
 
 Architecture review candidate B5. Upload had no module: one ~210-line route
@@ -149,6 +232,10 @@ one stream pump shared by chat and the check follow-ups.
   handle to one pump instead of editing a copy. Left to other candidates: the
   profile routes' double lock and If-Match (B6), `_to_response` (B7), and
   upload's document 404 (B5).
+
+  **Amended 2026-09-30 (B6):** the profile routes take `owned_session` in
+  #423 (no behaviour change); #441 moves their writes to `active_session`
+  together with the read-only profile page.
 
 ## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
 
