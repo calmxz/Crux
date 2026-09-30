@@ -3,6 +3,76 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-09-30 - Reference files are one module and file formats are one table (#430, #431, #432, #433, #434, #435)
+
+Architecture review candidate B5. Upload had no module: one ~210-line route
+did validation, dedupe, the cost gate, the rate slot, three content checks,
+row creation and the flush, blob, commit protocol with the worker. File-format
+knowledge (page counting, extension lists) lived in both upload and ingestion,
+and the two caches derived from a session's files (the centroid and the
+keyword index) had no owner. The card's "status computed in four places" was
+wrong: every reader already calls `documents_service`. Replaced by
+`documents_service` as the reference-files module and one file-format table.
+
+- **The module owns intake, status, delete and both derived caches; the
+  worker and the ingestion pipeline stay put.** Rejected: one package holding
+  the worker and ingestion too. It would rewrite 171 test references and the
+  RUNBOOK's scale-out recipe, and concentrate no rule the module leaves
+  scattered. The route keeps the guards (B4's tiers compose around the
+  module), and the module never touches money. Ingestion touches the caches
+  at two moments (centroid nulled before embedding, F-05; keywords merged in
+  the ready commit, F-27), so the module offers small functions, not one.
+- **Two status answers, on purpose.** "Learner status" ranks pending above
+  ready, so the banner says something is still coming. "Anything
+  searchable?" is any ready file. One shared answer would block search over
+  an older ready file while a new one processes: the masking bug the old
+  latest-document lookups had. Known wrinkle, accepted: the tutor's
+  `INGESTION_STATUS` reads `pending` while older files are searchable, and
+  two retrieval-policy rules then pull against each other. Prefetch covers
+  the common case (with a ready file it always returns hits, and is empty
+  only when the embedding call fails), so the wording is left to B2's prompt
+  work (note on #395). The session-wide contract enum drops `processing`,
+  which the aggregate never sends (#431).
+- **One backend file-format table.** Per format: extensions, magic bytes,
+  plaintext flag, page counter and extractor. Upload and ingestion both read
+  it. The frontend keeps its hand-kept list, and B7 takes it with the other
+  mirrors. Rejected: serving accepted types over the API (a contract change
+  that could clash with B7's method). `.markdown` is left out of the picker
+  hint (`ACCEPT_ATTR`) on purpose; it is not a bug.
+- **Found while grilling: fixes first (#430).** A rejected upload used a
+  daily slot. The slot, which commits, was taken before three free content
+  checks (probed: a fake PDF got 415 and a count of 1). The checks move
+  above the cost gate. The slot does not move later instead: its commit
+  would publish the flushed row before the blob exists. A 507 storage
+  failure still uses a slot, a deliberate deferral: it is an infrastructure
+  fault, and a refund would collide with #423's `take_slot`. Delete also left
+  the file's keywords behind; it now rebuilds them from the remaining ready
+  chunks under the session lock. The banner's "Indexing N" counted every
+  file.
+- **Delete stays allowed on an ended session.** Upload is refused there;
+  delete is not, so a learner can always remove their own file. Pinned by
+  #432.
+- **Dead code goes before the move.** `GET /api/upload/{document_id}` has no
+  caller (#400 removes the frontend wrapper first). The legacy bare-filename
+  blob fallback is dead: canonical keys arrived with the store in #120, R2
+  came later, and Render's disk is ephemeral. A NULL document status would
+  fail the file-list response, but no path writes one; left alone.
+- **E2E moves to Postgres (#434), then an upload spec (#435).** On SQLite,
+  chunks store but vector search fails (probed), so no browser test could
+  see a citation. Moving the required e2e job to the production database
+  also exposes SQLite-only assumptions in the 7 existing specs. The upload
+  spec ends on the citation list showing the file name. It needs #413's stub
+  provider plus deterministic fake vectors. The #425 cost fields are asserted
+  at the route, not in e2e. Rejected: a backend-only Postgres test with the
+  browser stopping at "ready" (misses the citation UI, leaves e2e on SQLite).
+- **Order: bug fix, safety net, contract cleanup, then the move.** #432 pins
+  the fixed behaviour, including the dedupe-for-a-capped-learner case #422
+  wrongly thought was pinned. The move (#433) waits for #432 and #431, so dead
+  code is not moved. The e2e tickets do not gate the move: #433 is
+  backend-only and #432 guards it. Split out as features, to be grilled after
+  the move: retry a failed file (#427), cancel processing (#428), and process
+  several files at once (#429).
+
 ## 2026-09-29 - Session guards are three tiers and paid admission owns one commit (#421, #422, #423, #424, #425)
 
 Architecture review candidate B4. "May this user take this action on this
@@ -273,6 +343,9 @@ a test fake).
   `complete` and the embeddings raise `LlmUnavailable`, callers keep today's
   stub-mode output, and stub mode never touches the network. Deterministic
   fake vectors wait for candidate B5's e2e upload test, their first user.
+  **Amended 2026-09-30 (B5):** #435 makes the stub's `embed` and `aembed`
+  return deterministic fake vectors (cost 0, no network); `complete` still
+  raises. Stub-mode ingestion now reaches ready.
 - **Tracer-bullet order.** #410 characterisation, then #411 (core plus
   summary, retrieval and ingestion), #412 (streaming and the tutor), #413
   (stub). The core is proven on low-risk callers before `run_streaming` is
