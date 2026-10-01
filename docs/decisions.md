@@ -3,6 +3,61 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-01 - Profile saves go through one write module (#459, #460, #461, #462)
+
+Architecture review candidate F5. Every profile write sends the body `etag`
+from the last load as `If-Match`; a stale tag gets 412 and the page must
+reload. The backend keeps this body `etag` separate from the HTTP ETag
+middleware (2026-09-21), so the frontend is the only place the protocol is
+spelled out, and it was spelled out twice: `ProfileView` (a serial queue,
+reload and a conflict notice) and the session page's level picker (a busy
+flag, reload and a conditional retry). #441 adds a third outcome, 409
+`session_ended`.
+
+- **One write module that reports an outcome, not a policy switch (#461).**
+  `useProfileWrite({ id, profile })` owns the tag, one write at a time, the
+  session check, storing the result through `useResource.set()` and reloading
+  on 412 or 409. `save()` returns `saved`, `conflict`, `ended`, `failed`,
+  `dropped` or `stale`; each caller decides what that means. The card's
+  first sketch had a `retry | surface` policy. Rejected: the picker retries
+  only while the level is still null after the reload, a rule about the
+  level, and a blind retry would overwrite the concurrent change the tag
+  exists to catch.
+- **Queued writes die with the page they were aimed at.** A conflict (412 or
+  409) drops every write queued before its outcome resolves, as `dropped`; a
+  session change drops the queue as `stale`. `busy` and the queue belong to
+  the current session: a switch resets them, and a stale write settling never
+  touches the new session's state.
+- **Two bugs fixed first.**
+  - #459: on `ProfileView` a write queued behind a 412 cleared the conflict
+    notice before it was ever visible, so a typed add vanished with no
+    signal. And a queued add read `props.id` when it ran, so after a switch
+    it was sent to the other session (probed: `alpha -> s1`, then
+    `beta -> s2`, accepted). Also: a failed add puts its text back, and the
+    notice now says the change was not saved.
+  - #460: only the chat send marked a session ended on 409 `session_ended`.
+    Check answer, skip, complete and stop, and upload showed the copy but
+    left the page open, with the check card still clickable. A new store
+    action `markSessionEnded()` sets the copy, stamps `ended_at` and clears
+    `pendingCheck` (the server abandons the open batch at session end); chat
+    uses it too.
+- **The level picker flips the page on `ended` (#462),** through
+  `markSessionEnded()`, like chat. #441 had planned no picker change.
+  Correction made during grilling: it was first stated that chat, check and
+  upload all flipped the page; only chat did, which is #460.
+- **No shared "still current?" helper.** After the move, 6 session checks
+  stay outside the write module (upload's 4 `uploadGen`, "Quiz me"'s 1, the
+  page load's 1). Each is correct and tested. The counter and id-compare
+  styles differ only on an A -> B -> A switch, where the id compare writes
+  A's own data onto A: harmless. A helper would be tidiness only and would
+  tie F5 to #450's move. Revisit if new wait-for-the-server sites multiply.
+- **No separate safety net.** Both save paths are pinned by about 20 view
+  tests that drive them the way the app does; the one gap (a 412 whose
+  reload fails) gets a test in #461.
+- **Order:** #459 and #460 (independent) -> #461 (after #408) -> #462 (after
+  #447, #461, #460). #441 now waits on #461 and keeps only its backend
+  refusal, `ended_at` and the read-only state.
+
 ## 2026-10-01 - The card is one CSS class (#453, #454, #455, #456, #457, #458)
 
 Architecture review candidate F6. `CONTEXT.md` calls the card the base unit
