@@ -3,6 +3,70 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-01 - Contracts are kept honest by tests against the spec (#463, #464, #465, #466, #467, #468)
+
+Architecture review candidate B7, the last of the 13. The card proposed a
+mapping layer for the roughly 96 places that build contract objects by hand.
+Declined: it would be a lot of interface for little behaviour, and it would
+catch none of the drift the survey found. That drift all sits between the
+spec, the backend and the frontend, not in how the backend builds objects:
+the stream-event block promised a `done.total_cost_usd` that was never sent
+and typed two nullable fields as required; 17 of 24 backend error codes were
+loose strings; and the frontend kept seven hand copies of backend values,
+one of them dead. No learner-visible bug; this slice is drift-proofing plus
+small copy and naming fixes. Card corrections at f02c85b: about 96 app-code
+construction lines, not 110 (33 of them are `ToolResult`, which is not a
+route response); `ended_at` has 19 reads in 10 files, not 30; the sessions
+`_to_response` runs one query plus a usually cached re-fetch, not two
+queries.
+
+- **The spec is the single home, and tests tie code to it.** CLAUDE.md
+  already makes `openapi.yaml` the contract source of truth. Codegen ignores
+  vendor blocks, so `x-sse-events`, the new `x-error-codes` and the new
+  `x-upload-limits` are enforced by tests from both sides.
+  `tutorPreferences.test.js` was the precedent. Rejected: frontend tests that
+  read backend Python files (brittle; #433 moves the file-type list), and
+  leaving the "keep in sync" comments as the only guard.
+- **Backend stream events are validated in tests (#463).** An autouse
+  fixture validates every `StreamEvent` against `x-sse-events`, closed with
+  `additionalProperties: false`, and a whole-suite run must see all 11 types.
+  The spec's three drift items are fixed first. Event builder functions in
+  `stream_events.py` were declined for now: they add no safety beyond the
+  test, since Python checks a call only when it runs, and they would rewrite
+  about 21 emit sites that the LLM adapter (#410-#413) is about to touch. They
+  are an optional follow-up after #413.
+- **Frontend fake events are validated too (#467).** Store tests fake the
+  stream by hand. Validating each fake against the spec means a field the
+  store reads but the backend never sends cannot appear in a fake. After #415
+  and #416, so it is written once.
+- **One error-code list (#464).** The spec lists all 24 codes; the backend
+  registry holds all 24. A guard fails on a string literal in a code
+  position, or on a registered value spelled inline, so a new code must be
+  registered. The frontend keeps the codes it handles, tested as a subset.
+  `CodedErrorDetail.code` stays a free string, because an enum becomes a
+  `Literal` in the generated models. #464 lands early, before #420, #423 and
+  #433 rework the routes holding those codes, so the guard keeps their new
+  codes on the list; the conflicts are one-word. `llm_failed` and
+  `max_iters_reached` get frontend copy. UPPERCASE upload codes are not
+  renamed (that would change the API).
+- **Delete-account failures send codes (#465).** The frontend matched three
+  `detail` sentences byte for byte, two of them on the same 503. They now
+  send `{code, message}` like every other coded error, which takes the list to
+  27. Accepted: for the minutes between frontend and backend deploys, an old
+  frontend shows generic copy for this flow.
+- **Other copies (#466).** The upload cap and file types are tested against
+  `x-upload-limits`. `Composer.vue` imports `ACCEPT_ATTR`. The 4000-character
+  cap test reads the spec. The unused frontend terms-version copy is deleted.
+- **`_to_response` (#468).** Renamed `_session_response` and `_me_response`;
+  the session one reads the profile from the row it already holds.
+- **Also declined:** generated frontend types (the frontend has no type
+  checking, so they would need new tooling across it, and the survey found no
+  bug from field reads); a shared `Citation` builder (both sites are one-line
+  unpacks); a spec flag for `PARTIAL_ABORT_CODES` (it mirrors behaviour, not
+  a value, and store tests pin it).
+- **Order.** #463, #464 and #468 are independent. #465 follows #464, #466
+  follows #433, and #467 follows #463, #415 and #416.
+
 ## 2026-10-01 - Profile saves go through one write module (#459, #460, #461, #462)
 
 Architecture review candidate F5. Every profile write sends the body `etag`
@@ -425,6 +489,9 @@ one stream pump shared by chat and the check follow-ups.
   **Amended 2026-09-30 (B6):** the profile routes take `owned_session` in
   #423 (no behaviour change); #441 moves their writes to `active_session`
   together with the read-only profile page.
+
+  **Amended 2026-10-01 (B7):** `_to_response` is #468 (rename only, no
+  behaviour change).
 
 ## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
 
