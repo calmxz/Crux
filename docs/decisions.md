@@ -3,6 +3,78 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-01 - The session page composes seven modules (#443, #444, #445, #446, #447, #448, #449, #450, #451, #452)
+
+Architecture review candidate F4. `SessionView` (1538 lines) was almost all
+orchestration. It wired 33 session store members, held 14 stale-id checks
+and 7 module-level `let` flags, and kept the cue tick only to pass one
+child's output to another. Its 116 tests mount the whole page, so the level
+picker, scroll follow and upload could not be tested alone. The page now
+composes seven composables and keeps only the glue. The card was wrong in
+three places: 33 store members, not 34; 116 tests, not 107; and the
+Diagnostic consent zone has 9 stale-id checks, not 5.
+
+- **The profile loads through F3's `useResource` (#445).** It is the same
+  endpoint and the same PATCH as `ProfileView`, so the profile gets one loader
+  and F5 one foundation. This is why F4 is blocked by #408: a choice, since
+  F3's ADR left the view's guards to F4. Two rules are added to
+  `useResource` (F3 amendment below): `set(value)` drops an older in-flight
+  fetch, and a `params` change clears `data`. `set()` closes a latent
+  same-id overlap. A stream-finish refetch that started before a level save
+  and landed after it wrote the old null level back and resurrected the
+  picker until the next click.
+- **A failed refetch keeps the last good profile.** Deliberate visible
+  change. Before, the profile went null: the picker hid, the cue column fell
+  back to the store's older copy so this session's cues vanished, and the next
+  good fetch re-animated them as new and ticked an unrelated reply. The
+  failure toast is unchanged.
+- **Seven modules; the view keeps the glue.** The modules are: profile
+  (#445), sending (#446), level picker (#447), arrival links and resume
+  (#448), scroll follow (#449), reference-file upload (#450), and spend-limit
+  notices (#451). The view keeps the `current` discriminator and its derived
+  computeds, the optimistic header, the end-summary dialog, the four check
+  handlers, the topic card's visibility and the F-18 stream announcements.
+- **Each module resets itself on a session change.** Each one takes the
+  session id getter, as `useReferencePoll` does. `loadCurrent`'s 9-item reset
+  list and the id watcher's upload reset go.
+- **A shared "still current?" helper is deferred to F5.** 12 id checks
+  survive F4: the picker's 7, upload's 4 `uploadGen` checks, and the page
+  load's 1. F5 rewrites the picker's 7 and adds `ProfileView`'s 3
+  `idAtWrite` copies, so it owns the decision. If it adds the helper, upload's
+  4 convert in that ticket.
+- **One `sendTurn`, with error placement per caller (#446).** Six paths
+  called the store's send with five error treatments, each on purpose:
+  - typing and topic pick show a chip with Retry, and typing stashes the
+    draft on `auth_expired` (E-05);
+  - the picker's "Quiz me" shows its error on the card (F6);
+  - the level declaration is swallowed, since the level is already saved;
+  - a review seed or `?quiz` link shows the store's banner.
+
+  One placement for all would undo F6 or E-05. The tick clears when any
+  tutor reply starts, not per sender (#443).
+- **"Which cues are new" belongs to the profile module (#445).** It moves out
+  of CueColumn, so CueColumn and MessageList become plain displays. Tidiness
+  only; CueColumn is always mounted, so there was no bug.
+- **Modules read stream state through the session store.** F2 keeps its
+  helper store-internal (#416).
+- **Found while grilling: the cue tick jumped (#443).** Only typing and a
+  topic pick cleared it. After the quiz button, the level declaration, a
+  review seed, a `?quiz` link or a check follow-up, a reply that landed no cue
+  inherited the previous reply's tick. Now it clears on the stream-start
+  edge.
+- **Deliberate visible changes:** `ProfileView`'s header no longer shows the
+  previous session's level while switching (#408); a failed refetch keeps the
+  profile (#445); the tick fix (#443).
+- **Tests.** The safety net comes first (#444): check-handler errors, cost
+  warnings, tick plumbing, and no picker on an ended session (#441 relies on
+  that). Each move adds its module's tests while every existing view test
+  passes unchanged. The one named edit is CueColumn's diff tests, which move
+  to the profile module (#445). #452 then trims the duplicated view tests and
+  keeps wiring tests.
+- **Order: bug fix, safety net, profile, sending, then the picker and
+  arrival links.** Scroll, upload and spend notices go in any order; the trim
+  is last. Every move waits for #416, and the profile also for #408.
+
 ## 2026-09-30 - The learner profile has one reader and one edit recipe (#436, #437, #438, #439, #440, #441, #442)
 
 Architecture review candidate B6. The learner profile is a JSON blob on the
@@ -500,6 +572,16 @@ by `frontend/src/composables/useResource.js`: a private latest-wins core under
   deliberate changes above, each named in its PR. There is no ordering
   dependency on F1 (#400-#403), because F3 sits above the service functions,
   whose signatures F1 keeps.
+
+  **Amended 2026-10-01 (F4):** `SessionView`'s per-turn profile load also
+  moves onto `useResource` (#445). Two rules are added (comment on #408).
+  First, `set(value)` writes `data` and drops any older in-flight fetch.
+  Second, a `params` change clears `data` for every caller, so "keeps `data`
+  on failure" now means same-params reloads only. Deliberate visible change:
+  `ProfileView`'s header no longer shows the previous session's level while
+  switching. A per-caller flag and a caller-side id check were rejected:
+  clearing in the composable is the only option safe on every page without
+  each caller remembering it.
 
 ## 2026-09-26 - One HTTP transport core under three thin wrappers (#401, #402, #403)
 
