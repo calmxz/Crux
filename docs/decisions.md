@@ -3,6 +3,68 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-01 - The card is one CSS class (#453, #454, #455, #456, #457, #458)
+
+Architecture review candidate F6. `CONTEXT.md` calls the card the base unit
+of the world, and `DESIGN.md` describes one card object, but the code had no
+card class. 21 `.vue` files each re-declared the box (stock, 1px `card-edge`,
+6px radius, 1px hard drop). Six rules re-declared the notice-strip shape.
+`sheet.css` and `profile.css` held private copies for two routes each. The
+card was off in two places: the drop is on 22 lines in 21 files, not 22
+files; and `CONTEXT.md` lists 8 things built from a card, while `DESIGN.md`
+lists 10.
+
+- **One global `.card` class with modifiers, not a `<Card>` component.**
+  `card--learner` (blue stock), `card--joined` (`0 6px 6px 6px`) and
+  `card--banner` (`0 0 6px 6px`, no drop) live in `assets/card.css`, loaded
+  after `base.css`. A class adds no DOM, works on plain elements, and doesn't
+  add a new place for the scoped-CSS root leak. A component would wrap every
+  card and could not wrap the sidebar row or the auth status slot cleanly.
+- **The class is the look only.** It never sets padding or layout. The
+  standard padding becomes `--card-pad` (the `DESIGN.md` name), and the 8
+  components that typed it use the variable. A class that set padding would
+  surprise every new user of it.
+- **Members:** full cards and notice strips. Dialogs and toasts stay in
+  `dialogs.css`; PrimeVue owns their markup and they use the lift, not the
+  drop. Tabs, the cue toggle, the avatar and structural edge lines are not
+  cards.
+- **Notice strips carry no drop.** `DESIGN.md` contradicted itself: the One
+  Drop Rule says every card has one, while the Status Banner spec and all six
+  shipped strips have none. The code wins: a strip hangs from the surface
+  above it, and on the login page it sits inside a card, where a drop would
+  be a second depth layer. The One Drop Rule gets amended to name the
+  exception (#458).
+- **The login status box is a notice strip.** `DESIGN.md`'s "Auth status
+  box" line (full coloured border, 4px) was stale; the code wins (#458).
+- **Also shared: `.text-btn` and `.error-line` (#457).** Both are pure
+  repeats. `.text-btn` takes `profile.css`'s existing set. The two focus
+  rings stay per component: the soft ring on components and the solid ring
+  in the sidebar and Settings is designed, and making soft the global
+  default would be a visible change. Per-component reduced motion is
+  deliberate (`base.css` comment, `reducedMotion.test.js`).
+- **Pure moves; no pixel changes.** Each move deletes the copied box lines
+  and keeps only a differing property, such as the composer's
+  `--control-edge` or the auth cover's lift. Three cascade traps are named
+  in the tickets:
+  - `base.css`'s `:focus-visible` radius ties with `.card`, so `card.css`
+    must load later;
+  - `.card` loses to every scoped rule on the same element, so each move
+    first checks sibling rules (for example, the sidebar row's `:hover`
+    background);
+  - Recall's existing local `card` class is renamed before the global one
+    lands (#454).
+- **Tests.** A computed-style Playwright spec pins every moved surface
+  first (#453). It is offline, with `page.route` stubs, and is not a
+  screenshot test, because fonts differ between Windows and Linux CI. A guard
+  test then fails on a re-pasted drop, full card box or notice strip
+  outside `card.css` and `dialogs.css` (#458). The refactor ends with one manual look in both
+  themes and at 390px.
+- **Order:** safety net (#453) -> class and session page (#454) -> page
+  cards (#455), shared-sheet copies (#456), text button and error line
+  (#457) in any order -> guard and docs (#458). Independent of F4: F4 moves
+  script and tests, and #454 rebases over whichever `SessionView` change
+  lands first.
+
 ## 2026-10-01 - The session page composes seven modules (#443, #444, #445, #446, #447, #448, #449, #450, #451, #452)
 
 Architecture review candidate F4. `SessionView` (1538 lines) was almost all
