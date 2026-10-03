@@ -1046,7 +1046,9 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
     assert state["arm_done"] is True, (
         "the pump returned while the tutor's cancel arm was still unwinding"
     )
-    # Stand-in for get_db teardown closing the request Session.
+    # Stand-in for get_db teardown closing the request Session. It runs after
+    # the pump returns, so the row must already be committed; the ordering
+    # assert above is what proves the drain.
     db_session.close()
 
     cancelled = db_session.execute(
