@@ -11,6 +11,7 @@ const activeMatch = {
   gap_count: 0,
   knowledge_level: null,
 }
+
 const endedMatch = {
   session_id: 'e1',
   title: 'CSS',
@@ -21,10 +22,11 @@ const endedMatch = {
 
 function mountActive(opts = {}) {
   const { attachTo, ...rest } = opts
-  return mount(StartTopicIntercept, {
-    props: { match: activeMatch, kind: 'active', ...rest.props },
-    ...(attachTo ? { attachTo } : {}),
-  })
+  const mountOptions = { props: { match: activeMatch, kind: 'active', ...rest.props } }
+
+  if (attachTo) mountOptions.attachTo = attachTo
+
+  return mount(StartTopicIntercept, mountOptions)
 }
 
 describe('StartTopicIntercept', () => {
@@ -49,6 +51,7 @@ describe('StartTopicIntercept', () => {
     const w = mount(StartTopicIntercept, {
       props: { match: { ...endedMatch, gap_count: 0 }, kind: 'ended' },
     })
+
     expect(w.text()).not.toContain('gaps open')
   })
 
