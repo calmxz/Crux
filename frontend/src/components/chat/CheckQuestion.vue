@@ -15,6 +15,7 @@ const props = defineProps({
   // Distinct from `busy`, which is about the follow-up stream.
   answering: { type: Boolean, default: false },
 })
+
 const emit = defineEmits(['answer', 'skip', 'back', 'next', 'done', 'stop'])
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E']
@@ -22,20 +23,30 @@ const LETTERS = ['A', 'B', 'C', 'D', 'E']
 const isResolved = (it) => it.status === 'answered' || it.status === 'skipped'
 
 const item = computed(() => props.check.items[props.check.viewIndex] || {})
+
 const answered = computed(() => isResolved(item.value))
+
 const correct = computed(() => item.value.correct === true)
+
 const isFirst = computed(() => props.check.viewIndex <= 0)
+
 const isLast = computed(() => props.check.viewIndex >= props.check.total - 1)
+
 // #348: free navigation within one set. Next and Back move between items
 // answered or not; Done waits until every item is answered or skipped (a skip
 // is the explicit "don't know", #339), and once it is, Done shows on any item.
 const resolvedCount = computed(() => props.check.items.filter(isResolved).length)
+
 const allResolved = computed(() => resolvedCount.value >= props.check.total)
+
 const showDone = computed(() => isLast.value || allResolved.value)
+
 const showProgress = computed(() => props.check.total > 1)
+
 // #340: the learner can end the check early while any item is unresolved;
 // once all are resolved, Done closes it. Chatting never ends a check.
 const canStop = computed(() => props.check.currentIndex < props.check.total)
+
 // Hidden-until-graded: the explanation is a raise, not a hint.
 const graded = computed(() => item.value.status === 'answered')
 
@@ -44,26 +55,37 @@ const graded = computed(() => item.value.status === 'answered')
 // item status since #348 lets items resolve in any order), upcoming sets are
 // empty. One set keeps today's single solid rule and no set words.
 const setIndex = computed(() => props.check.setIndex ?? 1)
+
 const setTotal = computed(() => props.check.setTotal ?? 1)
+
 const multiSet = computed(() => setTotal.value > 1)
+
 const segments = computed(() =>
   Array.from({ length: setTotal.value }, (_, k) => {
     const n = k + 1
+
     if (n < setIndex.value) return { state: 'is-done', fill: 1 }
+
     if (n > setIndex.value) return { state: 'is-todo', fill: 0 }
+
     return { state: 'is-live', fill: resolvedCount.value / props.check.total || 0 }
   }),
 )
 
 function optionClass(i) {
   if (item.value.status !== 'answered') return ''
+
   if (i === item.value.correctIndex) return 'is-correct'
+
   if (i === item.value.selectedIndex) return 'is-incorrect'
+
   return ''
 }
 
 const backBtn = ref(null)
+
 const nextBtn = ref(null)
+
 const doneBtn = ref(null)
 
 // Focus the way on once the viewed item resolves -- not when Back/Next land
@@ -84,6 +106,7 @@ async function go(dir) {
   emit(dir)
   await nextTick()
   const kept = dir === 'back' ? backBtn.value : nextBtn.value
+
   if (kept) return
   const other = dir === 'back' ? nextBtn.value : (backBtn.value ?? doneBtn.value)
   other?.focus()

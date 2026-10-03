@@ -6,14 +6,18 @@ import { formatRelative } from '@/utils/formatDate.js'
 // two sessions can share a topic and each is its own divider.
 export function groupBySource(items) {
   const groups = new Map()
+
   for (const item of items) {
     let group = groups.get(item.source_session_id)
+
     if (!group) {
       group = { id: item.source_session_id, topic: item.source_topic, items: [] }
       groups.set(item.source_session_id, group)
     }
+
     group.items.push(item)
   }
+
   return [...groups.values()]
 }
 

@@ -8,6 +8,7 @@ describe('AssistantBubble', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: '**bold**', tool_calls: [], citations: [] } },
     })
+
     expect(w.html()).toContain('<strong>bold</strong>')
   })
 
@@ -23,6 +24,7 @@ describe('AssistantBubble', () => {
         },
       },
     })
+
     expect(w.text()).toContain('Found 5 passages')
   })
 
@@ -36,6 +38,7 @@ describe('AssistantBubble', () => {
         },
       },
     })
+
     expect(w.text()).toContain('Doc')
     expect(w.text()).toContain('p.1')
   })
@@ -46,6 +49,7 @@ describe('AssistantBubble', () => {
         message: { content: 'partial', tool_calls: [], citations: [], status: 'cancelled' },
       },
     })
+
     expect(w.text()).toMatch(/stopped/i)
     expect(w.find('.cancelled-marker').exists()).toBe(true)
   })
@@ -56,6 +60,7 @@ describe('AssistantBubble', () => {
         message: { content: 'partial text', tool_calls: [], citations: [], status: 'partial' },
       },
     })
+
     expect(w.text()).toContain('(interrupted)')
   })
 
@@ -65,6 +70,7 @@ describe('AssistantBubble', () => {
         message: { content: 'full answer', tool_calls: [], citations: [], status: 'complete' },
       },
     })
+
     expect(w.find('.cancelled-marker').exists()).toBe(false)
   })
 
@@ -75,6 +81,7 @@ describe('AssistantBubble', () => {
         streaming: true,
       },
     })
+
     expect(w.findComponent(MarkdownContent).props('streaming')).toBe(true)
     expect(w.attributes('data-testid')).toBe('msg-streaming')
     expect(w.classes()).toContain('streaming')
@@ -87,6 +94,7 @@ describe('AssistantBubble', () => {
         streaming: false,
       },
     })
+
     expect(w.findComponent(MarkdownContent).props('streaming')).toBe(false)
     expect(w.attributes('data-testid')).toBe('msg-assistant')
     expect(w.classes()).not.toContain('streaming')
@@ -96,6 +104,7 @@ describe('AssistantBubble', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: 'test', tool_calls: [], citations: [] } },
     })
+
     expect(w.classes()).toContain('msg')
     expect(w.classes()).toContain('assistant')
   })
@@ -104,6 +113,7 @@ describe('AssistantBubble', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: 'test', tool_calls: [], citations: [] } },
     })
+
     expect(w.find('.role-tag').text()).toBe('tutor')
   })
 
@@ -120,6 +130,7 @@ describe('AssistantBubble', () => {
         streaming: false,
       },
     })
+
     expect(w.find('.content').exists()).toBe(false)
   })
 
@@ -130,6 +141,7 @@ describe('AssistantBubble', () => {
         streaming: true,
       },
     })
+
     expect(w.find('.content').exists()).toBe(true)
   })
 
@@ -148,6 +160,7 @@ describe('AssistantBubble', () => {
         },
       },
     })
+
     expect(w.text()).not.toContain('Could not ask questions')
     expect(w.findAll('.tool-call-row').length).toBe(1)
   })
@@ -162,6 +175,7 @@ describe('AssistantBubble', () => {
         },
       },
     })
+
     expect(w.text()).toContain('Could not ask questions')
   })
 
@@ -169,6 +183,7 @@ describe('AssistantBubble', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: 'safe' } },
     })
+
     expect(w.exists()).toBe(true)
     expect(w.text()).toContain('safe')
   })
@@ -202,6 +217,7 @@ describe('AssistantBubble check_batch', () => {
         },
       },
     })
+
     expect(w.find('[data-testid="check-recap"]').exists()).toBe(true)
     expect(w.find('.tool-call-row').exists()).toBe(false)
   })
@@ -210,6 +226,7 @@ describe('AssistantBubble check_batch', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: '', check_batch: recapBatch } },
     })
+
     expect(w.find('.content').exists()).toBe(false)
   })
 
@@ -217,6 +234,7 @@ describe('AssistantBubble check_batch', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: 'Nice work!', check_batch: recapBatch } },
     })
+
     expect(w.find('[data-testid="check-recap"]').exists()).toBe(true)
     expect(w.text()).toContain('Nice work!')
   })
@@ -225,6 +243,7 @@ describe('AssistantBubble check_batch', () => {
     const w = mount(AssistantBubble, {
       props: { message: { content: 'hello', tool_calls: [] } },
     })
+
     expect(w.find('[data-testid="check-recap"]').exists()).toBe(false)
     expect(w.find('.content').exists()).toBe(true)
   })

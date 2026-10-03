@@ -80,21 +80,27 @@ const tabRefs = ref([])
 // settings element, so it is painted on .page via a body class (same
 // mechanism SessionView uses for session-page).
 onMounted(() => document.body.classList.add('settings-page'))
+
 onUnmounted(() => document.body.classList.remove('settings-page'))
 
 async function activate(i) {
   const slug = tabs[i].slug
+
   if (slug !== props.tab) {
     await router.push({ name: 'settings', params: { tab: slug } })
   }
+
   await nextTick()
   tabRefs.value[i]?.focus()
 }
 
 function onKeydown(e, i) {
   let nextIndex = null
+
   if (e.key === 'ArrowDown' || e.key === 'ArrowRight') nextIndex = (i + 1) % tabs.length
+
   if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') nextIndex = (i - 1 + tabs.length) % tabs.length
+
   if (nextIndex === null) return
   e.preventDefault()
   activate(nextIndex)

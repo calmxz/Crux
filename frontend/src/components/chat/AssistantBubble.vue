@@ -18,9 +18,11 @@ const props = defineProps({
 // noise to the learner -- show only the successful chip.
 const visibleToolCalls = computed(() => {
   const calls = props.message.tool_calls || []
+
   const succeeded = new Set(
     calls.filter((tc) => (tc.state || 'done') !== 'error').map((tc) => tc.name),
   )
+
   return calls.filter((tc) => tc.state !== 'error' || !succeeded.has(tc.name))
 })
 

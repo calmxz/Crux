@@ -31,6 +31,7 @@ describe('CheckRecap', () => {
     const w = mount(CheckRecap, {
       props: { batch: batch({ selectedIndex: 1, correct: false }) },
     })
+
     const opts = w.findAll('[data-testid="recap-option"]')
     expect(opts[1].classes()).toContain('is-incorrect')
     expect(opts[0].classes()).toContain('is-correct')
@@ -40,6 +41,7 @@ describe('CheckRecap', () => {
     const w = mount(CheckRecap, {
       props: { batch: batch({ selectedIndex: null, correct: null, status: 'answered' }) },
     })
+
     expect(w.text()).toMatch(/answer not recorded/i)
     const opts = w.findAll('[data-testid="recap-option"]')
     expect(opts.some((o) => o.classes().includes('is-incorrect'))).toBe(false)
@@ -49,6 +51,7 @@ describe('CheckRecap', () => {
     const w = mount(CheckRecap, {
       props: { batch: batch({ status: 'skipped', selectedIndex: null, correct: null }) },
     })
+
     expect(w.text()).toMatch(/answer not recorded/i)
     const opts = w.findAll('[data-testid="recap-option"]')
     expect(opts.some((o) => o.classes().includes('is-incorrect'))).toBe(false)

@@ -122,14 +122,19 @@ import { dueSince, groupBySource, streakLabel } from '../utils/recallQueue.js'
 const QUEUE_LIMIT = 100
 
 const router = useRouter()
+
 const store = useSessionStore()
 
 const queue = ref({ items: [], total: 0 })
+
 const loaded = ref(false)
+
 const startBusy = ref(false)
+
 // D-11: a failed fetch is not an empty queue. `loading` and `error` are held
 // apart from emptiness so the page can say which of the three it is.
 const loading = ref(false)
+
 const error = ref(false)
 
 // The skeleton shows only while nothing is on screen: a failed fetch clears
@@ -139,7 +144,9 @@ const showSkeleton = computed(() => loading.value && !queue.value.items.length)
 // The next page's own state, apart from the first load's: its failure leaves
 // the loaded cards up.
 const moreLoading = ref(false)
+
 const moreError = ref(false)
+
 // Where the next page starts on the server, counted from what each page
 // returned, not from cards shown (a dropped duplicate still moved it on).
 const nextOffset = ref(0)
@@ -162,6 +169,7 @@ async function load() {
   loading.value = true
   error.value = false
   moreError.value = false
+
   try {
     // Silent: the inline error row is the surface on this page, so a toast on
     // top of it would say the same thing twice. Retry goes through here too.
@@ -182,11 +190,13 @@ async function loadMore() {
   if (moreLoading.value) return
   moreLoading.value = true
   moreError.value = false
+
   try {
     const page = await getReviewQueue(
       { limit: QUEUE_LIMIT, offset: nextOffset.value },
       { silent: true },
     )
+
     // An empty page means the queue shrank under us; stop offering more.
     nextOffset.value = page.items.length ? nextOffset.value + page.items.length : page.total
     // The queue can shift between pages (a check lands, a concept falls due),
@@ -204,11 +214,13 @@ async function loadMore() {
 async function startReview(item) {
   if (startBusy.value) return
   startBusy.value = true
+
   try {
     const created = await store.continueTopic({
       id: item.source_session_id,
       topic: item.source_topic,
     })
+
     if (created) {
       router.push({
         name: 'session',

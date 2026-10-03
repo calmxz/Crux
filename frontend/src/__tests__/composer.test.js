@@ -156,9 +156,11 @@ describe('Composer', () => {
 
     it('describes the cap on the textarea', () => {
       const wrapper = mountComposer()
+
       const describedby = wrapper
         .get('[data-testid="session-input"]')
         .attributes('aria-describedby')
+
       expect(describedby).toContain('composer-char-limit')
       expect(wrapper.get('#composer-char-limit').text()).toContain('4,000 characters')
     })

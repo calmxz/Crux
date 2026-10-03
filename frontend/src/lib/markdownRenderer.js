@@ -25,13 +25,16 @@ import DOMPurify from 'dompurify'
 export const markdownAssetsVersion = ref(0)
 
 let _md = null
+
 let _mdKatex = null
+
 let _hljs = null
 
 // 'idle' | 'loading' | 'ready' | 'failed'. A failed load stays failed: the
 // plain fallback is correct output, not an error state, and retrying on every
 // keystroke of a streaming reply would hammer a dead network.
 let _katexState = 'idle'
+
 let _hljsState = 'idle'
 
 // Promises still in flight, so tests and callers can await the settle point.
@@ -98,6 +101,7 @@ function ensureHljs() {
     ])
       .then(([core, ...langs]) => {
         const hljs = core.default
+
         const names = [
           'python',
           'javascript',
@@ -108,6 +112,7 @@ function ensureHljs() {
           'yaml',
           'markdown',
         ]
+
         names.forEach((name, i) => hljs.registerLanguage(name, langs[i].default))
         _hljs = hljs
         _hljsState = 'ready'
@@ -126,6 +131,7 @@ const FENCE_RE = /(^|\n)[ \t]{0,3}(```|~~~)/
 
 function requestAssets(text) {
   if (text.includes('$')) ensureKatex()
+
   if (FENCE_RE.test(text)) ensureHljs()
 }
 
@@ -146,9 +152,11 @@ function build() {
           return ''
         }
       }
+
       return ''
     },
   })
+
   if (_mdKatex) {
     md.use(_mdKatex, { throwOnError: false, errorColor: 'var(--math-accent, #ff6b5b)' })
   }
@@ -158,12 +166,16 @@ function build() {
   const defaultLinkOpen =
     md.renderer.rules.link_open ||
     ((tokens, idx, options, _env, self) => self.renderToken(tokens, idx, options))
+
   md.renderer.rules.link_open = (tokens, idx, options, env, self) => {
     const existing = tokens[idx].attrGet('rel') || ''
+
     const merged = [
       ...new Set([...existing.split(/\s+/), 'noopener', 'nofollow'].filter(Boolean)),
     ].join(' ')
+
     tokens[idx].attrSet('rel', merged)
+
     return defaultLinkOpen(tokens, idx, options, env, self)
   }
 
@@ -178,6 +190,7 @@ function build() {
     const langRaw = token.info.trim().split(/\s+/)[0] || ''
     const lang = langRaw || 'plain'
     let body
+
     if (_hljs && langRaw && _hljs.getLanguage(langRaw)) {
       body = _hljs.highlight(token.content, { language: langRaw, ignoreIllegals: true }).value
     } else {
@@ -186,7 +199,9 @@ function build() {
       // highlight.js lands.
       body = md.utils.escapeHtml(token.content)
     }
+
     const langClass = langRaw ? `language-${escapeAttr(langRaw)} hljs` : 'hljs'
+
     return (
       `<pre class="code-block">` +
       `<div class="code-block-header">` +
@@ -203,6 +218,7 @@ function build() {
 
 export function getRenderer() {
   if (!_md) _md = build()
+
   return _md
 }
 
@@ -216,6 +232,7 @@ export function renderMarkdown(text) {
   requestAssets(text)
   const md = getRenderer()
   const raw = md.render(text)
+
   return DOMPurify.sanitize(raw, PURIFY_CONFIG)
 }
 
@@ -247,10 +264,12 @@ export function renderMarkdown(text) {
 
 // Top-level link reference definition, e.g. "[foo]: /url".
 const REFDEF_RE = /^ {0,3}\[[^\]\n]+\]:/m
+
 // Capture the run of fence characters plus whatever trails it, so the scanner
 // can apply the CommonMark closing rule (same char, at least as long, nothing
 // but whitespace after) instead of treating any 3+ run as a toggle.
 const FENCE_LINE_RE = /^ {0,3}(`{3,}|~{3,})(.*)$/
+
 const BLANK_LINE_RE = /^[ \t]*$/
 
 // Last top-level token types that must not sit immediately before a cut.
@@ -279,6 +298,7 @@ export function resetRenderCache(cache) {
 
 function _lineEnd(text, i) {
   const nl = text.indexOf('\n', i)
+
   return nl === -1 ? text.length : nl
 }
 
@@ -300,19 +320,24 @@ function scanBlocks(text, from) {
   let inMath = false
   let sawContent = false
   let i = from
+
   while (i < text.length) {
     const eol = _lineEnd(text, i)
     const line = text.slice(i, eol)
     const next = eol === text.length ? text.length : eol + 1
+
     if (BLANK_LINE_RE.test(line)) {
       if (!fenceChar && !inMath && sawContent) {
         // Swallow the whole blank run; the boundary is the first content line.
         let j = next
+
         while (j < text.length) {
           const e2 = _lineEnd(text, j)
+
           if (!BLANK_LINE_RE.test(text.slice(j, e2))) break
           j = e2 === text.length ? text.length : e2 + 1
         }
+
         if (j < text.length) out.push(j)
         i = j
         continue
@@ -320,6 +345,7 @@ function scanBlocks(text, from) {
     } else {
       sawContent = true
       const fence = FENCE_LINE_RE.exec(line)
+
       if (fenceChar) {
         // CommonMark: a closing fence uses the same character, is at least as
         // long as the opener, and carries nothing but whitespace after it. A
@@ -342,8 +368,10 @@ function scanBlocks(text, from) {
         inMath = !inMath
       }
     }
+
     i = next
   }
+
   return { boundaries: out, inFence: fenceChar !== null }
 }
 
@@ -358,18 +386,24 @@ function topLevelBlankBoundaries(text, from) {
 /** True when `segment` ends on a block that cannot absorb what follows it. */
 function segmentClosesSafely(segment) {
   let tokens
+
   try {
     tokens = getRenderer().parse(segment, {})
   } catch {
     return false
   }
+
   let last = null
+
   for (const t of tokens) if (t.level === 0) last = t
+
   if (!last || UNSAFE_CLOSE.has(last.type)) return false
+
   // markdown-it renders an unterminated fence as a complete <pre>, so the head
   // would look closed while the tail got parsed as markdown rather than code.
   // `fence` is safe only once its closing run has actually arrived.
   if (last.type === 'fence' && scanBlocks(segment, 0).inFence) return false
+
   return true
 }
 
@@ -380,23 +414,30 @@ function segmentClosesSafely(segment) {
 export function renderMarkdownIncremental(text, cache) {
   if (!text) {
     resetRenderCache(cache)
+
     return ''
   }
+
   if (cache.version !== markdownAssetsVersion.value || !text.startsWith(cache.prefixText)) {
     resetRenderCache(cache)
   }
+
   if (cache.disabled) return renderMarkdown(text)
+
   if (REFDEF_RE.test(text)) {
     resetRenderCache(cache)
     cache.disabled = true
+
     return renderMarkdown(text)
   }
 
   const boundary = cache.prefixText.length
   const candidates = topLevelBlankBoundaries(text, boundary)
   const floor = Math.max(0, candidates.length - MAX_BOUNDARY_TRIES)
+
   for (let i = candidates.length - 1; i >= floor; i -= 1) {
     const segment = text.slice(boundary, candidates[i])
+
     if (segmentClosesSafely(segment)) {
       cache.prefixText = text.slice(0, candidates[i])
       cache.prefixHtml += renderMarkdown(segment)
@@ -405,5 +446,6 @@ export function renderMarkdownIncremental(text, cache) {
   }
 
   const tail = text.slice(cache.prefixText.length)
+
   return cache.prefixHtml + (tail ? renderMarkdown(tail) : '')
 }

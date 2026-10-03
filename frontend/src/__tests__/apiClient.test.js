@@ -143,10 +143,12 @@ describe('apiClient', () => {
       .mockResolvedValueOnce({
         data: { session: { access_token: 'fresh-token', user: { id: 'u1' } } },
       })
+
     const fetchMock = vi
       .fn()
       .mockResolvedValueOnce(new Response('{"detail":"invalid_token"}', { status: 401 }))
       .mockResolvedValueOnce(new Response('{"ok":true}', { status: 200 }))
+
     vi.stubGlobal('fetch', fetchMock)
 
     const result = await apiGet('/whatever')
@@ -170,6 +172,7 @@ describe('apiClient', () => {
   function makeJwt(expSeconds) {
     const b64 = (obj) =>
       btoa(JSON.stringify(obj)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+
     return `${b64({ alg: 'none' })}.${b64({ exp: expSeconds })}.sig`
   }
 
@@ -301,6 +304,7 @@ describe('apiClient', () => {
       const realSetTimeout = globalThis.setTimeout
       vi.spyOn(globalThis, 'setTimeout').mockImplementation((fn, ms) => {
         delays.push(ms)
+
         return realSetTimeout(fn, 0)
       })
       fetchMock.mockReturnValue(jsonResp(503, {}))

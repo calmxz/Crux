@@ -12,14 +12,21 @@ const props = defineProps({
 })
 
 const route = useRoute()
+
 const router = useRouter()
+
 const { closeDrawer } = useSidebar()
+
 const actions = useSessionActions()
+
 const { busy } = actions
 
 const renaming = ref(false)
+
 const draft = ref('')
+
 const inputEl = ref(null)
+
 const menuEl = ref(null)
 
 const isCurrent = computed(() => route.params.id === props.session.id)
@@ -28,14 +35,20 @@ const isCurrent = computed(() => route.params.id === props.session.id)
 // and mastered_count. Only the topic is shown on the row; the rest still feed
 // the aria-label for screen readers.
 const masteredCount = computed(() => props.session.progress?.mastered_count || 0)
+
 const focusCue = computed(() => props.session.progress?.focus_target_gap || '')
+
 const level = computed(() => props.session.progress?.level || null)
 
 const rowLabel = computed(() => {
   const parts = [`Open session: ${props.session.topic || 'Untitled'}`]
+
   if (level.value) parts.push(`level ${level.value}`)
+
   if (focusCue.value) parts.push(`focus ${focusCue.value}`)
+
   if (masteredCount.value) parts.push(`${masteredCount.value} mastered`)
+
   return parts.join(', ')
 })
 

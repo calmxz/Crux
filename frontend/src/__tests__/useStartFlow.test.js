@@ -41,6 +41,7 @@ describe('useStartFlow', () => {
         ended_match: null,
       }),
     })
+
     const flow = useStartFlow({ store, router })
     await flow.begin('css')
     expect(flow.stage.value).toBe('intercept')
@@ -62,6 +63,7 @@ describe('useStartFlow', () => {
         },
       }),
     })
+
     const flow = useStartFlow({ store, router })
     await flow.begin('css')
     expect(flow.interceptKind.value).toBe('ended')
@@ -79,6 +81,7 @@ describe('useStartFlow', () => {
         ended_match: { session_id: 'e1', title: 'CSS' },
       }),
     })
+
     const flow = useStartFlow({ store, router })
     await flow.begin('css')
     await flow.startFresh()
@@ -93,6 +96,7 @@ describe('useStartFlow', () => {
       status: 409,
       body: { detail: { code: 'duplicate_topic', session_id: 'a9' } },
     })
+
     const store = makeStore({ createSession: vi.fn().mockRejectedValue(err) })
     const flow = useStartFlow({ store, router })
     await flow.begin('t')
@@ -104,12 +108,15 @@ describe('useStartFlow', () => {
 
   it('awaits beforeNavigate hook between create and push', async () => {
     const order = []
+
     const store = makeStore({
       createSession: vi.fn().mockImplementation(async () => {
         order.push('create')
+
         return { id: 'n1' }
       }),
     })
+
     const beforeNavigate = vi.fn().mockImplementation(async () => order.push('hook'))
     const flow = useStartFlow({ store, router, beforeNavigate })
     await flow.begin('t')
@@ -124,6 +131,7 @@ describe('useStartFlow', () => {
         ended_match: null,
       }),
     })
+
     const flow = useStartFlow({ store, router })
     await flow.begin('t')
     flow.cancel()
@@ -132,9 +140,11 @@ describe('useStartFlow', () => {
 
   it('cancel during an in-flight begin() prevents the stale lookup from creating a session', async () => {
     let resolveLookup
+
     const lookupPromise = new Promise((resolve) => {
       resolveLookup = resolve
     })
+
     const store = makeStore({ lookupTopic: vi.fn().mockReturnValue(lookupPromise) })
     const flow = useStartFlow({ store, router })
     const beginPromise = flow.begin('old topic')

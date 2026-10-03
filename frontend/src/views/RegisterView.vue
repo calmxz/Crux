@@ -131,16 +131,25 @@ import { isValidEmail, isValidPassword, passwordsMismatch } from '../utils/valid
 const auth = useAuthStore()
 
 const email = ref('')
+
 const password = ref('')
+
 const confirm = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const sent = ref(false)
+
 const consent = ref(false)
 
 const emailValid = computed(() => isValidEmail(email.value.trim()))
+
 const passwordValid = computed(() => isValidPassword(password.value))
+
 const mismatch = computed(() => passwordsMismatch(password.value, confirm.value))
+
 const canSubmit = computed(
   () =>
     emailValid.value && passwordValid.value && confirm.value === password.value && consent.value,
@@ -150,6 +159,7 @@ async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.register(email.value.trim(), password.value)
     sent.value = true

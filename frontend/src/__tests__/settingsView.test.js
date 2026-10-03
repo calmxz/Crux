@@ -5,12 +5,15 @@ import { createPinia, setActivePinia } from 'pinia'
 import SettingsView from '../views/SettingsView.vue'
 
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 vi.mock('../composables/useToast.js', () => ({
   useToast: () => ({ showSuccess, showError, showWarn: vi.fn() }),
 }))
 
 const getUsageSummary = vi.fn()
+
 vi.mock('../services/profileApi.js', () => ({
   getUsageSummary: (...a) => getUsageSummary(...a),
 }))
@@ -42,10 +45,12 @@ function makeRouter() {
 async function mountAt(tab) {
   const router = makeRouter()
   await router.push(`/settings/${tab}`)
+
   const w = mount(SettingsView, {
     props: { tab },
     global: { plugins: [router], stubs },
   })
+
   return { w, router }
 }
 
@@ -60,9 +65,11 @@ describe('SettingsView shell', () => {
 
   it('renders three rail tabs with testids', async () => {
     const { w } = await mountAt('learning')
+
     for (const slug of ['learning', 'usage', 'appearance']) {
       expect(w.find(`[data-testid="settings-tab-${slug}"]`).exists()).toBe(true)
     }
+
     expect(w.find('[data-testid="settings-tab-rail"]').attributes('role')).toBe('tablist')
     expect(w.findAll('[role="tab"]').map((t) => t.text())).toEqual([
       'Learning',
@@ -100,6 +107,7 @@ describe('SettingsView shell', () => {
   it('pressing ArrowDown twice moves two tabs forward (real focus must follow activation)', async () => {
     const router = makeRouter()
     await router.push('/settings/learning')
+
     const w = mount(SettingsView, {
       props: { tab: 'learning' },
       global: { plugins: [router], stubs },
@@ -131,6 +139,7 @@ describe('SettingsView shell', () => {
   it('the Learning tab holds Feedback style, Check-ins and Reply length', async () => {
     const router = makeRouter()
     await router.push('/settings/learning')
+
     const w = mount(SettingsView, {
       props: { tab: 'learning' },
       global: {
@@ -138,6 +147,7 @@ describe('SettingsView shell', () => {
         stubs: { UsageTab: stubs.UsageTab, AppearanceTab: stubs.AppearanceTab },
       },
     })
+
     await flushPromises()
 
     const learning = w.get('[data-testid="agg-learning"]')
@@ -157,12 +167,14 @@ describe('SettingsView shell', () => {
     await router.push('/settings/usage')
 
     const Root = { template: '<router-view />' }
+
     const w = mount(Root, {
       global: {
         plugins: [router],
         stubs: { AppearanceTab: stubs.AppearanceTab },
       },
     })
+
     await flushPromises()
     expect(getUsageSummary).toHaveBeenCalledTimes(1)
 

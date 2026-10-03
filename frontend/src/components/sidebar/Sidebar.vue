@@ -19,23 +19,36 @@ import SidebarSkeletonList from './SidebarSkeletonList.vue'
 import SidebarUserMenu from './SidebarUserMenu.vue'
 
 const { mode, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
+
 const router = useRouter()
+
 const route = useRoute()
+
 const authStore = useAuthStore()
+
 const { isAuthenticated, userEmail } = storeToRefs(authStore)
+
 const userStore = useUserStore()
+
 const { name: userName } = storeToRefs(userStore)
+
 const sessionStore = useSessionStore()
+
 const { sessions, loading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
 
 const listEl = ref(null)
+
 const asideEl = ref(null)
+
 const statusFilter = ref('active') // 'active' | 'ended'
+
 const STATUS_TABS = [
   { key: 'active', label: 'Active' },
   { key: 'ended', label: 'Ended' },
 ]
+
 let lastFocused = null
+
 let cancelIdleBadge = null
 
 const FOCUSABLE_SELECTOR =
@@ -43,6 +56,7 @@ const FOCUSABLE_SELECTOR =
 
 function getFocusables() {
   if (!asideEl.value) return []
+
   return Array.from(asideEl.value.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
     (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
   )
@@ -52,17 +66,23 @@ function onTrapKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault()
     closeDrawer()
+
     return
   }
+
   if (e.key !== 'Tab') return
   const focusables = getFocusables()
+
   if (focusables.length === 0) {
     e.preventDefault()
+
     return
   }
+
   const first = focusables[0]
   const last = focusables[focusables.length - 1]
   const active = document.activeElement
+
   if (e.shiftKey && (active === first || !asideEl.value?.contains(active))) {
     e.preventDefault()
     last.focus()
@@ -74,6 +94,7 @@ function onTrapKeydown(e) {
 
 watch(drawerOpen, async (open) => {
   if (typeof document === 'undefined') return
+
   if (open && !isDesktop.value) {
     lastFocused = document.activeElement
     document.addEventListener('keydown', onTrapKeydown, true)
@@ -82,9 +103,11 @@ watch(drawerOpen, async (open) => {
     focusables[0]?.focus()
   } else {
     document.removeEventListener('keydown', onTrapKeydown, true)
+
     if (lastFocused && typeof lastFocused.focus === 'function') {
       lastFocused.focus()
     }
+
     lastFocused = null
   }
 })
@@ -93,6 +116,7 @@ onBeforeUnmount(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('keydown', onTrapKeydown, true)
   }
+
   clearTimeout(searchTimer)
   cancelIdleBadge?.()
   listResizeObserver?.disconnect()
@@ -100,6 +124,7 @@ onBeforeUnmount(() => {
 })
 
 const searchQuery = ref('')
+
 const { searching, pinnedActive, activeRows, endedRows } = useSessionGroups(sessions, searchQuery)
 
 // SIDEBAR_CAP is the floor (and the fallback wherever the list's height cannot
@@ -107,17 +132,21 @@ const { searching, pinnedActive, activeRows, endedRows } = useSessionGroups(sess
 // is the ceiling, and matches the store's SIDEBAR_PAGE_LIMIT window: rendering
 // past it would only ever draw rows the store does not hold.
 const SIDEBAR_CAP = 15
+
 const SIDEBAR_CAP_MAX = 40
+
 const DEFAULT_PITCH_PX = 28
 
 // How many rows the list column actually has room for. Recomputed from the
 // measured height of `listEl` so a tall screen fills instead of stopping at
 // the floor and leaving dead space below the last row.
 const renderCap = ref(SIDEBAR_CAP)
+
 let listResizeObserver = null
 
 function measureRenderCap() {
   const el = listEl.value
+
   if (!el) return
   const raw = getComputedStyle(el).getPropertyValue('--line-pitch')
   const parsed = parseFloat(raw)
@@ -135,8 +164,11 @@ function measureRenderCap() {
 // window -- see session.js for why every mutating action must be able to
 // patch them. The store's `sessions` array is never written by search.
 const searchTotal = ref(0)
+
 const searchLoading = ref(false)
+
 let searchTimer = null
+
 let _searchSeq = 0
 
 // Scoped to the current tab (status: statusFilter). Re-runs on a tab change
@@ -145,22 +177,27 @@ let _searchSeq = 0
 watch([searchQuery, statusFilter], ([raw]) => {
   if (searchTimer) clearTimeout(searchTimer)
   const q = (raw || '').trim()
+
   if (!q) {
     _searchSeq++ // invalidate any in-flight response
     searchRows.value = []
     searchTotal.value = 0
     searchLoading.value = false
+
     return
   }
+
   searchLoading.value = true
   searchTimer = setTimeout(async () => {
     const seq = ++_searchSeq
+
     try {
       // silent: a sidebar search must never toast; errors render as zero matches
       const page = await sessionsApi.getSessionLibrary(
         { status: statusFilter.value, q, sort: 'last_activity', limit: SIDEBAR_CAP, offset: 0 },
         { silent: true },
       )
+
       if (seq !== _searchSeq) return // stale response; a newer query owns the state
       searchRows.value = page.items
       searchTotal.value = page.total
@@ -188,20 +225,24 @@ const showViewAllSearch = computed(
 // itself is also sliced to the cap so a long pinned list can never push the
 // component's total render past renderCap on its own.
 const cappedPinnedActive = computed(() => pinnedActive.value.slice(0, renderCap.value))
+
 const cappedActiveFlat = computed(() =>
   activeRows.value.slice(0, Math.max(0, renderCap.value - cappedPinnedActive.value.length)),
 )
+
 const cappedEndedRows = computed(() => endedRows.value.slice(0, renderCap.value))
 
 const activeRendered = computed(
   () => cappedPinnedActive.value.length + cappedActiveFlat.value.length,
 )
+
 // View all is the list's closing line whenever rows are rendered. The
 // zero-rows guard stays: createSession bumps activeTotal without pushing
 // into the (windowed) `sessions` array, so a fresh account can sit at
 // activeTotal=1 with zero rendered rows. Without this guard the sidebar
 // would show "No sessions yet" and "View all 1 sessions" at once.
 const showViewAllActive = computed(() => activeRendered.value > 0)
+
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
 
 const showSkeleton = computed(() => loading.value && !sessions.value.length)
@@ -235,9 +276,11 @@ onMounted(async () => {
     listResizeObserver = new ResizeObserver(() => measureRenderCap())
     listResizeObserver.observe(listEl.value)
   }
+
   if (isAuthenticated.value && !sessions.value.length) {
     await sessionStore.listSessions().catch(() => {})
   }
+
   if (isAuthenticated.value) {
     // Badge count only; silent - a sidebar badge must never toast.
     // Deferred to browser idle so it never competes with first paint.
@@ -259,6 +302,7 @@ watch(
     // Nothing to scroll to off a session route -- skip the nextTick + query.
     if (!id) return
     await nextTick()
+
     if (!listEl.value) return
     const target = listEl.value.querySelector(`[data-session-id="${id}"]`)
     target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -266,7 +310,9 @@ watch(
 )
 
 const isExpanded = computed(() => mode.value === 'expanded' || mode.value === 'drawer-open')
+
 const showDrawerClose = computed(() => !isDesktop.value && mode.value === 'drawer-open')
+
 const isRail = computed(() => isDesktop.value && !isExpanded.value)
 
 // Identity row name. stores/user.js writes the literal 'Learner' when the
@@ -274,6 +320,7 @@ const isRail = computed(() => isDesktop.value && !isExpanded.value)
 // the row falls back to the email's local part.
 const identityName = computed(() => {
   const n = userName.value
+
   return n && n !== 'Learner' ? n : ''
 })
 
@@ -306,6 +353,7 @@ function onMenuNavigate(to) {
 // it is a navigation act, not a setting.
 async function onSignOut() {
   closeDrawer()
+
   try {
     await authStore.signOut()
   } catch (err) {
@@ -314,6 +362,7 @@ async function onSignOut() {
     // route rather than stranding the learner on it.
     useToast().showError(err?.message || 'Sign out failed')
   }
+
   router.push('/login')
 }
 </script>

@@ -190,10 +190,12 @@ describe('router', () => {
     const user = useUserStore()
     user.onboardingComplete = false
     user.hydrated = false
+
     const spy = vi.spyOn(user, 'hydrateFromServer').mockImplementation(async () => {
       user.onboardingComplete = true
       user.hydrated = true
     })
+
     await router.push({ name: 'settings', params: { tab: 'profile' } })
     expect(spy).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('settings')

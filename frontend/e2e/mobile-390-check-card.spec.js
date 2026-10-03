@@ -16,6 +16,7 @@
 import { test, expect } from '@playwright/test'
 
 const SESSION_ID = 's-mobile-check'
+
 const VIEWPORT = { width: 390, height: 844 }
 
 // A profile long enough that the expanded cue body would overflow the viewport
@@ -164,6 +165,7 @@ test.describe('mobile 390 check card', () => {
     // an empty payload instead of a network error toast over the layout. ---
     await page.route('**/api/**', async (route) => {
       const path = new URL(route.request().url()).pathname.replace(/^.*\/api/, '')
+
       if (path === '/me') {
         return json(route, {
           display_name: 'Eddy',
@@ -171,11 +173,15 @@ test.describe('mobile 390 check card', () => {
           onboarding_complete: true,
         })
       }
+
       if (path === '/sessions') return json(route, { sessions: [], active_total: 1 })
+
       if (path === `/sessions/${SESSION_ID}`) return json(route, SESSION)
+
       if (path === `/profile/${SESSION_ID}`) {
         return json(route, { profile: TOPIC_PROFILE, etag: 'e2e-etag' })
       }
+
       return json(route, {})
     })
 
@@ -255,8 +261,10 @@ test.describe('mobile 390 check card', () => {
     const oneLine = (loc) =>
       loc.evaluate((el) => {
         const fs = parseFloat(getComputedStyle(el).fontSize)
+
         return el.getBoundingClientRect().height < fs * 2
       })
+
     expect(await oneLine(card.locator('.role-tag'))).toBe(true)
     expect(await oneLine(recap.locator('.recap-gap'))).toBe(true)
     expect(await oneLine(recap.getByTestId('recap-score'))).toBe(true)
@@ -275,10 +283,13 @@ test.describe('mobile 390 check card', () => {
     await page.goto(`/session/${SESSION_ID}`)
     const live = page.getByTestId('check-card').locator('.check-rule-seg.is-live')
     await expect(live).toBeVisible()
+
     const fill = await live.evaluate((el) => {
       const after = getComputedStyle(el, '::after')
+
       return { duration: after.transitionDuration, transform: after.transform }
     })
+
     expect(fill.duration).toBe('0s')
     // scaleX(1/3): one of three items resolved.
     const scaleX = parseFloat(fill.transform.match(/matrix\(([^,]+)/)[1])
@@ -291,6 +302,7 @@ test.describe('mobile 390 check card', () => {
       await page.goto(`/session/${SESSION_ID}`)
       const card = page.getByTestId('check-card')
       await expect(card).toBeVisible()
+
       const colors = await card.evaluate((el) => {
         const probe = (v) => {
           const s = document.createElement('span')
@@ -298,10 +310,13 @@ test.describe('mobile 390 check card', () => {
           el.appendChild(s)
           const c = getComputedStyle(s).color
           s.remove()
+
           return c
         }
+
         const done = el.querySelector('.check-rule-seg.is-done')
         const todo = el.querySelector('.check-rule-seg.is-todo')
+
         return {
           ink: probe('--ink'),
           ruleStrong: probe('--rule-strong'),
@@ -309,6 +324,7 @@ test.describe('mobile 390 check card', () => {
           todoTrack: getComputedStyle(todo).backgroundColor,
         }
       })
+
       expect(colors.doneFill).toBe(colors.ink)
       expect(colors.todoTrack).toBe(colors.ruleStrong)
       expect(colors.ink).not.toBe(colors.ruleStrong)

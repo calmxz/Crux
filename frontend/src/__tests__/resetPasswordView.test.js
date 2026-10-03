@@ -7,6 +7,7 @@ import { AUTH_CODE_COPY } from '@/lib/authErrors.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const routerPush = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   RouterLink: { props: ['to'], template: '<a><slot /></a>' },

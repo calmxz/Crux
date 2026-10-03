@@ -15,11 +15,15 @@ vi.mock('@/services/meApi.js', () => ({
 }))
 
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showSuccess, showError, showWarn: vi.fn() }),
 }))
+
 const routerPush = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
@@ -71,6 +75,7 @@ describe('AccountView', () => {
 
   it('renders name field testids', () => {
     const w = mount(AccountView, { global: { stubs } })
+
     for (const id of ['settings-name', 'settings-save']) {
       expect(w.find(`[data-testid="${id}"]`).exists()).toBe(true)
     }
@@ -254,6 +259,7 @@ describe('AccountView', () => {
     function mountAuthed() {
       const auth = useAuthStore()
       auth.session = { user: { id: 'u-1', email: 'learner@example.com' }, access_token: 't' }
+
       return mount(AccountView, { global: { stubs } })
     }
 
@@ -354,6 +360,7 @@ describe('AccountView', () => {
     function mountAuthed() {
       const auth = useAuthStore()
       auth.session = { user: { id: 'u-1', email: 'learner@example.com' }, access_token: 't' }
+
       return mount(AccountView, { global: { stubs } })
     }
 

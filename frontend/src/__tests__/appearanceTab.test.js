@@ -9,9 +9,11 @@ import { resolve } from 'node:path'
 // flipping a single switch, so the composable is mocked on `override` +
 // `setTheme` rather than `isDark` + `toggle`.
 const setTheme = vi.fn()
+
 vi.mock('../composables/useTheme.js', async () => {
   const { ref } = await import('vue')
   const override = ref('auto')
+
   return { useTheme: () => ({ override, setTheme }) }
 })
 
@@ -22,6 +24,7 @@ describe('AppearanceTab', () => {
     const w = mount(AppearanceTab)
     expect(w.find('[data-testid="settings-appearance"]').exists()).toBe(true)
     expect(w.find('[data-testid="settings-theme-toggle"]').exists()).toBe(true)
+
     for (const mode of ['light', 'dark', 'auto']) {
       expect(w.find(`[data-testid="settings-theme-${mode}"]`).exists()).toBe(true)
     }
@@ -56,6 +59,7 @@ describe('AppearanceTab', () => {
     const w = mount(AppearanceTab)
     const labels = w.findAll('.mode-label')
     expect(labels.length).toBe(3)
+
     for (const label of labels) {
       expect(label.attributes('data-label')).toBe(label.text())
     }
@@ -70,6 +74,7 @@ describe('AppearanceTab — swatch tokens (T3)', () => {
   it('declares all 8 --sw-* tokens in base.css :root', () => {
     const css = readFileSync(resolve(process.cwd(), 'src/assets/base.css'), 'utf8')
     const root = css.slice(0, css.indexOf("[data-theme='dark']"))
+
     const tokens = [
       '--sw-light-paper',
       '--sw-light-ink',
@@ -80,6 +85,7 @@ describe('AppearanceTab — swatch tokens (T3)', () => {
       '--sw-dark-rule',
       '--sw-dark-margin',
     ]
+
     for (const token of tokens) {
       expect(root, `${token} must be declared in :root`).toMatch(
         new RegExp(`${token}:\\s*#[0-9a-fA-F]{6}`),
@@ -92,6 +98,7 @@ describe('AppearanceTab — swatch tokens (T3)', () => {
       resolve(process.cwd(), 'src/components/settings/AppearanceTab.vue'),
       'utf8',
     )
+
     const style = src.slice(src.indexOf('<style'), src.lastIndexOf('</style>'))
     expect(style).not.toMatch(/#[0-9a-fA-F]{3,6}/)
   })

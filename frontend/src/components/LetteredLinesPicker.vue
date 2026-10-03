@@ -26,6 +26,7 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue'])
 
 const generatedId = useId()
+
 const groupName = computed(() => props.name || `llp-${generatedId}`)
 
 // A. / B. / C. -- the option letters used by every check on the sheet.

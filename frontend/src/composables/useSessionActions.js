@@ -45,12 +45,14 @@ export function useSessionActions() {
   async function endSession(session) {
     if (busy.value) return
     busy.value = true
+
     try {
       await store.endSession(session.id)
       // F-44: the summary dialog lives in SessionView; ending from anywhere
       // else would silently drop the pending summary. Toast it instead.
       const s = store.pendingSummary
       const onThatSession = route.name === 'session' && route.params.id === session.id
+
       if (s && s.sessionId === session.id && !onThatSession) {
         showSuccess(s.text)
         store.consumePendingSummary()
@@ -65,6 +67,7 @@ export function useSessionActions() {
   async function resume(session) {
     if (busy.value) return
     busy.value = true
+
     try {
       await store.reopenSession(session.id)
       closeDrawer()
@@ -79,8 +82,10 @@ export function useSessionActions() {
   async function continueTopic(session) {
     if (busy.value) return
     busy.value = true
+
     try {
       const created = await store.continueTopic(session)
+
       if (created) router.push({ name: 'session', params: { id: created.id } })
       closeDrawer()
     } catch {
@@ -92,6 +97,7 @@ export function useSessionActions() {
 
   function setPinned(session, on) {
     const id = session.id
+
     return store
       .setPinned(id, on)
       .catch(() => showError(on ? 'Could not pin the session.' : 'Could not unpin the session.'))
@@ -99,12 +105,16 @@ export function useSessionActions() {
 
   async function rename(session, nextTopic) {
     const next = (nextTopic || '').trim()
+
     if (!next || next === (session.topic || '')) return false
+
     try {
       await store.renameSession(session.id, next)
+
       return true
     } catch {
       showError('Could not rename the session.')
+
       return false
     }
   }

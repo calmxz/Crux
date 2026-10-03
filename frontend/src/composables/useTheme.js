@@ -1,20 +1,25 @@
 import { computed, readonly, ref } from 'vue'
 
 const STORAGE_KEY = 'crux:theme:v1'
+
 const VALID = ['light', 'dark', 'auto']
 
 const override = ref(loadInitial())
+
 const systemDark = ref(false)
+
 let mediaQuery = null
 
 function loadInitial() {
   if (typeof window === 'undefined') return 'auto'
   const stored = window.localStorage?.getItem(STORAGE_KEY)
+
   return VALID.includes(stored) ? stored : 'auto'
 }
 
 function persist(value) {
   if (typeof window === 'undefined') return
+
   try {
     window.localStorage?.setItem(STORAGE_KEY, value)
   } catch {
@@ -34,7 +39,9 @@ function applyAttribute(resolved) {
 
 const resolved = computed(() => {
   if (override.value === 'light') return 'light'
+
   if (override.value === 'dark') return 'dark'
+
   return systemDark.value ? 'dark' : 'light'
 })
 
@@ -48,6 +55,7 @@ function handler(event) {
 
 function init() {
   if (typeof window === 'undefined' || typeof document === 'undefined') return
+
   // Re-entry guard: a second init() call (e.g. a second component mount)
   // must not attach a second matchMedia listener with no way to remove it.
   if (mediaQuery) return
@@ -55,6 +63,7 @@ function init() {
   if (window.matchMedia) {
     mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
     systemDark.value = mediaQuery.matches
+
     if (mediaQuery.addEventListener) mediaQuery.addEventListener('change', handler)
     else mediaQuery.addListener(handler)
   }
@@ -64,6 +73,7 @@ function init() {
 
 export function dispose() {
   if (!mediaQuery) return
+
   if (mediaQuery.removeEventListener) mediaQuery.removeEventListener('change', handler)
   else mediaQuery.removeListener(handler)
   mediaQuery = null

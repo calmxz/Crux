@@ -8,6 +8,7 @@ const props = defineProps({
   card: { type: Object, required: true },
   busy: { type: Boolean, default: false },
 })
+
 const emit = defineEmits(['pick', 'dismiss'])
 
 const broad = computed(() => props.card.mode !== 'specific')
@@ -25,8 +26,10 @@ const lines = computed(() => {
     hint: it.hint || '',
     message: `Let's start with ${it.label}`,
   }))
+
   if (broad.value) return items
   const keep = `Keep going on ${props.card.topic}`
+
   return [{ label: keep, hint: '', message: keep }, ...items]
 })
 
@@ -39,6 +42,7 @@ const other = ref('')
 
 function sendOther() {
   const text = other.value.trim()
+
   if (!text || props.busy) return
   emit('pick', text)
 }

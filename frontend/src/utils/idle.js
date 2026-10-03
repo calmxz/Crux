@@ -4,8 +4,11 @@
 export function runWhenIdle(cb, { timeout = 1500 } = {}) {
   if (typeof globalThis.requestIdleCallback === 'function') {
     const id = globalThis.requestIdleCallback(cb, { timeout })
+
     return () => globalThis.cancelIdleCallback(id)
   }
+
   const id = setTimeout(cb, 200)
+
   return () => clearTimeout(id)
 }

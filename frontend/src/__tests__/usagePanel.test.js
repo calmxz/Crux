@@ -108,6 +108,7 @@ describe('UsagePanel', () => {
         today_spend_usd: 0,
       }),
     )
+
     expect(w.find('[data-testid="usage-empty"]').exists()).toBe(true)
     expect(w.find('[data-testid="usage-glance"]').exists()).toBe(false)
   })
@@ -120,6 +121,7 @@ describe('UsagePanel', () => {
         top_sessions: [{ session_id: 's1', topic: 'CSS', cost_usd: 0.02 }],
       }),
     )
+
     expect(w.find('[data-testid="usage-empty"]').exists()).toBe(false)
     expect(w.find('[data-testid="usage-glance"]').exists()).toBe(true)
   })
@@ -135,6 +137,7 @@ describe('UsagePanel', () => {
         top_sessions: [{ session_id: 's9', topic: 'algebra', cost_usd: 0.42 }],
       }),
     )
+
     expect(w.find('[data-testid="usage-week"]').exists()).toBe(false)
     expect(w.find('[data-testid="usage-ledger"]').exists()).toBe(false)
     expect(w.find('[data-testid="usage-top-session"]').exists()).toBe(false)

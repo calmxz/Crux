@@ -322,25 +322,36 @@ const CUE_SECTIONS = [
 ]
 
 const router = useRouter()
+
 const confirm = useConfirm()
+
 const store = useSessionStore()
+
 const data = ref(null)
+
 const loading = ref(false)
+
 const error = ref('')
+
 const conflict = ref(false)
+
 // F-05: write failures get their own ref. Reusing the load-path `error`
 // would swap the whole loaded profile for an error paragraph (the template
 // chain is loading -> error -> data) with no control left to retry.
 const writeError = ref('')
+
 // E-08: true while any profile write is in flight. Every mutating control is
 // disabled for the duration, so a second write can never be issued against the
 // etag the first one is about to replace.
 const writing = ref(false)
+
 const drafts = reactive({ confirmed_gaps: '', mastered_concepts: '' })
+
 const gapPickerOpen = ref(false)
 
 const topicLabel = computed(() => {
   const fromStore = store.sessions.find((s) => s.id === props.id)?.topic
+
   return fromStore || store.currentSession?.topic || 'Session profile'
 })
 
@@ -355,6 +366,7 @@ const subtopicEntries = computed(() => Object.entries(data.value?.profile?.subto
 let loadSeq = 0
 
 let loadedId = null
+
 async function load() {
   const seq = ++loadSeq
   // Stale-sibling-state fix: the route component is reused across
@@ -366,16 +378,20 @@ async function load() {
   // must survive a conflict reload.
   conflict.value = false
   writeError.value = ''
+
   if (loadedId !== props.id) {
     drafts.confirmed_gaps = ''
     drafts.mastered_concepts = ''
     gapPickerOpen.value = false
   }
+
   loadedId = props.id
   loading.value = true
   error.value = ''
+
   try {
     const res = await getSessionProfile(props.id)
+
     if (seq !== loadSeq) return
     data.value = res
   } catch (e) {
@@ -395,6 +411,7 @@ async function load() {
 // (an Enter on the still-enabled text field) runs after the write ahead of it
 // instead of racing it.
 let _writeQueue = Promise.resolve()
+
 let _pendingWrites = 0
 
 function _applyWrite(fn) {
@@ -402,6 +419,7 @@ function _applyWrite(fn) {
   writing.value = true
   const run = _writeQueue.then(() => _doWrite(fn))
   _writeQueue = run.catch(() => {})
+
   return run
 }
 
@@ -411,34 +429,41 @@ async function _doWrite(fn) {
   // A write started on session A must not paint its result, its error, or
   // its conflict notice onto session B if the user navigated mid-flight.
   const idAtWrite = props.id
+
   try {
     const res = await fn()
+
     if (props.id !== idAtWrite) return
     // One source of truth for the etag: keeping a separate ref alongside
     // data.etag let the spread re-seed the stale value on the next write.
     data.value = { ...data.value, profile: res.profile, etag: res.etag }
   } catch (e) {
     if (props.id !== idAtWrite) return
+
     if (e?.status === 412) {
       // load() resets conflict at its top (stale-sibling-state fix), so the
       // flag must be set after the recovery reload finishes, not before --
       // otherwise load() would immediately wipe the notice it is meant to
       // introduce.
       await load()
+
       if (props.id === idAtWrite) conflict.value = true
     } else {
       writeError.value = friendlyError(e)
     }
   } finally {
     _pendingWrites -= 1
+
     if (_pendingWrites === 0) writing.value = false
   }
 }
 
 function addItem(sec) {
   const v = drafts[sec.key].trim()
+
   if (!v) return
   drafts[sec.key] = ''
+
   return _applyWrite(() => patchProfile(props.id, { [sec.patchKey]: v }, data.value.etag))
 }
 
@@ -489,6 +514,7 @@ function goReview(gap) {
 }
 
 onMounted(load)
+
 watch(() => props.id, load)
 </script>
 

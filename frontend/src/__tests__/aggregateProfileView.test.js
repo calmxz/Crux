@@ -3,6 +3,7 @@ import { mount, flushPromises, RouterLinkStub } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const apiGetAggregate = vi.fn()
+
 vi.mock('@/services/profileApi.js', () => ({
   getAggregateProfile: (...args) => apiGetAggregate(...args),
 }))
@@ -19,11 +20,14 @@ const S = {
   linalg: 'sess-linalg-0004',
   prob: 'sess-prob-0005',
 }
+
 const ago = (d, h = 3) => new Date(Date.now() - d * 86400000 - h * 3600000).toISOString()
+
 function monday(n) {
   const d = new Date()
   d.setUTCHours(0, 0, 0, 0)
   d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7) - n * 7)
+
   return d.toISOString().slice(0, 10)
 }
 
@@ -214,12 +218,14 @@ function emptyFixture() {
 }
 
 const profileOf = (id) => ({ name: 'session-profile', params: { id } })
+
 const sessionOf = (id) => ({ name: 'session', params: { id } })
 
 async function mountView(data = fullFixture()) {
   apiGetAggregate.mockResolvedValue(data)
   const wrapper = mount(AggregateProfileView, { global: { stubs: { RouterLink: RouterLinkStub } } })
   await flushPromises()
+
   return wrapper
 }
 
@@ -301,10 +307,12 @@ describe('AggregateProfileView (/profile)', () => {
     it('links the topic and Open profile to the session profile, and Continue / Resume to the session', async () => {
       const wrapper = await mountView()
       const cards = wrapper.findAll('[data-testid="aprof-topic-card"]')
+
       const odeLinks = cards[0].findAllComponents(RouterLinkStub).map((l) => ({
         text: l.text(),
         to: l.props('to'),
       }))
+
       expect(odeLinks).toEqual([
         { text: 'Ordinary differential equations', to: profileOf(S.ode) },
         { text: 'Continue', to: sessionOf(S.ode) },
@@ -331,9 +339,11 @@ describe('AggregateProfileView (/profile)', () => {
       const level = wrapper.get('[data-testid="aprof-level"]')
       expect(level.get('.divider-tab').classes()).toContain('divider-tab--level')
       expect(level.get('.divider-tab').text()).toBe('Level 9')
+
       const rows = level
         .findAll('[data-testid="aprof-level-row"]')
         .map((r) => [r.get('.level-word').text(), r.get('.meta').text()])
+
       expect(rows).toEqual([
         ['beginner', '2 topics'],
         ['intermediate', '4 topics'],
@@ -471,9 +481,11 @@ describe('AggregateProfileView (/profile)', () => {
   it('shows a loading skeleton, then the page', async () => {
     let resolve
     apiGetAggregate.mockReturnValue(new Promise((r) => (resolve = r)))
+
     const wrapper = mount(AggregateProfileView, {
       global: { stubs: { RouterLink: RouterLinkStub } },
     })
+
     await flushPromises()
     expect(wrapper.find('[data-testid="aprof-loading"]').exists()).toBe(true)
     resolve(fullFixture())
@@ -484,9 +496,11 @@ describe('AggregateProfileView (/profile)', () => {
 
   it('shows the error with a retry that refetches', async () => {
     apiGetAggregate.mockRejectedValueOnce(new Error('boom'))
+
     const wrapper = mount(AggregateProfileView, {
       global: { stubs: { RouterLink: RouterLinkStub } },
     })
+
     await flushPromises()
     expect(wrapper.find('[data-testid="aprof-error"]').exists()).toBe(true)
     apiGetAggregate.mockResolvedValueOnce(fullFixture())

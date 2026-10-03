@@ -30,16 +30,19 @@ export const useAuthStore = defineStore('auth', () => {
     const { data } = await sb.auth.getSession()
     session.value = data?.session ?? null
     useUserStore().setActiveUser(session.value?.user?.id ?? null)
+
     const sub = sb.auth.onAuthStateChange((_event, sess) => {
       session.value = sess ?? null
       useUserStore().setActiveUser(sess?.user?.id ?? null)
     })
+
     _unsubscribe.value = sub?.data?.subscription?.unsubscribe ?? null
     ready.value = true
   }
 
   async function register(email, password) {
     const sb = getSupabase()
+
     const { data, error } = await sb.auth.signUp({
       email,
       password,
@@ -51,41 +54,50 @@ export const useAuthStore = defineStore('auth', () => {
         data: { accepted_terms: true },
       },
     })
+
     if (error) throw error
+
     return data
   }
 
   async function signIn(email, password) {
     const sb = getSupabase()
     const { error } = await sb.auth.signInWithPassword({ email, password })
+
     if (error) throw error
   }
 
   async function resendConfirmation(email) {
     const sb = getSupabase()
     const { error } = await sb.auth.resend({ type: 'signup', email })
+
     if (error) throw error
   }
 
   async function requestPasswordReset(email) {
     const sb = getSupabase()
+
     const { error } = await sb.auth.resetPasswordForEmail(email, {
       redirectTo:
         typeof window !== 'undefined' ? `${window.location.origin}/reset-password` : undefined,
     })
+
     if (error) throw error
   }
 
   async function updatePassword(password) {
     const sb = getSupabase()
     const { error } = await sb.auth.updateUser({ password })
+
     if (error) throw error
   }
 
   async function signOut() {
     const sb = getSupabase()
+
     try {
       const { error } = await sb.auth.signOut()
+
       if (error) throw error
     } finally {
       // Clear local session even when the SDK call throws (network drop,
@@ -102,6 +114,7 @@ export const useAuthStore = defineStore('auth', () => {
   function _resetForTests() {
     session.value = null
     ready.value = false
+
     if (typeof _unsubscribe.value === 'function') _unsubscribe.value()
     _unsubscribe.value = null
   }

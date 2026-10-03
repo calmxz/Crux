@@ -52,6 +52,7 @@ import { useUserStore } from '../../stores/user.js'
 import { useToast } from '../../composables/useToast.js'
 
 const user = useUserStore()
+
 const { showError } = useToast()
 
 // One autosaving tutor preference (#357). Every change is its own
@@ -81,9 +82,11 @@ function autosaved(key) {
     queue = queue.then(async () => {
       try {
         await user.updateProfile({ [key]: next })
+
         if (seq === latest) saved.value = true
       } catch (e) {
         showError(friendlyError(e))
+
         if (seq === latest) value.value = stored()
       } finally {
         pending--

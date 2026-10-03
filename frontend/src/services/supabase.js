@@ -12,14 +12,17 @@ export function getSupabase() {
   if (_client) return _client
   const url = import.meta.env.VITE_SUPABASE_URL
   const key = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY
+
   if (!url || !key) {
     // Construct a no-op client in dev when env vars are not provided yet.
     // The auth store will report unauthenticated state and the guard will
     // redirect to /login. Any auth attempt will fail loudly — which is what
     // we want during the env-not-configured window.
     _client = createClient('http://placeholder.invalid', 'placeholder-publishable-key')
+
     return _client
   }
+
   _client = createClient(url, key, {
     auth: {
       persistSession: true,
@@ -27,6 +30,7 @@ export function getSupabase() {
       detectSessionInUrl: true,
     },
   })
+
   return _client
 }
 

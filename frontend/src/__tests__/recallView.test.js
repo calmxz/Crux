@@ -7,12 +7,14 @@ import RecallView from '@/views/RecallView.vue'
 import { useSessionStore } from '@/stores/session.js'
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
 }))
 
 const apiReviewQueue = vi.fn()
+
 vi.mock('@/services/reviewApi.js', () => ({
   getReviewQueue: (...args) => apiReviewQueue(...args),
 }))

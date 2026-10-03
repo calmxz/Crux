@@ -12,6 +12,7 @@ describe('runWhenIdle', () => {
     const cb = vi.fn()
     globalThis.requestIdleCallback = vi.fn((fn) => {
       fn()
+
       return 7
     })
     globalThis.cancelIdleCallback = vi.fn()

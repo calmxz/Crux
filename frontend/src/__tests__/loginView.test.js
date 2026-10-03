@@ -8,6 +8,7 @@ import { useAuthStore } from '@/stores/auth.js'
 import { safeRedirect } from '@/utils/safeRedirect.js'
 
 const { mockQuery, push } = vi.hoisted(() => ({ mockQuery: { value: {} }, push: vi.fn() }))
+
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: mockQuery.value }),
   useRouter: () => ({ push }),

@@ -5,19 +5,24 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn: vi.fn(), showSuccess: vi.fn() }),
 }))
+
 const routerPush = vi.fn()
+
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
   RouterView: { template: '<div />' },
   useRouter: () => ({ push: routerPush }),
   useRoute: () => ({ fullPath: '/', params: {}, meta: routeMeta }),
 }))
+
 // D-15: showShell reads route.meta.sidebar, so the chrome-less branch needs a
 // mutable meta. An empty object keeps the shell branch (sidebar !== false).
 let routeMeta = {}
+
 vi.mock('primevue/toast', () => ({
   default: { template: '<div data-testid="toast" />' },
 }))
@@ -107,6 +112,7 @@ describe('shell keyboard shortcuts', () => {
     const e = new KeyboardEvent('keydown', { key, ctrlKey: true, bubbles: true, ...init })
     const spy = vi.spyOn(e, 'preventDefault')
     target.dispatchEvent(e)
+
     return spy
   }
 
@@ -170,6 +176,7 @@ describe('P2: sidebar collapse is not a layout animation', () => {
   // (ruled ground + session list). The column must snap.
   it('App.vue never transitions grid-template-columns', () => {
     const transitions = appSrc.match(/transition:[^;}]*/g) || []
+
     for (const decl of transitions) {
       expect(decl).not.toMatch(/grid-template-columns/)
       expect(decl).not.toMatch(/\ball\b/)

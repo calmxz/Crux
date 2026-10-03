@@ -13,9 +13,12 @@ import {
 } from './errorCodes.js'
 
 const DAILY_LIMIT_COPY = "You've hit the daily limit. Try again tomorrow."
+
 const THROTTLED_COPY = 'Too many requests - wait a moment and retry.'
+
 // Shared with the session store's own 409 handling so the two cannot drift.
 export const SESSION_ENDED_COPY = 'This session was ended elsewhere. Reopen it to continue.'
+
 // Last resort for an SSE `error` event with neither a known code nor a message.
 export const GENERIC_STREAM_ERROR_COPY = 'The tutor hit a problem. Please try again.'
 
@@ -43,9 +46,12 @@ const CODE_COPY = {
 // code; `message` is backend prose and only a fallback for an unknown code.
 export function sseErrorCopy(data) {
   const code = data && typeof data === 'object' ? data.code : null
+
   if (typeof code === 'string' && Object.hasOwn(CODE_COPY, code)) return CODE_COPY[code]
   const message = data && typeof data === 'object' ? data.message : null
+
   if (typeof message === 'string' && message) return message
+
   return GENERIC_STREAM_ERROR_COPY
 }
 
@@ -54,23 +60,34 @@ export function sseErrorCopy(data) {
 export function friendlyError(err) {
   if (!err) return ''
   const code = err?.body?.detail?.code
+
   if (typeof code === 'string' && Object.hasOwn(CODE_COPY, code)) return CODE_COPY[code]
   const status = typeof err === 'object' ? err.status : null
+
   if (status === 0) return "Can't reach the server. Check your connection and try again."
+
   if (status === 401 || status === 403) return "You're not signed in for this action."
+
   if (status === 404) return "We couldn't find that resource."
+
   if (status === 429) {
     // I-04: nginx's per-IP throttle also 429s but with a non-JSON body (no
     // detail.code). Only a coded envelope is the daily cap.
     if (err?.body?.detail?.code) return DAILY_LIMIT_COPY
+
     return THROTTLED_COPY
   }
+
   if (status === 503) return 'The tutor is temporarily unavailable. Try again in a moment.'
+
   if (typeof status === 'number' && status >= 500)
     return 'Something went wrong on our side. Try again shortly.'
+
   if (typeof status === 'number' && status >= 400)
     return 'That request was rejected. Check the details and try again.'
+
   if (err instanceof Error) return err.message
+
   return String(err)
 }
 

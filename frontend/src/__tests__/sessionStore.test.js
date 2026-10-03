@@ -711,10 +711,12 @@ describe('session store — streaming', () => {
   it('sendMessageStreaming wires through streamChat and dispatches events', async () => {
     const s = useSessionStore()
     s.currentSessionId = 's1'
+
     const spy = vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
       onEvent({ event: 'assistant_delta', data: { text: 'Hi' } })
       onEvent({ event: 'done', data: { message_id: 'm1' } })
     })
+
     await s.sendMessageStreaming({ text: 'q' })
     expect(spy).toHaveBeenCalled()
     expect(s.messages.at(-1)).toMatchObject({ message_id: 'm1' })

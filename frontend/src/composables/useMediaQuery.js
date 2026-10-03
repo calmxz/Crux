@@ -13,9 +13,11 @@ export const REDUCED_MOTION_QUERY = '(prefers-reduced-motion: reduce)'
 export function useMediaQuery(query) {
   const matches = ref(false)
   let mql = null
+
   function onChange(e) {
     matches.value = e.matches
   }
+
   onMounted(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
     mql = window.matchMedia(query)
@@ -26,5 +28,6 @@ export function useMediaQuery(query) {
     mql?.removeEventListener?.('change', onChange)
     mql = null
   })
+
   return matches
 }

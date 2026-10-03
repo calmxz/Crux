@@ -7,7 +7,9 @@ import { useUserStore } from '@/stores/user.js'
 import * as profileApi from '@/services/profileApi.js'
 
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showSuccess, showError, showWarn: vi.fn() }),
 }))
@@ -18,6 +20,7 @@ function seedUser(prefs = { feedback: 'hints', checkIns: 'sometimes', replyLengt
   user.name = 'Eddy'
   user.interactionPreferences = prefs
   user.onboardingComplete = true
+
   return user
 }
 
@@ -75,9 +78,11 @@ describe('LearningTab', () => {
       'Check-ins',
       'Reply length',
     ])
+
     for (const id of ['learning-topics', 'learning-weekly', 'learning-accuracy', 'agg-loading']) {
       expect(wrapper.find(`[data-testid="${id}"]`).exists()).toBe(false)
     }
+
     expect(spy).not.toHaveBeenCalled()
   })
 
@@ -240,11 +245,13 @@ describe('LearningTab', () => {
     let resolveFirst
     vi.spyOn(user, 'updateProfile').mockImplementation((body) => {
       calls.push(body)
+
       if (calls.length === 1) {
         return new Promise((resolve) => {
           resolveFirst = resolve
         })
       }
+
       return Promise.resolve()
     })
 

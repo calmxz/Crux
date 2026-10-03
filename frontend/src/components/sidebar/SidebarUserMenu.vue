@@ -48,9 +48,13 @@ const ITEMS = [
 ]
 
 const open = ref(false)
+
 const triggerEl = ref(null)
+
 const popoverEl = ref(null)
+
 const fixedStyle = ref(null)
+
 const menuId = `sb-user-menu-${useId()}`
 
 // The name, else the email's local part: the row never shows a full address.
@@ -74,6 +78,7 @@ function menuItems() {
 // unfolded: 0.25rem above the trigger, its left edge on the avatar's.
 function placeFixed() {
   const trigger = triggerEl.value
+
   if (!trigger) return
   const rect = trigger.getBoundingClientRect()
   // Folded, the avatar is centred in a wider trigger, so align to the avatar
@@ -118,6 +123,7 @@ function toggle() {
 function onTriggerKeydown(e) {
   if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
     e.preventDefault()
+
     if (!open.value) openMenu(e.key === 'ArrowUp')
   } else if (e.key === 'Enter') {
     // Cancelling Enter's default also cancels its synthetic click.
@@ -128,8 +134,10 @@ function onTriggerKeydown(e) {
 
 function onMenuKeydown(e) {
   const items = menuItems()
+
   if (!items.length) return
   const idx = items.indexOf(document.activeElement)
+
   if (e.key === 'ArrowDown') {
     e.preventDefault()
     items[(idx + 1) % items.length].focus()
@@ -154,13 +162,16 @@ function onMenuKeydown(e) {
 
 function onItem(item) {
   closeAndReturn()
+
   if (item.to) emit('navigate', item.to)
   else emit('sign-out')
 }
 
 function onDocPointerDown(e) {
   if (!open.value) return
+
   if (popoverEl.value?.contains(e.target)) return
+
   if (triggerEl.value?.contains(e.target)) return
   // Outside click: focus follows the pointer, so it is not pulled back.
   close()
@@ -168,6 +179,7 @@ function onDocPointerDown(e) {
 
 function onKey(e) {
   if (!open.value) return
+
   if (e.key === 'Escape') {
     e.stopPropagation()
     closeAndReturn()
@@ -179,6 +191,7 @@ function onKey(e) {
 function closeKeepingFocus() {
   const hadFocus = popoverEl.value?.contains(document.activeElement)
   close()
+
   if (hadFocus) nextTick(focusTrigger)
 }
 

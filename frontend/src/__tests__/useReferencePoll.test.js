@@ -10,6 +10,7 @@ import {
 } from '@/composables/useReferencePoll.js'
 
 const getSessionIngestion = vi.fn()
+
 vi.mock('@/services/uploadApi.js', () => ({
   getSessionIngestion: (...a) => getSessionIngestion(...a),
 }))
@@ -18,6 +19,7 @@ const pending = (docs = [{ id: 1, filename: 'a.pdf', status: 'pending' }]) => ({
   status: 'pending',
   documents: docs,
 })
+
 const ready = (docs = [{ id: 1, filename: 'a.pdf', status: 'ready' }]) => ({
   status: 'ready',
   documents: docs,
@@ -80,6 +82,7 @@ describe('useReferencePoll', () => {
       await tick(1)
       expect(getSessionIngestion).toHaveBeenCalledTimes(i + 2)
     }
+
     poll.stop()
   })
 
@@ -290,6 +293,7 @@ describe('useReferencePoll', () => {
         props: { id: { type: String, required: true } },
         setup(props) {
           const poll = useReferencePoll(() => props.id)
+
           return { poll }
         },
         render: () => h('div'),

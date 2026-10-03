@@ -10,7 +10,9 @@ import { TICK_PATH } from '@/components/chat/levelMark.js'
 import LibrarySkeletonGrid from '@/components/LibrarySkeletonGrid.vue'
 
 const router = useRouter()
+
 const route = useRoute()
+
 const store = useSessionStore()
 
 // F-06: same guard/catch shape as HomeView.startReview (F-45) -- without
@@ -22,8 +24,10 @@ const continueBusy = ref(false)
 async function continueSession(s) {
   if (continueBusy.value) return
   continueBusy.value = true
+
   try {
     const created = await store.continueTopic(s)
+
     if (created) router.push({ name: 'session', params: { id: created.id } })
   } catch {
     // surfaced via store.error / errorBus
@@ -33,10 +37,15 @@ async function continueSession(s) {
 }
 
 const items = ref([])
+
 const total = ref(0)
+
 const limit = ref(20)
+
 const offset = ref(0)
+
 const loading = ref(false)
+
 const error = ref(null)
 
 // Row label cells, the same three-cell label Home and the sidebar carry:
@@ -51,6 +60,7 @@ const error = ref(null)
 const rows = computed(() =>
   items.value.map((s) => {
     const story = cardStory(s)
+
     return {
       s,
       story,
@@ -70,26 +80,34 @@ const rows = computed(() =>
 // a query-only navigation to the same route, so the same validation is
 // re-run by the watcher below whenever the query changes post-mount.
 const VALID_STATUSES = ['all', 'active', 'ended']
+
 function statusFromQuery(query) {
   return VALID_STATUSES.includes(query.status) ? query.status : 'all'
 }
+
 // Clamped to the backend's 200-char cap on `q` (C-17) so a long bookmarked
 // ?q= cannot turn the first load into a 422.
 const Q_MAX = 200
+
 function qFromQuery(query) {
   return typeof query.q === 'string' ? query.q.slice(0, Q_MAX) : ''
 }
+
 const status = ref(statusFromQuery(route.query))
+
 const q = ref(qFromQuery(route.query))
+
 const sort = ref('last_activity')
 
 let _loadSeq = 0
+
 async function load({ append = false } = {}) {
   // F-15: discard out-of-order settles - same discriminator idiom as the
   // session store's _latestRequestedId.
   const seq = ++_loadSeq
   loading.value = true
   error.value = null
+
   try {
     const page = await store.fetchLibrary({
       status: status.value,
@@ -98,6 +116,7 @@ async function load({ append = false } = {}) {
       limit: limit.value,
       offset: offset.value,
     })
+
     if (seq !== _loadSeq) return
     items.value = append ? [...items.value, ...page.items] : page.items
     total.value = page.total
@@ -125,6 +144,7 @@ const STATUSES = [
 // not a route query param.
 function syncRouteQuery() {
   const nextQuery = { ...route.query, status: status.value }
+
   if (q.value) nextQuery.q = q.value
   else delete nextQuery.q
   Promise.resolve(router.replace({ query: nextQuery })).catch(() => {})
@@ -143,6 +163,7 @@ function onSortChange() {
 }
 
 let searchTimer = null
+
 function onSearchInput() {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
@@ -162,6 +183,7 @@ watch(
   () => {
     const nextStatus = statusFromQuery(route.query)
     const nextQ = qFromQuery(route.query)
+
     if (nextStatus === status.value && nextQ === q.value) return
     status.value = nextStatus
     q.value = nextQ
@@ -172,6 +194,7 @@ watch(
 
 function loadMore() {
   if (loading.value || error.value) return
+
   if (items.value.length >= total.value) return
   offset.value = items.value.length
   load({ append: true })
@@ -191,6 +214,7 @@ function retryFirstLoad() {
 }
 
 const sentinelEl = ref(null)
+
 let observer = null
 
 onMounted(() => {
@@ -206,12 +230,15 @@ onMounted(() => {
 // The sentinel is v-if'd with the list; (un)observe as it (un)mounts.
 watch(sentinelEl, (el, prev) => {
   if (!observer) return
+
   if (prev) observer.unobserve(prev)
+
   if (el) observer.observe(el)
 })
 
 onUnmounted(() => {
   clearTimeout(searchTimer)
+
   if (observer) observer.disconnect()
   observer = null
 })

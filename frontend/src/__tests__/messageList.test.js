@@ -5,6 +5,7 @@ import UserBubble from '../components/chat/UserBubble.vue'
 import AssistantBubble from '../components/chat/AssistantBubble.vue'
 
 const userMsg = { message_id: 'u1', role: 'user', content: 'q' }
+
 const assistantMsg = {
   message_id: 'a1',
   role: 'assistant',
@@ -13,6 +14,7 @@ const assistantMsg = {
   citations: [],
   status: 'complete',
 }
+
 const streamingMsg = {
   role: 'assistant',
   content: 'stream',
@@ -25,6 +27,7 @@ describe('MessageList', () => {
     const w = mount(MessageList, {
       props: { messages: [userMsg, assistantMsg] },
     })
+
     expect(w.findAllComponents(UserBubble)).toHaveLength(1)
     expect(w.findAllComponents(AssistantBubble)).toHaveLength(1)
     expect(w.findAllComponents(AssistantBubble)[0].props('streaming')).toBe(false)
@@ -42,9 +45,11 @@ describe('MessageList', () => {
       status: 'complete',
       check_batch: null,
     }
+
     const w = mount(MessageList, {
       props: { messages: [userMsg, empty, assistantMsg] },
     })
+
     expect(w.findAllComponents(AssistantBubble)).toHaveLength(1)
     expect(w.findAllComponents(UserBubble)).toHaveLength(1)
   })
@@ -58,6 +63,7 @@ describe('MessageList', () => {
       citations: [],
       status: 'cancelled',
     }
+
     const recap = {
       message_id: 'a-r',
       role: 'assistant',
@@ -67,9 +73,11 @@ describe('MessageList', () => {
       status: 'complete',
       check_batch: { gap: 'g', total: 1, items: [] },
     }
+
     const w = mount(MessageList, {
       props: { messages: [cancelled, recap] },
     })
+
     expect(w.findAllComponents(AssistantBubble)).toHaveLength(2)
   })
 
@@ -80,6 +88,7 @@ describe('MessageList', () => {
         streamingMessage: streamingMsg,
       },
     })
+
     const bubbles = w.findAllComponents(AssistantBubble)
     // one for the regular assistant msg, one for streaming
     expect(bubbles).toHaveLength(2)
@@ -92,6 +101,7 @@ describe('MessageList', () => {
     const w = mount(MessageList, {
       props: { messages: [userMsg], awaiting: true },
     })
+
     expect(w.find('[data-testid="msg-typing"]').exists()).toBe(true)
   })
 
@@ -101,6 +111,7 @@ describe('MessageList', () => {
     const w = mount(MessageList, {
       props: { messages: [userMsg], awaiting: true },
     })
+
     const typing = w.find('[data-testid="msg-typing"]')
     expect(typing.find('.sr-only').text()).toBe('Tutor is thinking')
     expect(typing.find('p.typing-dots').attributes('aria-label')).toBeUndefined()
@@ -114,6 +125,7 @@ describe('MessageList', () => {
     const w = mount(MessageList, {
       props: { messages: [userMsg], awaiting: false },
     })
+
     expect(w.find('[data-testid="msg-typing"]').exists()).toBe(false)
   })
 
@@ -125,6 +137,7 @@ describe('MessageList', () => {
         awaiting: true,
       },
     })
+
     expect(w.find('[data-testid="msg-typing"]').exists()).toBe(false)
   })
 
@@ -132,6 +145,7 @@ describe('MessageList', () => {
     const w = mount(MessageList, {
       props: { messages: [userMsg, assistantMsg], awaiting: false },
     })
+
     expect(w.find('[data-testid="msg-typing"]').exists()).toBe(false)
     expect(w.find('[data-testid="msg-streaming"]').exists()).toBe(false)
   })
@@ -148,6 +162,7 @@ describe('MessageList', () => {
         { message_id: 'u9', role: 'user', content: 'one' },
         { role: 'user', content: 'two', client_id: 'c-2' },
       ]
+
       const w = mount(MessageList, { props: { messages: rows } })
       const firstUid = w.findAllComponents(UserBubble)[0].vm.$.uid
       await w.setProps({
@@ -165,6 +180,7 @@ describe('MessageList', () => {
         { role: 'user', content: 'one', client_id: 'c-1' },
         { role: 'user', content: 'two', client_id: 'c-2' },
       ]
+
       const w = mount(MessageList, { props: { messages: rows } })
       const firstUid = w.findAllComponents(UserBubble)[0].vm.$.uid
       await w.setProps({
@@ -179,6 +195,7 @@ describe('MessageList', () => {
       const w = mount(MessageList, {
         props: { messages: [{ role: 'user', content: 'q' }] },
       })
+
       expect(w.findAllComponents(UserBubble)).toHaveLength(1)
     })
 
@@ -204,6 +221,7 @@ describe('MessageList', () => {
         status: 'cancelled',
         client_id: 'c-1',
       }
+
       const pending2 = {
         message_id: 'pending',
         role: 'assistant',
@@ -213,6 +231,7 @@ describe('MessageList', () => {
         status: 'cancelled',
         client_id: 'c-2',
       }
+
       const older = {
         message_id: 'a-older',
         role: 'assistant',
@@ -221,6 +240,7 @@ describe('MessageList', () => {
         citations: [],
         status: 'complete',
       }
+
       const newer = {
         message_id: 'a-newer',
         role: 'assistant',
@@ -229,6 +249,7 @@ describe('MessageList', () => {
         citations: [],
         status: 'complete',
       }
+
       const w = mount(MessageList, { props: { messages: [older, pending1, pending2] } })
       const bubbles = w.findAllComponents(AssistantBubble)
       const oneUid = bubbles.find((b) => b.props('message').content === 'one').vm.$.uid
@@ -262,6 +283,7 @@ describe('MessageList', () => {
         { message_id: 'u2', role: 'user', content: 'u2' },
         { message_id: 'a2', role: 'assistant', content: 'a2', tool_calls: [], citations: [] },
       ]
+
       const w = mount(MessageList, { props: { messages } })
       const rows = w.findAll('.msg')
       expect(rows).toHaveLength(4)
@@ -287,6 +309,7 @@ describe('MessageList', () => {
       const w = mount(MessageList, {
         props: { messages: [userMsg], streamingMessage: streamingMsg },
       })
+
       expect(w.find('[data-testid="msg-streaming"]').classes()).toContain('msg-row--speaker-change')
     })
   })

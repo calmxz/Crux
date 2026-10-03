@@ -28,6 +28,8 @@ export const TOOL_LABELS = {
 
 export function labelFor(toolName, state) {
   const labels = TOOL_LABELS[toolName]
+
   if (!labels) return toolName
+
   return labels[state] || toolName
 }

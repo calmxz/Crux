@@ -116,6 +116,7 @@ export const useSessionStore = defineStore('session', () => {
   // it. Rethrows, so the caller still sees the failure.
   async function fetchLibrary(params) {
     libraryLoading.value = true
+
     try {
       return await sessionsApi.getSessionLibrary(params, { silent: true })
     } finally {
@@ -143,11 +144,16 @@ export const useSessionStore = defineStore('session', () => {
   function _observedRows(id, extra = null) {
     const held = []
     const i = sessions.value.findIndex((s) => s.id === id)
+
     if (i !== -1) held.push(sessions.value[i])
     const j = searchRows.value.findIndex((s) => s.id === id)
+
     if (j !== -1) held.push(searchRows.value[j])
+
     if (currentSession.value?.id === id) held.push(currentSession.value)
+
     if (extra && extra.id === id && !held.includes(extra)) held.push(extra)
+
     return held
   }
 
@@ -157,8 +163,10 @@ export const useSessionStore = defineStore('session', () => {
   // cap banner already renders this failure and must not also write `error`.
   function _applyCapError(detail) {
     const { kind, info } = mapCapError(detail)
+
     if (kind === 'daily') dailyCapInfo.value = info
     else if (kind === 'cost') costCapInfo.value = info
+
     return kind !== null
   }
 
@@ -173,9 +181,11 @@ export const useSessionStore = defineStore('session', () => {
 
   async function listSessions() {
     if (_inflight.has('list')) return _inflight.get('list')
+
     const p = (async () => {
       loading.value = true
       error.value = null
+
       try {
         // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
         // because a background load must never toast (U-05).
@@ -189,6 +199,7 @@ export const useSessionStore = defineStore('session', () => {
             { silent: true },
           ),
         ])
+
         // DECISION: Promise.all is all-or-nothing -- if either page's request
         // rejects, the other page's already-resolved items/total are discarded
         // and sessions/activeTotal/endedTotal are left at their stale pre-call
@@ -197,14 +208,17 @@ export const useSessionStore = defineStore('session', () => {
         // stale-but-consistent one, and the caller can retry.
         const seen = new Set()
         const merged = []
+
         for (const item of [...activePage.items, ...endedPage.items]) {
           if (seen.has(item.id)) continue
           seen.add(item.id)
           merged.push(item)
         }
+
         sessions.value = merged
         activeTotal.value = activePage.total
         endedTotal.value = endedPage.total
+
         return sessions.value
       } catch (e) {
         _setError(e)
@@ -213,13 +227,16 @@ export const useSessionStore = defineStore('session', () => {
         _inflight.delete('list')
       }
     })()
+
     _inflight.set('list', p)
+
     return p
   }
 
   async function createSession({ topic, seedMode, priorSessionId, declaredLevel } = {}) {
     loading.value = true
     error.value = null
+
     try {
       const created = await sessionsApi.createSession({
         topic,
@@ -227,6 +244,7 @@ export const useSessionStore = defineStore('session', () => {
         priorSessionId,
         declaredLevel,
       })
+
       // A freshly created session is always active server-side; count it
       // unconditionally even though it isn't added to the (windowed)
       // `sessions` list here.
@@ -234,6 +252,7 @@ export const useSessionStore = defineStore('session', () => {
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
+
       return created
     } catch (e) {
       _setError(e)
@@ -256,14 +275,18 @@ export const useSessionStore = defineStore('session', () => {
     // keep running (and billing) or deliver into the incoming transcript.
     if (id !== currentSessionId.value && abortController.value) abandonStream()
     _latestRequestedId = id
+
     if (_inflight.has(id)) return _inflight.get(id)
+
     const p = (async () => {
       loading.value = true
       detailLoading.value = true
       error.value = null
       duplicateReopen.value = null
+
       try {
         const s = await sessionsApi.getSession(id)
+
         if (_latestRequestedId !== id) return s // superseded by a newer load; drop the write
         currentSession.value = s
         currentSessionId.value = s.id
@@ -291,6 +314,7 @@ export const useSessionStore = defineStore('session', () => {
               })),
             }
           : null
+
         return s
       } catch (e) {
         // Same discriminator as the success path: a superseded load (the user
@@ -306,10 +330,13 @@ export const useSessionStore = defineStore('session', () => {
           loading.value = false
           detailLoading.value = false
         }
+
         _inflight.delete(id)
       }
     })()
+
     _inflight.set(id, p)
+
     return p
   }
 
@@ -330,7 +357,9 @@ export const useSessionStore = defineStore('session', () => {
   // a reload replaces it with the real row.
   function _newClientId() {
     const uuid = globalThis.crypto?.randomUUID?.()
+
     if (uuid) return `c-${uuid}`
+
     return `c-${Date.now()}-${Math.random().toString(36).slice(2)}`
   }
 
@@ -344,6 +373,7 @@ export const useSessionStore = defineStore('session', () => {
 
   function _appendMessage(m) {
     messages.value.push(m)
+
     if (messages.value.length <= MAX_RETAINED_MESSAGES) return
     let keep = messages.value.slice(messages.value.length - MAX_RETAINED_MESSAGES)
     // The oldest retained message doubles as the pagination cursor, so trim a
@@ -352,7 +382,9 @@ export const useSessionStore = defineStore('session', () => {
     // no gap and no duplicates. If nothing retained has an id there is no
     // cursor to protect, so keep the plain window.
     let i = 0
+
     while (i < keep.length && !_hasServerId(keep[i])) i += 1
+
     if (i < keep.length) keep = keep.slice(i)
     messages.value = keep
     hasMoreMessages.value = true
@@ -365,11 +397,14 @@ export const useSessionStore = defineStore('session', () => {
     // local-only bubble, and `before: undefined` would silently page nothing.
     const oldest = messages.value.find(_hasServerId)?.message_id
     const sid = currentSessionId.value
+
     if (oldest == null || !sid) return
     loadingEarlier.value = true
     loadEarlierError.value = null
+
     try {
       const page = await sessionsApi.getSessionMessages(sid, { before: oldest })
+
       // A navigation may have swapped sessions while the page was in flight.
       if (currentSessionId.value !== sid) return
       messages.value = [...(page.items || []).map(toUiMessage), ...messages.value]
@@ -391,9 +426,11 @@ export const useSessionStore = defineStore('session', () => {
 
   async function endSession(sessionId) {
     const id = sessionId || currentSessionId.value
+
     if (!id) throw new Error('no active session')
     loading.value = true
     error.value = null
+
     try {
       const resp = await sessionsApi.endSession(id)
       const summaryText = resp?.summary?.text ?? ''
@@ -403,7 +440,9 @@ export const useSessionStore = defineStore('session', () => {
       // shared rule this implements.
       const observed = _observedRows(id)
       const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+
       for (const r of observed) r.ended_at = resp.ended_at
+
       if (
         currentSession.value &&
         currentSession.value.id === id &&
@@ -416,10 +455,12 @@ export const useSessionStore = defineStore('session', () => {
           last_session_summary: summaryText,
         }
       }
+
       if (!alreadyEnded) {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       }
+
       const summary = resp?.summary
       pendingSummary.value = {
         sessionId: id,
@@ -430,6 +471,7 @@ export const useSessionStore = defineStore('session', () => {
             ? 'This session ended without any exchanges. Start a new session to continue.'
             : 'Session ended.'),
       }
+
       return resp
     } catch (e) {
       _setError(e)
@@ -446,16 +488,20 @@ export const useSessionStore = defineStore('session', () => {
     loading.value = true
     error.value = null
     duplicateReopen.value = null
+
     try {
       const resp = await sessionsApi.reopenSession(sessionId)
       // Same reasoning as endSession: snapshot before patching.
       const observed = _observedRows(sessionId)
       const alreadyActive = observed.length > 0 && observed.every((r) => !r.ended_at)
+
       for (const r of observed) r.ended_at = null
+
       if (!alreadyActive) {
         endedTotal.value = Math.max(0, endedTotal.value - 1)
         activeTotal.value += 1
       }
+
       return resp
     } catch (e) {
       // I-05: the contract hands over the conflicting session id - surface
@@ -465,6 +511,7 @@ export const useSessionStore = defineStore('session', () => {
         error.value = 'An active session with this topic already exists.'
         throw e
       }
+
       _setError(e)
     } finally {
       loading.value = false
@@ -474,12 +521,14 @@ export const useSessionStore = defineStore('session', () => {
   async function continueTopic(prior) {
     loading.value = true
     error.value = null
+
     try {
       const created = await sessionsApi.createSession({
         topic: prior.topic,
         seedMode: 'resume',
         priorSessionId: prior.id,
       })
+
       // Backend auto-ends the prior session on resume-create; reflect it
       // locally so ended-state UI updates without a refetch. Same
       // SHARED TOTALS RULE as endSession/reopenSession -- `prior` is exactly
@@ -488,23 +537,29 @@ export const useSessionStore = defineStore('session', () => {
       // outside the loaded window.
       const observed = _observedRows(prior.id, prior)
       const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+
       if (!alreadyEnded) {
         const endedAt = new Date().toISOString()
+
         for (const r of observed) r.ended_at = endedAt
       }
+
       // The new session is always active. The prior only moves active ->
       // ended in the totals when it was NOT already observed as ended -
       // continueTopic is only ever offered on already-ended rows in the UI,
       // so in the normal case the prior is already counted in endedTotal
       // and there is no transition to apply here.
       activeTotal.value += 1
+
       if (!alreadyEnded) {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       }
+
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
+
       return created
     } catch (e) {
       _setError(e)
@@ -522,7 +577,9 @@ export const useSessionStore = defineStore('session', () => {
     // response is fresher.
     const observed = _observedRows(id)
     const prevs = observed.map((r) => r.topic)
+
     for (const r of observed) r.topic = topic
+
     try {
       return await sessionsApi.renameSession(id, topic)
     } catch (e) {
@@ -539,7 +596,9 @@ export const useSessionStore = defineStore('session', () => {
     error.value = null
     const observed = _observedRows(id)
     const prevs = observed.map((r) => r.pinned)
+
     for (const r of observed) r.pinned = pinned
+
     try {
       return await sessionsApi.setPinned(id, pinned)
     } catch (e) {
@@ -585,13 +644,17 @@ export const useSessionStore = defineStore('session', () => {
   async function answerCheck(selectedIndex) {
     const id = currentSessionId.value
     const pc = pendingCheck.value
+
     if (!id || !pc) return
     // #348: free navigation -- grade the item on screen, in any order.
     const i = pc.viewIndex
     const item = pc.items[i]
+
     if (!item || item.status !== 'pending') return
+
     if (checkAnswering.value) return
     checkAnswering.value = true
+
     try {
       const resp = await sessionsApi.answerCheck(id, i, selectedIndex)
       item.status = 'answered'
@@ -609,11 +672,13 @@ export const useSessionStore = defineStore('session', () => {
   // currentIndex stays the server's first-unresolved pointer.
   function nextCheck() {
     const pc = pendingCheck.value
+
     if (pc) pc.viewIndex = Math.min(pc.viewIndex + 1, pc.total - 1)
   }
 
   function prevCheck() {
     const pc = pendingCheck.value
+
     if (pc) pc.viewIndex = Math.max(pc.viewIndex - 1, 0)
   }
 
@@ -621,24 +686,30 @@ export const useSessionStore = defineStore('session', () => {
   function nextPendingIndex(pc, from) {
     for (let k = 1; k <= pc.total; k++) {
       const n = (from + k) % pc.total
+
       if (pc.items[n]?.status === 'pending') return n
     }
+
     return from
   }
 
   async function skipCheck() {
     const id = currentSessionId.value
     const pc = pendingCheck.value
+
     if (!id || !pc) return
     const i = pc.viewIndex
     const item = pc.items[i]
+
     if (!item || item.status !== 'pending') return
+
     // Same in-flight guard as answerCheck: a rapid double-skip would otherwise
     // double-POST, and the second hits a 409 since the item is already
     // resolved.
     if (checkAnswering.value) return
     checkAnswering.value = true
     let resp
+
     try {
       resp = await sessionsApi.skipCheck(id, i)
       item.status = 'skipped'
@@ -646,6 +717,7 @@ export const useSessionStore = defineStore('session', () => {
     } finally {
       checkAnswering.value = false
     }
+
     if (resp.done) {
       await completeCheck()
     } else {
@@ -665,8 +737,11 @@ export const useSessionStore = defineStore('session', () => {
 
   async function _runCheckFollowup(streamFollowup) {
     const id = currentSessionId.value
+
     if (!id || !pendingCheck.value) return
+
     if (checkCompleting.value) return
+
     // F-04: never start the follow-up stream while another stream is live --
     // both write through the shared streamingMessage/abortController, so a
     // second start would interleave two SSE streams into one bubble and
@@ -687,13 +762,16 @@ export const useSessionStore = defineStore('session', () => {
     error.value = null
     const deltaBatcher = createDeltaBatcher(appendAssistantDelta)
     let sawTerminal = false
+
     try {
       await streamFollowup({
         sessionId: id,
         signal: ctrl.signal,
         onEvent: ({ event, data }) => {
           sawAnyEvent = true
+
           if (event !== 'assistant_delta') deltaBatcher.flush()
+
           switch (event) {
             case 'tool_call_start':
               recordToolCall({ kind: 'start', tool_call: data })
@@ -726,10 +804,12 @@ export const useSessionStore = defineStore('session', () => {
               break
             case 'followup_skipped':
               sawTerminal = true
+
               if (!_streamSuperseded()) {
                 followupNotice.value =
                   'Daily message limit reached - recap saved, tutor follow-up skipped.'
               }
+
               streamingMessage.value = null
               streamState.value = 'idle'
               abortController.value = null
@@ -742,6 +822,7 @@ export const useSessionStore = defineStore('session', () => {
         },
       })
       deltaBatcher.flush()
+
       if (!sawTerminal) {
         if (!_streamSuperseded()) error.value = 'The tutor stopped responding. Please try again.'
         streamingMessage.value = null
@@ -750,16 +831,22 @@ export const useSessionStore = defineStore('session', () => {
       }
     } catch (e) {
       deltaBatcher.flush()
+
       if (_streamSuperseded()) {
         _clearStreamState()
+
         return
       }
+
       if (!sawAnyEvent && !pendingCheck.value) pendingCheck.value = savedCheck
+
       if (e?.name === 'AbortError') {
         if (streamingMessage.value)
           handleCancelled('pending', streamingMessage.value.content.length, '0')
+
         return
       }
+
       if (e?.status === 429) _applyCapError(e?.body?.detail)
       streamingMessage.value = null
       streamState.value = 'idle'
@@ -794,9 +881,11 @@ export const useSessionStore = defineStore('session', () => {
     // unmount). Unlike stopStream -- the user-visible Stop, which persists a
     // cancelled bubble -- nothing may be pushed into messages or error state.
     _streamSid = null
+
     if (abortController.value) abortController.value.abort()
     _clearStreamState()
   }
+
   const followupNotice = ref(null)
 
   function clearFollowupNotice() {
@@ -810,16 +899,19 @@ export const useSessionStore = defineStore('session', () => {
 
   function recordToolCall({ kind, tool_call }) {
     if (!streamingMessage.value) return
+
     if (kind === 'start') {
       streamingMessage.value.tool_calls.push({ ...tool_call, state: 'running' })
       streamState.value = 'tool_running'
     } else if (kind === 'done') {
       const tc = streamingMessage.value.tool_calls.find((t) => t.id === tool_call.id)
+
       if (tc) {
         tc.state = tool_call.status === 'error' ? 'error' : 'done'
         tc.summary = tool_call.summary
         tc.error = tool_call.error
       }
+
       streamState.value = 'streaming'
     }
   }
@@ -839,8 +931,10 @@ export const useSessionStore = defineStore('session', () => {
   function finalizeMessage(message_id) {
     if (_streamSuperseded()) {
       _clearStreamState()
+
       return
     }
+
     if (!streamingMessage.value) return
     _appendMessage({ ...streamingMessage.value, message_id, status: 'complete' })
     streamingMessage.value = null
@@ -851,8 +945,10 @@ export const useSessionStore = defineStore('session', () => {
   function handleCancelled(message_id, partial_chars, estimated_cost_usd) {
     if (_streamSuperseded()) {
       _clearStreamState()
+
       return
     }
+
     if (!streamingMessage.value) return
     _appendMessage({
       ...streamingMessage.value,
@@ -889,14 +985,17 @@ export const useSessionStore = defineStore('session', () => {
       const status = PARTIAL_ABORT_CODES.has(code) ? 'partial' : 'error'
       _appendMessage({ ...streamingMessage.value, status })
     }
+
     _clearStreamState()
   }
 
   function handleAbortError(code) {
     if (_streamSuperseded()) {
       _clearStreamState()
+
       return
     }
+
     _settleWithError(code)
   }
 
@@ -905,6 +1004,7 @@ export const useSessionStore = defineStore('session', () => {
   // suppresses a second sentence saying the same thing.
   function _onSseError(data) {
     const claimedByCapBanner = _applyCapError(data)
+
     if (!claimedByCapBanner && !_streamSuperseded()) error.value = sseErrorCopy(data)
     handleAbortError(data?.code)
   }
@@ -924,7 +1024,9 @@ export const useSessionStore = defineStore('session', () => {
   }) {
     if (!currentSessionId.value) throw new Error('no active session')
     const trimmed = (text || '').trim()
+
     if (!trimmed) return null
+
     // F-04 (defensive): same single-live-stream invariant as completeCheck.
     if (streamState.value !== 'idle') return null
     followupNotice.value = null
@@ -939,6 +1041,7 @@ export const useSessionStore = defineStore('session', () => {
     const deltaBatcher = createDeltaBatcher(appendAssistantDelta)
     let sawTerminal = false
     let sawAnyEvent = false
+
     try {
       await streamChat({
         sessionId: currentSessionId.value,
@@ -949,7 +1052,9 @@ export const useSessionStore = defineStore('session', () => {
         signal: ctrl.signal,
         onEvent: ({ event, data }) => {
           sawAnyEvent = true
+
           if (event !== 'assistant_delta') deltaBatcher.flush()
+
           switch (event) {
             case 'tool_call_start':
               recordToolCall({ kind: 'start', tool_call: data })
@@ -988,6 +1093,7 @@ export const useSessionStore = defineStore('session', () => {
         },
       })
       deltaBatcher.flush()
+
       if (!sawTerminal) {
         if (!_streamSuperseded()) error.value = 'The tutor stopped responding. Please try again.'
         streamingMessage.value = null
@@ -997,17 +1103,22 @@ export const useSessionStore = defineStore('session', () => {
     } catch (e) {
       deltaBatcher.flush()
       const authExpired = e?.status === 401
+
       // Superseded by navigation: swallow. Superseded because sign-out reset
       // the store (E-05): fall through so the 401 arm can rethrow.
       if (_streamSuperseded() && !authExpired) {
         _clearStreamState()
+
         return
       }
+
       if (e?.name === 'AbortError') {
         if (streamingMessage.value)
           handleCancelled('pending', streamingMessage.value.content.length, '0')
+
         return
       }
+
       if (!sawAnyEvent && typeof e?.status === 'number' && e.status >= 400) {
         // I-10: the server persisted nothing pre-stream - drop the
         // optimistic bubble instead of stranding it in the transcript.
@@ -1017,22 +1128,27 @@ export const useSessionStore = defineStore('session', () => {
         // so it always removes THIS send's row even if the array moved under
         // it (an _appendMessage eviction reassigns messages.value).
         const at = messages.value.findIndex((m) => m.client_id === clientId)
+
         if (at !== -1) messages.value.splice(at, 1)
       }
+
       if (authExpired) {
         // E-05: the view must get a chance to stash the draft before the
         // login redirect unmounts it.
         _clearStreamState()
         throw new StreamAbortedError('auth_expired', e)
       }
+
       if (e?.status === 409 && e?.body?.detail?.code === ERR_SESSION_ENDED) {
         error.value = SESSION_ENDED_COPY
+
         if (currentSession.value) currentSession.value.ended_at = new Date().toISOString()
         _clearStreamState()
         // E-11: rethrow so the view restores the draft instead of running
         // its success path.
         throw new StreamAbortedError('session_ended', e)
       }
+
       if (e?.status === 429) _applyCapError(e?.body?.detail)
       // E-03: a transport failure mid-stream keeps the text already streamed
       // (as status 'error'), matching what a reload of this session shows.

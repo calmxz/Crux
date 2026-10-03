@@ -21,6 +21,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: '```python\ndef foo():\n    pass\n```' },
     })
+
     expect(w.html()).toMatch(/<code class="language-python[^"]*"/)
   })
 
@@ -40,6 +41,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: '| a | b |\n|---|---|\n| 1 | 2 |' },
     })
+
     expect(w.html()).toContain('<table')
   })
 
@@ -49,6 +51,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: '| a | b |\n|---|---|\n| 1 | 2 |' },
     })
+
     expect(w.find('.md-table-wrap > table').exists()).toBe(true)
     expect(w.findAll('table')).toHaveLength(1)
   })
@@ -62,6 +65,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: 'cost is $O(log ', streaming: true },
     })
+
     expect(w.html()).toContain('cost is')
     expect(w.html()).toContain('class="deferred"')
     expect(w.html()).toContain('$O(log')
@@ -71,6 +75,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: 'cost is $O(n)$', streaming: true },
     })
+
     await settle()
     expect(w.html()).toContain('class="katex"')
     expect(w.html()).not.toContain('class="deferred"')
@@ -80,6 +85,7 @@ describe('MarkdownContent', () => {
     const w = mount(MarkdownContent, {
       props: { text: 'cost is $O(log ', streaming: false },
     })
+
     // Should render the dollar literally rather than throw.
     expect(w.html()).toContain('$O(log')
   })
@@ -117,10 +123,13 @@ describe('MarkdownContent', () => {
 
     const FRAME_ENDS = (() => {
       const ends = []
+
       for (let end = 40; ; end = Math.min(end + 40, FULL.length)) {
         ends.push(end)
+
         if (end >= FULL.length) break
       }
+
       return ends
     })()
 
@@ -134,28 +143,36 @@ describe('MarkdownContent', () => {
         const mismatches = []
         let coldMismatches = 0
         let compared = 0
+
         for (const end of FRAME_ENDS) {
           const text = FULL.slice(0, end)
           // `await` per frame: Vue batches prop writes, and the cache has to see
           // every frame the way a real stream delivers them.
           await w.setProps({ text })
+
           // A frame with nothing held back renders the whole buffer, so the
           // streamed HTML must equal the non-streaming render of the same text.
           if (!w.find('.deferred').exists()) {
             const plain = mount(MarkdownContent, { props: { text, streaming: false } })
+
             if (w.find('.md-rendered').html() !== plain.find('.md-rendered').html()) {
               mismatches.push(end)
             }
+
             plain.unmount()
             compared += 1
           }
+
           // And a long-lived cache must not drift from a cold one.
           const fresh = mount(MarkdownContent, { props: { text, streaming: true } })
+
           if (w.find('.md-rendered').html() !== fresh.find('.md-rendered').html()) {
             coldMismatches += 1
           }
+
           fresh.unmount()
         }
+
         expect(mismatches).toEqual([])
         expect(coldMismatches).toBe(0)
         // Guard against the splitter deferring on nearly every frame and making
@@ -176,28 +193,35 @@ describe('MarkdownContent', () => {
       let chars = 0
       md.render = (src) => {
         chars += src.length
+
         return real(src)
       }
+
       let naive = 0
       let incremental = 0
+
       try {
         for (const streaming of [false, true]) {
           // streaming=false re-renders the whole prefix every frame, which is
           // exactly the pre-F-15 behaviour of the streaming branch.
           const w = mount(MarkdownContent, { props: { text: '', streaming } })
           let total = 0
+
           for (const end of FRAME_ENDS) {
             chars = 0
             await w.setProps({ text: FULL.slice(0, end) })
             total += chars
           }
+
           w.unmount()
+
           if (streaming) incremental = total
           else naive = total
         }
       } finally {
         md.render = real
       }
+
       // Whole-prefix re-rendering is quadratic in the buffer length; the cached
       // head makes the streaming path close to linear.
       // Measured 2026-09-20 on a 4092-char fixture in 40-char chunks (103

@@ -56,16 +56,21 @@ function longProse() {
     'boundary',
     'estimate',
   ]
+
   const paras = []
   let n = 0
+
   while (paras.join('\n\n').length < 4000) {
     const sentence = []
+
     for (let i = 0; i < 26; i += 1) {
       sentence.push(words[(n + i) % words.length])
       n += 1
     }
+
     paras.push(sentence.join(' ') + '.')
   }
+
   return paras.join('\n\n') + '\n'
 }
 
@@ -77,14 +82,18 @@ function parityMismatches(full, size) {
   const split = createSplitState()
   const cache = createRenderCache()
   const bad = []
+
   for (let end = size; ; end = Math.min(end + size, full.length)) {
     const text = full.slice(0, end)
     const { safe } = splitSafePrefixIncremental(text, split)
     const incremental = renderMarkdownIncremental(safe, cache)
     const expected = renderMarkdown(safe)
+
     if (incremental !== expected) bad.push({ end, safe, incremental, expected })
+
     if (end >= full.length) break
   }
+
   return bad
 }
 
@@ -97,13 +106,17 @@ function parityMismatches(full, size) {
 function rawParityMismatches(full, size) {
   const cache = createRenderCache()
   const bad = []
+
   for (let end = size; ; end = Math.min(end + size, full.length)) {
     const text = full.slice(0, end)
     const incremental = renderMarkdownIncremental(text, cache)
     const expected = renderMarkdown(text)
+
     if (incremental !== expected) bad.push({ end, text, incremental, expected })
+
     if (end >= full.length) break
   }
+
   return bad
 }
 
@@ -212,14 +225,17 @@ describe('renderMarkdownIncremental work saved', () => {
     let chars = 0
     md.render = (src) => {
       chars += src.length
+
       return real(src)
     }
+
     try {
       let before = 0
       let after = 0
       const splitA = createSplitState()
       const splitB = createSplitState()
       const cache = createRenderCache()
+
       for (let end = 40; ; end = Math.min(end + 40, full.length)) {
         const text = full.slice(0, end)
 
@@ -233,6 +249,7 @@ describe('renderMarkdownIncremental work saved', () => {
 
         if (end >= full.length) break
       }
+
       // Whole-prefix re-rendering is quadratic in the buffer length; the
       // incremental path is close to linear.
       expect(before).toBeGreaterThan(150000)

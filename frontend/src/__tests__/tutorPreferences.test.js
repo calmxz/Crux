@@ -25,14 +25,18 @@ function contractEnum(schema) {
   const m = openapi.match(
     new RegExp(`\\n {4}${schema}:\\n {6}type: string\\n {6}enum: \\[([^\\]]+)\\]`),
   )
+
   if (!m) throw new Error(`enum for ${schema} not found in openapi.yaml`)
+
   return m[1].split(',').map((s) => s.trim())
 }
 
 function contractDefault(field) {
   const block = openapi.split('\n    MeResponse:\n')[1].split('\n\n')[0]
   const m = block.match(new RegExp(`\\n {8}${field}:\\n[^\\n]*\\n {10}default: (\\w+)`))
+
   if (!m) throw new Error(`MeResponse default for ${field} not found in openapi.yaml`)
+
   return m[1]
 }
 

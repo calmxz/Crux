@@ -50,6 +50,7 @@ export const useUserStore = defineStore('user', () => {
 
   function setActiveUser(uid) {
     const next = uid ?? null
+
     if (next === activeUserId.value) return
     activeUserId.value = next
     _clearInMemory()
@@ -57,13 +58,16 @@ export const useUserStore = defineStore('user', () => {
     // user's sessions/messages/profile state readable by the next account
     // on the same tab. Token refreshes hit the same-uid early return above.
     useSessionStore().reset()
+
     if (next) loadFromLocalStorage()
   }
 
   function loadFromLocalStorage() {
     if (typeof localStorage === 'undefined' || !activeUserId.value) return
     const raw = localStorage.getItem(_storageKey())
+
     if (!raw) return
+
     try {
       const data = JSON.parse(raw)
       name.value = data.name ?? null
@@ -92,17 +96,22 @@ export const useUserStore = defineStore('user', () => {
   async function hydrateFromServer() {
     if (!activeUserId.value) return
     hydrateFailed.value = false
+
     try {
       const me = await apiGet('/me', undefined, { silent: true })
+
       if (me) {
         if (me.display_name != null) name.value = me.display_name
         const prefs = {}
+
         for (const [key, field] of Object.entries(PREF_FIELDS)) {
           if (me[field] != null) prefs[key] = me[field]
         }
+
         if (Object.keys(prefs).length) {
           interactionPreferences.value = { ...interactionPreferences.value, ...prefs }
         }
+
         onboardingComplete.value = Boolean(me.onboarding_complete)
         persist()
       }
@@ -130,6 +139,7 @@ export const useUserStore = defineStore('user', () => {
 
   function resetOnboarding() {
     _clearInMemory()
+
     if (typeof localStorage !== 'undefined' && activeUserId.value) {
       localStorage.removeItem(_storageKey())
     }
@@ -154,20 +164,26 @@ export const useUserStore = defineStore('user', () => {
   async function updateProfile({ name: displayName, ...changes }) {
     const body = {}
     const prefs = {}
+
     if (displayName != null) body.display_name = displayName.trim() || 'Learner'
+
     for (const [key, field] of Object.entries(PREF_FIELDS)) {
       if (changes[key] != null) {
         body[field] = changes[key]
         prefs[key] = changes[key]
       }
     }
+
     if (Object.keys(body).length) {
       await apiPatch('/me', body)
     }
+
     if (displayName != null) name.value = displayName.trim() || 'Learner'
+
     if (Object.keys(prefs).length) {
       interactionPreferences.value = { ...interactionPreferences.value, ...prefs }
     }
+
     persist()
   }
 

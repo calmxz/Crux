@@ -285,29 +285,45 @@ import { costCapToastMessage, dailyCapToastMessage } from '../lib/capToast.js'
 const props = defineProps({ id: { type: String, required: true } })
 
 const route = useRoute()
+
 const router = useRouter()
+
 const store = useSessionStore()
+
 // Drives the panel column width only (see --panel-col in <style>); CueColumn
 // owns its own collapsed rendering and the toggle button.
 const { collapsed: panelCollapsed } = usePanel()
 
 const draft = ref('')
+
 const lastSentText = ref('')
+
 const summaryDialog = ref(false)
+
 const summaryText = ref('')
+
 const summaryKind = ref('summary')
+
 const notFound = ref(false)
+
 const resuming = ref(false)
+
 const gapPickerOpen = ref(false)
+
 const sending = ref(false)
+
 const composerRef = ref(null)
+
 const uploading = ref(false)
+
 const uploadStatus = ref(null)
+
 // Same generation-counter idiom as useReferencePoll: /session/:id reuses
 // this component instance across sidebar switches, so an in-flight upload poll
 // from the previous session must not write uploadStatus/uploading after the id
 // changes. Bumped by the props.id watcher; every write after an await checks it.
 let uploadGen = 0
+
 const lastError = ref(null)
 
 // F-12 / E-07: one poller for this session, shared by the reference banner and
@@ -327,8 +343,11 @@ const {
 // null means not loaded or load failed - the card simply does not render,
 // the tutor's conversational offer is the fallback.
 const diagProfile = ref(null)
+
 const diagDismissed = ref(false)
+
 const diagError = ref('')
+
 // A conversational decline ("no thanks, just teach me") never writes a level,
 // so knowledge_level stays null and the card would render for the rest of the
 // session. Two completed tutor turns with the level still null are treated as
@@ -345,6 +364,7 @@ function dismissDiag() {
   // storage unavailable (private mode/quota) - in-memory dismissal still holds
   storageSet(sessionStorageThunk, diagDismissKey(props.id), '1')
 }
+
 // F5: guards onDiagLevel's async body against a rapid second click firing a
 // second PATCH with the same (soon-to-be-stale) etag. Folded into the card's
 // busy binding so the buttons visually disable too.
@@ -380,7 +400,9 @@ function dismissTopicCard() {
 
 const topicCard = computed(() => {
   const last = store.messages.at(-1)
+
   if (last?.role !== 'assistant' || !last.topic_suggestions) return null
+
   if (
     topicDismissed.value ||
     store.streamingMessage ||
@@ -392,6 +414,7 @@ const topicCard = computed(() => {
     store.detailLoading
   )
     return null
+
   return last.topic_suggestions
 })
 
@@ -400,6 +423,7 @@ async function onTopicPick(text) {
   lastError.value = null
   cuesLanded.value = false
   sending.value = true
+
   try {
     await store.sendMessageStreaming({ text })
   } catch (e) {
@@ -415,6 +439,7 @@ async function onTopicPick(text) {
 async function loadDiagProfile(id) {
   try {
     const data = await getSessionProfile(id)
+
     if (id !== props.id) return // stale response from a previous session
     diagProfile.value = data
   } catch {
@@ -428,6 +453,7 @@ async function loadDiagProfile(id) {
 // stopping), so the edges we care about are idle -> non-idle (start) and
 // non-idle -> idle (finish), not every individual hop.
 const streamAnnouncement = ref('')
+
 // Both things this view does on a stream-state edge, in one watcher.
 //
 // F2: the agent may have conversationally recorded a declared level
@@ -445,17 +471,23 @@ watch(
   (next, prev) => {
     if (prev === 'idle' && next !== 'idle') {
       streamAnnouncement.value = 'Tutor is replying.'
+
       return
     }
+
     if (prev === 'idle' || next !== 'idle') return
     streamAnnouncement.value = 'Reply finished.'
+
     const stillUnset =
       diagProfile.value &&
       diagProfile.value.profile?.knowledge_level == null &&
       !diagDismissed.value
+
     loadDiagProfile(props.id)
+
     if (!stillUnset) return
     diagNullTurns += 1
+
     if (diagNullTurns >= 2) dismissDiag()
   },
 )
@@ -475,31 +507,42 @@ const current = computed(() =>
 
 // Falls back to not-ended until the target detail resolves.
 const isEnded = computed(() => Boolean(current.value?.ended_at))
+
 // The one profile the frontend holds. The store's copy is only written on
 // loadSession, so the per-turn GET /profile/:id refetch (diagProfile) is the
 // fresher of the two and wins when present; both are already discriminated on
 // props.id, so a switch never paints the previous session's cues.
 const liveProfile = computed(() => {
   if (diagProfile.value?.profile) return diagProfile.value.profile
+
   return current.value?.topic_profile ?? null
 })
+
 const profileLevel = computed(() => liveProfile.value?.knowledge_level || '')
+
 const startedAt = computed(() => current.value?.created_at || '')
+
 const endedSummary = computed(() => stripAutoPrefix(liveProfile.value?.last_session_summary))
+
 // While a check batch is open, the cue it tests carries the red underline.
 const testingGap = computed(() => store.pendingCheck?.gap || '')
+
 // The full gap list drives the picker (single gap skips it, >1 gap opens it).
 const confirmedGaps = computed(() => entryNames(current.value?.topic_profile?.confirmed_gaps))
+
 // Gates the "Review my gaps" CTA — only meaningful once we're showing the
 // ended banner for this session.
 const hasGaps = computed(() => confirmedGaps.value.length > 0)
+
 const canEnd = computed(() => Boolean(current.value) && !isEnded.value)
+
 const canSend = computed(() => canEnd.value && !store.dailyCapReached && !store.costCapReached)
 
 // Cue-lands: CueColumn diffs the live profile and tells us when new cues were
 // written; the gutter of the latest tutor turn then carries the blue tick
 // until the learner writes again.
 const cuesLanded = ref(false)
+
 function onCuesLanded() {
   cuesLanded.value = true
 }
@@ -508,7 +551,9 @@ function onCuesLanded() {
 // follow-up notice (it is the newer, more specific event).
 const topCaption = computed(() => {
   if (uploadStatus.value) return 'upload'
+
   if (store.followupNotice) return 'followup'
+
   return null
 })
 
@@ -518,8 +563,10 @@ const topCaption = computed(() => {
 // row. View-local only — store.currentSession is never stubbed, which is what
 // keeps this clear of the PR #72 switch-reload bug class.
 const knownRow = computed(() => store.sessions.find((s) => s.id === props.id) || null)
+
 const headerTopic = computed(() => {
   if (current.value) return current.value.topic || ''
+
   return knownRow.value?.topic || ''
 })
 
@@ -530,6 +577,7 @@ const headerTopic = computed(() => {
 // patches both copies optimistically).
 const headerSession = computed(() => {
   if (!current.value && !knownRow.value) return null
+
   return {
     id: props.id,
     topic: headerTopic.value,
@@ -550,6 +598,7 @@ const headerSession = computed(() => {
 // 'ready'/'failed'/null pass through unchanged.
 const headerRefStatus = computed(() => {
   const s = refStatus.value
+
   return s === 'pending' ? 'processing' : s || null
 })
 
@@ -558,12 +607,16 @@ const headerRefStatus = computed(() => {
 // input is blocked. null when not cap-disabled (renders no attribute).
 const capDescribedby = computed(() => {
   const ids = []
+
   if (store.dailyCapReached) ids.push('cap-banner-daily')
+
   if (store.costCapReached) ids.push('cap-banner-cost')
+
   return ids.length ? ids.join(' ') : null
 })
 
 const { showError, showWarn } = useToast()
+
 watch(
   () => store.dailyCapReached,
   (now) => {
@@ -573,6 +626,7 @@ watch(
     showError(message, { summary, life: 8000 })
   },
 )
+
 watch(
   () => store.costCapReached,
   (now) => {
@@ -590,17 +644,23 @@ watch(
 // warning), while neither level repeats. Never read by the template, so plain
 // per-instance flags (setup scope, i.e. one pair per mount) rather than refs.
 let softCapShown = false
+
 let urgentCapShown = false
+
 function resolveCostWarningLevel(detail) {
   let level = detail?.level
+
   if (!level && typeof detail?.header === 'string') {
     const match = detail.header.match(/level=(\w+)/)
     level = match ? match[1] : null
   }
+
   return level === 'urgent' ? 'urgent' : 'soft'
 }
+
 function onCostWarning(event) {
   const level = resolveCostWarningLevel(event?.detail)
+
   if (level === 'urgent') {
     if (urgentCapShown) return
     urgentCapShown = true
@@ -608,8 +668,10 @@ function onCostWarning(event) {
       summary: 'Cost limit near',
       life: 8000,
     })
+
     return
   }
+
   if (softCapShown) return
   softCapShown = true
   showWarn('You’re approaching the daily cost limit for this session.', {
@@ -617,14 +679,18 @@ function onCostWarning(event) {
     life: 6000,
   })
 }
+
 onMounted(() => costBus.addEventListener('cost-warning', onCostWarning))
+
 onUnmounted(() => costBus.removeEventListener('cost-warning', onCostWarning))
 
 // #346: the document is the scroller. A body class drives the route-scoped
 // flex-height cascade (see <style>) so a short transcript still puts the
 // composer at the foot of the viewport. Removed unconditionally on leave.
 onMounted(() => document.body.classList.add('session-page'))
+
 onUnmounted(() => document.body.classList.remove('session-page'))
+
 // There is no router scrollBehavior, so a long session scrolled to its foot
 // would hand the next route a scrolled-down document.
 onUnmounted(() => window.scrollTo(0, 0))
@@ -639,6 +705,7 @@ onUnmounted(() => store.abandonStream())
 const awaitingResponse = computed(() => {
   if (!sending.value) return false
   const last = store.messages[store.messages.length - 1]
+
   return !last || last.role === 'user'
 })
 
@@ -660,8 +727,11 @@ function scrollToBottom() {
 // does not. Re-arming takes FOLLOW_SLACK_PX so sub-pixel rounding still
 // counts as "back at the bottom". Never read by the template, so plain lets.
 const FOLLOW_SLACK_PX = 40
+
 let following = true
+
 let lastScrollY = 0
+
 const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY)
 
 function distanceFromBottom() {
@@ -670,20 +740,24 @@ function distanceFromBottom() {
 
 function onWindowScroll() {
   const distance = distanceFromBottom()
+
   if (window.scrollY < lastScrollY && distance > 1) following = false
   else if (distance <= FOLLOW_SLACK_PX) following = true
   lastScrollY = window.scrollY
 }
+
 // The scroll event lags the gesture by a frame, long enough for a token to
 // land and a programmatic scroll to swallow the learner's first flick. A wheel
 // turned upward is intent itself, so cancel on it directly.
 function onWindowWheel(event) {
   if (event.deltaY < 0 && window.scrollY > 0) following = false
 }
+
 onMounted(() => {
   window.addEventListener('scroll', onWindowScroll, { passive: true })
   window.addEventListener('wheel', onWindowWheel, { passive: true })
 })
+
 onUnmounted(() => {
   window.removeEventListener('scroll', onWindowScroll)
   window.removeEventListener('wheel', onWindowWheel)
@@ -705,6 +779,7 @@ function followStream() {
 watch(
   () => {
     const s = store.streamingMessage
+
     return s && [s.content.length, s.tool_calls.map((t) => t.state).join(), s.citations.length]
   },
   (streamSize) => {
@@ -725,6 +800,7 @@ async function onLoadEarlier() {
   const prevHeight = docScrollHeight()
   const prevTop = window.scrollY
   prepending = true
+
   try {
     await store.loadEarlierMessages()
     await nextTick()
@@ -736,9 +812,11 @@ async function onLoadEarlier() {
 
 watch([() => store.messages.length, awaitingResponse], () => {
   if (prepending) return
+
   // A learner who just sent expects to see the reply, wherever they were; a
   // reply landing while they read history above must not yank them down.
   if (awaitingResponse.value || store.messages.at(-1)?.role === 'user') following = true
+
   if (following) scrollToBottom()
 })
 
@@ -772,6 +850,7 @@ async function loadCurrent(id) {
   diagError.value = ''
   diagLevelBusy.value = false
   loadDiagProfile(id) // deliberately not awaited: card is best-effort
+
   try {
     await store.loadSession(id)
   } catch (e) {
@@ -779,12 +858,15 @@ async function loadCurrent(id) {
     // 404 from the session we left must not flash its not-found over the one now
     // on screen. Same discriminator the success-path computeds use (id===props.id).
     if (id !== props.id) return
+
     if (e?.status === 404) {
       notFound.value = true
       store.setError(null)
     }
   }
+
   if (!isEnded.value && !notFound.value) focusComposer()
+
   // Covers fresh navigation (new id, e.g. from ProfileView's "Review gaps"
   // button, or the level-at-start picker's "Quiz me" chip) where the query
   // is already present before the session loads. handleQuizQuery runs first
@@ -828,6 +910,7 @@ watch(
   () => route.query.review_gap,
   (gap) => {
     if (!gap) return
+
     if (!current.value) return
     handleReviewGapQuery()
   },
@@ -838,6 +921,7 @@ watch(
   () => route.query.quiz,
   (quiz) => {
     if (!quiz) return
+
     if (!current.value) return
     handleQuizQuery()
   },
@@ -856,6 +940,7 @@ const canRetry = computed(() => Boolean(lastSentText.value) && !sending.value &&
 
 async function send() {
   const text = draft.value
+
   if (!text.trim()) return
   draft.value = ''
   lastSentText.value = text
@@ -863,6 +948,7 @@ async function send() {
   // The learner is writing again: the previous turn's landed tick is spent.
   cuesLanded.value = false
   sending.value = true
+
   try {
     await store.sendMessageStreaming({ text })
     lastSentText.value = ''
@@ -878,6 +964,7 @@ async function send() {
         // the in-memory restore below is still the best we can do.
         storageSet(sessionStorageThunk, `crux:draft:${props.id}`, text)
       }
+
       draft.value = text
     } else {
       draft.value = text
@@ -894,6 +981,7 @@ async function retryLastMessage() {
   // silently discard that edit. lastSentText is only the fallback for the case
   // where the composer was cleared.
   if (!draft.value.trim() && lastSentText.value) draft.value = lastSentText.value
+
   if (!draft.value.trim()) return
   await send()
 }
@@ -903,6 +991,7 @@ async function retryLastMessage() {
 function restoreStashedDraft(id) {
   const key = `crux:draft:${id}`
   const stashed = storageGet(sessionStorageThunk, key)
+
   if (stashed !== null) {
     draft.value = stashed
     storageRemove(sessionStorageThunk, key)
@@ -913,6 +1002,7 @@ async function onDiagQuiz() {
   if (!canSend.value) return
   const id = props.id
   diagError.value = ''
+
   try {
     await store.sendMessageStreaming({ text: 'Quiz me to gauge my level' })
   } catch {
@@ -930,6 +1020,7 @@ async function onDiagQuiz() {
 // send failure is not surfaced on the card.
 async function sendLevelDeclaration(level) {
   if (!canSend.value) return
+
   try {
     await store.sendMessageStreaming({ text: `I'd say my level is ${level}.` })
   } catch {
@@ -947,11 +1038,14 @@ async function onDiagLevel(level) {
   // resolves late.
   const id = props.id
   const etag = diagProfile.value?.etag
+
   if (!etag) return
   diagLevelBusy.value = true
   diagError.value = ''
+
   try {
     const res = await patchProfile(id, { knowledge_level: level }, etag)
+
     if (id !== props.id) return // stale response from a previous session
     diagProfile.value = { profile: res.profile, etag: res.etag }
     await sendLevelDeclaration(level)
@@ -962,7 +1056,9 @@ async function onDiagLevel(level) {
       // has its own stale-response guard, so this is safe even if the
       // session has since switched.
       await loadDiagProfile(id)
+
       if (id !== props.id) return // stale response from a previous session
+
       if (diagProfile.value == null) {
         // The refetch itself failed (loadDiagProfile sets it to null on
         // error) -- distinct from "refetch succeeded, level still null".
@@ -972,8 +1068,10 @@ async function onDiagLevel(level) {
         // false alarm, not a real conflicting write. Retry once with the
         // fresh etag so the original click is not silently swallowed.
         const freshEtag = diagProfile.value.etag
+
         try {
           const retryRes = await patchProfile(id, { knowledge_level: level }, freshEtag)
+
           if (id !== props.id) return // stale response from a previous session
           diagProfile.value = { profile: retryRes.profile, etag: retryRes.etag }
           await sendLevelDeclaration(level)
@@ -1011,20 +1109,26 @@ watch(
 async function onAttachFile(file) {
   // Client-side pre-check for instant feedback; backend re-validates (type + 25 MB).
   const v = validateFile(file)
+
   if (!v.ok) {
     uploadStatus.value = { kind: 'failed', text: v.reason }
+
     return
   }
+
   uploading.value = true
   uploadStatus.value = { kind: 'pending', text: `Uploading ${file.name}...` }
   const gen = uploadGen
+
   try {
     const resp = await uploadDocument({ sessionId: props.id, file })
+
     if (gen !== uploadGen) return
     // The shared poller both drives the banner (so the new doc appears) and
     // resolves once this document reaches a terminal state, replacing the old
     // fixed-1s / 90-attempt pollUploadStatus loop.
     const outcome = await watchReference(resp.document_id, file.name)
+
     if (gen !== uploadGen) return
     applyUploadOutcome(outcome, file.name)
   } catch (e) {
@@ -1050,24 +1154,31 @@ function applyUploadOutcome(outcome, filename) {
   // Session switched or the poller stopped: the id watcher already cleared the
   // chip, so writing anything here would paint a stale session's status.
   if (!outcome || outcome.cancelled) return
+
   if (outcome.status === 'ready') {
     uploadStatus.value = { kind: 'ready', text: `${filename} is ready. Ask a question about it.` }
+
     return
   }
+
   if (outcome.status === 'failed') {
     uploadStatus.value = {
       kind: 'failed',
       text: `Upload failed: ${outcome.error || 'ingestion error'}`,
     }
+
     return
   }
+
   if (outcome.unavailable) {
     uploadStatus.value = {
       kind: 'failed',
       text: `Upload status unavailable: ${friendlyError(outcome.error)}`,
     }
+
     return
   }
+
   // E-15: still pending at the wall-clock ceiling. The chip is a report on one
   // upload attempt and nothing clears it, so a "still processing" caption sat
   // there for the rest of the session on top of ReferenceStatusBanner, which
@@ -1078,6 +1189,7 @@ function applyUploadOutcome(outcome, filename) {
 async function resume() {
   if (!store.currentSession) return
   resuming.value = true
+
   try {
     await store.reopenSession(store.currentSession.id)
   } catch {
@@ -1089,10 +1201,13 @@ async function resume() {
 
 async function resumeReviewGaps() {
   if (!store.currentSession) return
+
   if (confirmedGaps.value.length > 1) {
     gapPickerOpen.value = true
+
     return
   }
+
   await sendReviewSeed(confirmedGaps.value[0])
 }
 
@@ -1104,6 +1219,7 @@ async function sendReviewSeed(gap) {
   // before calling in, but this covers both null and stale defensively.
   if (!current.value) return
   resuming.value = true
+
   try {
     if (isEnded.value) await store.reopenSession(current.value.id)
     await store.sendMessageStreaming({
@@ -1120,6 +1236,7 @@ async function sendReviewSeed(gap) {
 
 async function handleReviewGapQuery() {
   const gap = route.query.review_gap
+
   if (!gap) return
   router.replace({ query: { ...route.query, review_gap: undefined } })
   await sendReviewSeed(String(gap))
@@ -1142,8 +1259,11 @@ async function handleQuizQuery() {
   // fires unprompted on a later remount/reload once review_gap is gone.
   const yieldToReviewGap = !!route.query.review_gap
   router.replace({ query: { ...route.query, quiz: undefined } })
+
   if (yieldToReviewGap) return
+
   if (!current.value) return
+
   try {
     await store.sendMessageStreaming({
       text: 'Quiz me so you can pitch this at the right level.',

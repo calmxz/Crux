@@ -14,10 +14,13 @@ export const REQUEST_TIMEOUT_MS = 30000
 // banner. GETs are idempotent, so retry them a bounded number of times; nothing
 // else is retried (a POST could have landed before the connection dropped).
 export const GET_RETRY_ATTEMPTS = 3
+
 // Delay before attempt 2 and attempt 3. Jittered +/-20% so a backend restart
 // does not get every open tab back in lockstep.
 export const GET_RETRY_DELAYS_MS = [300, 900]
+
 const RETRY_JITTER = 0.2
+
 // Only transient upstream failures. 500 is a real bug and 429 has its own copy;
 // retrying either just delays the error the user needs to see.
 const RETRYABLE_STATUS = new Set([502, 503, 504])
@@ -29,8 +32,10 @@ const RETRYABLE_STATUS = new Set([502, 503, 504])
 // revalidated with If-None-Match rather than dropped outright -- a 304 means
 // the cached body is still current and just refreshes the TTL.
 export const GET_CACHE_TTL_MS = 5000
+
 // url -> { at, value, token, etag }
 const _getCache = new Map()
+
 // Bumped by every invalidation/reset. A GET captures it before its fetch and
 // skips the cache write if it moved meanwhile -- otherwise a GET that was
 // already in flight when a write landed would store its stale body on settle.
@@ -50,6 +55,7 @@ function _pathOfUrl(url) {
 // `/sessions/abcdef`.
 function _isSegmentPrefix(prefix, path) {
   if (!prefix || prefix === '/') return true
+
   return path === prefix || path.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`)
 }
 
@@ -70,8 +76,10 @@ export function invalidateGetCache(path) {
   // under a resource root therefore also drops every cached GET under that
   // root. Coarse, but a 5 s cache gains nothing from being clever here.
   const root = `/${target.split('/').filter(Boolean)[0] ?? ''}`
+
   for (const url of _getCache.keys()) {
     const cached = _pathOfUrl(url)
+
     if (
       _isSegmentPrefix(cached, target) ||
       _isSegmentPrefix(target, cached) ||
@@ -99,15 +107,20 @@ function _isRetryableError(e) {
 // a shared signal would already be spent when attempt 2 starts.
 async function _fetchWithRetry(url, buildInit, retryable) {
   const attempts = retryable ? GET_RETRY_ATTEMPTS : 1
+
   for (let attempt = 0; attempt < attempts; attempt += 1) {
     if (attempt > 0) {
       const delay = _jittered(GET_RETRY_DELAYS_MS[attempt - 1])
       await new Promise((r) => setTimeout(r, delay))
     }
+
     const last = attempt === attempts - 1
+
     try {
       const resp = await fetch(url, buildInit())
+
       if (!last && RETRYABLE_STATUS.has(resp.status)) continue
+
       return resp
     } catch (e) {
       // reportApiError stays in request(), so it fires once after the final
@@ -115,6 +128,7 @@ async function _fetchWithRetry(url, buildInit, retryable) {
       if (last || !_isRetryableError(e)) throw e
     }
   }
+
   /* c8 ignore next -- the loop either returns or throws on the last attempt */
   throw new Error('unreachable')
 }
@@ -138,6 +152,7 @@ const TOKEN_REFRESH_MARGIN_MS = 60000
 function _tokenExpMs(token) {
   try {
     const payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+
     return typeof payload.exp === 'number' ? payload.exp * 1000 : 0
   } catch {
     return 0
@@ -152,22 +167,27 @@ function _tokenExpMs(token) {
 export async function getFreshAccessToken() {
   try {
     const cached = useAuthStore().accessToken
+
     if (cached && _tokenExpMs(cached) - Date.now() > TOKEN_REFRESH_MARGIN_MS) {
       return cached
     }
   } catch {
     // no active pinia -- fall through to the SDK path
   }
+
   try {
     const { getSupabase } = await import('./supabase.js')
     const { data } = await getSupabase().auth.getSession()
     const tok = data?.session?.access_token
+
     if (tok) return tok
   } catch {
     // fall through to the store snapshot
   }
+
   try {
     const store = useAuthStore()
+
     return store.accessToken ?? null
   } catch {
     return null
@@ -181,6 +201,7 @@ export async function _refreshAccessToken() {
   try {
     const { getSupabase } = await import('./supabase.js')
     const { data } = await getSupabase().auth.getSession()
+
     return data?.session?.access_token ?? null
   } catch {
     return null
@@ -203,8 +224,10 @@ export async function _onAuthExpired() {
   // Belt to the per-entry token check in request(): nothing cached under the
   // dead session should outlive it.
   _resetApiCache()
+
   try {
     const store = useAuthStore()
+
     try {
       await store.signOut()
     } catch {
@@ -213,6 +236,7 @@ export async function _onAuthExpired() {
   } catch {
     // No active pinia (unit tests) -- nothing to sign out.
   }
+
   try {
     _unauthorizedHandler?.()
   } catch {
@@ -227,19 +251,23 @@ async function request(
   _retried = false,
 ) {
   let url = `${BASE_URL}${path}`
+
   if (params) {
     const qs = new URLSearchParams(
       Object.entries(params).filter(([, v]) => v !== undefined && v !== null),
     ).toString()
+
     if (qs) url += `?${qs}`
   }
 
   const isGet = method === 'GET'
 
   const baseHeaders = { ...headers }
+
   if (body !== undefined) baseHeaders['content-type'] = 'application/json'
 
   const token = _retried ? await _refreshAccessToken() : await getFreshAccessToken()
+
   if (token) baseHeaders['authorization'] = `Bearer ${token}`
 
   // Read the cache only after the token is known: the url alone is not a
@@ -252,10 +280,13 @@ async function request(
   // the server", not "always download the body". A hit under a different
   // token is dropped outright: that account's ETag must never be sent as ours.
   let revalidate = null
+
   if (isGet) {
     const hit = _getCache.get(url)
+
     if (hit && hit.token === token) {
       if (!fresh && Date.now() - hit.at < GET_CACHE_TTL_MS) return hit.value
+
       if (hit.etag) {
         revalidate = hit
         baseHeaders['if-none-match'] = hit.etag
@@ -267,10 +298,13 @@ async function request(
 
   const buildInit = () => {
     const init = { method, headers: { ...baseHeaders } }
+
     if (body !== undefined) init.body = JSON.stringify(body)
+
     if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
       init.signal = AbortSignal.timeout(REQUEST_TIMEOUT_MS)
     }
+
     return init
   }
 
@@ -279,12 +313,14 @@ async function request(
   const epochAtFetch = _cacheEpoch
 
   let resp
+
   try {
     resp = await _fetchWithRetry(url, buildInit, isGet)
   } catch (e) {
     if (!isGet) invalidateGetCache(path)
     const detail = e?.name === 'TimeoutError' ? 'request timed out' : e.message
     const err = new ApiError(0, { detail }, path)
+
     if (!silent) reportApiError(err)
     throw err
   }
@@ -313,6 +349,7 @@ async function request(
       if (epochAtFetch === _cacheEpoch && _getCache.get(url) === revalidate) {
         _getCache.set(url, { ...revalidate, at: Date.now() })
       }
+
       return revalidate.value
     }
     // Nothing sent If-None-Match, so the server should not have answered 304
@@ -325,11 +362,13 @@ async function request(
   if (!resp.ok) {
     if (resp.status === 401 && _retried) await _onAuthExpired()
     const err = new ApiError(resp.status, parsed ?? text, path)
+
     if (!silent) reportApiError(err)
     throw err
   }
 
   const warn = resp.headers?.get?.('x-cost-warning')
+
   if (warn) reportCostWarning({ header: warn, path })
 
   // Written even for fresh: true -- the response is current either way, and a
@@ -353,6 +392,9 @@ function safeJson(text) {
 }
 
 export const apiGet = (path, params, opts = {}) => request('GET', path, { params, ...opts })
+
 export const apiPost = (path, body, opts = {}) => request('POST', path, { body, ...opts })
+
 export const apiPatch = (path, body, opts = {}) => request('PATCH', path, { body, ...opts })
+
 export const apiDelete = (path, opts = {}) => request('DELETE', path, { ...opts })

@@ -49,6 +49,7 @@ export function useReferencePoll(sessionIdSource) {
 
   const readId = () =>
     typeof sessionIdSource === 'function' ? sessionIdSource() : unref(sessionIdSource)
+
   let sessionId = readId()
 
   function clearTimer() {
@@ -60,6 +61,7 @@ export function useReferencePoll(sessionIdSource) {
 
   function settle(key, outcome) {
     const entry = watched.get(key)
+
     if (!entry) return
     watched.delete(key)
     entry.resolve(outcome)
@@ -76,6 +78,7 @@ export function useReferencePoll(sessionIdSource) {
   function settleFromDocuments() {
     for (const [key, entry] of watched.entries()) {
       const doc = documents.value.find((d) => String(d?.id) === key)
+
       if (doc?.status === 'ready') settle(key, { status: 'ready' })
       else if (doc?.status === 'failed') settle(key, { status: 'failed', error: doc.error })
       else if (Date.now() >= entry.deadline) settle(key, { timedOut: true })
@@ -84,18 +87,21 @@ export function useReferencePoll(sessionIdSource) {
 
   function schedule() {
     if (stopped || timer) return
+
     // Keep going while the server is still working, while a watched upload has
     // not settled, or while the last poll threw (transient outage -- the banner
     // shows "References unavailable" and this loop is what clears it).
     if (!(status.value === 'pending' || failed.value || watched.size > 0)) return
     let delay = POLL_DELAYS_MS[Math.min(delayIndex, POLL_DELAYS_MS.length - 1)]
     delayIndex += 1
+
     // Never sleep past a watcher's wall-clock ceiling: at the 15s cap the next
     // step after 89s would be 104s, so the chip would sit on "Uploading..."
     // 14s beyond the advertised 90s. Wake exactly on the earliest deadline.
     for (const entry of watched.values()) {
       delay = Math.min(delay, Math.max(0, entry.deadline - Date.now()))
     }
+
     timer = setTimeout(() => {
       timer = null
       poll()
@@ -106,20 +112,24 @@ export function useReferencePoll(sessionIdSource) {
     if (stopped || !sessionId) return
     const gen = (generation += 1)
     const id = sessionId
+
     try {
       // fresh: true -- apiClient's 5s GET cache (F-18) would otherwise hand
       // this poll its own previous response back. silent: true -- the banner's
       // failed row is the error surface, not a toast per failed attempt.
       const res = await getSessionIngestion(id, { fresh: true, silent: true })
+
       if (stopped || gen !== generation) return
       status.value = res?.status ?? null
       documents.value = res?.documents ?? []
+
       // Recovered from an outage: drop back to the fast cadence.
       if (failed.value) delayIndex = 0
       failed.value = false
       settleFromDocuments()
     } catch (e) {
       if (stopped || gen !== generation) return
+
       // A 4xx is a verdict, not an outage: an unknown or foreign session id
       // 404s forever, so retrying it just loops at the 15s cap while the
       // banner claims "References unavailable" on a page that has none. Leave
@@ -128,8 +138,10 @@ export function useReferencePoll(sessionIdSource) {
       if (e?.status >= 400 && e.status < 500) {
         failed.value = false
         settleAll({ unavailable: true, error: e })
+
         return
       }
+
       // Keep the last known document list so per-file delete stays reachable.
       failed.value = true
       // The chip must not wait out the ceiling for an outage: the old poller
@@ -137,6 +149,7 @@ export function useReferencePoll(sessionIdSource) {
       // while this loop keeps retrying in the background.
       settleAll({ unavailable: true, error: e })
     }
+
     schedule()
   }
 
@@ -157,6 +170,7 @@ export function useReferencePoll(sessionIdSource) {
   function watchDocument(documentId, filename) {
     if (stopped || !sessionId) return Promise.resolve({ cancelled: true })
     const key = String(documentId)
+
     return new Promise((resolve) => {
       watched.set(key, { filename, deadline: Date.now() + WATCH_CEILING_MS, resolve })
       refresh()
@@ -172,6 +186,7 @@ export function useReferencePoll(sessionIdSource) {
     status.value = null
     documents.value = []
     failed.value = false
+
     if (nextId) poll()
   }
 

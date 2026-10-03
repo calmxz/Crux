@@ -20,12 +20,17 @@ const props = defineProps({
 const emit = defineEmits(['landed'])
 
 const level = computed(() => props.profile?.knowledge_level ?? null)
+
 const levelLabel = computed(() => level.value || 'level not set')
+
 const levelStroke = computed(() => levelStrokeFor(level.value))
 
 const focus = computed(() => props.profile?.focus_target_gap || '')
+
 const gaps = computed(() => entryNames(props.profile?.confirmed_gaps).filter(Boolean))
+
 const mastered = computed(() => entryNames(props.profile?.mastered_concepts).filter(Boolean))
+
 // The focus cue has its own section; listing it twice would read as two gaps.
 const openGaps = computed(() => gaps.value.filter((g) => g !== focus.value))
 
@@ -37,6 +42,7 @@ const gapsCount = computed(() =>
 
 const subtopics = computed(() => {
   const map = props.profile?.subtopic_levels ?? {}
+
   return Object.keys(map).map((name) => ({
     name,
     level: map[name],
@@ -54,21 +60,27 @@ const allNames = computed(() => [
 ])
 
 const seen = ref(new Set())
+
 const fresh = ref(new Set())
+
 let seededFor = null
 
 watch(
   [() => props.sessionId, () => props.profile, allNames],
   ([sid, profile, names]) => {
     if (!profile) return
+
     if (sid !== seededFor) {
       seededFor = sid
       seen.value = new Set(names)
       fresh.value = new Set()
+
       return
     }
+
     const added = names.filter((n) => !seen.value.has(n))
     seen.value = new Set(names)
+
     if (!added.length) return
     fresh.value = new Set(added)
     emit('landed', added)

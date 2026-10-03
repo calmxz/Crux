@@ -21,12 +21,15 @@ import UsagePanel from '../profile/UsagePanel.vue'
 import { getUsageSummary } from '../../services/profileApi.js'
 
 const usage = ref(null)
+
 const loading = ref(true)
+
 const error = ref(false)
 
 async function load() {
   loading.value = true
   error.value = false
+
   try {
     usage.value = await getUsageSummary()
   } catch (e) {

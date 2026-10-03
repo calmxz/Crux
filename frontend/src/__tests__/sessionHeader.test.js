@@ -15,6 +15,7 @@ const actions = {
   setPinned: vi.fn(),
   rename: vi.fn(() => Promise.resolve(true)),
 }
+
 vi.mock('@/composables/useSessionActions.js', () => ({
   useSessionActions: () => actions,
 }))
@@ -48,6 +49,7 @@ describe('SessionHeader', () => {
     ]) {
       actions[k].mockClear()
     }
+
     actions.busy.value = false
   })
 
@@ -103,6 +105,7 @@ describe('SessionHeader', () => {
     const wrapper = mountHeader({
       session: { ...baseSession, ended_at: '2026-09-21T10:00:00Z' },
     })
+
     expect(wrapper.find('[data-testid="session-action-end"]').exists()).toBe(false)
     const resume = wrapper.find('[data-testid="session-action-resume"]')
     expect(resume.exists()).toBe(true)
@@ -136,6 +139,7 @@ describe('SessionHeader', () => {
     const wrapper = mountHeader({
       session: { ...baseSession, ended_at: '2026-09-21T10:00:00Z' },
     })
+
     await wrapper.find('[data-testid="session-action-resume"]').trigger('click')
     expect(actions.resume).toHaveBeenCalledWith(expect.objectContaining({ id: 's1' }))
   })
@@ -213,6 +217,7 @@ describe('SessionHeader', () => {
 
   it('renders the reference status dot only when refStatus is set', () => {
     expect(mountHeader().find('[data-testid="session-ref-status"]').exists()).toBe(false)
+
     for (const state of ['processing', 'ready', 'failed']) {
       const dot = mountHeader({ refStatus: state }).find('[data-testid="session-ref-status"]')
       expect(dot.exists()).toBe(true)

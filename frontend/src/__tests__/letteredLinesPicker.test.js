@@ -7,6 +7,7 @@ const options = [
   { value: 'hints', label: 'Hints', sub: 'Nudge me toward the answer.' },
   { value: 'direct_answers', label: 'Direct answers', sub: 'Explain outright when I ask.' },
 ]
+
 const required = { legend: 'Feedback style', testidPrefix: 'feedback-style' }
 
 describe('LetteredLinesPicker', () => {
@@ -14,6 +15,7 @@ describe('LetteredLinesPicker', () => {
     const wrapper = mount(LetteredLinesPicker, {
       props: { ...required, modelValue: 'hints', options },
     })
+
     expect(wrapper.findAll('.radio-row')).toHaveLength(2)
     expect(wrapper.find('[data-testid="feedback-style-hints"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="feedback-style-direct_answers"]').exists()).toBe(true)
@@ -23,6 +25,7 @@ describe('LetteredLinesPicker', () => {
     const wrapper = mount(LetteredLinesPicker, {
       props: { ...required, modelValue: 'direct_answers', options },
     })
+
     const rows = wrapper.findAll('.radio-row')
     expect(rows[0].classes()).not.toContain('selected')
     expect(rows[1].classes()).toContain('selected')
@@ -33,6 +36,7 @@ describe('LetteredLinesPicker', () => {
     const wrapper = mount(LetteredLinesPicker, {
       props: { ...required, modelValue: 'hints', options },
     })
+
     await wrapper.get('[data-testid="feedback-style-direct_answers"]').setValue(true)
     expect(wrapper.emitted('update:modelValue')).toBeTruthy()
     expect(wrapper.emitted('update:modelValue')[0]).toEqual(['direct_answers'])
@@ -46,6 +50,7 @@ describe('LetteredLinesPicker', () => {
         options: [{ value: 'hints', label: 'Hints' }],
       },
     })
+
     expect(wrapper.find('.radio-sub').exists()).toBe(false)
     expect(wrapper.text()).toContain('Hints')
   })
@@ -54,6 +59,7 @@ describe('LetteredLinesPicker', () => {
     const wrapper = mount(LetteredLinesPicker, {
       props: { ...required, modelValue: 'hints', options },
     })
+
     const radios = wrapper.findAll('input[type="radio"]')
     expect(radios).toHaveLength(2)
     const names = radios.map((r) => r.attributes('name'))
@@ -71,6 +77,7 @@ describe('LetteredLinesPicker', () => {
     const wrapper = mount(LetteredLinesPicker, {
       props: { ...required, modelValue: 'hints', options, name: 'custom-group' },
     })
+
     const names = wrapper.findAll('input[type="radio"]').map((r) => r.attributes('name'))
     expect(names).toEqual(['custom-group', 'custom-group'])
   })

@@ -152,23 +152,29 @@ const emit = defineEmits(['refresh'])
 const expanded = ref(false)
 
 const readyCount = computed(() => props.documents.filter((d) => d.status === 'ready').length)
+
 const failedCount = computed(() => props.documents.filter((d) => d.status === 'failed').length)
+
 const total = computed(() => props.documents.length)
 
 const message = computed(() => {
   if (props.status === 'pending') {
     return `Indexing ${total.value} reference${total.value === 1 ? '' : 's'}... you can start chatting now.`
   }
+
   if (props.status === 'failed') {
     return `${failedCount.value} reference${failedCount.value === 1 ? '' : 's'} could not be indexed.`
   }
+
   if (props.status === 'ready') {
     return `${readyCount.value} reference${readyCount.value === 1 ? '' : 's'} ready.`
   }
+
   return ''
 })
 
 const confirm = useConfirm()
+
 const { showSuccess, showError } = useToast()
 
 function confirmDelete(doc) {

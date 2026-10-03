@@ -65,6 +65,7 @@ describe('uploadApi', () => {
       text: () => Promise.resolve(JSON.stringify(body)),
     })
   }
+
   function fail(status, body) {
     return Promise.resolve({
       ok: false,
@@ -169,11 +170,13 @@ describe('uploadApi', () => {
   it('uploadPdf invalidates the cached session GET whether it succeeds or fails', async () => {
     const { apiGet, _resetApiCache } = await import('@/services/apiClient.js')
     _resetApiCache()
+
     const json = (body, status = 200) =>
       new Response(JSON.stringify(body), {
         status,
         headers: { 'content-type': 'application/json' },
       })
+
     fetchMock.mockResolvedValueOnce(json({ n: 1 }))
     await apiGet('/sessions/s1')
     fetchMock.mockResolvedValueOnce(json({ document_id: 'd1' }))

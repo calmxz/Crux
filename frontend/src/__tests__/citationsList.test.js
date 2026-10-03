@@ -17,6 +17,7 @@ describe('CitationsList', () => {
         ],
       },
     })
+
     expect(w.text()).toContain('Algorithms Chapter 3')
     expect(w.text()).toContain('p.42')
     expect(w.text()).toContain('p.44')
@@ -32,6 +33,7 @@ describe('CitationsList', () => {
         ],
       },
     })
+
     const docs = w.findAll('.citation-doc')
     expect(docs).toHaveLength(2)
     expect(docs[0].text()).toContain('A')
@@ -43,6 +45,7 @@ describe('CitationsList', () => {
     const w = mount(CitationsList, {
       props: { citations: [{ doc_id: 'fallback-id', page: 7 }] },
     })
+
     expect(w.text()).toContain('fallback-id')
   })
 
@@ -51,6 +54,7 @@ describe('CitationsList', () => {
     const w = mount(CitationsList, {
       props: { citations: [{ doc_id: 'algo-ch3', text: 'a snippet' }] },
     })
+
     expect(w.text()).toContain('algo-ch3')
     expect(w.text()).not.toContain('p.')
     expect(w.find('.citation-pages').exists()).toBe(false)

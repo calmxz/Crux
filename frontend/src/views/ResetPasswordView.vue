@@ -104,11 +104,15 @@ import { useAuthStore } from '../stores/auth.js'
 import { isValidPassword, passwordsMismatch } from '../utils/validation.js'
 
 const auth = useAuthStore()
+
 const router = useRouter()
 
 const password = ref('')
+
 const confirm = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
 
 // Supabase exchanges the recovery hash asynchronously after init(), so the
@@ -117,16 +121,20 @@ const error = ref('')
 const recoveryHash = ref(
   typeof window !== 'undefined' && window.location.hash.includes('type=recovery'),
 )
+
 const hasRecovery = computed(() => recoveryHash.value || !auth.ready || !!auth.session)
 
 const passwordValid = computed(() => isValidPassword(password.value))
+
 const mismatch = computed(() => passwordsMismatch(password.value, confirm.value))
+
 const canSubmit = computed(() => passwordValid.value && confirm.value === password.value)
 
 async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.updatePassword(password.value)
     await auth.signOut()

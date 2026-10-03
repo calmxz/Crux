@@ -75,7 +75,9 @@ const router = createRouter({
         if (to.params.tab === 'account') {
           return { name: 'account' }
         }
+
         const valid = ['learning', 'usage', 'appearance']
+
         if (!valid.includes(to.params.tab)) {
           return { name: 'settings', params: { tab: 'learning' } }
         }
@@ -151,6 +153,7 @@ router.beforeEach(() => {
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
   // If auth store hasn't booted yet (first navigation in tests/dev), do it
   // now so the guard has a deterministic answer.
   if (!auth.ready) {
@@ -163,15 +166,18 @@ router.beforeEach(async (to) => {
   }
 
   const isPublic = to.meta?.public === true
+
   if (!auth.isAuthenticated && !isPublic) {
     // F-49: carry the intended path through login so a deep link survives.
     return { name: 'login', query: { redirect: to.fullPath } }
   }
+
   if (auth.isAuthenticated && (to.name === 'login' || to.name === 'register')) {
     return { name: 'home' }
   }
 
   const user = useUserStore()
+
   if (auth.isAuthenticated && !user.hydrated) {
     // F-46: onboarding truth lives on the server; the localStorage snapshot
     // is only a warm cache. Await one hydrate so a new device does not
@@ -185,6 +191,7 @@ router.beforeEach(async (to) => {
       await user.hydrateFromServer()
     }
   }
+
   if (
     auth.isAuthenticated &&
     !user.onboardingComplete &&
@@ -194,6 +201,7 @@ router.beforeEach(async (to) => {
   ) {
     return { name: 'onboarding' }
   }
+
   if (user.onboardingComplete && to.name === 'onboarding' && to.query.retake !== '1') {
     return { name: 'home' }
   }
@@ -204,8 +212,10 @@ router.afterEach((to, from, failure) => {
   // to the main landmark on real navigations (skip the initial load so we
   // don't steal focus from the address bar / skip-link).
   if (failure || !from.name) return
+
   if (typeof document === 'undefined') return
   const el = document.getElementById('main-content')
+
   // D-15: a missing target used to fail silently, which is how the chrome-less
   // routes went unnoticed. App.vue now gives both branches the id; say so in
   // dev if a new layout ever drops it again.
@@ -213,8 +223,10 @@ router.afterEach((to, from, failure) => {
     if (import.meta.env.DEV) {
       console.warn('[router] focus target #main-content not found for', to.path)
     }
+
     return
   }
+
   el.focus()
 })
 

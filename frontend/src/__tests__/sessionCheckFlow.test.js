@@ -5,7 +5,9 @@ import * as sessionsApi from '@/services/sessionsApi.js'
 import * as streamSvc from '@/services/chatStreamService.js'
 
 vi.mock('@/services/sessionsApi.js')
+
 vi.mock('@/services/chatStreamService.js')
+
 vi.mock('@/services/costBus.js', () => ({ reportCostWarning: vi.fn() }))
 
 class ApiErrorLike extends Error {
@@ -253,6 +255,7 @@ describe('multi-check store', () => {
 
   it('#348 loadSession of a fully resolved batch views the last item, not past it', async () => {
     const s = useSessionStore()
+
     const resolved = (q) => ({
       question: q,
       options: ['a', 'b'],
@@ -262,6 +265,7 @@ describe('multi-check store', () => {
       correct: null,
       explanation: null,
     })
+
     sessionsApi.getSession.mockResolvedValue({
       id: 'sid',
       messages: [],
@@ -348,6 +352,7 @@ describe('multi-check store', () => {
 
   it('#364 set_index / set_total survive reload on pending_check and check_batch', async () => {
     const s = useSessionStore()
+
     const item = {
       question: 'Q1',
       options: ['a', 'b'],
@@ -357,6 +362,7 @@ describe('multi-check store', () => {
       correct: true,
       explanation: 'a.',
     }
+
     sessionsApi.getSession.mockResolvedValue({
       id: 'sid',
       messages: [

@@ -12,20 +12,27 @@ const props = defineProps({
 // #364: the same segmented head rule as the check card, sets 1..N done. The
 // next set is not signposted here; the tutor's lead-in line carries that.
 const setIndex = computed(() => props.batch.setIndex ?? 1)
+
 const setTotal = computed(() => props.batch.setTotal ?? 1)
+
 const multiSet = computed(() => setTotal.value > 1)
 
 const LETTERS = ['A', 'B', 'C', 'D', 'E']
 
 const items = computed(() => props.batch.items || [])
+
 const graded = computed(() => items.value.filter((it) => it.status === 'answered'))
+
 const nCorrect = computed(() => graded.value.filter((it) => it.correct === true).length)
 
 function optionClass(item, i) {
   if (i === item.correctIndex) return 'is-correct'
+
   if (item.selectedIndex != null && i === item.selectedIndex) return 'is-incorrect'
+
   return ''
 }
+
 function isYourAnswer(item, i) {
   return item.selectedIndex != null && i === item.selectedIndex
 }

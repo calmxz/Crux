@@ -30,10 +30,13 @@ const parts = computed(() => {
   // renderMarkdownIncremental compares the same version against its cache, so a
   // plugin landing mid-stream invalidates the cached head too.
   void markdownAssetsVersion.value
+
   if (!props.streaming) {
     return { safeHtml: renderMarkdown(props.text), deferred: '' }
   }
+
   const { safe, deferred } = splitSafePrefixIncremental(props.text, splitState)
+
   return { safeHtml: renderMarkdownIncremental(safe, renderCache), deferred }
 })
 
@@ -52,18 +55,23 @@ watch(
 // in the notes column is already a whole multiple, so one block never drags the
 // rest of the page off the rules.
 const rootEl = ref(null)
+
 const SNAP_SELECTOR = '.katex-display, pre, table, img'
+
 let _ro = null
 
 function _pitch(el) {
   const v = parseFloat(getComputedStyle(el).getPropertyValue('--line-pitch'))
+
   return v > 0 ? v : 28
 }
 
 function snapBlocks() {
   const root = rootEl.value
+
   if (!root) return
   const pitch = _pitch(root)
+
   for (const el of root.querySelectorAll(SNAP_SELECTOR)) {
     // The applied top-up is read back from the property we wrote, never from a
     // measurement: clearing the style and re-measuring can return a mid-flight
@@ -71,12 +79,15 @@ function snapBlocks() {
     // pad on each pass.
     const applied = parseFloat(el.style.getPropertyValue('--snap-pad')) || 0
     const cs = getComputedStyle(el)
+
     const total =
       el.getBoundingClientRect().height +
       (parseFloat(cs.marginTop) || 0) +
       (parseFloat(cs.marginBottom) || 0)
+
     const natural = total - applied
     const pad = (pitch - (natural % pitch)) % pitch
+
     // Only write on a real change, so the observer cannot drive itself.
     if (Math.abs(pad - applied) > 0.01) {
       if (pad > 0.01) el.style.setProperty('--snap-pad', `${pad}px`)
@@ -87,6 +98,7 @@ function snapBlocks() {
 
 // One pass per frame at most, and never re-entered from its own writes.
 let _frame = 0
+
 function scheduleSnap() {
   if (_frame) return
   _frame = requestAnimationFrame(() => {
@@ -97,14 +109,17 @@ function scheduleSnap() {
 
 function observeBlocks() {
   const root = rootEl.value
+
   if (!root || typeof ResizeObserver === 'undefined') return
   const blocks = root.querySelectorAll(SNAP_SELECTOR)
   _ro?.disconnect()
+
   // Most turns are prose and match nothing here, so the observer is built on
   // first need rather than once per rendered bubble. With no targets there is
   // also nothing for snapBlocks to top up.
   if (!blocks.length) return
   _ro = _ro || new ResizeObserver(() => scheduleSnap())
+
   for (const el of blocks) _ro.observe(el)
   snapBlocks()
 }
@@ -112,6 +127,7 @@ function observeBlocks() {
 // One re-observe per tick at most, however many watchers asked for it (the
 // last streaming frame trips both of them in the same flush).
 let _observeQueued = false
+
 function scheduleObserve() {
   if (_observeQueued) return
   _observeQueued = true
@@ -145,6 +161,7 @@ if (typeof ResizeObserver !== 'undefined') {
 onBeforeUnmount(() => {
   _ro?.disconnect()
   _ro = null
+
   if (_frame) cancelAnimationFrame(_frame)
   _frame = 0
 })
@@ -153,18 +170,23 @@ onBeforeUnmount(() => {
 // v-html markup can't carry handlers (DOMPurify strips inline ones), so the
 // click is delegated from the component root.
 let _copyResetTimer = null
+
 onBeforeUnmount(() => clearTimeout(_copyResetTimer))
 
 async function onRootClick(e) {
   const btn = e.target.closest?.('[data-copy-button]')
+
   if (!btn) return
   const code = btn.closest('pre')?.querySelector('code')
+
   if (!code || !navigator.clipboard?.writeText) return
+
   try {
     await navigator.clipboard.writeText(code.textContent)
   } catch {
     return // clipboard permission denied; leave the label unchanged
   }
+
   btn.textContent = 'copied'
   clearTimeout(_copyResetTimer)
   _copyResetTimer = setTimeout(() => {

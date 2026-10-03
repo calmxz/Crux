@@ -4,14 +4,18 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { name: 'home', params: {}, fullPath: '/' }
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
 
 const toastSuccess = vi.fn()
+
 const toastError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showSuccess: toastSuccess, showError: toastError, showWarn: vi.fn() }),
 }))
@@ -19,6 +23,7 @@ vi.mock('@/composables/useToast.js', () => ({
 // E-12: capture the confirm config so a test can invoke accept itself.
 // Nothing is accepted implicitly here -- that is the point of the dialog.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -35,13 +40,17 @@ import { useSidebar } from '@/composables/useSidebar.js'
 // component and capture the returned API via closure.
 function mountHost() {
   let actions
+
   const Host = defineComponent({
     setup() {
       actions = useSessionActions()
+
       return () => h('div')
     },
   })
+
   mount(Host)
+
   return actions
 }
 
@@ -106,6 +115,7 @@ describe('useSessionActions — endSession pending-summary toast', () => {
     const store = useSessionStore()
     vi.spyOn(store, 'endSession').mockImplementation(async () => {
       store.pendingSummary = { sessionId: 's1', kind: 'summary', text: 'Great work.' }
+
       return {}
     })
     routeRef.name = 'home'
@@ -122,6 +132,7 @@ describe('useSessionActions — endSession pending-summary toast', () => {
     const store = useSessionStore()
     vi.spyOn(store, 'endSession').mockImplementation(async () => {
       store.pendingSummary = { sessionId: 's1', kind: 'summary', text: 'Great work.' }
+
       return {}
     })
     routeRef.name = 'session'
@@ -137,12 +148,14 @@ describe('useSessionActions — endSession pending-summary toast', () => {
   it('guards against a double submit', async () => {
     const store = useSessionStore()
     let resolveEnd
+
     const endSpy = vi.spyOn(store, 'endSession').mockImplementation(
       () =>
         new Promise((resolve) => {
           resolveEnd = resolve
         }),
     )
+
     const actions = mountHost()
 
     const p1 = actions.endSession({ id: 's1', topic: 'X' })

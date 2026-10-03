@@ -8,12 +8,14 @@ import { useAuthStore } from '@/stores/auth.js'
 // Build a Response whose body is a ReadableStream containing the given SSE text.
 function mockResponse(sseBody) {
   const encoder = new TextEncoder()
+
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode(sseBody))
       controller.close()
     },
   })
+
   return new Response(stream, {
     status: 200,
     headers: { 'content-type': 'text/event-stream' },
@@ -30,12 +32,14 @@ function mock401Response() {
 // and then never closes -- used to simulate an idle (hung) stream.
 function sseResponseThatHangsAfterOneEvent() {
   const encoder = new TextEncoder()
+
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode('event: assistant_delta\ndata: {"delta":"hi"}\n\n'))
       // deliberately never close/enqueue again
     },
   })
+
   return new Response(stream, {
     status: 200,
     headers: { 'content-type': 'text/event-stream' },
@@ -46,12 +50,14 @@ function sseResponseThatHangsAfterOneEvent() {
 // with `err` -- how a connection that dies mid-body surfaces to the reader.
 function sseResponseThatErrorsMidBody(err) {
   const encoder = new TextEncoder()
+
   const stream = new ReadableStream({
     start(controller) {
       controller.enqueue(encoder.encode('event: assistant_delta\ndata: {"delta":"hi"}\n\n'))
       controller.error(err)
     },
   })
+
   return new Response(stream, {
     status: 200,
     headers: { 'content-type': 'text/event-stream' },
@@ -162,8 +168,10 @@ describe('chatStreamService', () => {
           // behavior instead of relying solely on a future 'abort' event.
           if (init.signal.aborted) {
             reject(init.signal.reason ?? new DOMException('aborted', 'AbortError'))
+
             return
           }
+
           init.signal.addEventListener('abort', () =>
             reject(init.signal.reason ?? new DOMException('aborted', 'AbortError')),
           )
@@ -180,6 +188,7 @@ describe('chatStreamService', () => {
     // caller (e.g. a Stop button) aborts once it has seen that first event,
     // simulating a genuine mid-stream user cancel.
     fetchMock.mockResolvedValueOnce(sseResponseThatHangsAfterOneEvent())
+
     const onEvent = vi.fn(() => {
       ctrl.abort()
     })
@@ -298,11 +307,13 @@ describe('chatStreamService', () => {
   it('invalidates the cached session GET once the stream settles', async () => {
     const { apiGet, _resetApiCache } = await import('@/services/apiClient.js')
     _resetApiCache()
+
     const json = (body) =>
       new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
+
     fetchMock.mockResolvedValueOnce(json({ n: 1 }))
     await apiGet('/sessions/s1/messages')
     fetchMock.mockResolvedValueOnce(mockResponse('event: done\ndata: {}\n\n'))
@@ -315,11 +326,13 @@ describe('chatStreamService', () => {
   it('invalidates the cached session GET even when the stream fails', async () => {
     const { apiGet, _resetApiCache } = await import('@/services/apiClient.js')
     _resetApiCache()
+
     const json = (body) =>
       new Response(JSON.stringify(body), {
         status: 200,
         headers: { 'content-type': 'application/json' },
       })
+
     fetchMock.mockResolvedValueOnce(json({ n: 1 }))
     await apiGet('/sessions/s1')
     fetchMock.mockRejectedValueOnce(new TypeError('network error'))

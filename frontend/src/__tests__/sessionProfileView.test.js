@@ -8,6 +8,7 @@ import { TICK_PATH } from '@/components/chat/levelMark.js'
 import * as profileApi from '@/services/profileApi.js'
 
 const routerPushMock = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPushMock }),
 }))
@@ -16,6 +17,7 @@ vi.mock('vue-router', () => ({
 // test can drive accept/reject deterministically instead of rendering the
 // PrimeVue dialog.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -72,6 +74,7 @@ describe('SessionProfileView (per-session)', () => {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
 
     const mastered = wrapper.find('[data-testid="sprof-mastered"]').text()
@@ -101,6 +104,7 @@ describe('SessionProfileView (per-session)', () => {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
 
     const summary = wrapper.find('[data-testid="sprof-summary"]')
@@ -128,6 +132,7 @@ describe('SessionProfileView (per-session)', () => {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
 
     const chips = wrapper.findAll('[data-testid="sprof-mastered"] .chip')
@@ -146,6 +151,7 @@ describe('SessionProfileView (per-session)', () => {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
 
     const err = wrapper.find('[data-testid="sprof-error"]')
@@ -164,11 +170,14 @@ describe('SessionProfileView (per-session)', () => {
       etag,
       recent_learning_events: [],
     })
+
     const wrapper = mount(ProfileView, {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
+
     return wrapper
   }
 
@@ -180,6 +189,7 @@ describe('SessionProfileView (per-session)', () => {
       },
       etag: 'e1',
     })
+
     const wrapper = await mountProfile({ etag: 'e0' })
     await wrapper.get('[data-testid="add-mastered"]').setValue('loops')
     await wrapper.get('[data-testid="add-mastered-submit"]').trigger('click')
@@ -195,6 +205,7 @@ describe('SessionProfileView (per-session)', () => {
       },
       etag: 'e1',
     })
+
     const wrapper = await mountProfile({ etag: 'e0' })
     await wrapper.get('[data-testid="add-gap"]').setValue('window-fns')
     await wrapper.get('[data-testid="add-gap-submit"]').trigger('click')
@@ -207,6 +218,7 @@ describe('SessionProfileView (per-session)', () => {
       profile: { mastered_concepts: [], confirmed_gaps: [] },
       etag: 'e1',
     })
+
     const wrapper = await mountProfile({
       profile: {
         mastered_concepts: [{ name: 'loops', evidence_type: 'tested', last_event_at: null }],
@@ -214,6 +226,7 @@ describe('SessionProfileView (per-session)', () => {
       },
       etag: 'e0',
     })
+
     await wrapper.get('[data-testid="chip-remove"]').trigger('click')
     await flushPromises()
     // E-08: the click only opens the confirm; nothing is deleted until accept.
@@ -236,6 +249,7 @@ describe('SessionProfileView (per-session)', () => {
       profile: { mastered_concepts: [], confirmed_gaps: [] },
       etag: 'e1',
     })
+
     const wrapper = await mountProfile({
       profile: {
         mastered_concepts: [{ name: 'loops', evidence_type: 'tested', last_event_at: null }],
@@ -243,6 +257,7 @@ describe('SessionProfileView (per-session)', () => {
       },
       etag: 'e0',
     })
+
     await wrapper.get('[data-testid="chip-remove"]').trigger('click')
     await flushPromises()
     expect(deleteProfileItem).not.toHaveBeenCalled()
@@ -254,11 +269,14 @@ describe('SessionProfileView (per-session)', () => {
       profile: { mastered_concepts: [], confirmed_gaps: [], knowledge_level: 'advanced' },
       etag: 'e1',
     })
+
     const wrapper = await mountProfile({ etag: 'e0' })
+
     const advancedBtn = wrapper
       .get('[data-testid="level-select"]')
       .findAll('button')
       .find((b) => b.text() === 'advanced')
+
     await advancedBtn.trigger('click')
     await flushPromises()
     expect(patchProfile).toHaveBeenCalledWith('s1', { knowledge_level: 'advanced' }, 'e0')
@@ -269,12 +287,14 @@ describe('SessionProfileView (per-session)', () => {
   // duration, so the re-entrant click never reaches the handler.
   it('ignores a re-entrant write while one is in flight (E-08)', async () => {
     let resolveFirst
+
     const patchProfile = vi.spyOn(profileApi, 'patchProfile').mockImplementation(
       () =>
         new Promise((res) => {
           resolveFirst = res
         }),
     )
+
     const wrapper = await mountProfile({ etag: 'e0' })
     const buttons = wrapper.get('[data-testid="level-select"]').findAll('button')
     const advanced = buttons.find((b) => b.text() === 'advanced')
@@ -302,9 +322,11 @@ describe('SessionProfileView (per-session)', () => {
   // the queued write reads the etag the previous response produced.
   it('threads the previous response etag into a queued write (E-08)', async () => {
     const resolvers = []
+
     const patchProfile = vi
       .spyOn(profileApi, 'patchProfile')
       .mockImplementation(() => new Promise((res) => resolvers.push(res)))
+
     const wrapper = await mountProfile({ etag: 'e0' })
     const input = wrapper.get('[data-testid="add-gap"]')
 
@@ -336,6 +358,7 @@ describe('SessionProfileView (per-session)', () => {
       etag: 'e0',
       recent_learning_events: [],
     })
+
     vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(
       Object.assign(new Error('x'), { status: 412 }),
     )
@@ -344,6 +367,7 @@ describe('SessionProfileView (per-session)', () => {
       props: { id: 's1' },
       global: { stubs },
     })
+
     await flushPromises()
 
     await wrapper.get('[data-testid="add-mastered"]').setValue('loops')
@@ -360,12 +384,14 @@ describe('SessionProfileView (per-session)', () => {
     vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(
       Object.assign(new Error('boom'), { status: 500 }),
     )
+
     const wrapper = await mountProfile({
       profile: {
         mastered_concepts: [{ name: 'loops', evidence_type: 'tested', last_event_at: null }],
       },
       etag: 'e0',
     })
+
     await wrapper.get('[data-testid="add-gap"]').setValue('window-fns')
     await wrapper.get('[data-testid="add-gap-submit"]').trigger('click')
     await flushPromises()
@@ -401,6 +427,7 @@ describe('SessionProfileView (per-session)', () => {
         ],
       },
     })
+
     await wrapper.get('[data-testid="sprof-review-gaps"]').trigger('click')
     await wrapper.get('[data-testid="gap-picker-option-0"]').trigger('click')
     expect(routerPushMock).toHaveBeenCalledWith({
@@ -417,6 +444,7 @@ describe('SessionProfileView (per-session)', () => {
         confirmed_gaps: [{ name: 'only-gap', evidence_type: null, last_event_at: null }],
       },
     })
+
     await wrapper.get('[data-testid="sprof-review-gaps"]').trigger('click')
     expect(wrapper.find('[data-testid="gap-picker"]').exists()).toBe(false)
     expect(routerPushMock).toHaveBeenCalledWith({
@@ -436,6 +464,7 @@ describe('SessionProfileView (per-session)', () => {
     const wrapper = await mountProfile({
       profile: { subtopic_levels: { 'chain rule': 'beginner' } },
     })
+
     const sec = wrapper.find('[data-testid="sprof-subtopics"]')
     expect(sec.exists()).toBe(true)
     expect(sec.text()).toContain('chain rule')
@@ -452,14 +481,17 @@ describe('SessionProfileView (per-session)', () => {
       },
       etag: 'e1',
     })
+
     const deleteProfileItem = vi.spyOn(profileApi, 'deleteProfileItem').mockResolvedValue({
       profile: { mastered_concepts: [], confirmed_gaps: [], subtopic_levels: {} },
       etag: 'e2',
     })
+
     const wrapper = await mountProfile({
       profile: { subtopic_levels: { 'chain rule': 'beginner' } },
       etag: 'e0',
     })
+
     const row = wrapper.get('[data-testid="sprof-subtopics"] .subtopic-row')
     const advancedBtn = row.findAll('.level-opt').find((b) => b.text() === 'advanced')
     await advancedBtn.trigger('click')
@@ -501,6 +533,7 @@ describe('SessionProfileView (per-session)', () => {
       etag: 'e0',
       recent_learning_events: [],
     })
+
     const wrapper = mount(ProfileView, { props: { id: 's1' }, global: { stubs } })
     await flushPromises()
     expect(getSessionProfile).toHaveBeenNthCalledWith(1, 's1')
@@ -557,6 +590,7 @@ describe('SessionProfileView (per-session)', () => {
         etag: `etag-${id}`,
         recent_learning_events: [],
       }))
+
     let resolveWrite
     vi.spyOn(profileApi, 'patchProfile').mockReturnValueOnce(
       new Promise((r) => {
@@ -654,6 +688,7 @@ describe('SessionProfileView (per-session)', () => {
       etag: 'e0',
       recent_learning_events: [],
     })
+
     vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(
       Object.assign(new Error('x'), { status: 412 }),
     )

@@ -18,6 +18,7 @@ import { MIN_PASSWORD_LEN } from '../utils/validation.js'
 // failure and an API failure of the same kind read identically. Kept as
 // literals because errors.js does not export them.
 const THROTTLED_COPY = 'Too many requests - wait a moment and retry.'
+
 const SERVER_COPY = 'Something went wrong on our side. Try again shortly.'
 
 export const AUTH_CODE_COPY = {
@@ -43,12 +44,17 @@ export const AUTH_CODE_COPY = {
  */
 export function authErrorCopy(e, fallback) {
   const code = e && typeof e === 'object' ? e.code : null
+
   if (typeof code === 'string' && Object.hasOwn(AUTH_CODE_COPY, code)) {
     return AUTH_CODE_COPY[code]
   }
+
   const status = e && typeof e === 'object' ? e.status : null
+
   if (status === 429) return THROTTLED_COPY
+
   if (typeof status === 'number' && status >= 500) return SERVER_COPY
+
   return fallback
 }
 

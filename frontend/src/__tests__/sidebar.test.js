@@ -3,23 +3,31 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { params: {}, fullPath: '/' }
+
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
+
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 const showWarn = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn, showSuccess }),
 }))
+
 // E-12: the row's End action goes through PrimeVue's confirm service, which is
 // not installed on a bare mount. The stub captures the config and accepts
 // straight away so the existing End assertions keep reading the same way; the
 // cancel path is covered in sidebarSessionRow.test.js.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -28,13 +36,18 @@ vi.mock('primevue/useconfirm', () => ({
     },
   }),
 }))
+
 const apiReviewQueue = vi.fn()
+
 vi.mock('@/services/reviewApi.js', () => ({
   getReviewQueue: (...args) => apiReviewQueue(...args),
 }))
+
 const apiGetSessionLibrary = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
   const actual = await importOriginal()
+
   return {
     ...actual,
     getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
@@ -230,6 +243,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('filters sessions via the search input and shows a match count', async () => {
     vi.useFakeTimers()
+
     try {
       const store = useSessionStore()
       store.sessions = [
@@ -260,6 +274,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('shows a no-match hint when search matches nothing', async () => {
     vi.useFakeTimers()
+
     try {
       const store = useSessionStore()
       store.sessions = [
@@ -383,9 +398,11 @@ describe('sidebar server-side search', () => {
 
   it('renders server results and total; store sessions array untouched', async () => {
     const store = useSessionStore()
+
     const seeded = [
       { id: 'a1', topic: 'Big-O', created_at: new Date().toISOString(), ended_at: null },
     ]
+
     store.sessions = seeded
     apiGetSessionLibrary.mockResolvedValue({
       items: [
@@ -427,9 +444,11 @@ describe('sidebar server-side search', () => {
     await flushPromises()
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-search"]')
     expect(viewAll.exists()).toBe(true)
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-search')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active', q: 'gly' },
@@ -445,7 +464,9 @@ describe('sidebar server-side search', () => {
     let resolveAb
     apiGetSessionLibrary.mockImplementation((params) => {
       if (params.q === 'a') return new Promise((resolve) => (resolveA = resolve))
+
       if (params.q === 'ab') return new Promise((resolve) => (resolveAb = resolve))
+
       return Promise.resolve({ items: [], total: 0 })
     })
     wrapper = mount(Sidebar)
@@ -482,9 +503,11 @@ describe('sidebar server-side search', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-search"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('9')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-search')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active', q: 'ab' },
@@ -500,7 +523,9 @@ describe('sidebar server-side search', () => {
     let resolveBb
     apiGetSessionLibrary.mockImplementation((params) => {
       if (params.q === 'aa') return new Promise((resolve) => (resolveAa = resolve))
+
       if (params.q === 'bb') return new Promise((resolve) => (resolveBb = resolve))
+
       return Promise.resolve({ items: [], total: 0 })
     })
     wrapper = mount(Sidebar)
@@ -579,9 +604,11 @@ describe('sidebar server-side search', () => {
       total: 1,
     })
     const api = await import('@/services/sessionsApi.js')
+
     const endSpy = vi
       .spyOn(api, 'endSession')
       .mockResolvedValue({ ended_at: '2026-05-21T10:00:00Z', summary: null })
+
     try {
       wrapper = mount(Sidebar, { attachTo: document.body })
       await flushPromises()
@@ -756,6 +783,7 @@ describe('Sidebar.vue — row interactions', () => {
     ]
     vi.spyOn(store, 'endSession').mockImplementation(async (id) => {
       store.pendingSummary = { sessionId: id, kind: 'summary', text: 'Great progress on Big-O.' }
+
       return {}
     })
     // Not on that session's own view — SessionView isn't mounted to consume it.
@@ -779,6 +807,7 @@ describe('Sidebar.vue — row interactions', () => {
     ]
     vi.spyOn(store, 'endSession').mockImplementation(async (id) => {
       store.pendingSummary = { sessionId: id, kind: 'summary', text: 'Great progress on Big-O.' }
+
       return {}
     })
     routeRef.name = 'session'
@@ -893,7 +922,9 @@ describe('Sidebar.vue — row interactions', () => {
     // spy flips real store state so the row relocates across sections
     vi.spyOn(store, 'setPinned').mockImplementation(async (id, pinned) => {
       const s = store.sessions.find((x) => x.id === id)
+
       if (s) s.pinned = pinned
+
       return {}
     })
     wrapper = mount(Sidebar, { attachTo: document.body })
@@ -904,9 +935,11 @@ describe('Sidebar.vue — row interactions', () => {
     await wrapper.find('[data-testid="sidebar-row-menu-pin"]').trigger('click')
     await flushPromises()
     const active = document.activeElement
+
     const a1Trigger = wrapper.find(
       '[data-session-id="a1"] [data-testid="sidebar-row-menu-trigger"]',
     ).element
+
     expect(active).toBe(a1Trigger)
   })
 
@@ -1042,11 +1075,13 @@ describe('Sidebar.vue — row interactions', () => {
     const input = wrapper.find('[data-session-id="a1"] [data-testid="sidebar-row-rename-input"]')
     await input.setValue('New')
     await input.trigger('keydown.enter')
+
     try {
       await input.trigger('blur')
     } catch {
       /* input may be detached after rename exits */
     }
+
     await flushPromises()
     expect(renameSpy).toHaveBeenCalledTimes(1)
     expect(renameSpy).toHaveBeenCalledWith('a1', 'New')
@@ -1224,10 +1259,12 @@ describe('Sidebar.vue — identity row and account menu', () => {
     expect(list.element.contains(head.element)).toBe(false)
     const items = list.findAll('[role="menuitem"]')
     expect(items.map((i) => i.text())).toEqual(['Settings', 'Usage', 'Account', 'Sign out'])
+
     // Every item carries a drawn icon, hidden from assistive tech.
     for (const item of items) {
       expect(item.get('svg').attributes('aria-hidden')).toBe('true')
     }
+
     // A rule sets Sign out apart from the navigation items.
     expect(list.findAll('[role="separator"]')).toHaveLength(1)
     // Focus moves into the menu on open.
@@ -1239,6 +1276,7 @@ describe('Sidebar.vue — identity row and account menu', () => {
     wrapper = mount(Sidebar, { attachTo: document.body })
     await flushPromises()
     const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+
     for (const key of ['ArrowDown', 'Enter']) {
       trigger.element.focus()
       await trigger.trigger('keydown', { key })
@@ -1437,6 +1475,7 @@ describe('Sidebar.vue — identity row and account menu', () => {
     sidebarTest._setExpanded(false)
     const savedHeight = window.innerHeight
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+
     try {
       signIn()
       wrapper = mount(Sidebar, { attachTo: document.body })
@@ -1547,8 +1586,10 @@ describe('Sidebar.vue — recall entry', () => {
     // run synchronously so the existing badge assertions still hold.
     globalThis.requestIdleCallback = (cb) => {
       cb()
+
       return 1
     }
+
     globalThis.cancelIdleCallback = () => {}
   })
   afterEach(() => {
@@ -1603,8 +1644,10 @@ describe('Sidebar.vue — recall entry', () => {
     let idleCb
     globalThis.requestIdleCallback = (cb) => {
       idleCb = cb
+
       return 1
     }
+
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(apiReviewQueue).not.toHaveBeenCalled()
@@ -1803,6 +1846,7 @@ describe('Sidebar.vue — header states', () => {
 // (most-recent first) when the component slices down to the cap.
 function makeActiveSessions(count, { pinned = false, prefix = 'u' } = {}) {
   const now = Date.now()
+
   return Array.from({ length: count }, (_, i) => ({
     id: `${prefix}${i}`,
     topic: `${prefix}${i}`,
@@ -1815,6 +1859,7 @@ function makeActiveSessions(count, { pinned = false, prefix = 'u' } = {}) {
 
 function makeEndedSessions(count) {
   const now = Date.now()
+
   return Array.from({ length: count }, (_, i) => ({
     id: `e${i}`,
     topic: `e${i}`,
@@ -1872,9 +1917,11 @@ describe('sidebar row cap and View all links', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-active"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('View all 28 sessions')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-active')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active' },
@@ -1908,9 +1955,11 @@ describe('sidebar row cap and View all links', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-ended"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('40')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-ended')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'ended' },
@@ -2007,6 +2056,7 @@ describe('sidebar row cap and View all links', () => {
   // every case above still sees the 15-row floor.
   it('renders as many rows as the measured list height allows, up to 40', async () => {
     installResizeObserverStub(28 * 31)
+
     try {
       const store = useSessionStore()
       store.sessions = makeActiveSessions(40)
@@ -2023,6 +2073,7 @@ describe('sidebar row cap and View all links', () => {
 
   it('keeps the 15-row floor when the measured height fits fewer rows', async () => {
     installResizeObserverStub(100)
+
     try {
       const store = useSessionStore()
       store.sessions = makeActiveSessions(40)
@@ -2066,8 +2117,10 @@ describe('Sidebar.vue — profile entry (#362)', () => {
     vi.spyOn(store, 'listSessions').mockResolvedValue([])
     globalThis.requestIdleCallback = (cb) => {
       cb()
+
       return 1
     }
+
     globalThis.cancelIdleCallback = () => {}
   })
   afterEach(() => {

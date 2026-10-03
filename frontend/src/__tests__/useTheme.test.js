@@ -136,6 +136,7 @@ describe('useTheme', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }
+
     window.matchMedia = vi.fn(() => mq)
     const { useTheme } = await import('@/composables/useTheme.js')
     const { init } = useTheme()
@@ -153,6 +154,7 @@ describe('useTheme', () => {
       addEventListener: vi.fn(),
       removeEventListener: vi.fn(),
     }
+
     window.matchMedia = vi.fn(() => mq)
     const { useTheme } = await import('@/composables/useTheme.js')
     const { init, dispose } = useTheme()

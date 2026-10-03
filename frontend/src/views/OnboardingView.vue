@@ -91,25 +91,31 @@ import { useAuthStore } from '../stores/auth.js'
 import { useToast } from '../composables/useToast.js'
 
 const router = useRouter()
+
 const userStore = useUserStore()
+
 const authStore = useAuthStore()
 
 const displayName = ref(userStore.name || '')
+
 // Labels only: the help line below the picker carries the explanation here,
 // so the Settings sub copy is left off.
 const feedbackOptions = TUTOR_PREFERENCES.feedback.options.map(({ value, label }) => ({
   value,
   label,
 }))
+
 const feedback = ref(preferenceValue(userStore.interactionPreferences, 'feedback'))
 
 const submitting = ref(false)
+
 const submitError = ref(null)
 
 async function submit() {
   if (submitting.value) return
   submitting.value = true
   submitError.value = null
+
   try {
     await userStore.completeOnboarding({
       name: displayName.value,
@@ -131,8 +137,10 @@ async function signOut() {
     await authStore.signOut()
   } catch (err) {
     useToast().showError(err?.message || 'Sign out failed')
+
     return
   }
+
   router.push('/login')
 }
 </script>

@@ -7,14 +7,18 @@ const props = defineProps({
 
 const grouped = computed(() => {
   const map = new Map()
+
   for (const c of props.citations || []) {
     const key = c.doc_id
     const name = c.doc_name || c.doc_id
+
     if (!map.has(key)) map.set(key, { doc_id: key, doc_name: name, pages: [] })
+
     // Phase 1 citations are {doc_id, text} with no page; Phase 2 (Task 14)
     // extends the contract with page. Only show chips for real page numbers.
     if (c.page !== undefined && c.page !== null) map.get(key).pages.push(c.page)
   }
+
   return Array.from(map.values())
 })
 </script>

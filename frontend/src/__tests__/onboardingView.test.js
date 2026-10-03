@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/user.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
 // F-46: completeOnboarding writes through to PATCH /me via the real

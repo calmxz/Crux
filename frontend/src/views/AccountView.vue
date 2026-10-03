@@ -240,21 +240,28 @@ import { downloadJson } from '@/lib/download.js'
 import { deleteAccount, exportData } from '../services/meApi.js'
 
 const user = useUserStore()
+
 const authStore = useAuthStore()
+
 const router = useRouter()
+
 const { showSuccess } = useToast()
 
 // The deep-desk ground must fill the whole routed pane, not just the
 // account element -- same mechanism SettingsView uses (a body class painted
 // on .page via assets/sheet.css).
 onMounted(() => document.body.classList.add('settings-page'))
+
 onUnmounted(() => document.body.classList.remove('settings-page'))
 
 const emailDisplay = computed(() => authStore.userEmail || 'No email')
 
 const displayName = ref(user.name || '')
+
 const savedFlash = ref(false)
+
 const saving = ref(false)
+
 const saveError = ref(null)
 
 const dirty = computed(() => (displayName.value || '').trim() !== (user.name || ''))
@@ -263,6 +270,7 @@ async function save() {
   if (!dirty.value || saving.value) return
   saving.value = true
   saveError.value = null
+
   try {
     await user.updateProfile({ name: displayName.value })
     savedFlash.value = true
@@ -281,13 +289,19 @@ watch(displayName, () => {
 })
 
 const pwCurrent = ref('')
+
 const pwNew = ref('')
+
 const pwConfirm = ref('')
+
 const pwError = ref('')
+
 const pwSuccess = ref(false)
+
 const pwSubmitting = ref(false)
 
 const pwMismatch = computed(() => pwConfirm.value.length > 0 && pwConfirm.value !== pwNew.value)
+
 const pwCanSubmit = computed(
   () => pwCurrent.value.length > 0 && pwNew.value.length >= 8 && pwNew.value === pwConfirm.value,
 )
@@ -297,13 +311,16 @@ async function changePassword() {
   pwError.value = ''
   pwSuccess.value = false
   pwSubmitting.value = true
+
   try {
     await authStore.signIn(authStore.userEmail, pwCurrent.value)
   } catch {
     pwError.value = 'Current password is incorrect.'
     pwSubmitting.value = false
+
     return
   }
+
   try {
     await authStore.updatePassword(pwNew.value)
     pwCurrent.value = ''
@@ -320,6 +337,7 @@ async function changePassword() {
 }
 
 const exportBusy = ref(false)
+
 const exportError = ref('')
 
 // #361: fixed copy rather than friendlyError -- its 503 line talks about the
@@ -328,6 +346,7 @@ async function downloadExport() {
   if (exportBusy.value) return
   exportBusy.value = true
   exportError.value = ''
+
   try {
     const data = await exportData()
     // The server's UTC exported_at, so the name matches its Content-Disposition.
@@ -348,13 +367,18 @@ async function downloadExport() {
 // match backend/routes/me.py's `detail=` string byte for byte or the
 // friendly copy below silently stops matching.
 const DELETE_AUTH_STEP_DETAIL = 'app data deleted; auth user removal failed'
+
 // Same rule: these two must match backend/routes/me.py byte for byte.
 const DELETE_NOT_CONFIGURED_DETAIL = 'auth admin not configured'
+
 const DELETE_CONFLICT_DETAIL = 'account changed during deletion; try again'
 
 const deleteDialogOpen = ref(false)
+
 const deleteConfirmText = ref('')
+
 const deleteBusy = ref(false)
+
 const deleteError = ref('')
 
 // Case-sensitive, trimmed exact match -- "Delete" or "delet" must not arm it.
@@ -386,6 +410,7 @@ function handleDialogVisible(v) {
 
 function deleteErrorMessage(e) {
   const detail = e?.body?.detail
+
   if (typeof detail === 'string' && detail) {
     if (detail === DELETE_AUTH_STEP_DETAIL) {
       // The backend delete is idempotent, so a retry can finish the job
@@ -395,14 +420,18 @@ function deleteErrorMessage(e) {
         'Try again, or contact support if this keeps happening.'
       )
     }
+
     if (detail === DELETE_NOT_CONFIGURED_DETAIL) {
       return 'Account deletion is not available right now. Nothing was removed. Contact support.'
     }
+
     if (detail === DELETE_CONFLICT_DETAIL) {
       return 'Something was still being saved to your account. Nothing was removed. Try again in a moment.'
     }
+
     return detail
   }
+
   return friendlyError(e) || 'Could not delete your account. Try again.'
 }
 
@@ -410,15 +439,18 @@ async function submitDelete() {
   if (!deleteArmed.value || deleteBusy.value) return
   deleteBusy.value = true
   deleteError.value = ''
+
   try {
     await deleteAccount()
     user.clearForAccountDeletion()
+
     try {
       await authStore.signOut()
     } catch {
       // The auth user is already gone server-side by this point; a local
       // signOut failure must not strand the learner mid-delete.
     }
+
     showSuccess('Your account has been deleted.')
     router.push({ name: 'login' })
   } catch (e) {

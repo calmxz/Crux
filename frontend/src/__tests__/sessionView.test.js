@@ -15,13 +15,16 @@ import { useSessionStore } from '@/stores/session.js'
 import { getSessionProfile, patchProfile } from '@/services/profileApi.js'
 
 const push = vi.fn()
+
 // Writes the mutation back into the shared mock route so the query-strip
 // watcher/re-trigger interaction is actually exercised (a bare vi.fn() would
 // leave route.query.review_gap set, hiding a double-send regression).
 const route = { query: {} }
+
 const replace = vi.fn((to) => {
   Object.assign(route.query, to.query)
 })
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push, replace }),
   useRoute: () => route,
@@ -31,6 +34,7 @@ vi.mock('vue-router', () => ({
 // Ticket 10: the session action bar calls useSessionActions, which calls
 // useConfirm in setup. Capture the last dialog config so a test can accept it.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -40,16 +44,20 @@ vi.mock('primevue/useconfirm', () => ({
 }))
 
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn: vi.fn(), showSuccess: vi.fn() }),
 }))
 
 const uploadDocument = vi.fn()
+
 const validateFile = vi.fn()
+
 // F-12: the upload chip is driven by useReferencePoll's per-document
 // transitions now, so the view polls /sessions/:id/ingestion (once per session
 // at setup, then with backoff) instead of /upload/:documentId.
 const getSessionIngestion = vi.fn()
+
 vi.mock('@/services/uploadApi.js', () => ({
   uploadDocument: (...args) => uploadDocument(...args),
   validateFile: (...args) => validateFile(...args),
@@ -114,7 +122,9 @@ function setupSession({
   store.currentSessionId = id
   store.messages = messages
   store.hasMoreMessages = hasMoreMessages
+
   if (dailyCap) store.dailyCapInfo = dailyCap
+
   return store
 }
 
@@ -166,9 +176,11 @@ describe('SessionView', () => {
 
   it('reloads when the route id prop changes without a remount', async () => {
     const store = useSessionStore()
+
     const load = vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const wrapper = mountView({ id: 's1' })
     await flushPromises()
     expect(load).toHaveBeenCalledWith('s1')
@@ -182,12 +194,14 @@ describe('SessionView', () => {
   it('clears a prior 404 state when navigating to a valid session', async () => {
     const store = useSessionStore()
     const err = Object.assign(new Error('not found'), { status: 404 })
+
     const load = vi
       .spyOn(store, 'loadSession')
       .mockRejectedValueOnce(err)
       .mockImplementationOnce(async () => {
         setupSession()
       })
+
     const wrapper = mountView({ id: 'gone' })
     await flushPromises()
     expect(wrapper.find('[data-testid="session-not-found"]').exists()).toBe(true)
@@ -207,9 +221,11 @@ describe('SessionView', () => {
           rejectGone = () => rej(Object.assign(new Error('not found'), { status: 404 }))
         })
       }
+
       store.currentSession = { id, topic: 'Calculus', ended_at: null }
       store.currentSessionId = id
       store.messages = []
+
       return Promise.resolve()
     })
     const wrapper = mountView({ id: 'gone' })
@@ -348,10 +364,12 @@ describe('SessionView', () => {
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const sendSpy = vi
       .spyOn(store, 'sendMessageStreaming')
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce()
+
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-testid="session-input"]').setValue('retry me')
@@ -449,9 +467,11 @@ describe('SessionView', () => {
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const sendSpy = vi
       .spyOn(store, 'sendMessageStreaming')
       .mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
+
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-testid="session-input"]').setValue('original')
@@ -573,6 +593,7 @@ describe('SessionView', () => {
     })
     route.name = 'session'
     route.params = { id: 's1' }
+
     try {
       lastConfirm = null
       const wrapper = mountView()
@@ -813,9 +834,11 @@ describe('SessionView', () => {
 
   it('navigating to a different session id with review_gap query present sends into the new session only', async () => {
     const store = useSessionStore()
+
     const load = vi.spyOn(store, 'loadSession').mockImplementation(async (id) => {
       setupSession({ id, confirmedGaps: ['x'] })
     })
+
     const sendSpy = vi.spyOn(store, 'sendMessageStreaming').mockResolvedValue()
     const wrapper = mountView({ id: 's1' })
     await flushPromises()
@@ -980,6 +1003,7 @@ describe('SessionView', () => {
   // and the banner carries it from there - nothing is left stuck.
   it('clears the upload chip at the poll ceiling and leaves the banner to it', async () => {
     vi.useFakeTimers()
+
     try {
       const store = useSessionStore()
       vi.spyOn(store, 'loadSession').mockImplementation(async () => {
@@ -1326,10 +1350,12 @@ describe('SessionView', () => {
         { label: 'Integrals', hint: null },
       ],
     }
+
     const withCard = (extra = []) => [
       { role: 'assistant', content: 'Calculus studies change.', topic_suggestions: TOPIC_CARD },
       ...extra,
     ]
+
     const levelSet = () =>
       getSessionProfile.mockResolvedValue({ profile: { knowledge_level: 'beginner' }, etag: 't1' })
 
@@ -2057,6 +2083,7 @@ describe('SessionView', () => {
         store.streamingMessage = { role: 'assistant', content: '', tool_calls: [], citations: [] }
         await flushPromises()
         scrollSpy.mockClear()
+
         return store
       }
 

@@ -13,7 +13,9 @@ const props = defineProps({
 const emit = defineEmits(['end', 'resume', 'continue-topic', 'rename', 'pin', 'unpin'])
 
 const open = ref(false)
+
 const triggerEl = ref(null)
+
 const popoverEl = ref(null)
 
 function toggle() {
@@ -39,13 +41,16 @@ function onAction(kind) {
 
 function onDocPointerDown(e) {
   if (!open.value) return
+
   if (popoverEl.value?.contains(e.target)) return
+
   if (triggerEl.value?.contains(e.target)) return
   close()
 }
 
 function onKey(e) {
   if (!open.value) return
+
   if (e.key === 'Escape') {
     e.stopPropagation()
     close()

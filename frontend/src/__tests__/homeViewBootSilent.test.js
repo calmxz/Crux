@@ -13,6 +13,7 @@ import { errorBus } from '@/services/errorBus.js'
 // just call-argument shape.
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },

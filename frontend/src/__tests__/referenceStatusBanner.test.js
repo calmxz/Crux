@@ -4,12 +4,14 @@ import { mount, flushPromises } from '@vue/test-utils'
 import ReferenceStatusBanner from '@/components/chat/ReferenceStatusBanner.vue'
 
 const deleteDocument = vi.fn()
+
 vi.mock('@/services/uploadApi.js', () => ({
   deleteDocument: (...a) => deleteDocument(...a),
 }))
 
 // Capture the confirm config so a test can invoke accept/reject deterministically.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -17,8 +19,11 @@ vi.mock('primevue/useconfirm', () => ({
     },
   }),
 }))
+
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showSuccess, showError, showWarn: vi.fn() }),
 }))
@@ -49,6 +54,7 @@ describe('ReferenceStatusBanner', () => {
       status: 'pending',
       documents: [{ id: 1, filename: 'a.pdf', status: 'pending' }],
     })
+
     expect(wrapper.get('[data-testid="reference-status"]').text()).toMatch(/indexing/i)
   })
 
@@ -57,6 +63,7 @@ describe('ReferenceStatusBanner', () => {
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     expect(wrapper.get('[data-testid="reference-status"]').text()).toMatch(/ready/i)
   })
 
@@ -65,6 +72,7 @@ describe('ReferenceStatusBanner', () => {
       status: 'failed',
       documents: [{ id: 1, filename: 'a.pdf', status: 'failed', error: 'bad pdf' }],
     })
+
     expect(wrapper.get('[data-testid="reference-status"]').text()).toMatch(/could not|failed/i)
   })
 
@@ -73,6 +81,7 @@ describe('ReferenceStatusBanner', () => {
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     expect(wrapper.get('[data-testid="reference-status"]').text()).toMatch(/1 reference ready/i)
     await wrapper.setProps({ status: null, documents: [] })
     expect(wrapper.find('[data-testid="reference-status"]').exists()).toBe(false)
@@ -86,6 +95,7 @@ describe('ReferenceStatusBanner', () => {
         { id: 2, filename: 'b.md', status: 'pending' },
       ],
     })
+
     // List hidden until expanded.
     expect(wrapper.find('[data-testid="ref-file-list"]').exists()).toBe(false)
     await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
@@ -117,6 +127,7 @@ describe('ReferenceStatusBanner', () => {
         documents: [{ id: 1, filename: 'a.pdf', status: 'pending' }],
         failed: true,
       })
+
       expect(wrapper.find('[data-testid="ref-unavailable"]').exists()).toBe(true)
       await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
       expect(wrapper.find('[data-testid="ref-delete-1"]').exists()).toBe(true)
@@ -135,10 +146,12 @@ describe('ReferenceStatusBanner', () => {
 
   it('deletes a file on confirm-accept, shows a success toast and asks for a refresh', async () => {
     deleteDocument.mockResolvedValue(undefined)
+
     const wrapper = mountBanner({
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
     await wrapper.get('[data-testid="ref-delete-1"]').trigger('click')
     // Simulate the user accepting the confirm dialog.
@@ -154,6 +167,7 @@ describe('ReferenceStatusBanner', () => {
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
     await wrapper.get('[data-testid="ref-delete-1"]').trigger('click')
     // Accept carries the darker-delete hook class (styled globally).
@@ -168,18 +182,22 @@ describe('ReferenceStatusBanner', () => {
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
     await wrapper.get('[data-testid="ref-delete-1"]').trigger('click')
+
     if (lastConfirm.reject) await lastConfirm.reject()
     expect(deleteDocument).not.toHaveBeenCalled()
   })
 
   it('shows an error toast and asks for a refresh when delete fails', async () => {
     deleteDocument.mockRejectedValue(new Error('500'))
+
     const wrapper = mountBanner({
       status: 'ready',
       documents: [{ id: 1, filename: 'a.pdf', status: 'ready' }],
     })
+
     await wrapper.get('[data-testid="ref-toggle"]').trigger('click')
     await wrapper.get('[data-testid="ref-delete-1"]').trigger('click')
     await lastConfirm.accept()

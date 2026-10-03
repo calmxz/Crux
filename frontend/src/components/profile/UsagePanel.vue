@@ -107,6 +107,7 @@ const meterPctLabel = computed(() => {
     100,
     Math.round((props.usage.today_spend_usd / props.usage.hard_cap_usd) * 100),
   )
+
   return `${pct}% of daily cap spent`
 })
 </script>

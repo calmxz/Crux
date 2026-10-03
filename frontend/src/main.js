@@ -34,10 +34,13 @@ setUnauthorizedHandler(() => {
 // the rest of the bundle parses and auth resolves.
 function preconnect() {
   const hrefs = [import.meta.env.VITE_API_BASE_URL, import.meta.env.VITE_SUPABASE_URL]
+
   for (const href of hrefs) {
     if (!href) continue
+
     try {
       const origin = new URL(href, window.location.href).origin
+
       if (origin === window.location.origin) continue
       const link = document.createElement('link')
       link.rel = 'preconnect'
@@ -55,6 +58,7 @@ async function bootstrap() {
   const app = createApp(App)
   app.use(createPinia())
   useTheme().init()
+
   // Resolve Supabase session before the router guard fires, so the first
   // navigation has a deterministic auth answer rather than racing with the
   // SDK's initial getSession() call. auth.init() also re-keys the user
@@ -66,6 +70,7 @@ async function bootstrap() {
     // router guard route to /login.
     console.error('auth init failed; continuing unauthenticated', e)
   }
+
   app.use(router)
   app.use(PrimeVue, {
     theme: {

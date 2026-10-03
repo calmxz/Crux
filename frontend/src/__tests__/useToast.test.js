@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest'
 
 const addMock = vi.fn()
+
 vi.mock('primevue/usetoast', () => ({
   useToast: () => ({ add: addMock }),
 }))

@@ -33,7 +33,9 @@ describe('apiClient cost-warning bus', () => {
 
   function okWithHeader(body, header) {
     const headers = new Headers()
+
     if (header) headers.set('x-cost-warning', header)
+
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -171,7 +173,9 @@ vi.mock('@/services/uploadApi.js', () => ({
 }))
 
 const showError = vi.fn()
+
 const showWarn = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn, showSuccess: vi.fn() }),
 }))

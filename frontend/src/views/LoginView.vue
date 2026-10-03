@@ -131,17 +131,25 @@ import { isValidEmail } from '../utils/validation.js'
 import { safeRedirect } from '../utils/safeRedirect.js'
 
 const route = useRoute()
+
 const router = useRouter()
+
 const resetDone = computed(() => route.query.reset === '1')
 
 const auth = useAuthStore()
 
 const email = ref('')
+
 const password = ref('')
+
 const showPassword = ref(false)
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const needsConfirm = ref(false)
+
 const resent = ref(false)
 
 const canSubmit = computed(() => isValidEmail(email.value.trim()) && password.value.length > 0)
@@ -152,6 +160,7 @@ async function submit() {
   needsConfirm.value = false
   resent.value = false
   submitting.value = true
+
   try {
     await auth.signIn(email.value.trim(), password.value)
     // signInWithPassword updates the store reactively, but the router guard
@@ -169,6 +178,7 @@ async function submit() {
     // AuthError.code instead, so neither the copy nor the unconfirmed-address
     // detection depends on SDK prose.
     error.value = authErrorCopy(e, 'Could not sign in. Try again.')
+
     if (isEmailNotConfirmed(e)) needsConfirm.value = true
   } finally {
     submitting.value = false
@@ -177,6 +187,7 @@ async function submit() {
 
 async function resend() {
   resent.value = false
+
   try {
     await auth.resendConfirmation(email.value.trim())
     resent.value = true

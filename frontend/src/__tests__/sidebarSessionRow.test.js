@@ -3,17 +3,22 @@ import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { params: {}, fullPath: '/' }
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showWarn: vi.fn() }),
 }))
+
 // E-12: capture the confirm config so a test can invoke accept/reject itself.
 // Nothing is accepted implicitly here -- that is the point of the dialog.
 let lastConfirm = null
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({
     require: (cfg) => {
@@ -59,6 +64,7 @@ describe('SidebarSessionRow — accessible row label', () => {
         progress: { level: 'advanced', focus_target_gap: 'ATP yield', mastered_count: 3 },
       }),
     )
+
     const label = wrapper.get('[data-testid="sidebar-row-open"]').attributes('aria-label')
     expect(label).toContain('level advanced')
     expect(label).toContain('focus ATP yield')

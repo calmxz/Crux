@@ -18,6 +18,7 @@ describe('groupBySource', () => {
       item('stomata', 's1', 'Photosynthesis'),
       item('squeeze', 's2', 'Limits'),
     ])
+
     expect(groups.map((g) => g.id)).toEqual(['s1', 's2'])
     expect(groups[0].topic).toBe('Photosynthesis')
     expect(groups[0].items.map((i) => i.concept)).toEqual(['calvin', 'stomata'])

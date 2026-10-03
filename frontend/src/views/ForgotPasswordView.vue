@@ -83,8 +83,11 @@ import { isValidEmail } from '../utils/validation.js'
 const auth = useAuthStore()
 
 const email = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const sent = ref(false)
 
 const canSubmit = computed(() => isValidEmail(email.value.trim()))
@@ -93,6 +96,7 @@ async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.requestPasswordReset(email.value.trim())
     sent.value = true

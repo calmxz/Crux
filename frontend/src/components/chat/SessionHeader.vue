@@ -26,31 +26,45 @@ const props = defineProps({
 })
 
 const actions = useSessionActions()
+
 const { busy } = actions
 
 const topic = computed(() => props.session?.topic || '')
+
 const sessionId = computed(() => props.session?.id || '')
+
 const startedAt = computed(() => props.session?.created_at || '')
+
 const isEnded = computed(() => Boolean(props.session?.ended_at))
+
 const isPinned = computed(() => Boolean(props.session?.pinned))
 
 const started = computed(() =>
   startedAt.value ? `started ${formatRelative(startedAt.value)}` : '',
 )
+
 const levelText = computed(() => props.level || 'level not set')
+
 const stroke = computed(() => levelStroke(props.level))
 
 const pinLabel = computed(() => (isPinned.value ? 'Unpin session' : 'Pin session'))
+
 const pinTitle = computed(() => (isPinned.value ? 'Unpin' : 'Pin'))
+
 const refLabel = computed(() => (props.refStatus ? `Reference files: ${props.refStatus}` : ''))
 
 // Rename: mirrors SidebarSessionRow -- Enter commits, Escape cancels, blur
 // commits; focus returns to the Rename button afterwards.
 const renaming = ref(false)
+
 const draft = ref('')
+
 const inputEl = ref(null)
+
 const renameBtn = ref(null)
+
 const endBtn = ref(null)
+
 const resumeBtn = ref(null)
 
 async function startRename() {
@@ -118,9 +132,12 @@ watch(
 // button is still mounted when this reads document.activeElement.
 watch(isEnded, async (ended) => {
   const leaving = ended ? endBtn.value : resumeBtn.value
+
   if (!leaving || document.activeElement !== leaving) return
   await nextTick()
+
   const target = ended ? resumeBtn.value : endBtn.value
+
   ;(target || renameBtn.value)?.focus()
 })
 </script>

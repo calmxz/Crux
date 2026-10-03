@@ -324,17 +324,21 @@ const CUE_SECTIONS = [
 ]
 
 const data = ref(null)
+
 const loading = ref(false)
+
 const error = ref('')
 
 async function load() {
   loading.value = true
   error.value = ''
+
   try {
     data.value = await getAggregateProfile()
   } catch (e) {
     error.value = friendlyError(e)
   }
+
   loading.value = false
 }
 
@@ -351,10 +355,13 @@ const lastStudied = computed(() =>
 // recent_topics is capped at 5 and sorted server-side; the foot line and
 // "See all topics" cover the rest.
 const topics = computed(() => data.value?.recent_topics ?? [])
+
 const weeklyMastery = computed(() => data.value?.weekly_mastery ?? [])
+
 const conceptAccuracy = computed(() => data.value?.concept_accuracy ?? [])
 
 const profileOf = (id) => ({ name: 'session-profile', params: { id } })
+
 const sessionOf = (id) => ({ name: 'session', params: { id } })
 
 // The card's one line of story: the session summary (auto prefix stripped)
@@ -362,23 +369,29 @@ const sessionOf = (id) => ({ name: 'session', params: { id } })
 // and math the same way the library cards clean it.
 function topicStory(t) {
   const summary = stripAutoPrefix(t.last_session_summary)
+
   if (summary) return { text: summary, preview: false }
   const preview = cleanPreview(t.last_message_preview)
+
   return preview ? { text: preview, preview: true } : null
 }
 
 const levelRows = computed(() => {
   const dist = data.value?.knowledge_level_distribution ?? {}
   const rows = LEVELS.map((l) => ({ key: l, level: l, label: l, count: dist[l] ?? 0 }))
+
   if (dist.unknown) {
     rows.push({ key: 'unknown', level: null, label: 'level not set', count: dist.unknown })
   }
+
   return rows
 })
 
 function formatWeekLabel(iso) {
   const d = new Date(`${iso}T00:00:00Z`)
+
   if (Number.isNaN(d.getTime())) return iso
+
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
 }
 
@@ -386,15 +399,20 @@ function formatWeekLabel(iso) {
 // a fixed bar/gap pitch so it never scales with the card (see
 // .weekly-figure max-width). One series in the green mastered token only.
 const WEEKLY_BAR_WIDTH = 16
+
 const WEEKLY_GAP = 8
+
 const WEEKLY_CHART_HEIGHT = 56
 
 // weekly_mastery is always 12 zero-filled points server-side, so "has data"
 // is some week carrying a count, never the array's length.
 const weeklyHasData = computed(() => weeklyMastery.value.some((w) => w.count > 0))
+
 const weeklyMax = computed(() => Math.max(...weeklyMastery.value.map((w) => w.count), 1))
+
 const weeklyChartWidth = computed(() => {
   const n = weeklyMastery.value.length
+
   return n ? n * WEEKLY_BAR_WIDTH + (n - 1) * WEEKLY_GAP : WEEKLY_BAR_WIDTH
 })
 
@@ -404,8 +422,10 @@ const weeklyChartWidth = computed(() => {
 const weeklyColumns = computed(() => {
   const points = weeklyMastery.value
   const n = points.length
+
   return points.map((w, i) => {
     const barHeight = (w.count / weeklyMax.value) * WEEKLY_CHART_HEIGHT
+
     return {
       key: w.week_start,
       x: i * (WEEKLY_BAR_WIDTH + WEEKLY_GAP),
@@ -423,6 +443,7 @@ const weeklyColumns = computed(() => {
 // 6 the slices overlap; the most-accurate group drops anything already shown,
 // and the labels only appear when both groups do.
 const ACCURACY_GROUP_SIZE = 3
+
 const accuracyGroupList = computed(() => {
   const all = conceptAccuracy.value
   const least = all.slice(0, ACCURACY_GROUP_SIZE)
@@ -430,10 +451,13 @@ const accuracyGroupList = computed(() => {
   const most = all.slice(-ACCURACY_GROUP_SIZE).filter((c) => !leastNames.has(c.concept))
   const showLabels = least.length > 0 && most.length > 0
   const groups = []
+
   if (least.length)
     groups.push({ key: 'least', label: showLabels ? 'Least accurate' : null, rows: least })
+
   if (most.length)
     groups.push({ key: 'most', label: showLabels ? 'Most accurate' : null, rows: most })
+
   return groups
 })
 </script>

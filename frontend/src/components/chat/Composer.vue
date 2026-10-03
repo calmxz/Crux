@@ -180,10 +180,12 @@ const props = defineProps({
 const emit = defineEmits(['update:modelValue', 'send', 'stop', 'attach'])
 
 const composerEl = ref(null)
+
 const fileInputEl = ref(null)
 
 // I-10: matches ChatRequest.message maxLength in the API contract.
 const MAX_DRAFT_LEN = 4000
+
 // Six pitches: the textarea grows from one ruled line to six, then scrolls.
 const COMPOSER_MAX_HEIGHT_PX = 168
 
@@ -200,8 +202,11 @@ const describedbyIds = computed(() => [props.describedby, LIMIT_HINT_ID].filter(
 // change; at the cap the wording says so outright.
 const limitAnnouncement = computed(() => {
   const left = MAX_DRAFT_LEN - props.modelValue.length
+
   if (left <= 0) return 'Character limit reached'
+
   if (!nearCharLimit.value) return ''
+
   return `${left.toLocaleString()} character${left === 1 ? '' : 's'} left`
 })
 
@@ -211,6 +216,7 @@ const sendArmed = computed(() => !props.disabled && Boolean(props.modelValue.tri
 
 function autoResize() {
   const inner = composerEl.value
+
   if (!inner) return
   inner.style.height = 'auto'
   const next = Math.min(inner.scrollHeight, COMPOSER_MAX_HEIGHT_PX)
@@ -251,6 +257,7 @@ function openFilePicker() {
 function onFileChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
+
   if (file) {
     emit('attach', file)
   }
@@ -258,6 +265,7 @@ function onFileChange(event) {
 
 function focus() {
   const el = composerEl.value
+
   if (el) {
     el.focus()
     autoResize()

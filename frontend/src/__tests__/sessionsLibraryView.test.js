@@ -4,6 +4,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const push = vi.fn()
+
 // Reactive so watch(() => route.query...) inside the component actually
 // re-fires when a test mutates a property post-mount (simulating a
 // same-route query navigation). replace() mimics real router behavior by
@@ -18,13 +19,16 @@ const push = vi.fn()
 // inflating the call count nondeterministically. A fresh object per test
 // means only the current test's component instance is subscribed to it.
 let mockRouteQuery = reactive({})
+
 const replace = vi.fn((to) => {
   if (to?.query) {
     for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k]
     Object.assign(mockRouteQuery, to.query)
   }
+
   return Promise.resolve()
 })
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push, replace }),
   useRoute: () => ({ query: mockRouteQuery }),
@@ -45,6 +49,7 @@ const stubs = {
 function page(items, over = {}) {
   return { items, total: items.length, limit: 20, offset: 0, ...over }
 }
+
 function item(id, over = {}) {
   return {
     id,
@@ -163,9 +168,11 @@ describe('SessionsLibraryView', () => {
     sessionsApi.getSessionLibrary.mockResolvedValue(page([item('a')]))
     const wrapper = mount(SessionsLibraryView, { global: { stubs } })
     await flushPromises()
+
     const link = wrapper
       .findAllComponents(stubs.RouterLink)
       .find((c) => c.props('to')?.params?.id === 'a')
+
     expect(link).toBeTruthy()
     expect(link.props('to')).toEqual({ name: 'session', params: { id: 'a' } })
   })
@@ -413,12 +420,14 @@ describe('SessionsLibraryView', () => {
     const { useSessionStore } = await import('@/stores/session.js')
     const store = useSessionStore()
     let resolve
+
     const continueTopicSpy = vi.spyOn(store, 'continueTopic').mockImplementation(
       () =>
         new Promise((r) => {
           resolve = r
         }),
     )
+
     sessionsApi.getSessionLibrary.mockResolvedValue(
       page([item('z', { ended_at: '2026-06-02T00:00:00Z' })]),
     )
@@ -442,11 +451,14 @@ describe('SessionsLibraryView', () => {
     const wrapper = mount(SessionsLibraryView, { global: { stubs } })
     await flushPromises()
     const rejections = []
+
     const onUnhandled = (e) => {
       rejections.push(e)
       e.preventDefault()
     }
+
     window.addEventListener('unhandledrejection', onUnhandled)
+
     try {
       await wrapper.get('[data-testid="library-continue-z"]').trigger('click')
       await flushPromises()
@@ -454,6 +466,7 @@ describe('SessionsLibraryView', () => {
     } finally {
       window.removeEventListener('unhandledrejection', onUnhandled)
     }
+
     expect(rejections).toHaveLength(0)
     expect(push).not.toHaveBeenCalled()
     // The button is usable again for a retry.

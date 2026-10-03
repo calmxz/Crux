@@ -3,25 +3,34 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { params: {}, fullPath: '/' }
+
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError: vi.fn(), showWarn: vi.fn(), showSuccess: vi.fn() }),
 }))
+
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({ require: (cfg) => cfg.accept?.() }),
 }))
+
 const apiReviewQueue = vi.fn()
+
 vi.mock('@/services/reviewApi.js', () => ({
   getReviewQueue: (...args) => apiReviewQueue(...args),
 }))
+
 const apiGetSessionLibrary = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
   const actual = await importOriginal()
+
   return {
     ...actual,
     getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
@@ -56,8 +65,10 @@ describe('Sidebar.vue -- folded icon rail', () => {
     vi.spyOn(useSessionStore(), 'listSessions').mockResolvedValue([])
     globalThis.requestIdleCallback = (cb) => {
       cb()
+
       return 1
     }
+
     globalThis.cancelIdleCallback = () => {}
   })
   afterEach(() => {
@@ -96,6 +107,7 @@ describe('Sidebar.vue -- folded icon rail', () => {
   it('the head toggle follows the wordmark in DOM order when open', async () => {
     const precedes = (a, b) =>
       Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING)
+
     wrapper = mount(Sidebar)
     await flushPromises()
     await wrapper.get('[data-testid="sidebar-collapse-toggle"]').trigger('click')
@@ -115,10 +127,12 @@ describe('Sidebar.vue -- folded icon rail', () => {
     ]
     wrapper = mount(Sidebar)
     await flushPromises()
+
     const ids = wrapper
       .findAll('button, a')
       .map((w) => w.attributes('data-testid'))
       .filter(Boolean)
+
     expect(ids.slice(0, 3)).toEqual([
       'sidebar-collapse-toggle',
       'sidebar-new-session',
@@ -134,6 +148,7 @@ describe('Sidebar.vue -- folded icon rail', () => {
   it('keeps focus on the head toggle across folding and unfolding', async () => {
     wrapper = mount(Sidebar, { attachTo: document.body })
     await flushPromises()
+
     for (let i = 0; i < 2; i++) {
       const toggle = wrapper.get('[data-testid="sidebar-collapse-toggle"]')
       toggle.element.focus()

@@ -44,9 +44,11 @@ describe('RegisterView', () => {
 
   it('submit calls register and shows the check-inbox state', async () => {
     const auth = useAuthStore()
+
     const spy = vi
       .spyOn(auth, 'register')
       .mockResolvedValue({ user: { id: 'u-new' }, session: null })
+
     const wrapper = mountView()
     await wrapper.get('[data-testid="register-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="register-password"]').setValue('hunter2pw')

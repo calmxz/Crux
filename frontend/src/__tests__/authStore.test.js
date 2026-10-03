@@ -46,6 +46,7 @@ describe('auth store', () => {
     let callback
     globalThis.__supabaseAuthStub.onAuthStateChange.mockImplementationOnce((cb) => {
       callback = cb
+
       return { data: { subscription: { unsubscribe: vi.fn() } } }
     })
     const auth = useAuthStore()

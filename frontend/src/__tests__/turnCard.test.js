@@ -13,12 +13,14 @@ import UserBubble from '@/components/chat/UserBubble.vue'
 // jsdom mount.
 function styleOf(rel) {
   const src = readFileSync(fileURLToPath(new URL(rel, import.meta.url)), 'utf8')
+
   return src.slice(src.indexOf('<style'))
 }
 
 function ruleBody(css, selector) {
   const at = css.indexOf(`${selector} {`)
   expect(at, `${selector} rule missing`).toBeGreaterThan(-1)
+
   return css.slice(at, css.indexOf('}', at))
 }
 

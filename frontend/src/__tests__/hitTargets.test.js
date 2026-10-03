@@ -62,6 +62,7 @@ describe('SessionHeader — action bar touch targets', () => {
   let SessionHeader
 
   const RouterLinkStub = { template: '<a><slot /></a>', props: ['to'] }
+
   const session = {
     id: 's1',
     topic: 'Glycolysis pathway',
@@ -74,6 +75,7 @@ describe('SessionHeader — action bar touch targets', () => {
     vi.resetModules()
     vi.doMock('@/composables/useSessionActions.js', async () => {
       const { ref } = await import('vue')
+
       return {
         useSessionActions: () => ({
           busy: ref(false),
@@ -118,6 +120,7 @@ describe('CueColumn — disclosure and panel-collapse touch targets', () => {
   let CueColumn
 
   const entry = (name) => ({ name, evidence_type: null, last_event_at: null })
+
   const profile = {
     knowledge_level: null,
     subtopic_levels: {},
@@ -160,6 +163,7 @@ describe('Sidebar — collapse toggle touch target', () => {
     }))
     vi.doMock('@/services/sessionsApi.js', async (importOriginal) => {
       const actual = await importOriginal()
+
       return {
         ...actual,
         getSessionLibrary: vi.fn().mockResolvedValue({ items: [], total: 0, limit: 15, offset: 0 }),

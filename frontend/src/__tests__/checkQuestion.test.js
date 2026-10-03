@@ -109,6 +109,7 @@ describe('CheckQuestion batch', () => {
         },
       ],
     })
+
     const w = mount(CheckQuestion, { props: { check: b } })
     expect(w.find('[data-testid="check-done"]').exists()).toBe(true)
   })
@@ -147,6 +148,7 @@ describe('CheckQuestion batch', () => {
         },
       ],
     })
+
     const done = mount(CheckQuestion, { props: { check: b, busy: true } })
     expect(done.find('[data-testid="check-done"]').element.disabled).toBe(true)
     const pending = mount(CheckQuestion, { props: { check: batch(), busy: true } })
@@ -167,6 +169,7 @@ describe('CheckQuestion free navigation (#348)', () => {
     correct: true,
     explanation: 'a.',
   })
+
   const skippedItem = (q) => ({ ...answeredItem(q), status: 'skipped', correct: null })
 
   it('Next is shown and enabled on an unanswered, non-last item', async () => {
@@ -228,6 +231,7 @@ describe('CheckQuestion free navigation (#348)', () => {
         busy: true,
       },
     })
+
     expect(w.get('[data-testid="check-back"]').element.disabled).toBe(true)
     expect(w.get('[data-testid="check-next"]').element.disabled).toBe(true)
   })
@@ -336,6 +340,7 @@ describe('CheckQuestion accessibility (D-01)', () => {
         },
       ],
     })
+
     return mount(CheckQuestion, { props: { check: b } })
   }
 
@@ -433,6 +438,7 @@ describe('CheckQuestion set progress (#364)', () => {
       resolve(process.cwd(), 'src/components/chat/CheckQuestion.vue'),
       'utf8',
     )
+
     const block = src.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/)
     expect(block).not.toBeNull()
     expect(block[1]).toMatch(/\.check-rule-seg::after\s*\{\s*transition:\s*none;/)

@@ -50,6 +50,7 @@ test.describe.skip('resume carries profile', () => {
     await page
       .locator(`[data-session-id="${sessionId}"] [data-testid="sidebar-row-menu-trigger"]`)
       .click()
+
     // Start waiting for the end-session request before clicking: the click
     // resolves on event dispatch, not on the async handler, and the
     // subsequent page.goto is a full-page navigation that would abort an
@@ -59,6 +60,7 @@ test.describe.skip('resume carries profile', () => {
     const endResponse = page.waitForResponse(
       (r) => r.url().includes(`/sessions/${sessionId}/end`) && r.ok(),
     )
+
     await page.getByTestId('sidebar-row-menu-end').click()
     // E-12: End now sits behind a PrimeVue confirm dialog (same contract as
     // file delete); the request only fires on the destructive accept.

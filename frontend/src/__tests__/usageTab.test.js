@@ -67,6 +67,7 @@ describe('UsageTab', () => {
       data: () => ({ show: true }),
       template: '<KeepAlive><UsageTab v-if="show" /></KeepAlive>',
     }
+
     const wrapper = mount(Host)
     await flushPromises()
     expect(spy).toHaveBeenCalledTimes(1)

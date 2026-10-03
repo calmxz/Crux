@@ -70,8 +70,11 @@ import { useSessionStore } from '../stores/session.js'
 import { friendlyError } from '../lib/errors.js'
 
 const router = useRouter()
+
 const store = useSessionStore()
+
 const quickTopic = ref('')
+
 const startError = ref(null)
 
 const {
@@ -93,6 +96,7 @@ const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 const bootError = computed(() =>
   store.error && !store.sessions.length ? friendlyError(store.error) : null,
 )
+
 const displayError = computed(() => startError.value || bootError.value)
 
 onMounted(() => {
@@ -109,6 +113,7 @@ onMounted(() => {
 // feedback. Catch at the call site and surface inline instead.
 async function startQuick() {
   startError.value = null
+
   try {
     await begin(quickTopic.value)
   } catch (e) {
@@ -118,6 +123,7 @@ async function startQuick() {
 
 async function handleContinuePrior() {
   startError.value = null
+
   try {
     await continuePrior()
   } catch (e) {
@@ -127,6 +133,7 @@ async function handleContinuePrior() {
 
 async function handleStartFresh() {
   startError.value = null
+
   try {
     await startFresh()
   } catch (e) {

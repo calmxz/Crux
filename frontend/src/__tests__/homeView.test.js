@@ -6,12 +6,14 @@ import HomeView from '@/views/HomeView.vue'
 import { useSessionStore } from '@/stores/session.js'
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
 }))
 
 const apiEndSession = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', () => ({
   endSession: (...args) => apiEndSession(...args),
 }))
@@ -26,6 +28,7 @@ const stubs = {
 
 function makeSession(id, topic, ended = false, createdOffset = 0) {
   const created = new Date(Date.now() + createdOffset).toISOString()
+
   return {
     id,
     topic,
@@ -200,11 +203,13 @@ describe('HomeView', () => {
     const store = useSessionStore()
     vi.spyOn(store, 'listSessions').mockResolvedValue([])
     let resolveLookup
+
     const lookupSpy = vi.spyOn(store, 'lookupTopic').mockReturnValue(
       new Promise((resolve) => {
         resolveLookup = resolve
       }),
     )
+
     vi.spyOn(store, 'createSession').mockResolvedValue({ id: 'sess1' })
     const wrapper = mountView()
     await flushPromises()

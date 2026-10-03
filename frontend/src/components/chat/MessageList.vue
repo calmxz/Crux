@@ -19,6 +19,7 @@ const props = defineProps({
 // skipped. Cancelled/partial rows keep their marker even without text.
 function _renderable(m) {
   if (m.role === 'user') return true
+
   return Boolean(
     m.content ||
     m.check_batch ||
@@ -36,6 +37,7 @@ const lastAssistantIndex = computed(() => {
   for (let i = visibleMessages.value.length - 1; i >= 0; i -= 1) {
     if (visibleMessages.value[i].role !== 'user') return i
   }
+
   return -1
 })
 
@@ -48,6 +50,7 @@ function tickAt(i) {
 // so a skipped-empty assistant row (U-01) never counts as a voice change.
 function speakerChangeAt(i) {
   if (i === 0) return false
+
   return visibleMessages.value[i].role !== visibleMessages.value[i - 1].role
 }
 
@@ -55,6 +58,7 @@ function speakerChangeAt(i) {
 // the last rendered turn was the learner's.
 const trailingSpeakerChange = computed(() => {
   const last = visibleMessages.value[visibleMessages.value.length - 1]
+
   return last ? last.role === 'user' : false
 })
 </script>
