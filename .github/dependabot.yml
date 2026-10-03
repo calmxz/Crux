@@ -29,6 +29,8 @@ updates:
     # uses its own SVG icon components), so it is no longer tracked here.
     # eslint-plugin-oxlint pins its peer to the matching oxlint minor
     # (oxlint@~X.Y.0); a solo oxlint bump fails npm ci with ERESOLVE.
+    # @oxlint/plugins is exact-pinned to the oxlint version for the vendored
+    # anti-slop plugin (frontend/.oxlint/anti-slop), so it moves with them.
     # @vitest/coverage-v8 peer-requires the exact same vitest version, so a
     # solo bump of either fails npm ci the same way (#315).
     # @vitest/eslint-plugin versions independently and stays out of the group.
@@ -37,6 +39,7 @@ updates:
         patterns:
           - "oxlint"
           - "eslint-plugin-oxlint"
+          - "@oxlint/plugins"
       vitest:
         patterns:
           - "vitest"

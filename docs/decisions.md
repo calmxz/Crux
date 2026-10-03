@@ -3,6 +3,31 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-03 - Anti-slop Oxlint plugin adopted, partly (#470)
+
+Vendored dmmulroy/anti-slop into `frontend/.oxlint/anti-slop/` (the
+frontend is the npm root and holds `.oxlintrc.json`). `@oxlint/plugins` is
+exact-pinned to the installed oxlint and grouped with it in dependabot. The
+plugin also covers `.vue` script blocks. Loading gotchas are in
+`docs/reference.md`.
+
+The frontend is plain JS, so it is a partial fit:
+
+- **On at `error`:** every generic rule except the two below, plus
+  `oxc/no-accumulating-spread`. The 13 rules that match TS-only syntax report
+  nothing here; they stay on so a later TS migration is covered for free.
+- **`require-readable-spacing`:** 1545 blank-line findings, applied by
+  `oxlint --fix` as a blank-line-only pass. Exceptions: two one-line
+  blocks in `sseParser.js` and its test were rewritten by hand (and got a
+  full Prettier pass from the edit hook), and the one
+  `no-conditional-empty-object-spread` finding in
+  `startTopicIntercept.test.js` was fixed.
+- **`no-runtime-typeof` off.** Its only exemption is a TS type-predicate
+  function, which JS cannot express, so it flagged all 33 `typeof` guards,
+  including the ones that parse untrusted error payloads at the boundary.
+- **`no-module-mocking` off for now.** 82 `vi.mock` calls in 32 test files;
+  replacing them is a test refactor, tracked in #470.
+
 ## 2026-10-01 - Contracts are kept honest by tests against the spec (#463, #464, #465, #466, #467, #468)
 
 Architecture review candidate B7, the last of the 13. The card proposed a
