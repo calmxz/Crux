@@ -41,6 +41,12 @@ class Settings(BaseSettings):
     # limits; env-tunable so the deploy can be sized without a code change.
     db_pool_size: int = 5
     db_max_overflow: int = 5
+    # F-01: how long a request waits for a pooled connection before failing.
+    # SQLAlchemy's default is 30s, which turns pool exhaustion into a pile-up
+    # of hung requests instead of fast, visible load shedding.
+    db_pool_timeout_s: float = 5.0
+    # G-07 follow-up: seconds psycopg waits for the TCP connect before failing.
+    db_connect_timeout_s: float = 5.0
     llm_stub: bool = False
     debug_timing: bool = False
     # The web process drains the ingestion queue itself by default. Set false
@@ -60,11 +66,23 @@ class Settings(BaseSettings):
     supabase_secret_key: str = ""
     llm_soft_cap_usd: float = 2.00
     llm_hard_cap_usd: float = 3.00
+    # B-05: provisional per-turn charge reserved at the cost gate, released
+    # when the turn ends.
+    llm_turn_reserve_usd: float = 0.02
     max_chunks: int = 5000
+    # F-03: upload-time page/slide ceiling for .pdf/.pptx. Cheap structural
+    # check that rejects a document before a worker loads and tokenises it.
+    max_pages: int = 400
     global_daily_cost_cap_usd: float | None = None
     llm_temperature: float = 0.3
     summary_temperature: float = 0.0
     retrieval_fallback_threshold: float = 0.75
+    # G-11: cosine-similarity floor for surfacing a retrieved chunk as a
+    # citation; None-scored chunks pass.
+    citation_min_similarity: float = 0.25
+    # F-10: SET LOCAL hnsw.ef_search on the retrieval transaction; pgvector
+    # default 40.
+    hnsw_ef_search: int = 100
 
     # F-06: explicit LiteLLM timeouts. Chat streams get the longest budget;
     # summaries and embeddings are shorter single-shot calls.
@@ -87,6 +105,13 @@ class Settings(BaseSettings):
     # F-35: hard cap per profile concept list (confirmed_gaps,
     # mastered_concepts); oldest entries evicted at write time.
     max_profile_list: int = 40
+
+    # C-03: non-multipart request bodies above this are rejected before
+    # parsing.
+    max_json_body_bytes: int = 64 * 1024
+
+    # G-07: /ready DB probe budget.
+    readiness_timeout_s: float = 2.0
 
     @property
     def cors_origin_list(self) -> list[str]:

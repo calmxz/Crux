@@ -3,10 +3,12 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import LoginView from '@/views/LoginView.vue'
+import { AUTH_CODE_COPY } from '@/lib/authErrors.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { safeRedirect } from '@/utils/safeRedirect.js'
 
 const { mockQuery, push } = vi.hoisted(() => ({ mockQuery: { value: {} }, push: vi.fn() }))
+
 vi.mock('vue-router', () => ({
   useRoute: () => ({ query: mockQuery.value }),
   useRouter: () => ({ push }),
@@ -25,6 +27,16 @@ const stubs = {
 
 function mountView() {
   return mount(LoginView, { global: { stubs } })
+}
+
+// Shape of a real auth-js AuthError: prose message plus a machine-readable
+// code. The prose is what E-13 stopped rendering.
+function authError(code, status) {
+  return Object.assign(new Error(`gotrue prose for ${code}`), {
+    code,
+    status,
+    name: 'AuthApiError',
+  })
 }
 
 describe('LoginView', () => {
@@ -84,19 +96,33 @@ describe('LoginView', () => {
 
   it('shows an error banner when sign-in throws', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'signIn').mockRejectedValue(new Error('Invalid login credentials'))
+    // E-13: our copy for the SDK code, never the SDK's prose.
+    vi.spyOn(auth, 'signIn').mockRejectedValue(authError('invalid_credentials', 400))
     const wrapper = mountView()
     await wrapper.get('[data-testid="login-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="login-password"]').setValue('wrongpass')
     await wrapper.get('[data-testid="login-form"]').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('[data-testid="login-error"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="login-error"]').text()).toContain('Invalid login credentials')
+    const text = wrapper.get('[data-testid="login-error"]').text()
+    expect(text).toBe(AUTH_CODE_COPY.invalid_credentials)
+    expect(text).not.toContain('Invalid login credentials')
+  })
+
+  it('falls back to its own copy for an auth error with no known code', async () => {
+    const auth = useAuthStore()
+    vi.spyOn(auth, 'signIn').mockRejectedValue(new Error('something odd'))
+    const wrapper = mountView()
+    await wrapper.get('[data-testid="login-email"]').setValue('me@example.com')
+    await wrapper.get('[data-testid="login-password"]').setValue('wrongpass')
+    await wrapper.get('[data-testid="login-form"]').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="login-error"]').text()).toBe('Could not sign in. Try again.')
   })
 
   it('announces the error to screen readers', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'signIn').mockRejectedValue(new Error('Invalid login credentials'))
+    vi.spyOn(auth, 'signIn').mockRejectedValue(authError('invalid_credentials', 400))
     const wrapper = mountView()
     await wrapper.get('[data-testid="login-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="login-password"]').setValue('wrongpass')
@@ -107,7 +133,8 @@ describe('LoginView', () => {
 
   it('offers resend when the account email is not confirmed', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'signIn').mockRejectedValue(new Error('Email not confirmed'))
+    // E-13: driven by AuthError.code, not a /not confirmed/i prose test.
+    vi.spyOn(auth, 'signIn').mockRejectedValue(authError('email_not_confirmed', 400))
     const resendSpy = vi.spyOn(auth, 'resendConfirmation').mockResolvedValue()
     const wrapper = mountView()
     await wrapper.get('[data-testid="login-email"]').setValue('me@example.com')
@@ -119,6 +146,17 @@ describe('LoginView', () => {
     await flushPromises()
     expect(resendSpy).toHaveBeenCalledWith('me@example.com')
     expect(wrapper.find('[data-testid="login-resent"]').exists()).toBe(true)
+  })
+
+  it('does not offer resend for prose that merely mentions confirmation', async () => {
+    const auth = useAuthStore()
+    vi.spyOn(auth, 'signIn').mockRejectedValue(new Error('Email not confirmed'))
+    const wrapper = mountView()
+    await wrapper.get('[data-testid="login-email"]').setValue('me@example.com')
+    await wrapper.get('[data-testid="login-password"]').setValue('hunter2pw')
+    await wrapper.get('[data-testid="login-form"]').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="login-resend"]').exists()).toBe(false)
   })
 
   it('toggles password visibility via the eye button', async () => {

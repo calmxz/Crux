@@ -13,9 +13,9 @@ import pytest
 
 from config import settings
 from contracts import TopicProfile
-from db.models import ChatMessage, Session as SessionModel, User
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services import cost_meter, summary_service
-
 
 USER_ID = "u_roll"
 
@@ -187,8 +187,10 @@ def test_rolling_summary_counts_before_loading(db_session, monkeypatch):
     """F-58: when not due, no ChatMessage rows are materialized -- only a
     COUNT query runs."""
     import asyncio
+
+    from db.models import ChatMessage
+    from db.models import Session as SessionModel
     from services import summary_service
-    from db.models import ChatMessage, Session as SessionModel
 
     s = SessionModel(id="s_f58_count", user_id="u1", topic="t")
     db_session.add(s)
@@ -221,8 +223,10 @@ def test_rolling_transcript_capped_to_newest(db_session, monkeypatch):
     """F-58: the dropped-transcript sent to the LLM contains at most
     ROLLING_TRANSCRIPT_MAX messages, the newest ones."""
     import asyncio
+
+    from db.models import ChatMessage
+    from db.models import Session as SessionModel
     from services import summary_service
-    from db.models import ChatMessage, Session as SessionModel
 
     s = SessionModel(id="s_f58_cap", user_id="u1", topic="t")
     db_session.add(s)

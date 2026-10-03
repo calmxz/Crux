@@ -15,9 +15,9 @@ import pytest
 from agent import tools
 from agent.types import ToolContext
 from contracts import TopicProfile
-from db.models import Session as SessionModel, User
+from db.models import Session as SessionModel
+from db.models import User
 from services import profile_service
-
 
 SESSION_ID = "sess_inject"
 USER_ID = "u_inject"

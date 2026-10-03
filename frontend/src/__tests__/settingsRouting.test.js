@@ -23,23 +23,36 @@ beforeEach(async () => {
 })
 
 describe('unified settings routing', () => {
-  it('/settings redirects to /settings/profile', async () => {
+  it('/settings redirects to /settings/learning', async () => {
     await router.push('/settings')
-    expect(router.currentRoute.value.fullPath).toBe('/settings/profile')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/learning')
   })
 
-  it('/profile redirects to /settings/profile and keeps its route name usable', async () => {
+  it('/profile is its own page now, not a redirect to Settings (#362)', async () => {
     await router.push({ name: 'profile-aggregate' })
-    expect(router.currentRoute.value.fullPath).toBe('/settings/profile')
+    expect(router.currentRoute.value.fullPath).toBe('/profile')
+    expect(router.currentRoute.value.name).toBe('profile-aggregate')
+    expect(router.currentRoute.value.matched.at(-1).components.default).toBeTruthy()
   })
 
-  it('invalid tab slug redirects to /settings/profile', async () => {
+  it('invalid tab slug redirects to /settings/learning', async () => {
     await router.push('/settings/bogus')
-    expect(router.currentRoute.value.fullPath).toBe('/settings/profile')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/learning')
+  })
+
+  it('the old profile tab param redirects to learning', async () => {
+    await router.push('/settings/profile')
+    expect(router.currentRoute.value.fullPath).toBe('/settings/learning')
+  })
+
+  it('the old account tab param redirects to the Account page', async () => {
+    await router.push('/settings/account')
+    expect(router.currentRoute.value.name).toBe('account')
+    expect(router.currentRoute.value.fullPath).toBe('/account')
   })
 
   it('each valid tab resolves to the settings route with the tab param', async () => {
-    for (const tab of ['profile', 'usage', 'account', 'appearance']) {
+    for (const tab of ['learning', 'usage', 'appearance']) {
       await router.push(`/settings/${tab}`)
       expect(router.currentRoute.value.name).toBe('settings')
       expect(router.currentRoute.value.params.tab).toBe(tab)

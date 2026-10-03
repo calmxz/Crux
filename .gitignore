@@ -75,9 +75,14 @@ Thumbs.db
 
 
 CLAUDE.md
+DESIGN.md
+PRODUCT.md
 .superpowers/
 
 .playwright-mcp/
 
 # Impeccable critique snapshots (local design-review runs)
 .impeccable/
+
+# Local-markdown issue tracker scratch space (mattpocock-skills)
+.scratch/

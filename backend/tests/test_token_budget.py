@@ -21,7 +21,15 @@ from config import settings
 # Re-baselined 2026-07-30 (smart-start Task 4): IMMUTABLE_RULES grew by the
 # DIAGNOSTIC ACCEPTED bullet (spec-required). Measured 6829 -> 6829*1.10 ->
 # 7600.
-TOKEN_BUDGET = 7600
+# Re-baselined 2026-09-24 (#340 check sets): IMMUTABLE_RULES grew by the set
+# rules, the between-sets continuation, the learner-stop and ask-why-once
+# POST-QUIZ bullets, and the 3-sets diagnostic (all spec-required, #339
+# resolution). Measured 7873 -> 7873*1.10 -> 8700.
+# Re-baselined 2026-09-25 (#354 topic card): IMMUTABLE_RULES grew by the
+# TOPIC SUGGESTIONS block and the LEVEL WORDING / clarify-when-unsure rule
+# (spec-required and owner-requested), plus the TOPIC_SUGGEST context line.
+# Measured 8741 in CI -> 8741*1.10 -> 9700.
+TOKEN_BUDGET = 9700
 
 
 def _assembled_turn():

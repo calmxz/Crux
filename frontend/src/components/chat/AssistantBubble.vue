@@ -4,6 +4,7 @@ import MarkdownContent from './MarkdownContent.vue'
 import ToolCallChip from './ToolCallChip.vue'
 import CitationsList from './CitationsList.vue'
 import CheckRecap from './CheckRecap.vue'
+import { TICK_PATH } from './levelMark.js'
 import { formatTime } from '../../utils/formatDate.js'
 
 const props = defineProps({
@@ -17,9 +18,11 @@ const props = defineProps({
 // noise to the learner -- show only the successful chip.
 const visibleToolCalls = computed(() => {
   const calls = props.message.tool_calls || []
+
   const succeeded = new Set(
     calls.filter((tc) => (tc.state || 'done') !== 'error').map((tc) => tc.name),
   )
+
   return calls.filter((tc) => tc.state !== 'error' || !succeeded.has(tc.name))
 })
 
@@ -45,7 +48,7 @@ const timeLabel = computed(() => formatTime(props.message.created_at))
         focusable="false"
         data-testid="msg-landed-tick"
       >
-        <path d="M2 6.5 L4.8 9.2 L10 3.2" pathLength="1" />
+        <path :d="TICK_PATH" pathLength="1" />
       </svg>
     </div>
     <div class="msg-body">
@@ -77,19 +80,18 @@ const timeLabel = computed(() => formatTime(props.message.created_at))
 </template>
 
 <style scoped>
-/* The tutor's card: white stock, told apart from the learner by material,
-   never by an avatar. The head line carries the role and time in pencil. */
+/* The tutor writes flat on the desk -- no card, no edge, no drop. Told
+   apart from the learner by the absence of a card, never by an avatar.
+   The head line carries the role and time in pencil. */
 .msg {
   align-self: flex-start;
+  /* A fixed measure, not shrink-to-fit: with no card edge to explain it, the
+     time label and landed tick must land on one shared right edge. */
+  width: 78%;
   max-width: 78%;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  background: var(--card);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-card);
-  box-shadow: 0 1px 0 var(--card-drop);
-  padding: 0.55rem 0.9rem 0.7rem;
 }
 
 .msg-gutter {
@@ -172,6 +174,7 @@ const timeLabel = computed(() => formatTime(props.message.created_at))
 
 @media (max-width: 599px) {
   .msg {
+    width: 92%;
     max-width: 92%;
   }
 }

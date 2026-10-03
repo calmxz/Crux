@@ -9,18 +9,21 @@ dependency on `app.dependency_overrides`.
 """
 from __future__ import annotations
 
+import threading
 import time
 from typing import Any
 
 import jwt
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import HTTPException, Request, status
 from jwt import PyJWKClient
 
 from config import settings
 
-
 _JWKS_CACHE: dict[str, Any] = {"client": None, "fetched_at": 0.0}
 _JWKS_TTL_SECONDS = 60 * 60  # refresh hourly
+# F-19: serialises the refresh. Without it every concurrent request that
+# observes the stale cache builds its own PyJWKClient (one JWKS fetch each).
+_JWKS_LOCK = threading.Lock()
 JWT_LEEWAY_SECONDS = 30  # F-41: absorb small backend-vs-Supabase clock skew
 
 
@@ -31,19 +34,37 @@ def expected_issuer() -> str:
     return settings.supabase_url.rstrip("/") + "/auth/v1"
 
 
-def _get_jwks_client() -> PyJWKClient:
-    now = time.time()
-    if (
+def _jwks_cache_stale(now: float) -> bool:
+    return (
         _JWKS_CACHE["client"] is None
         or now - _JWKS_CACHE["fetched_at"] > _JWKS_TTL_SECONDS
-    ):
-        if not settings.supabase_jwks_url:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="auth_not_configured",
-            )
-        _JWKS_CACHE["client"] = PyJWKClient(settings.supabase_jwks_url)
-        _JWKS_CACHE["fetched_at"] = now
+    )
+
+
+def _new_jwks_client() -> PyJWKClient:
+    """F-19: pin the cache settings instead of inheriting PyJWT's 300 s
+    default lifespan, which would silently refetch JWKS 12x per hour."""
+    return PyJWKClient(
+        settings.supabase_jwks_url,
+        cache_jwk_set=True,
+        lifespan=_JWKS_TTL_SECONDS,
+    )
+
+
+def _get_jwks_client() -> PyJWKClient:
+    # Lock-free fast path: a warm, fresh cache is the common case.
+    if not _jwks_cache_stale(time.time()):
+        return _JWKS_CACHE["client"]
+    if not settings.supabase_jwks_url:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="auth_not_configured",
+        )
+    # F-19: double-checked -- whoever loses the lock race finds a fresh cache.
+    with _JWKS_LOCK:
+        if _jwks_cache_stale(time.time()):
+            _JWKS_CACHE["client"] = _new_jwks_client()
+            _JWKS_CACHE["fetched_at"] = time.time()
     return _JWKS_CACHE["client"]
 
 
@@ -63,7 +84,7 @@ def validate_jwks_startup() -> None:
             "is not set; refusing to boot a deploy where every authenticated "
             "request would fail (F-61)"
         )
-    client = PyJWKClient(settings.supabase_jwks_url)
+    client = _new_jwks_client()
     try:
         client.get_jwk_set()
     except Exception as e:

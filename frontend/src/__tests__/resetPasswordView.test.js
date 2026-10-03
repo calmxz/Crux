@@ -3,9 +3,11 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import ResetPasswordView from '@/views/ResetPasswordView.vue'
+import { AUTH_CODE_COPY } from '@/lib/authErrors.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const routerPush = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push: routerPush }),
   RouterLink: { props: ['to'], template: '<a><slot /></a>' },
@@ -107,15 +109,36 @@ describe('ResetPasswordView', () => {
 
   it('shows an error banner when the update throws', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'updatePassword').mockRejectedValue(new Error('Auth session missing!'))
+    // E-13: our copy for the SDK code, never the SDK's prose.
+    vi.spyOn(auth, 'updatePassword').mockRejectedValue(
+      Object.assign(new Error('Email link is invalid or has expired'), {
+        code: 'otp_expired',
+        status: 401,
+      }),
+    )
     const wrapper = mountView()
     await wrapper.get('[data-testid="reset-password"]').setValue('newpass12')
     await wrapper.get('[data-testid="reset-confirm"]').setValue('newpass12')
     await wrapper.get('[data-testid="reset-form"]').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('[data-testid="reset-error"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="reset-error"]').text()).toContain('Auth session missing!')
+    const text = wrapper.get('[data-testid="reset-error"]').text()
+    expect(text).toBe(AUTH_CODE_COPY.otp_expired)
+    expect(text).not.toContain('Email link is invalid')
     expect(routerPush).not.toHaveBeenCalled()
+  })
+
+  it('falls back to its own copy when the auth error has no known code', async () => {
+    const auth = useAuthStore()
+    vi.spyOn(auth, 'updatePassword').mockRejectedValue(new Error('Auth session missing'))
+    const wrapper = mountView()
+    await wrapper.get('[data-testid="reset-password"]').setValue('newpass12')
+    await wrapper.get('[data-testid="reset-confirm"]').setValue('newpass12')
+    await wrapper.get('[data-testid="reset-form"]').trigger('submit.prevent')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="reset-error"]').text()).toBe(
+      'Could not update password. The link may have expired.',
+    )
   })
 
   it('announces the error to screen readers', async () => {

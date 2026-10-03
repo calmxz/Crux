@@ -29,6 +29,20 @@ from datetime import datetime, timedelta
 BASE_INTERVAL_DAYS = 1
 MAX_INTERVAL_DAYS = 60
 
+# F-07: the route loads every in-window event and computes the schedule in
+# Python, because `streak` needs the full trailing run of answers per concept
+# -- a "latest event per concept" query cannot produce it. Bounding the scan
+# to a window keeps that load O(recent activity) instead of O(lifetime
+# events). A concept with no event in the window has fallen off the schedule:
+# it is neither due nor counted. The window must be at least
+# MAX_INTERVAL_DAYS, or a concept scheduled at the cap would be dropped
+# before it ever came due.
+REVIEW_WINDOW_DAYS = 90
+
+assert REVIEW_WINDOW_DAYS >= MAX_INTERVAL_DAYS, (
+    "REVIEW_WINDOW_DAYS must cover the longest scheduling interval"
+)
+
 
 @dataclass(frozen=True)
 class EventRow:

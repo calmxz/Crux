@@ -29,7 +29,7 @@ The tutor's memory is structured and verifiable, not a chat transcript. Mastery 
 - **Check questions:** the tutor registers a batch of 1 to 5 multiple-choice items; the learner answers in the chat; the server grades; a recap card shows score, the learner's answer, the correct answer, and explanations. Correct answers promote a gap to mastered; an incorrect retest demotes.
 - **Retrieval:** uploaded files are chunked and embedded; answers cite page and document name. An ingestion status banner shows processing state.
 - **Streaming:** tutor replies stream token by token with a stop control. Math renders via KaTeX; code via highlight.js.
-- **Review:** spaced-repetition queue across sessions with streaks.
+- **Recall:** spaced-repetition queue across sessions with streaks.
 - **Insights:** aggregate profile across sessions (mastered, gaps, subtopic levels), usage and spend.
 - **Onboarding:** display name and feedback style (hints vs explain outright). A diagnostic consent card inside the first session asks for a self-assessed level.
 - **Limits:** per-user daily LLM cost cap surfaces as banners and toasts.

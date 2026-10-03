@@ -66,8 +66,12 @@ test.describe('auth gate', () => {
       await route.fulfill({
         status: 400,
         contentType: 'application/json',
+        // GoTrue also sends `error_code`, which auth-js surfaces as
+        // AuthError.code. E-13 keys the banner copy on that code, never on
+        // the SDK prose in error_description.
         body: JSON.stringify({
           error: 'invalid_grant',
+          error_code: 'invalid_credentials',
           error_description: 'Invalid login credentials',
         }),
       })
@@ -79,7 +83,10 @@ test.describe('auth gate', () => {
     await page.getByTestId('login-submit').click()
 
     await expect(page.getByTestId('login-error')).toBeVisible()
-    await expect(page.getByTestId('login-error')).toContainText('Invalid login credentials')
+    await expect(page.getByTestId('login-error')).toContainText(
+      'That email and password do not match',
+    )
+    await expect(page.getByTestId('login-error')).not.toContainText('Invalid login credentials')
   })
 
   test('registering shows the check-your-inbox confirmation', async ({ page }) => {

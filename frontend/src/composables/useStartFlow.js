@@ -14,13 +14,17 @@ export function useStartFlow({ store, router, beforeNavigate }) {
 
   async function begin(rawTopic) {
     const trimmed = (rawTopic || '').trim()
+
     if (!trimmed || busy.value) return
     topic.value = trimmed
     busy.value = true
     const gen = generation
+
     try {
       const res = await store.lookupTopic(trimmed)
+
       if (gen !== generation) return
+
       if (res?.active_match) {
         interceptMatch.value = res.active_match
         interceptKind.value = 'active'
@@ -44,12 +48,14 @@ export function useStartFlow({ store, router, beforeNavigate }) {
   async function continuePrior() {
     if (busy.value) return
     busy.value = true
+
     try {
       const created = await store.continueTopic({
         id: interceptMatch.value.session_id,
         topic: interceptMatch.value.title,
         ended_at: interceptMatch.value.ended_at,
       })
+
       if (created) router.push({ name: 'session', params: { id: created.id } })
     } finally {
       busy.value = false
@@ -59,6 +65,7 @@ export function useStartFlow({ store, router, beforeNavigate }) {
   async function startFresh() {
     if (busy.value) return
     busy.value = true
+
     try {
       await _create(generation)
     } finally {
@@ -73,7 +80,9 @@ export function useStartFlow({ store, router, beforeNavigate }) {
         seedMode: 'fresh',
         priorSessionId: null,
       })
+
       if (!created || gen !== generation) return
+
       if (beforeNavigate) await beforeNavigate(created)
       router.push({ name: 'session', params: { id: created.id } })
     } catch (e) {
@@ -82,8 +91,10 @@ export function useStartFlow({ store, router, beforeNavigate }) {
         interceptMatch.value = { session_id: e.body.detail.session_id, title: topic.value }
         interceptKind.value = 'active'
         stage.value = 'intercept'
+
         return
       }
+
       throw e
     }
   }

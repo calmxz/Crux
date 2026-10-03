@@ -48,6 +48,7 @@ describe('createDeltaBatcher', () => {
     // what's actually exercised. Batcher implementation is unchanged.
     const original = globalThis.requestAnimationFrame
     delete globalThis.requestAnimationFrame
+
     try {
       const apply = vi.fn()
       const b = createDeltaBatcher(apply, undefined)

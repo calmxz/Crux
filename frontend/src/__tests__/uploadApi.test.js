@@ -65,6 +65,7 @@ describe('uploadApi', () => {
       text: () => Promise.resolve(JSON.stringify(body)),
     })
   }
+
   function fail(status, body) {
     return Promise.resolve({
       ok: false,
@@ -161,5 +162,33 @@ describe('uploadApi', () => {
     ).rejects.toMatchObject({ status: 401 })
     expect(globalThis.__supabaseAuthStub.signOut).toHaveBeenCalled()
     expect(unauthorizedHandler).toHaveBeenCalledTimes(1)
+  })
+
+  // F-18 review finding: the multipart POST is a raw fetch, so it must drop the
+  // session tree from the short GET cache itself (ingestion_status lives on
+  // the session body).
+  it('uploadPdf invalidates the cached session GET whether it succeeds or fails', async () => {
+    const { apiGet, _resetApiCache } = await import('@/services/apiClient.js')
+    _resetApiCache()
+
+    const json = (body, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
+
+    fetchMock.mockResolvedValueOnce(json({ n: 1 }))
+    await apiGet('/sessions/s1')
+    fetchMock.mockResolvedValueOnce(json({ document_id: 'd1' }))
+    await uploadPdf({ sessionId: 's1', file: new File([''], 'a.pdf') })
+    fetchMock.mockResolvedValueOnce(json({ n: 2 }))
+    await expect(apiGet('/sessions/s1')).resolves.toEqual({ n: 2 })
+
+    fetchMock.mockRejectedValueOnce(new Error('offline'))
+    await expect(
+      uploadPdf({ sessionId: 's1', file: new File([''], 'a.pdf') }),
+    ).rejects.toBeInstanceOf(ApiError)
+    fetchMock.mockResolvedValueOnce(json({ n: 3 }))
+    await expect(apiGet('/sessions/s1')).resolves.toEqual({ n: 3 })
   })
 })

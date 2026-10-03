@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy import or_, select
@@ -6,10 +6,15 @@ from sqlalchemy.orm import Session
 
 from contracts import ReviewQueueItem, ReviewQueuePage
 from db.database import get_db
-from db.models import LearningEvent, Session as SessionModel
+from db.models import LearningEvent
+from db.models import Session as SessionModel
 from services import profile_service
 from services.auth import current_user_id
-from services.review_queue_service import EventRow, compute_schedule
+from services.review_queue_service import (
+    REVIEW_WINDOW_DAYS,
+    EventRow,
+    compute_schedule,
+)
 from services.session_enrichment import aware_utc
 
 router = APIRouter(prefix="/api")
@@ -23,10 +28,15 @@ def get_review_queue(
     db: Session = Depends(get_db),
 ):
     now = datetime.now(timezone.utc)
+    # F-07: bound the scan. Without this the queue reads every learning event
+    # the user has ever produced on each sidebar boot. See
+    # review_queue_service.REVIEW_WINDOW_DAYS for why the window is safe.
+    window_start = now - timedelta(days=REVIEW_WINDOW_DAYS)
     rows = db.execute(
         select(LearningEvent, SessionModel.topic)
         .join(SessionModel, LearningEvent.session_id == SessionModel.id)
         .where(SessionModel.user_id == user_id)
+        .where(LearningEvent.created_at >= window_start)
         .where(
             or_(
                 LearningEvent.purpose.is_(None),

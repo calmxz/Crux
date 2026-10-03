@@ -15,9 +15,9 @@ from sqlalchemy import select
 
 from agent.types import ToolContext
 from contracts import RetrieveChunksArgs, TopicProfile
-from db.models import Document, LlmCallLog, Session as SessionModel, User
+from db.models import Document, LlmCallLog, User
+from db.models import Session as SessionModel
 from services import cost_meter, pgvector_store, retrieval_service
-
 
 SESSION_ID = "sess_ret"
 USER_ID = "u_ret"
@@ -637,3 +637,70 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
         )
     )
     assert len(embed_calls) == 1
+
+
+def test_session_centroid_returns_stored_column_without_querying(db_session, monkeypatch):
+    """F-05: once materialised on sessions.chunk_centroid, the centroid is a
+    column read -- no avg() aggregation over every chunk of the session."""
+    from config import settings
+
+    db_session.add(User(id="u_cent"))
+    db_session.flush()
+    stored = [0.25] * settings.embedding_dim
+    db_session.add(
+        SessionModel(
+            id="s_cent",
+            user_id="u_cent",
+            topic="sql",
+            topic_profile_json=TopicProfile().model_dump_json(),
+            chunk_centroid=stored,
+        )
+    )
+    db_session.commit()
+
+    # Dialect guard must stay the first statement on sqlite (test_chat_prepare_perf
+    # counts statements there), so force the postgres branch explicitly.
+    monkeypatch.setattr("services.retrieval_service._is_postgres", lambda db: True)
+
+    def boom(*a, **kw):
+        raise AssertionError("no aggregate query may run when the centroid is stored")
+
+    monkeypatch.setattr("services.retrieval_service.func.avg", boom)
+
+    assert retrieval_service._session_centroid(db_session, "s_cent") == stored
+
+
+def test_session_centroid_materialises_and_does_not_commit(db_session, monkeypatch):
+    """F-05: a missing centroid is computed once and written back, but the
+    write must not commit -- _prepare_turn owns that transaction (B-08)."""
+    from config import settings
+
+    db_session.add(User(id="u_cent2"))
+    db_session.flush()
+    db_session.add(
+        SessionModel(
+            id="s_cent2",
+            user_id="u_cent2",
+            topic="sql",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
+    db_session.commit()
+
+    computed = [0.5] * settings.embedding_dim
+    monkeypatch.setattr("services.retrieval_service._is_postgres", lambda db: True)
+    monkeypatch.setattr(
+        "services.retrieval_service._compute_centroid", lambda db, sid: computed
+    )
+
+    commits: list[int] = []
+    monkeypatch.setattr(
+        type(db_session), "commit", lambda self: commits.append(1)
+    )
+
+    assert retrieval_service._session_centroid(db_session, "s_cent2") == computed
+    assert commits == []
+
+    row = db_session.get(SessionModel, "s_cent2")
+    db_session.refresh(row)
+    assert list(row.chunk_centroid) == computed

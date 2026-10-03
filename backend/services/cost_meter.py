@@ -22,7 +22,6 @@ from db.models import DailyCostLedger, LlmCallLog
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
 from services.sql_dialect import dialect_insert
 
-
 log = logging.getLogger(__name__)
 
 _ZERO = Decimal("0.0000")
@@ -32,12 +31,15 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def midnight_utc_iso() -> str:
-    now = datetime.now(timezone.utc)
-    tomorrow = (now + timedelta(days=1)).replace(
+def next_midnight_utc(now: datetime | None = None) -> datetime:
+    now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+    return (now + timedelta(days=1)).replace(
         hour=0, minute=0, second=0, microsecond=0
     )
-    return tomorrow.isoformat()
+
+
+def midnight_utc_iso(now: datetime | None = None) -> str:
+    return next_midnight_utc(now).isoformat()
 
 
 def _quantize(v: Decimal) -> Decimal:
@@ -77,6 +79,27 @@ def current_spend(db: Session, user_id: str) -> Decimal:
     return _to_decimal(total)
 
 
+def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
+    """One atomic INSERT .. ON CONFLICT DO UPDATE .. RETURNING against today's
+    ledger row; returns the post-write total. `delta` may be negative.
+
+    Shared by record_cost / reserve_cost / adjust_cost so all three serialize
+    on the same row the same way (F-17).
+    """
+    ins = dialect_insert(db)(DailyCostLedger).values(
+        user_id=user_id, date_utc=_today_utc(), cost_usd=delta
+    )
+    stmt = ins.on_conflict_do_update(
+        index_elements=["user_id", "date_utc"],
+        set_={
+            "cost_usd": DailyCostLedger.cost_usd + ins.excluded.cost_usd,
+            # onupdate defaults do not fire for ON CONFLICT set_; stamp explicitly.
+            "updated_at": datetime.now(timezone.utc),
+        },
+    ).returning(DailyCostLedger.cost_usd)
+    return _to_decimal(db.execute(stmt).scalar_one())
+
+
 def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
     """Atomically add `cost_usd` to today's ledger row for `user_id` and
     return the new total (F-17: INSERT .. ON CONFLICT DO UPDATE, so two
@@ -87,20 +110,41 @@ def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
     cost = _quantize(_to_decimal(cost_usd))
     if cost <= _ZERO:
         return current_spend(db, user_id)
+    return _upsert_delta(db, user_id, cost)
 
-    ins = dialect_insert(db)(DailyCostLedger).values(
-        user_id=user_id, date_utc=_today_utc(), cost_usd=cost
-    )
-    stmt = ins.on_conflict_do_update(
-        index_elements=["user_id", "date_utc"],
-        set_={
-            "cost_usd": DailyCostLedger.cost_usd + ins.excluded.cost_usd,
-            # onupdate defaults do not fire for ON CONFLICT set_; stamp explicitly.
-            "updated_at": datetime.now(timezone.utc),
-        },
-    ).returning(DailyCostLedger.cost_usd)
-    new_total = db.execute(stmt).scalar_one()
-    return _to_decimal(new_total)
+
+def reserve_cost(db: Session, user_id: str, amount) -> Decimal:
+    """B-05: provisionally charge `amount` to today's ledger and return the
+    PRE-increment total (i.e. the spend that existed before this reservation).
+
+    The cost gate must judge a turn on that pre-increment value. A plain
+    SELECT-then-compare lets N concurrent turns at cap-minus-epsilon all pass
+    and each run an LLM call; routing every turn through this upsert makes
+    them serialize on the ledger row, so each caller sees a distinct total and
+    only those below the hard cap are admitted.
+
+    Flushes into the caller's transaction (like record_cost); the caller's
+    commit publishes it. The caller releases the reservation with
+    `adjust_cost(db, user_id, -amount)` when the turn ends.
+    """
+    reserve = _quantize(_to_decimal(amount))
+    if reserve <= _ZERO:
+        return current_spend(db, user_id)
+    return _upsert_delta(db, user_id, reserve) - reserve
+
+
+def adjust_cost(db: Session, user_id: str, delta) -> Decimal:
+    """B-05: signed counterpart of record_cost; returns the new total.
+
+    `delta` may be negative -- this is how a reserve_cost reservation is
+    released. Deliberately NOT floored at zero: the only negative deltas the
+    app issues are releases of a reserve it added itself, so flooring would
+    silently keep money on the ledger. A zero delta is a no-op.
+    """
+    amount = _quantize(_to_decimal(delta))
+    if amount == _ZERO:
+        return current_spend(db, user_id)
+    return _upsert_delta(db, user_id, amount)
 
 
 def log_call(

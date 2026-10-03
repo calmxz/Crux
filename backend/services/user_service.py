@@ -8,13 +8,25 @@ not evidence consent.
 """
 
 from datetime import datetime, timezone
+from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import set_committed_value
 
-from db.models import User
+from db.models import (
+    ChatMessage,
+    ChunkEmbedding,
+    DailyCostLedger,
+    Document,
+    LearningEvent,
+    LlmCallLog,
+    UsageCounter,
+    User,
+)
+from db.models import Session as SessionModel
 from lib.terms import CURRENT_TERMS_VERSION
+from services import object_store
 from services.sql_dialect import dialect_insert
 
 
@@ -60,3 +72,72 @@ def ensure_user(db: Session, user_id: str, *, accepted_terms: bool = False) -> U
     if result.rowcount == 1 and accepted_terms:
         set_committed_value(created, "accepted_terms_at", now)
     return created
+
+
+def delete_user_account(db: Session, user_id: str) -> list[str]:
+    """Delete every row belonging to user_id, children before parents.
+
+    Returns the object-store keys of the user's uploads; the caller deletes
+    them best-effort AFTER committing. Does not commit. Idempotent: a user
+    with no rows (or no users row) is a no-op.
+
+    Order is explicit rather than cascade-reliant: SQLite (tests) does not
+    enforce FK cascades, and chunk_embeddings.session_id has no ON DELETE
+    CASCADE in Postgres either.
+    """
+    session_ids = select(SessionModel.id).where(SessionModel.user_id == user_id)
+    docs = db.execute(
+        select(Document.id, Document.filename).where(Document.session_id.in_(session_ids))
+    ).all()
+    keys = [object_store.key_for(doc_id, Path(filename).name) for doc_id, filename in docs]
+
+    # Delete documents by the ids we just read, not by a live subquery: a
+    # document uploaded between the read and the delete would otherwise lose
+    # its row while its blob survives. Left in place, that late row makes the
+    # sessions delete below fail on its FK, rolling the whole transaction
+    # back -- the safe outcome (the learner retries).
+    doc_ids = [doc_id for doc_id, _ in docs]
+    db.execute(
+        delete(ChunkEmbedding).where(
+            or_(
+                ChunkEmbedding.session_id.in_(session_ids),
+                ChunkEmbedding.document_id.in_(doc_ids),
+            )
+        ),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(Document).where(Document.id.in_(doc_ids)),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(LearningEvent).where(LearningEvent.session_id.in_(session_ids)),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(ChatMessage).where(ChatMessage.session_id.in_(session_ids)),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(LlmCallLog).where(
+            or_(LlmCallLog.user_id == user_id, LlmCallLog.session_id.in_(session_ids))
+        ),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(UsageCounter).where(UsageCounter.user_id == user_id),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(DailyCostLedger).where(DailyCostLedger.user_id == user_id),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(SessionModel).where(SessionModel.user_id == user_id),
+        execution_options={"synchronize_session": False},
+    )
+    db.execute(
+        delete(User).where(User.id == user_id),
+        execution_options={"synchronize_session": False},
+    )
+    return keys

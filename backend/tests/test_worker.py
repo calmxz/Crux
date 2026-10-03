@@ -1,7 +1,8 @@
 from datetime import datetime, timedelta, timezone
 
 import worker
-from db.models import Document, Session as SessionModel, User
+from db.models import Document, User
+from db.models import Session as SessionModel
 
 
 def _seed_doc(db, status="pending", claimed_at=None, sid="s_w", uid="u_w"):

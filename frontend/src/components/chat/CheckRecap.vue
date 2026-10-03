@@ -2,23 +2,37 @@
 import { computed } from 'vue'
 
 // Batch (camelCase, mapped by the session store):
-//   { gap, total, items: [
+//   { gap, total, setIndex, setTotal, items: [
 //     { question, options, status, selectedIndex, correctIndex, correct, explanation } ] }
+// setIndex / setTotal (1-based, #340) may be null; null means one set.
 const props = defineProps({
   batch: { type: Object, required: true },
 })
 
+// #364: the same segmented head rule as the check card, sets 1..N done. The
+// next set is not signposted here; the tutor's lead-in line carries that.
+const setIndex = computed(() => props.batch.setIndex ?? 1)
+
+const setTotal = computed(() => props.batch.setTotal ?? 1)
+
+const multiSet = computed(() => setTotal.value > 1)
+
 const LETTERS = ['A', 'B', 'C', 'D', 'E']
 
 const items = computed(() => props.batch.items || [])
+
 const graded = computed(() => items.value.filter((it) => it.status === 'answered'))
+
 const nCorrect = computed(() => graded.value.filter((it) => it.correct === true).length)
 
 function optionClass(item, i) {
   if (i === item.correctIndex) return 'is-correct'
+
   if (item.selectedIndex != null && i === item.selectedIndex) return 'is-incorrect'
+
   return ''
 }
+
 function isYourAnswer(item, i) {
   return item.selectedIndex != null && i === item.selectedIndex
 }
@@ -26,12 +40,27 @@ function isYourAnswer(item, i) {
 
 <template>
   <section class="recap-card" data-testid="check-recap">
-    <header class="recap-header">
+    <header class="recap-header" :class="{ 'is-segmented': multiSet }">
       <span class="recap-score" data-testid="recap-score" data-tabular>
         {{ nCorrect }} / {{ graded.length }}
       </span>
-      <span class="recap-gap">{{ batch.gap }}</span>
+      <span v-if="multiSet" class="recap-gap">
+        <span class="recap-gap-name" :title="batch.gap">{{ batch.gap }}</span>
+        <span class="recap-set" data-testid="recap-set"
+          >&middot; set {{ setIndex }} of {{ setTotal }}</span
+        >
+      </span>
+      <span v-else class="recap-gap">{{ batch.gap }}</span>
     </header>
+    <div v-if="multiSet" class="recap-rule" data-testid="recap-set-rule" aria-hidden="true">
+      <span
+        v-for="n in setTotal"
+        :key="n"
+        class="recap-rule-seg"
+        :class="n <= setIndex ? 'is-done' : 'is-todo'"
+        data-testid="recap-rule-seg"
+      ></span>
+    </div>
 
     <div v-for="(item, qi) in items" :key="qi" class="recap-item">
       <p class="recap-question">{{ item.question }}</p>
@@ -100,6 +129,55 @@ function isYourAnswer(item, i) {
 .recap-gap {
   font-size: var(--fs-caption);
   color: var(--pencil);
+}
+
+/* 390px: the recap card is narrow, and a long gap name beside the set phrase
+   would wrap the head line and crush the score onto two lines. The score and
+   the set phrase never break; the gap name gives way with an ellipsis (its
+   full name is in the title), so the head line holds one baseline. */
+.recap-score {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.recap-header.is-segmented .recap-gap {
+  display: flex;
+  gap: 0.3em;
+  min-width: 0;
+}
+
+.recap-gap-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recap-set {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* #364: with more than one set the head rule is the progress; the negative
+   margin cancels the card's flex gap so it sits where the border was. */
+.recap-header.is-segmented {
+  border-bottom: 0;
+}
+
+.recap-rule {
+  display: flex;
+  gap: 4px;
+  height: 3px;
+  margin-top: -0.6rem;
+}
+
+.recap-rule-seg {
+  flex: 1 1 0;
+  background: var(--rule-strong);
+}
+
+.recap-rule-seg.is-done {
+  background: var(--ink);
 }
 
 .recap-item {

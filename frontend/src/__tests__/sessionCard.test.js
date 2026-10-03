@@ -62,6 +62,7 @@ describe('cardStory', () => {
       ended_at: '2026-06-02T00:00:00Z',
       last_session_summary: '[auto] Covered the Krebs cycle',
     })
+
     expect(cardStory(ended)).toBe('Covered the Krebs cycle')
     const bare = active({ ended_at: '2026-06-02T00:00:00Z', last_session_summary: null })
     expect(cardStory(bare)).toBe('Completed')
@@ -161,6 +162,7 @@ describe('cardChips', () => {
     const s = active({
       progress: { focus_target_gap: 'ATP yield', level: 'intermediate', mastered_count: 2 },
     })
+
     expect(cardChips(s)).toEqual([
       { type: 'focus', label: 'ATP yield' },
       { type: 'level', label: 'Intermediate', level: 'intermediate' },

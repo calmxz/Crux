@@ -5,6 +5,7 @@ import { computed, unref } from 'vue'
 // has no messages (last_activity_at is null). Returns ms, 0 if neither.
 function activityMs(session) {
   const ts = session.last_activity_at || session.created_at
+
   return ts ? new Date(ts).getTime() : 0
 }
 

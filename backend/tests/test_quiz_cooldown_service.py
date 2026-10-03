@@ -4,7 +4,8 @@ from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 from db.database import Base
-from db.models import Session as SessionModel, User
+from db.models import Session as SessionModel
+from db.models import User
 
 
 def _make_session():
@@ -90,6 +91,7 @@ from contracts import AskCheckQuestionsArgs
 
 def _one_item_args(sid="s1"):
     return AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=sid,
         gap="derivatives",
         items=[{

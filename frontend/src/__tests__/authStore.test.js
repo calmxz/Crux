@@ -44,12 +44,11 @@ describe('auth store', () => {
 
   it('init() subscribes to onAuthStateChange and updates session on event', async () => {
     let callback
-    globalThis.__supabaseAuthStub.onAuthStateChange.mockImplementationOnce(
-      (cb) => {
-        callback = cb
-        return { data: { subscription: { unsubscribe: vi.fn() } } }
-      },
-    )
+    globalThis.__supabaseAuthStub.onAuthStateChange.mockImplementationOnce((cb) => {
+      callback = cb
+
+      return { data: { subscription: { unsubscribe: vi.fn() } } }
+    })
     const auth = useAuthStore()
     await auth.init()
     callback('SIGNED_IN', { access_token: 't2', user: { id: 'u-2' } })
@@ -98,9 +97,7 @@ describe('auth store', () => {
       error: new Error('User already registered'),
     })
     const auth = useAuthStore()
-    await expect(auth.register('x@y.z', 'hunter2pw')).rejects.toThrow(
-      'User already registered',
-    )
+    await expect(auth.register('x@y.z', 'hunter2pw')).rejects.toThrow('User already registered')
   })
 
   it('signIn calls Supabase signInWithPassword with email + password', async () => {
@@ -117,9 +114,7 @@ describe('auth store', () => {
       error: new Error('Invalid login credentials'),
     })
     const auth = useAuthStore()
-    await expect(auth.signIn('x@y.z', 'bad')).rejects.toThrow(
-      'Invalid login credentials',
-    )
+    await expect(auth.signIn('x@y.z', 'bad')).rejects.toThrow('Invalid login credentials')
   })
 
   it('resendConfirmation calls Supabase resend for signup type', async () => {
@@ -153,6 +148,21 @@ describe('auth store', () => {
     })
     const auth = useAuthStore()
     await expect(auth.signOut()).rejects.toThrow('network')
+  })
+
+  // A thrown Supabase error must still clear the local session -- otherwise
+  // the router guard's stale isAuthenticated bounces /login back to home and
+  // re-hydrates /me, recreating a users row for an account that just tried
+  // to sign out.
+  it('signOut still clears session and isAuthenticated when Supabase rejects', async () => {
+    globalThis.__supabaseAuthStub.signOut.mockResolvedValueOnce({
+      error: new Error('network'),
+    })
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-3' }, access_token: 't' }
+    await expect(auth.signOut()).rejects.toThrow('network')
+    expect(auth.session).toBeNull()
+    expect(auth.isAuthenticated).toBe(false)
   })
 
   it('userEmail reflects the session user email', async () => {

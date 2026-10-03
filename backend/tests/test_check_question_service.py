@@ -6,10 +6,10 @@ import pytest
 
 from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import Session as SessionModel, User
+from db.models import Session as SessionModel
+from db.models import User
 from services import check_question_service as cq
 from services import profile_service
-
 
 SESSION_ID = "sess_1"
 USER_ID = "u1"
@@ -103,6 +103,7 @@ def ctx_session_with_level(db_session):
 
 def one_item_args(gap: str, correct_index: int = 0):
     return AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=SESSION_ID,
         gap=gap,
         items=[{
@@ -116,6 +117,7 @@ def one_item_args(gap: str, correct_index: int = 0):
 
 def _batch_args(session_id):
     return AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session_id,
         gap="atp",
         items=[
@@ -133,6 +135,8 @@ def test_register_batch_persists_items_pending(db, ctx, session_id):
     assert res.data == {
         "gap": "atp",
         "total": 2,
+        "set_index": 1,
+        "set_total": 1,
         "items": [
             {"question": "Q1?", "options": ["2 ATP", "36 ATP"]},
             {"question": "Q2?", "options": ["yes", "no", "maybe"]},
@@ -153,6 +157,7 @@ def test_register_rejects_second_batch_while_open(db, ctx, session_id):
 
 def test_register_rejects_bad_correct_index(db, ctx, session_id):
     bad = AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session_id, gap="g",
         items=[{"question": "q", "options": ["a", "b"],
                 "correct_index": 5, "explanation": "e"}],
@@ -191,10 +196,44 @@ def test_answer_advances_and_reports_progress(db, ctx, session_id):
     assert r1["done"] is True
 
 
-def test_answer_out_of_order_rejected(db, ctx, session_id):
+def test_answer_any_pending_item_first(db, ctx, session_id):
+    # #348: free navigation. The pointer stays on the first unresolved item.
     cq.register(db, ctx, _batch_args(session_id))
+    r = cq.answer(db, session_id, index=1, selected_index=1)
+    assert r["correct"] is True
+    assert r["current_index"] == 0
+    assert r["done"] is False
+    pc = cq.get_pending_check(db, session_id)
+    assert pc["items"][0]["status"] == "pending"
+    assert pc["items"][1]["status"] == "answered"
+
+
+def test_done_only_once_every_item_resolved_in_any_order(db, ctx, session_id):
+    cq.register(db, ctx, _batch_args(session_id))
+    cq.skip(db, session_id, index=1)
+    assert cq.is_done(cq.get_pending_check(db, session_id)) is False
+    r = cq.answer(db, session_id, index=0, selected_index=0)
+    assert r["current_index"] == 2
+    assert r["done"] is True
+    assert cq.is_done(cq.get_pending_check(db, session_id)) is True
+
+
+def test_answer_resolved_item_rejected(db, ctx, session_id):
+    cq.register(db, ctx, _batch_args(session_id))
+    cq.answer(db, session_id, index=1, selected_index=0)
     with pytest.raises(cq.CheckStateError):
-        cq.answer(db, session_id, index=1, selected_index=0)
+        cq.answer(db, session_id, index=1, selected_index=1)
+    with pytest.raises(cq.CheckStateError):
+        cq.skip(db, session_id, index=1)
+
+
+def test_answer_index_out_of_range_rejected(db, ctx, session_id):
+    cq.register(db, ctx, _batch_args(session_id))
+    for bad in (-1, 2):
+        with pytest.raises(cq.CheckStateError):
+            cq.answer(db, session_id, index=bad, selected_index=0)
+        with pytest.raises(cq.CheckStateError):
+            cq.skip(db, session_id, index=bad)
 
 
 def test_answer_does_not_clear_batch(db, ctx, session_id):

@@ -15,9 +15,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config import settings
-from db.models import ChatMessage, Session as SessionModel
+from db.models import ChatMessage
+from db.models import Session as SessionModel
 from services import check_question_service, cost_meter, profile_service
-
 
 log = logging.getLogger(__name__)
 

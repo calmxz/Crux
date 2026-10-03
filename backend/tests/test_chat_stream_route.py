@@ -28,17 +28,18 @@ a running server; it is not reliably testable under TestClient.
 
 import asyncio
 from datetime import datetime, timezone
+from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
 from sqlalchemy import delete, func, select
 
-from contracts import ChatRequest, TopicProfile
-from db.models import Session as SessionModel, UsageCounter, User
 from agent.stream_events import StreamEvent
+from contracts import ChatRequest, TopicProfile
+from db.models import Session as SessionModel
+from db.models import UsageCounter, User
 from routes.chat import _prepare_turn
 from services import rate_limit, summary_service
-
 
 SESSION_ID = "stream-s1"
 USER_ID = "stream-u1"
@@ -464,3 +465,140 @@ def test_first_turn_creates_user_before_rate_limit_insert(db_session, seeded_ses
     monkeypatch.setattr(rate_limit, "check_and_increment", spy)
     asyncio.run(_prepare_turn(ChatRequest(session_id=seeded_session.id, message="hi"), new_uid, db_session))
     assert db_session.get(User, new_uid) is not None
+
+
+# ---------------------------------------------------------------------------
+# Test: disconnect must drain the producer before the reserve is released
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_disconnect_drains_producer_before_releasing_reserve(
+    db_session, monkeypatch
+):
+    """B-05: on a real client disconnect the ambient anyio cancel scope is
+    cancelled level-triggered, so an unshielded `await task` in the finally
+    returns immediately (its CancelledError swallowed) while the tutor's
+    cancel arm is still mid-unwind. _release_reserve then rolls back the
+    shared Session and discards the pending 'cancelled' assistant message.
+
+    The drain must therefore run under the same shield as the release, so the
+    producer has fully finished with ctx.db before the release touches it.
+    """
+    from types import SimpleNamespace
+
+    import anyio
+
+    from db.models import ChatMessage
+    from routes import chat as chat_route
+    from services import cost_meter
+
+    state = {"arm_done": False, "release_saw_arm_done": None}
+    started = asyncio.Event()
+
+    async def fake_run_streaming(messages, system_prompt, ctx):
+        try:
+            yield StreamEvent("assistant_delta", {"text": "partial"})
+            started.set()
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            # Mirrors tutor.py's cancel arm: the row is staged on ctx.db, then
+            # the arm suspends (draining its shielded tool dispatch) before the
+            # commit. A rollback from another coroutine in that window loses it.
+            ctx.db.add(
+                ChatMessage(
+                    session_id=SESSION_ID,
+                    role="assistant",
+                    content="partial",
+                    status="cancelled",
+                    cancelled_at=datetime.now(timezone.utc),
+                )
+            )
+            await asyncio.sleep(0.05)
+            ctx.db.commit()
+            state["arm_done"] = True
+            raise
+
+    monkeypatch.setattr("agent.tutor.run_streaming", fake_run_streaming)
+    monkeypatch.setattr(chat_route, "accepted_terms_from_request", lambda r: False)
+
+    real_release = chat_route._release_reserve
+
+    def spy_release(db, user_id):
+        state["release_saw_arm_done"] = state["arm_done"]
+        return real_release(db, user_id)
+
+    monkeypatch.setattr(chat_route, "_release_reserve", spy_release)
+
+    async def _not_disconnected():
+        return False
+
+    request = SimpleNamespace(headers={}, is_disconnected=_not_disconnected)
+
+    resp = await chat_route.chat_stream(
+        ChatRequest(session_id=SESSION_ID, message="hello"),
+        request,
+        user_id=USER_ID,
+        db=db_session,
+    )
+
+    async def consume():
+        async for _chunk in resp.body_iterator:
+            pass
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(consume)
+        await started.wait()
+        # Simulate Starlette's disconnect handling: cancel the scope the
+        # response body iterator runs in.
+        tg.cancel_scope.cancel()
+
+    assert state["release_saw_arm_done"] is True, (
+        "_release_reserve ran while the tutor producer was still unwinding"
+    )
+    cancelled = (
+        db_session.execute(
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(ChatMessage.status == "cancelled")
+        ).scalar_one()
+    )
+    assert cancelled == 1, "the cancelled assistant message was not persisted"
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000"), (
+        "the per-turn reserve was left on the ledger"
+    )
+
+
+@pytest.mark.asyncio
+async def test_prepare_failure_under_cancel_releases_the_reservation(
+    db_session, seeded_session, monkeypatch
+):
+    """#421: a cancel after the cost reservation (B-05) is committed, but
+    before the stream starts, must still hand the reservation back. Under a
+    level-triggered cancel an unshielded release is cancelled with it.
+    """
+    import anyio
+
+    from routes import chat as chat_route
+    from services import cost_meter
+
+    uid = seeded_session.user_id
+    before = cost_meter.current_spend(db_session, uid)
+    reserved = asyncio.Event()
+
+    async def hang_after_guards(*args, **kwargs):
+        reserved.set()
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(chat_route, "_prepare_turn_after_guards", hang_after_guards)
+
+    req = ChatRequest(session_id=seeded_session.id, message="hi")
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(_prepare_turn, req, uid, db_session)
+        await reserved.wait()
+        assert cost_meter.current_spend(db_session, uid) > before
+        tg.cancel_scope.cancel()
+
+    assert cost_meter.current_spend(db_session, uid) == before, (
+        "the per-turn reservation was left on the ledger"
+    )

@@ -58,8 +58,8 @@ paths:
       summary: Streaming tutor turn (SSE over POST).
       description: |
         Emits text/event-stream events: assistant_delta, tool_call_start,
-        tool_call_done, citations, check_question, cost_warning, done,
-        error, cancelled. Terminal events are done | error | cancelled.
+        tool_call_done, citations, check_question, topic_suggestions,
+        cost_warning, done, error, cancelled. Terminal events are done | error | cancelled.
         See the x-sse-events vendor extension below for per-event data shapes.
       operationId: chatStream
       requestBody:
@@ -79,6 +79,12 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Session already ended (code session_ended).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: The message is empty or whitespace-only (code empty_message).
           content:
             application/json:
               schema:
@@ -110,8 +116,20 @@ paths:
                 $ref: "#/components/schemas/SessionResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "404":
+          description: seed_mode is resume and prior_session_id does not name a session owned by this user.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "409":
           description: An active session with this topic already exists (code duplicate_topic, session_id carries the existing id).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: declared_level is forbidden when seed_mode is resume, or the topic is whitespace-only (code empty_topic).
           content:
             application/json:
               schema:
@@ -124,6 +142,15 @@ paths:
       tags: [sessions]
       summary: List sessions for the authenticated user.
       operationId: listSessions
+      parameters:
+        - in: query
+          name: limit
+          required: false
+          schema: { type: integer, default: 100, minimum: 1, maximum: 200 }
+        - in: query
+          name: offset
+          required: false
+          schema: { type: integer, default: 0, minimum: 0 }
       responses:
         "200":
           description: Sessions grouped/sorted by recency.
@@ -151,7 +178,8 @@ paths:
         - in: query
           name: q
           required: false
-          schema: { type: [string, "null"], default: null }
+          description: Case-insensitive substring match on topic. LIKE metacharacters are matched literally.
+          schema: { type: [string, "null"], default: null, maxLength: 200 }
         - in: query
           name: sort
           required: false
@@ -272,6 +300,66 @@ paths:
                 $ref: "#/components/schemas/MeResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "422":
+          description: Empty patch; at least one field must be provided.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+    delete:
+      tags: [me]
+      summary: Delete the caller's account, every row, stored upload, and the auth user.
+      operationId: deleteMe
+      responses:
+        "204":
+          description: Account deleted.
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "409":
+          description: >-
+            A row for this account was written while the delete ran (for
+            example a streaming reply or an upload still being processed).
+            Nothing was deleted; retry once that work has settled.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "503":
+          description: >-
+            The auth admin service key is not configured (nothing was
+            deleted), app data was removed but the auth user removal
+            failed, or the auth JWKS endpoint is unavailable. The
+            ErrorResponse detail names the failed step.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/me/export:
+    get:
+      tags: [me]
+      summary: Download the caller's account, sessions, messages, check answers, uploads, and usage as one JSON file.
+      operationId: exportMe
+      description: >-
+        Pure read. Uploads are listed by metadata only; the PDF bytes are not
+        included. Internal state (embeddings, open-check pointers, per-call
+        LLM logs) is left out. A caller with no users row gets an export with
+        a null account and empty lists.
+      responses:
+        "200":
+          description: The full export, sent as an attachment.
+          headers:
+            Content-Disposition:
+              description: attachment; filename="crux-export-YYYY-MM-DD.json"
+              schema: { type: string }
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DataExport"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "503":
@@ -320,6 +408,18 @@ paths:
           $ref: "#/components/responses/BadRequest"
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: An active session with this topic already exists (code duplicate_topic, session_id carries the existing id).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "422":
+          description: The topic is whitespace-only (code empty_topic).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "401":
           $ref: "#/components/responses/Unauthorized"
         "503":
@@ -449,7 +549,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Session already ended (code session_ended), or the batch is in a conflicting state -- no open batch, out-of-order index, already-resolved item, or an out-of-range selection (code check_conflict).
+          description: Session already ended (code session_ended), or the batch is in a conflicting state -- no open batch, out-of-range index, already-resolved item, or an out-of-range selection (code check_conflict).
           content:
             application/json:
               schema:
@@ -482,7 +582,7 @@ paths:
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
-          description: Session already ended (code session_ended), or the batch is in a conflicting state -- no open batch, out-of-order index, or already-resolved item (code check_conflict).
+          description: Session already ended (code session_ended), or the batch is in a conflicting state -- no open batch, out-of-range index, or already-resolved item (code check_conflict).
           content:
             application/json:
               schema:
@@ -501,8 +601,8 @@ paths:
         synthetic user turn, clears the batch, and streams the tutor's
         reaction. Emits the same text/event-stream vocabulary as
         POST /api/chat/stream (assistant_delta, tool_call_start,
-        tool_call_done, citations, check_question, cost_warning, done,
-        error, cancelled), plus a followup_skipped event when the daily
+        tool_call_done, citations, check_question, topic_suggestions,
+        cost_warning, done, error, cancelled), plus a followup_skipped event when the daily
         message cap blocks the reaction (data: {reason: "daily_cap"}).
         Terminal events are done | error | cancelled | followup_skipped.
       operationId: completeCheck
@@ -519,6 +619,44 @@ paths:
           $ref: "#/components/responses/NotFound"
         "409":
           description: Session already ended (code session_ended), or there is no fully-resolved batch to react to (code no_resolved_batch).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          $ref: "#/components/responses/RateLimited"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "503":
+          $ref: "#/components/responses/ServiceUnavailable"
+
+  /api/sessions/{session_id}/check/stop:
+    post:
+      tags: [sessions]
+      summary: Learner ends the check early (Stop button); results follow-up (SSE over POST).
+      description: |
+        Ends the check in progress: the open set's unanswered items are
+        graded as skipped (Skip-button semantics: results summary, quiz
+        cooldown), a diagnostic check is graded from the answered items, and
+        sets not yet posed are never posed. Between sets there is no open set;
+        the summary only records where the learner stopped. Then streams the
+        tutor's reaction exactly like POST .../check/complete (same event
+        vocabulary, same followup_skipped on the daily cap). The summary line
+        reads "learner stopped at set N of M".
+      operationId: stopCheck
+      parameters:
+        - $ref: "#/components/parameters/SessionId"
+      responses:
+        "200":
+          description: SSE stream of the tutor's follow-up reaction.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Session already ended (code session_ended), or no check is in progress to stop (code no_open_check). A fully answered set is not stoppable; POST .../check/complete closes it.
           content:
             application/json:
               schema:
@@ -565,6 +703,14 @@ paths:
                 $ref: "#/components/schemas/UploadResponse"
         "400":
           $ref: "#/components/responses/BadRequest"
+        "404":
+          $ref: "#/components/responses/NotFound"
+        "409":
+          description: Session already ended (code session_ended).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
         "413":
           $ref: "#/components/responses/PayloadTooLarge"
         "415":
@@ -847,6 +993,18 @@ components:
       type: string
       enum: [demonstrated, tested_correct, user_redirected]
 
+    FeedbackPref:
+      type: string
+      enum: [hints, direct_answers]
+
+    CheckIns:
+      type: string
+      enum: [often, sometimes, only_when_asked]
+
+    ReplyLength:
+      type: string
+      enum: [brief, balanced, thorough]
+
     IngestionStatus:
       type: string
       enum: [pending, processing, ready, failed]
@@ -1098,12 +1256,15 @@ components:
     AskCheckQuestionsArgs:
       type: object
       additionalProperties: false
-      required: [session_id, gap, items]
+      required: [session_id, gap, items, set_index, set_total]
       description: |
-        Register an ordered batch of 1..5 multiple-choice check-questions and end
-        the turn. The card renders from this payload; any lead-in prose is the
-        model's own text in the same turn.
-        Per-item correct_index must be < len(options); that cross-field rule is
+        Register one SET (an ordered batch of 1..5 multiple-choice
+        check-questions) and end the turn. A check is set_total sets, posed one
+        set per turn. The card renders from this payload; any lead-in prose is
+        the model's own text in the same turn.
+        Per-item correct_index must be < len(options), set_index must be
+        <= set_total, and a later set must continue the current check
+        (same set_total, set_index = previous + 1); those cross-field rules are
         enforced in check_question_service, not here.
       properties:
         session_id:
@@ -1114,13 +1275,28 @@ components:
           type: string
           maxLength: 200
           description: >-
-            The single confirmed gap every item probes. Use the exact name from
-            confirmed_gaps so grading updates the right profile entry.
+            The single confirmed gap every item in this set probes. Use the
+            exact name from confirmed_gaps so grading updates the right profile
+            entry. Each set carries its own gap.
+        set_index:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: >-
+            1-based position of this set within the check. set_index=1 starts a
+            new check; each later set must be the previous set_index + 1.
+        set_total:
+          type: integer
+          minimum: 1
+          maximum: 3
+          description: >-
+            Number of sets in this check, declared on set 1 and never changed.
+            Mid-lesson checks default to 1.
         items:
           type: array
           minItems: 1
           maxItems: 5
-          description: Ordered batch of questions, all on gap. One batch per turn.
+          description: Ordered questions for this set, all on gap. One set per turn.
           items:
             type: object
             additionalProperties: false
@@ -1151,6 +1327,66 @@ components:
                   One sentence shown to the learner after they answer, whether
                   right or wrong.
 
+    SuggestTopicsArgs:
+      type: object
+      additionalProperties: false
+      required: [session_id, mode, topic, items]
+      description: |
+        Offer the learner a topic card under this reply, once per session,
+        after their level becomes known (#354). Ends the turn. broad: items are
+        3-5 subtopics of the session topic. specific: items are 2-4 adjacent
+        topics; the card itself adds the "Keep going on <topic>" line. The
+        per-mode item counts are enforced in topic_suggest_service, not here.
+      properties:
+        session_id:
+          type: string
+          maxLength: 64
+          description: Ignored; the server injects the authoritative session id.
+        mode:
+          type: string
+          enum: [broad, specific]
+          description: >-
+            broad when the topic spans several subtopics; specific when it is
+            already one narrow concept.
+        topic:
+          type: string
+          minLength: 1
+          maxLength: 200
+          description: The session topic as a short noun phrase.
+        items:
+          type: array
+          minItems: 2
+          maxItems: 5
+          items: { $ref: "#/components/schemas/TopicSuggestionItem" }
+
+    TopicSuggestionItem:
+      type: object
+      additionalProperties: false
+      required: [label]
+      properties:
+        label:
+          type: string
+          minLength: 1
+          maxLength: 80
+          description: Short noun phrase naming the subtopic or adjacent topic.
+        hint:
+          type: [string, "null"]
+          maxLength: 80
+          default: null
+          description: Optional one-line note shown beside the label.
+
+    TopicSuggestions:
+      type: object
+      additionalProperties: false
+      required: [mode, topic, items]
+      description: A suggest_topics card as persisted on its assistant message.
+      properties:
+        mode:  { type: string, enum: [broad, specific] }
+        topic: { type: string }
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/TopicSuggestionItem" }
+
     PendingCheck:
       type: object
       additionalProperties: false
@@ -1164,6 +1400,14 @@ components:
         gap:           { type: string }
         current_index: { type: integer }
         total:         { type: integer }
+        set_index:
+          type: [integer, "null"]
+          default: null
+          description: 1-based set position within the check; null for pre-set batches.
+        set_total:
+          type: [integer, "null"]
+          default: null
+          description: Sets in the check; null for pre-set batches.
         items:
           type: array
           items:
@@ -1248,7 +1492,7 @@ components:
       required: [session_id, message]
       properties:
         session_id:  { type: string, maxLength: 64 }
-        message:     { type: string, maxLength: 4000 }
+        message:     { type: string, minLength: 1, maxLength: 4000 }
         review_gaps: { type: boolean, default: false }
         review_gap:  { type: [string, "null"], default: null, maxLength: 200 }
         diagnostic_accepted: { type: boolean, default: false }
@@ -1258,7 +1502,7 @@ components:
       additionalProperties: false
       required: [topic, seed_mode]
       properties:
-        topic:             { type: string, maxLength: 200 }
+        topic:             { type: string, minLength: 1, maxLength: 200 }
         seed_mode:         { $ref: "#/components/schemas/SeedMode" }
         prior_session_id:  { type: [string, "null"], default: null, maxLength: 64 }
         declared_level:
@@ -1272,7 +1516,7 @@ components:
       additionalProperties: false
       minProperties: 1
       properties:
-        topic:  { type: string, maxLength: 200 }
+        topic:  { type: string, minLength: 1, maxLength: 200 }
         pinned: { type: boolean }
 
     SessionResponse:
@@ -1350,6 +1594,12 @@ components:
             - $ref: "#/components/schemas/PendingCheck"
             - type: "null"
           default: null
+        topic_suggestions:
+          oneOf:
+            - $ref: "#/components/schemas/TopicSuggestions"
+            - type: "null"
+          default: null
+          description: The topic card this assistant turn offered (#354), else null.
         status:
           type: [string, "null"]
           default: null
@@ -1512,10 +1762,18 @@ components:
     MeResponse:
       type: object
       additionalProperties: false
-      required: [onboarding_complete]
+      required: [onboarding_complete, feedback_pref, check_ins, reply_length]
       properties:
         display_name:        { type: [string, "null"], default: null, maxLength: 120 }
-        feedback_pref:       { type: [string, "null"], default: null, maxLength: 40 }
+        feedback_pref:
+          allOf: [{ $ref: "#/components/schemas/FeedbackPref" }]
+          default: hints
+        check_ins:
+          allOf: [{ $ref: "#/components/schemas/CheckIns" }]
+          default: sometimes
+        reply_length:
+          allOf: [{ $ref: "#/components/schemas/ReplyLength" }]
+          default: balanced
         onboarding_complete: { type: boolean, default: false }
 
     MePatchRequest:
@@ -1524,8 +1782,131 @@ components:
       minProperties: 1
       properties:
         display_name:        { type: string, maxLength: 120 }
-        feedback_pref:       { type: string, maxLength: 40 }
+        feedback_pref:       { $ref: "#/components/schemas/FeedbackPref" }
+        check_ins:           { $ref: "#/components/schemas/CheckIns" }
+        reply_length:        { $ref: "#/components/schemas/ReplyLength" }
         onboarding_complete: { type: boolean }
+
+    # ---- Data export (#361) ----
+    DataExport:
+      type: object
+      additionalProperties: false
+      required: [format_version, exported_at, account, sessions, usage]
+      description: Everything the server holds for one learner, oldest first.
+      properties:
+        format_version:
+          type: integer
+          description: Bumped when a field is removed or changes meaning.
+        exported_at: { type: string, format: date-time }
+        account:
+          oneOf:
+            - $ref: "#/components/schemas/ExportAccount"
+            - type: "null"
+        sessions:
+          type: array
+          items: { $ref: "#/components/schemas/ExportSession" }
+        usage:
+          type: array
+          items: { $ref: "#/components/schemas/ExportUsageDay" }
+
+    ExportAccount:
+      type: object
+      additionalProperties: false
+      required: [user_id, created_at, feedback_pref, check_ins, reply_length, onboarding_complete]
+      properties:
+        user_id:             { type: string }
+        created_at:          { type: string, format: date-time }
+        display_name:        { type: [string, "null"], default: null }
+        feedback_pref:       { $ref: "#/components/schemas/FeedbackPref" }
+        check_ins:           { $ref: "#/components/schemas/CheckIns" }
+        reply_length:        { $ref: "#/components/schemas/ReplyLength" }
+        onboarding_complete: { type: boolean }
+        accepted_terms_at:
+          oneOf:
+            - { type: string, format: date-time }
+            - type: "null"
+          default: null
+        terms_version:       { type: [string, "null"], default: null }
+
+    ExportSession:
+      type: object
+      additionalProperties: false
+      required: [id, topic, created_at, pinned, topic_profile, messages, check_answers, documents]
+      properties:
+        id:         { type: string }
+        topic:      { type: string }
+        created_at: { type: string, format: date-time }
+        ended_at:
+          oneOf:
+            - { type: string, format: date-time }
+            - type: "null"
+          default: null
+        pinned:        { type: boolean }
+        topic_profile: { $ref: "#/components/schemas/TopicProfile" }
+        messages:
+          type: array
+          items: { $ref: "#/components/schemas/ExportMessage" }
+        check_answers:
+          type: array
+          items: { $ref: "#/components/schemas/ExportCheckAnswer" }
+        documents:
+          type: array
+          items: { $ref: "#/components/schemas/ExportDocument" }
+
+    ExportMessage:
+      type: object
+      additionalProperties: false
+      required: [id, role, content, created_at]
+      properties:
+        id:         { type: integer }
+        role:       { type: string }
+        content:    { type: string }
+        created_at: { type: string, format: date-time }
+        status:     { type: [string, "null"], default: null }
+        citations:
+          type: array
+          items: { $ref: "#/components/schemas/Citation" }
+          default: []
+
+    ExportCheckAnswer:
+      type: object
+      additionalProperties: false
+      required: [id, gap_tested, question, correct, created_at]
+      properties:
+        id:             { type: integer }
+        gap_tested:     { type: string }
+        question:       { type: string }
+        correct:        { type: boolean }
+        created_at:     { type: string, format: date-time }
+        options:
+          type: array
+          items: { type: string }
+          default: []
+        selected_index: { type: [integer, "null"], default: null }
+        correct_index:  { type: [integer, "null"], default: null }
+        purpose:        { type: [string, "null"], default: null }
+
+    ExportDocument:
+      type: object
+      additionalProperties: false
+      required: [id, filename, created_at]
+      description: Upload metadata only; the file itself is not in the export.
+      properties:
+        id:         { type: integer }
+        filename:   { type: string }
+        status:     { type: [string, "null"], default: null }
+        error:      { type: [string, "null"], default: null }
+        page_count: { type: [integer, "null"], default: null }
+        created_at: { type: string, format: date-time }
+
+    ExportUsageDay:
+      type: object
+      additionalProperties: false
+      required: [date_utc, messages, cost_usd]
+      properties:
+        date_utc: { type: string, format: date }
+        messages: { type: integer, minimum: 0 }
+        cost_usd: { type: number, minimum: 0 }
 
     ProfileResponse:
       type: object
@@ -1733,11 +2114,13 @@ components:
         - urgent_cap_usd
         - hard_cap_usd
         - top_sessions
+        - resets_at
       description: |
         Spend transparency for the current user. daily covers the last 14 UTC
         days, oldest first, zero-filled for missing ledger rows. Cap values
         mirror the runtime cost meter; the urgent tier is derived (0.9 x
-        hard), never a duplicated literal.
+        hard), never a duplicated literal. resets_at is the next UTC midnight,
+        the same instant the daily cap and rate limit 429 payloads report.
       properties:
         daily:
           type: array
@@ -1750,6 +2133,7 @@ components:
           type: array
           maxItems: 3
           items: { $ref: "#/components/schemas/SessionSpend" }
+        resets_at: { type: string, format: date-time }
 
     # I-02: structured errors (409 session_ended / duplicate_topic /
     # check_conflict, 429 caps, 413/400/415/507 upload) send detail as an
@@ -1862,8 +2246,10 @@ x-sse-events:
       type: object
       required: [gap, total, items]
       properties:
-        gap:   { type: string }
-        total: { type: integer }
+        gap:       { type: string }
+        total:     { type: integer }
+        set_index: { type: integer, description: 1-based set position within the check. }
+        set_total: { type: integer, description: Sets in the check. }
         items:
           type: array
           items:
@@ -1874,6 +2260,22 @@ x-sse-events:
               options:
                 type: array
                 items: { type: string }
+
+  topic_suggestions:
+    data:
+      type: object
+      required: [mode, topic, items]
+      properties:
+        mode:  { type: string, enum: [broad, specific] }
+        topic: { type: string }
+        items:
+          type: array
+          items:
+            type: object
+            required: [label]
+            properties:
+              label: { type: string }
+              hint:  { type: [string, "null"] }
 
   followup_skipped:
     data:

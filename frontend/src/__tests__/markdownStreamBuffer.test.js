@@ -112,6 +112,7 @@ describe('splitSafePrefixIncremental', () => {
   it('matches full scan at every prefix of every fixture (char-by-char)', () => {
     for (const fixture of FIXTURES) {
       const state = createSplitState()
+
       for (let i = 1; i <= fixture.length; i++) {
         const text = fixture.slice(0, i)
         const inc = splitSafePrefixIncremental(text, state)
@@ -124,6 +125,7 @@ describe('splitSafePrefixIncremental', () => {
   it('matches full scan under chunked appends (3-char deltas)', () => {
     for (const fixture of FIXTURES) {
       const state = createSplitState()
+
       for (let i = 3; i <= fixture.length + 2; i += 3) {
         const text = fixture.slice(0, Math.min(i, fixture.length))
         expect(splitSafePrefixIncremental(text, state)).toEqual(splitSafePrefix(text))

@@ -14,7 +14,8 @@ This document supersedes `Crux_Spec.md` and `Crux_DevPlan.md` for v1 scope. The 
 > is shipped** (not "None"). The §1 table and §2 architecture below are corrected;
 > deeper sections (e.g. §swap-path, §test plan) may retain as-authored
 > ChromaDB/SQLite references. Design intent (e.g. the §3.4 dropped mastery gate)
-> is **not** changed here. See `docs/review/2026-05-30-adversarial-code-review.md`.
+> is **not** changed here. Source: the 2026-05-30 adversarial code review, archived
+> in git history (`git show 6dd9180~1:docs/review/2026-05-30-adversarial-code-review.md`).
 
 ---
 

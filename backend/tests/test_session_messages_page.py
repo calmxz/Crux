@@ -1,7 +1,8 @@
 import pytest
 
 from contracts import TopicProfile
-from db.models import ChatMessage, Session as SessionModel
+from db.models import ChatMessage
+from db.models import Session as SessionModel
 
 USER_ID = "u1"
 

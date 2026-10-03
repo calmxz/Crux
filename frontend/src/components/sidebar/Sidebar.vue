@@ -8,6 +8,7 @@ import { useSidebar } from '@/composables/useSidebar.js'
 import { useToast } from '@/composables/useToast.js'
 import { useAuthStore } from '@/stores/auth.js'
 import { useSessionStore } from '@/stores/session.js'
+import { useUserStore } from '@/stores/user.js'
 import { useSessionGroups } from '@/composables/useSessionGroups.js'
 import { getReviewQueue } from '@/services/reviewApi.js'
 import * as sessionsApi from '@/services/sessionsApi.js'
@@ -15,23 +16,39 @@ import { runWhenIdle } from '@/utils/idle.js'
 import Logo from '@/components/Logo.vue'
 import SidebarSessionRow from './SidebarSessionRow.vue'
 import SidebarSkeletonList from './SidebarSkeletonList.vue'
+import SidebarUserMenu from './SidebarUserMenu.vue'
 
 const { mode, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
+
 const router = useRouter()
+
 const route = useRoute()
+
 const authStore = useAuthStore()
-const { isAuthenticated } = storeToRefs(authStore)
+
+const { isAuthenticated, userEmail } = storeToRefs(authStore)
+
+const userStore = useUserStore()
+
+const { name: userName } = storeToRefs(userStore)
+
 const sessionStore = useSessionStore()
+
 const { sessions, loading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
 
 const listEl = ref(null)
+
 const asideEl = ref(null)
+
 const statusFilter = ref('active') // 'active' | 'ended'
+
 const STATUS_TABS = [
   { key: 'active', label: 'Active' },
   { key: 'ended', label: 'Ended' },
 ]
+
 let lastFocused = null
+
 let cancelIdleBadge = null
 
 const FOCUSABLE_SELECTOR =
@@ -39,6 +56,7 @@ const FOCUSABLE_SELECTOR =
 
 function getFocusables() {
   if (!asideEl.value) return []
+
   return Array.from(asideEl.value.querySelectorAll(FOCUSABLE_SELECTOR)).filter(
     (el) => !el.hasAttribute('disabled') && el.offsetParent !== null,
   )
@@ -48,17 +66,23 @@ function onTrapKeydown(e) {
   if (e.key === 'Escape') {
     e.preventDefault()
     closeDrawer()
+
     return
   }
+
   if (e.key !== 'Tab') return
   const focusables = getFocusables()
+
   if (focusables.length === 0) {
     e.preventDefault()
+
     return
   }
+
   const first = focusables[0]
   const last = focusables[focusables.length - 1]
   const active = document.activeElement
+
   if (e.shiftKey && (active === first || !asideEl.value?.contains(active))) {
     e.preventDefault()
     last.focus()
@@ -70,6 +94,7 @@ function onTrapKeydown(e) {
 
 watch(drawerOpen, async (open) => {
   if (typeof document === 'undefined') return
+
   if (open && !isDesktop.value) {
     lastFocused = document.activeElement
     document.addEventListener('keydown', onTrapKeydown, true)
@@ -78,9 +103,11 @@ watch(drawerOpen, async (open) => {
     focusables[0]?.focus()
   } else {
     document.removeEventListener('keydown', onTrapKeydown, true)
+
     if (lastFocused && typeof lastFocused.focus === 'function') {
       lastFocused.focus()
     }
+
     lastFocused = null
   }
 })
@@ -89,6 +116,7 @@ onBeforeUnmount(() => {
   if (typeof document !== 'undefined') {
     document.removeEventListener('keydown', onTrapKeydown, true)
   }
+
   clearTimeout(searchTimer)
   cancelIdleBadge?.()
   listResizeObserver?.disconnect()
@@ -96,6 +124,7 @@ onBeforeUnmount(() => {
 })
 
 const searchQuery = ref('')
+
 const { searching, pinnedActive, activeRows, endedRows } = useSessionGroups(sessions, searchQuery)
 
 // SIDEBAR_CAP is the floor (and the fallback wherever the list's height cannot
@@ -103,17 +132,21 @@ const { searching, pinnedActive, activeRows, endedRows } = useSessionGroups(sess
 // is the ceiling, and matches the store's SIDEBAR_PAGE_LIMIT window: rendering
 // past it would only ever draw rows the store does not hold.
 const SIDEBAR_CAP = 15
+
 const SIDEBAR_CAP_MAX = 40
+
 const DEFAULT_PITCH_PX = 28
 
 // How many rows the list column actually has room for. Recomputed from the
 // measured height of `listEl` so a tall screen fills instead of stopping at
 // the floor and leaving dead space below the last row.
 const renderCap = ref(SIDEBAR_CAP)
+
 let listResizeObserver = null
 
 function measureRenderCap() {
   const el = listEl.value
+
   if (!el) return
   const raw = getComputedStyle(el).getPropertyValue('--line-pitch')
   const parsed = parseFloat(raw)
@@ -131,8 +164,11 @@ function measureRenderCap() {
 // window -- see session.js for why every mutating action must be able to
 // patch them. The store's `sessions` array is never written by search.
 const searchTotal = ref(0)
+
 const searchLoading = ref(false)
+
 let searchTimer = null
+
 let _searchSeq = 0
 
 // Scoped to the current tab (status: statusFilter). Re-runs on a tab change
@@ -141,22 +177,27 @@ let _searchSeq = 0
 watch([searchQuery, statusFilter], ([raw]) => {
   if (searchTimer) clearTimeout(searchTimer)
   const q = (raw || '').trim()
+
   if (!q) {
     _searchSeq++ // invalidate any in-flight response
     searchRows.value = []
     searchTotal.value = 0
     searchLoading.value = false
+
     return
   }
+
   searchLoading.value = true
   searchTimer = setTimeout(async () => {
     const seq = ++_searchSeq
+
     try {
       // silent: a sidebar search must never toast; errors render as zero matches
       const page = await sessionsApi.getSessionLibrary(
         { status: statusFilter.value, q, sort: 'last_activity', limit: SIDEBAR_CAP, offset: 0 },
         { silent: true },
       )
+
       if (seq !== _searchSeq) return // stale response; a newer query owns the state
       searchRows.value = page.items
       searchTotal.value = page.total
@@ -184,27 +225,24 @@ const showViewAllSearch = computed(
 // itself is also sliced to the cap so a long pinned list can never push the
 // component's total render past renderCap on its own.
 const cappedPinnedActive = computed(() => pinnedActive.value.slice(0, renderCap.value))
+
 const cappedActiveFlat = computed(() =>
   activeRows.value.slice(0, Math.max(0, renderCap.value - cappedPinnedActive.value.length)),
 )
-const cappedEndedRows = computed(() => endedRows.value.slice(0, renderCap.value))
 
-// Collapsed icon rail: one flat spine of every row the expanded view would draw.
-const railRows = computed(() => [
-  ...cappedPinnedActive.value,
-  ...cappedActiveFlat.value,
-  ...cappedEndedRows.value,
-])
+const cappedEndedRows = computed(() => endedRows.value.slice(0, renderCap.value))
 
 const activeRendered = computed(
   () => cappedPinnedActive.value.length + cappedActiveFlat.value.length,
 )
+
 // View all is the list's closing line whenever rows are rendered. The
 // zero-rows guard stays: createSession bumps activeTotal without pushing
 // into the (windowed) `sessions` array, so a fresh account can sit at
 // activeTotal=1 with zero rendered rows. Without this guard the sidebar
 // would show "No sessions yet" and "View all 1 sessions" at once.
 const showViewAllActive = computed(() => activeRendered.value > 0)
+
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
 
 const showSkeleton = computed(() => loading.value && !sessions.value.length)
@@ -212,6 +250,11 @@ const showSkeleton = computed(() => loading.value && !sessions.value.length)
 const showEmptyHint = computed(() => !loading.value && !searching.value && !sessions.value.length)
 
 const reviewTotal = ref(0)
+
+// The Profile glyph: a divider card with its tab up, the profile's own
+// furniture. Not a person silhouette -- the identity circle in the foot is the
+// only mark of a person the shell draws (DESIGN.md).
+const PROFILE_ICON_PATH = 'M3 7.5 H17 V16 H3 Z M4.5 7.5 V4 H10 V7.5 M6 11 H14 M6 13.5 H11'
 
 const showEmptyActiveHint = computed(
   () =>
@@ -233,9 +276,11 @@ onMounted(async () => {
     listResizeObserver = new ResizeObserver(() => measureRenderCap())
     listResizeObserver.observe(listEl.value)
   }
+
   if (isAuthenticated.value && !sessions.value.length) {
     await sessionStore.listSessions().catch(() => {})
   }
+
   if (isAuthenticated.value) {
     // Badge count only; silent - a sidebar badge must never toast.
     // Deferred to browser idle so it never competes with first paint.
@@ -257,6 +302,7 @@ watch(
     // Nothing to scroll to off a session route -- skip the nextTick + query.
     if (!id) return
     await nextTick()
+
     if (!listEl.value) return
     const target = listEl.value.querySelector(`[data-session-id="${id}"]`)
     target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
@@ -264,29 +310,59 @@ watch(
 )
 
 const isExpanded = computed(() => mode.value === 'expanded' || mode.value === 'drawer-open')
+
 const showDrawerClose = computed(() => !isDesktop.value && mode.value === 'drawer-open')
 
-// Clear search when collapsing so the icon rail is never gated empty.
+const isRail = computed(() => isDesktop.value && !isExpanded.value)
+
+// Identity row name. stores/user.js writes the literal 'Learner' when the
+// learner leaves the name blank, so that placeholder counts as unset here and
+// the row falls back to the email's local part.
+const identityName = computed(() => {
+  const n = userName.value
+
+  return n && n !== 'Learner' ? n : ''
+})
+
+// Clear search when collapsing: the field folds away with the list, so a
+// query left behind would silently filter the list on the next unfold.
 watch(isExpanded, (expanded) => {
   if (!expanded) searchQuery.value = ''
 })
+
+// Rail Search unfolds the sidebar, then hands the caret to the search field
+// once the expanded body has rendered.
+async function onRailSearch() {
+  toggleDesktop()
+  await nextTick()
+  asideEl.value?.querySelector('[data-testid="sidebar-search"]')?.focus()
+}
 
 function onNewSession() {
   closeDrawer()
   router.push({ name: 'new-session' })
 }
 
-// Sign out lives on the footer rail rather than inside Settings > Account:
-// it is a navigation act, not a setting, and it belongs with the other
-// written lines at the foot of the contents page.
+// The account menu's Settings, Usage and Account items.
+function onMenuNavigate(to) {
+  closeDrawer()
+  router.push(to)
+}
+
+// Sign out lives in the identity row's account menu at the sidebar foot:
+// it is a navigation act, not a setting.
 async function onSignOut() {
   closeDrawer()
+
   try {
     await authStore.signOut()
   } catch (err) {
+    // The store clears the local session even when the SDK throws, so the
+    // shell is already signed out; say so and still leave the protected
+    // route rather than stranding the learner on it.
     useToast().showError(err?.message || 'Sign out failed')
-    return
   }
+
   router.push('/login')
 }
 </script>
@@ -314,23 +390,31 @@ async function onSignOut() {
     aria-label="App navigation"
   >
     <div class="sb-header">
-      <RouterLink to="/" class="sb-brand" aria-label="Crux home" @click="closeDrawer">
-        <Logo :size="isExpanded ? 'md' : 'sm'" :variant="isExpanded ? 'full' : 'mark-only'" />
+      <!-- Folded, the rail starts at the toggle: no mark above it. -->
+      <RouterLink
+        v-if="!isRail"
+        to="/"
+        class="sb-brand"
+        aria-label="Crux home"
+        @click="closeDrawer"
+      >
+        <Logo size="md" variant="full" />
       </RouterLink>
       <button
         v-if="isDesktop"
         type="button"
-        class="sb-toggle sb-toggle--edge hit-44"
+        class="sb-toggle sb-toggle--head hit-44"
         :aria-label="isExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
         :title="isExpanded ? 'Collapse sidebar' : 'Expand sidebar'"
         data-testid="sidebar-collapse-toggle"
         @click="toggleDesktop"
       >
+        <!-- The drawn "sidebar" glyph: a page with a narrow left pane. -->
         <svg
           class="sb-toggle-icon"
           viewBox="0 0 20 20"
-          width="14"
-          height="14"
+          width="20"
+          height="20"
           fill="none"
           stroke="currentColor"
           stroke-width="1.5"
@@ -339,14 +423,8 @@ async function onSignOut() {
           aria-hidden="true"
           focusable="false"
         >
-          <template v-if="isExpanded">
-            <path d="M12.5 4.5 L7 10 L12.5 15.5" />
-            <path d="M17 4.5 L11.5 10 L17 15.5" />
-          </template>
-          <template v-else>
-            <path d="M7.5 4.5 L13 10 L7.5 15.5" />
-            <path d="M3 4.5 L8.5 10 L3 15.5" />
-          </template>
+          <rect x="3" y="4" width="14" height="12" rx="2" />
+          <path d="M8 4 L8 16" />
         </svg>
       </button>
       <button
@@ -382,6 +460,7 @@ async function onSignOut() {
         class="sb-new-session"
         :class="{ 'sb-new-session--icon': !isExpanded }"
         :title="isExpanded ? '' : 'New session'"
+        :aria-label="isExpanded ? null : 'New session'"
         data-testid="sidebar-new-session"
         @click="onNewSession"
       >
@@ -404,12 +483,116 @@ async function onSignOut() {
       </button>
     </div>
 
+    <!-- Folded rail: Search, Profile and Recall stay one click away without unfolding. -->
+    <div v-if="isDesktop && !isExpanded" class="sb-rail-actions">
+      <button
+        type="button"
+        class="sb-icon sb-icon-btn hit-44"
+        aria-label="Search sessions"
+        title="Search sessions"
+        data-testid="sidebar-rail-search"
+        @click="onRailSearch"
+      >
+        <svg
+          class="sb-inline-icon"
+          viewBox="0 0 20 20"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <circle cx="8.5" cy="8.5" r="6" />
+          <path d="M13 13 L17.5 17.5" />
+        </svg>
+      </button>
+      <RouterLink
+        :to="{ name: 'profile-aggregate' }"
+        class="sb-icon hit-44"
+        data-testid="sidebar-profile"
+        aria-label="Profile"
+        title="Profile"
+      >
+        <svg
+          class="sb-inline-icon"
+          viewBox="0 0 20 20"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <path :d="PROFILE_ICON_PATH" />
+        </svg>
+      </RouterLink>
+      <RouterLink
+        v-if="reviewTotal > 0"
+        to="/recall"
+        class="sb-icon sb-rail-review hit-44"
+        data-testid="sidebar-recall"
+        :aria-label="`Recall: ${reviewTotal} ${reviewTotal === 1 ? 'concept' : 'concepts'} due`"
+        title="Recall"
+      >
+        <svg
+          class="sb-inline-icon"
+          viewBox="0 0 20 20"
+          width="16"
+          height="16"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="1.5"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+          aria-hidden="true"
+          focusable="false"
+        >
+          <circle cx="10" cy="10.5" r="7" />
+          <path d="M10 6.5 L10 10.5 L13 12.5" />
+        </svg>
+        <span class="sb-rail-badge" aria-hidden="true">{{ reviewTotal }}</span>
+      </RouterLink>
+    </div>
+
+    <!-- Profile is always shown (Recall hides at zero due); it sits first so
+         it never jumps when the idle-loaded Recall line appears under it. -->
+    <RouterLink
+      v-if="isExpanded"
+      :to="{ name: 'profile-aggregate' }"
+      class="sb-navline"
+      data-testid="sidebar-profile"
+      @click="closeDrawer"
+    >
+      <svg
+        class="sb-inline-icon"
+        viewBox="0 0 20 20"
+        width="14"
+        height="14"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        stroke-linecap="round"
+        stroke-linejoin="round"
+        aria-hidden="true"
+        focusable="false"
+      >
+        <path :d="PROFILE_ICON_PATH" />
+      </svg>
+      <span>Profile</span>
+    </RouterLink>
     <RouterLink
       v-if="isExpanded && reviewTotal > 0"
-      to="/review"
-      class="sb-review"
-      data-testid="sidebar-review"
-      :aria-label="`Review: ${reviewTotal} ${reviewTotal === 1 ? 'concept' : 'concepts'} due`"
+      to="/recall"
+      class="sb-navline"
+      data-testid="sidebar-recall"
+      :aria-label="`Recall: ${reviewTotal} ${reviewTotal === 1 ? 'concept' : 'concepts'} due`"
       @click="closeDrawer"
     >
       <svg
@@ -428,8 +611,8 @@ async function onSignOut() {
         <circle cx="10" cy="10.5" r="7" />
         <path d="M10 6.5 L10 10.5 L13 12.5" />
       </svg>
-      <span>Review</span>
-      <span class="sb-review-count" aria-hidden="true">{{ reviewTotal }}</span>
+      <span>Recall</span>
+      <span class="sb-navline-count" aria-hidden="true">{{ reviewTotal }}</span>
     </RouterLink>
 
     <div v-if="isExpanded" class="sb-search">
@@ -482,7 +665,10 @@ async function onSignOut() {
       </button>
     </div>
 
-    <nav ref="listEl" class="sb-list-wrap" aria-label="Sessions">
+    <!-- Folded, the rail shows actions only; the list returns on unfold. The
+         nav itself stays as the spacer that holds the identity foot down (and
+         the fit-to-height target), hidden so it is not an empty landmark. -->
+    <nav ref="listEl" class="sb-list-wrap" aria-label="Sessions" :aria-hidden="isRail || null">
       <template v-if="isExpanded">
         <template v-if="searching">
           <p
@@ -629,78 +815,16 @@ async function onSignOut() {
           </section>
         </template>
       </template>
-
-      <!-- Collapsed icon rail: compact row markers without sections -->
-      <template v-else>
-        <ul v-if="sessions.length" class="sb-session-list sb-session-list--collapsed">
-          <SidebarSessionRow
-            v-for="s in railRows"
-            :key="s.id"
-            :session="s"
-            :state="s.ended_at ? 'ended' : 'active'"
-          />
-        </ul>
-      </template>
     </nav>
 
-    <footer class="sb-rail" :class="{ 'sb-rail--column': !isExpanded }">
-      <RouterLink
-        to="/settings"
-        class="sb-icon"
-        :class="{ 'sb-icon--row': isExpanded }"
-        aria-label="Settings"
-        title="Settings"
-        data-testid="sidebar-settings"
-        @click="closeDrawer"
-      >
-        <svg
-          class="sb-inline-icon"
-          viewBox="0 0 20 20"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <circle cx="10" cy="10" r="2.5" />
-          <path
-            d="M10 3.5 V5.5 M10 14.5 V16.5 M16.5 10 H14.5 M5.5 10 H3.5 M14.7 5.3 L13.3 6.7 M6.7 13.3 L5.3 14.7 M14.7 14.7 L13.3 13.3 M6.7 6.7 L5.3 5.3"
-          />
-        </svg>
-        <span v-if="isExpanded" class="sb-icon-label">Settings</span>
-      </RouterLink>
-      <button
-        v-if="isAuthenticated"
-        type="button"
-        class="sb-icon sb-icon-btn"
-        :class="{ 'sb-icon--row': isExpanded }"
-        aria-label="Sign out"
-        title="Sign out"
-        data-testid="sidebar-sign-out"
-        @click="onSignOut"
-      >
-        <svg
-          class="sb-inline-icon"
-          viewBox="0 0 20 20"
-          width="16"
-          height="16"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="1.5"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-          focusable="false"
-        >
-          <path d="M12 4 H5 V16 H12" />
-          <path d="M9 10 H17 M14 7 L17 10 L14 13" />
-        </svg>
-        <span v-if="isExpanded" class="sb-icon-label">Sign out</span>
-      </button>
+    <footer v-if="isAuthenticated" class="sb-rail" :class="{ 'sb-rail--column': !isExpanded }">
+      <SidebarUserMenu
+        :name="identityName"
+        :email="userEmail || ''"
+        :collapsed="isRail"
+        @navigate="onMenuNavigate"
+        @sign-out="onSignOut"
+      />
     </footer>
   </aside>
 </template>
@@ -711,6 +835,10 @@ async function onSignOut() {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  /* D-18: mobile browser chrome eats into 100vh, so the drawer's own footer
+     sits under it. 100dvh tracks the visible viewport; 100vh stays as the
+     fallback for engines without dvh (matches SessionView). */
+  height: 100dvh;
   position: sticky;
   top: 0;
   background: var(--desk-deep);
@@ -803,7 +931,6 @@ async function onSignOut() {
 
 .sidebar--collapsed .sb-header {
   flex-direction: column;
-  gap: 0.75rem;
   padding: 0.75rem 0;
 }
 
@@ -841,19 +968,43 @@ async function onSignOut() {
   outline-offset: 2px;
 }
 
-/* The collapse control is a half-tab standing off the sidebar's right edge,
-   the one control on the contents page allowed to look like a fixture rather
-   than a written line. */
-.sb-toggle--edge {
+/* The fold control is a drawn icon in the head: right of the wordmark when
+   open, alone at the top of the rail when folded. */
+.sb-toggle--head {
+  margin-left: auto;
+  width: 2rem;
+  height: 2rem;
+}
+
+.sidebar--collapsed .sb-toggle--head {
+  margin-left: 0;
+}
+
+/* Folded rail rows: Search, Profile and Recall, centred under New session. */
+.sb-rail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0 0 0.25rem;
+}
+
+.sb-rail-review {
+  position: relative;
+}
+
+.sb-rail-badge {
   position: absolute;
-  top: 0.875rem;
-  right: -1px;
-  width: 22px;
-  height: 28px;
-  border: 1px solid var(--card-edge);
-  border-right: 0;
-  border-radius: 6px 0 0 6px;
-  background: var(--card);
+  top: -4px;
+  /* The 36px icon sits centred in the 48px rail (47px inside its right
+     border), so -4px keeps the count clear of the rail's overflow clip. */
+  right: -4px;
+  font-family: var(--font-sans);
+  font-size: var(--fs-label);
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink-learner);
+  font-variant-numeric: tabular-nums;
 }
 
 .sb-cta {
@@ -912,6 +1063,12 @@ async function onSignOut() {
   border-top: 1px solid var(--rule-strong);
 }
 
+/* Folded, the list is empty space above the foot; a rule under the actions
+   would close off nothing. */
+.sidebar--collapsed .sb-list-wrap {
+  border-top: 0;
+}
+
 .sb-section {
   margin: 0;
 }
@@ -960,10 +1117,6 @@ async function onSignOut() {
   padding: 0.25rem 0;
   display: flex;
   flex-direction: column;
-}
-
-.sb-session-list--collapsed {
-  align-items: stretch;
 }
 
 .sb-empty-hint {
@@ -1019,27 +1172,13 @@ async function onSignOut() {
   transition: color var(--motion-fast) ease;
 }
 
-.sb-icon.sb-icon--row {
-  width: 100%;
-  height: var(--line-pitch);
-  justify-content: flex-start;
-  gap: 0.625rem;
-  padding: 0;
-  border-radius: 0;
-}
-
-/* Sign out is a button, not a link; strip the UA chrome so it reads as the
-   same written line as Settings. */
+/* Rail Search is a button, not a link; strip the UA chrome so it reads as the
+   same drawn mark as the links around it. */
 .sb-icon-btn {
   background: transparent;
   border: 0;
   font: inherit;
   text-align: left;
-}
-
-.sb-icon-label {
-  font-family: var(--font-sans);
-  font-size: 0.9375rem;
 }
 
 .sb-icon:hover {
@@ -1130,7 +1269,7 @@ async function onSignOut() {
   border-bottom-color: var(--ink);
 }
 
-.sb-review {
+.sb-navline {
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1144,18 +1283,18 @@ async function onSignOut() {
   text-decoration: none;
 }
 
-.sb-review:hover {
+.sb-navline:hover {
   color: var(--color-accent-hover);
   text-decoration: underline;
   text-underline-offset: 3px;
 }
 
-.sb-review:focus-visible {
+.sb-navline:focus-visible {
   outline: 2px solid var(--ink-learner);
   outline-offset: 2px;
 }
 
-.sb-review-count {
+.sb-navline-count {
   margin-left: auto;
   font-size: var(--fs-label);
   font-weight: 400;

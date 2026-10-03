@@ -3,7 +3,7 @@
     :visible="visible"
     modal
     header="Which gap should we review?"
-    :style="{ width: '24rem' }"
+    :style="{ width: 'min(24rem, calc(100vw - 2rem))' }"
     class="crux-dialog"
     data-testid="gap-picker"
     @update:visible="$emit('update:visible', $event)"

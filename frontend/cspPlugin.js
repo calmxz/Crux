@@ -6,12 +6,15 @@
 // that remains in vercel.json/nginx.
 export function buildCspContent(apiBase) {
   let apiOrigin
+
   try {
     apiOrigin = apiBase ? new URL(apiBase).origin : ''
   } catch {
     apiOrigin = '' // relative base (/api): same-origin, 'self' covers it
   }
+
   const connect = ["'self'", 'https://*.supabase.co', apiOrigin].filter(Boolean).join(' ')
+
   return [
     "default-src 'self'",
     `connect-src ${connect}`,
@@ -40,7 +43,9 @@ export function cspPlugin(apiBase) {
             'transformIndexHtml in cspPlugin.js to match the new index.html shape.',
         )
       }
+
       const meta = `<meta http-equiv="Content-Security-Policy" content="${buildCspContent(apiBase)}">`
+
       return html.replace('</title>', `</title>\n    ${meta}`)
     },
   }

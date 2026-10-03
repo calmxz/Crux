@@ -9,8 +9,8 @@ from sqlalchemy import create_engine, inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
-from db.database import Base
 import db.models  # noqa: F401 — ensures all models are registered with Base.metadata
+from db.database import Base
 
 
 def _make_engine():

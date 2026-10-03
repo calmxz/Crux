@@ -21,10 +21,12 @@
       <div class="field stagger" style="--delay: 60ms">
         <div class="choice" data-testid="onboarding-feedback">
           <p class="field-label">When you get stuck</p>
-          <FeedbackStylePicker
+          <LetteredLinesPicker
             v-model="feedback"
             :options="feedbackOptions"
             name="feedback-style"
+            legend="Feedback style"
+            testid-prefix="feedback-style"
           />
         </div>
         <p class="help">
@@ -61,6 +63,15 @@
       <p v-if="submitError" class="status is-alert" role="alert" data-testid="onboarding-error">
         {{ submitError }}
       </p>
+
+      <!-- E-09: onboarding must not be a dead end for a learner who cannot
+           or does not want to complete it right now (e.g. force-landed here
+           after a failed hydrate). Same sign-out as Sidebar.vue's onSignOut. -->
+      <p class="line">
+        <button type="button" class="linkbtn" data-testid="onboarding-signout" @click="signOut">
+          Sign out
+        </button>
+      </p>
     </form>
   </AuthCover>
 </template>
@@ -72,27 +83,39 @@ import { useRouter } from 'vue-router'
 import InputText from 'primevue/inputtext'
 
 import AuthCover from '../components/auth/AuthCover.vue'
-import FeedbackStylePicker from '../components/FeedbackStylePicker.vue'
+import LetteredLinesPicker from '../components/LetteredLinesPicker.vue'
 import { friendlyError } from '@/lib/errors.js'
+import { TUTOR_PREFERENCES, preferenceValue } from '@/lib/tutorPreferences.js'
 import { useUserStore } from '../stores/user.js'
+import { useAuthStore } from '../stores/auth.js'
+import { useToast } from '../composables/useToast.js'
 
 const router = useRouter()
+
 const userStore = useUserStore()
 
+const authStore = useAuthStore()
+
 const displayName = ref(userStore.name || '')
-const feedbackOptions = [
-  { label: 'Hints', value: 'hints' },
-  { label: 'Direct answers', value: 'direct_answers' },
-]
-const feedback = ref(userStore.interactionPreferences?.feedback || 'hints')
+
+// Labels only: the help line below the picker carries the explanation here,
+// so the Settings sub copy is left off.
+const feedbackOptions = TUTOR_PREFERENCES.feedback.options.map(({ value, label }) => ({
+  value,
+  label,
+}))
+
+const feedback = ref(preferenceValue(userStore.interactionPreferences, 'feedback'))
 
 const submitting = ref(false)
+
 const submitError = ref(null)
 
 async function submit() {
   if (submitting.value) return
   submitting.value = true
   submitError.value = null
+
   try {
     await userStore.completeOnboarding({
       name: displayName.value,
@@ -107,6 +130,19 @@ async function submit() {
     submitting.value = false
   }
 }
+
+// Same sign-out as Sidebar.vue's onSignOut, except a failure keeps the learner here.
+async function signOut() {
+  try {
+    await authStore.signOut()
+  } catch (err) {
+    useToast().showError(err?.message || 'Sign out failed')
+
+    return
+  }
+
+  router.push('/login')
+}
 </script>
 
 <style scoped>
@@ -117,7 +153,7 @@ async function submit() {
   padding: 0;
 }
 
-/* The lettered lines come from the shared FeedbackStylePicker, so the
+/* The lettered lines come from the shared LetteredLinesPicker, so the
    grammar has one source; this wrapper only carries the pencil label. */
 .choice {
   min-width: 0;
@@ -153,5 +189,27 @@ async function submit() {
     opacity: 1;
     animation: none;
   }
+}
+
+/* The sign-out control is a button that has to read as the cover's link. */
+.linkbtn {
+  background: none;
+  border: 0;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: var(--ink-learner);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.linkbtn:hover {
+  color: var(--color-accent-hover);
+}
+
+.linkbtn:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
+  outline-offset: 2px;
 }
 </style>

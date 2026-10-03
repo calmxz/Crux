@@ -1,4 +1,4 @@
-"""Streaming tutor agent loop. Calls LiteLLM (stream=True) with the three
+"""Streaming tutor agent loop. Calls LiteLLM (stream=True) with the
 registered tools and dispatches tool calls until the model returns a final
 text answer or max_iters is exhausted, yielding StreamEvent objects live.
 """
@@ -20,12 +20,22 @@ from agent.types import ToolContext
 from config import settings
 from contracts import Citation, ToolCallRecord, ToolResult
 from db.models import ChatMessage
-from services import check_question_service, cost_meter
-
+from lib.citations import chunks_to_citations
+from services import check_question_service, cost_meter, topic_suggest_service
 
 log = logging.getLogger(__name__)
 
 MAX_ITERS = 8
+
+# Turn-terminating tools: each hands the learner a card and ends the turn, so
+# at most one of them runs per response (see the reduce in run_streaming).
+_TERMINAL_TOOLS = ("ask_check_questions", topic_suggest_service.TOOL_NAME)
+
+# #354: the topic card sits under the tutor's reply, never alone. A call made
+# before any reply text fails so the model writes the reply and calls again.
+_SUGGEST_NEEDS_PROSE = (
+    "write your reply to the learner first, then call suggest_topics"
+)
 
 
 def _persist_assistant_message(
@@ -84,6 +94,8 @@ def _summarize(name: str, result) -> str:
         return "Profile updated"
     if name == "ask_check_questions":
         return "Questions asked"
+    if name == topic_suggest_service.TOOL_NAME:
+        return "Topics suggested"
     return "ok"
 
 
@@ -321,17 +333,18 @@ async def run_streaming(
 
             # Tool calls present: append the assistant turn, then dispatch each.
             ordered = [tool_frags[k] for k in sorted(tool_frags)]
-            # ask_check_questions is turn-terminating and must be the LAST call
-            # of the turn. F-10: bundled non-ask calls (profile patches,
-            # retrieval) are legitimate and are dispatched first in their
-            # original order; only ADDITIONAL asks (e.g. the model prematurely
-            # grading its own question) are dropped. Reduce BEFORE building the
-            # assistant message so the persisted tool calls and `full` stay
-            # consistent.
-            ask_slots = [s for s in ordered if s["name"] == "ask_check_questions"]
-            if ask_slots:
-                non_ask = [s for s in ordered if s["name"] != "ask_check_questions"]
-                ordered = non_ask + ask_slots[:1]
+            # ask_check_questions and suggest_topics are turn-terminating and
+            # must be the LAST call of the turn. F-10: bundled non-terminal
+            # calls (profile patches, retrieval) are legitimate and are
+            # dispatched first in their original order; only ADDITIONAL
+            # terminal calls (e.g. a second ask, or a topic card next to a
+            # check) are dropped, and the first one streamed wins. Reduce
+            # BEFORE building the assistant message so the persisted tool
+            # calls and `full` stay consistent.
+            terminal_slots = [s for s in ordered if s["name"] in _TERMINAL_TOOLS]
+            if terminal_slots:
+                non_terminal = [s for s in ordered if s["name"] not in _TERMINAL_TOOLS]
+                ordered = non_terminal + terminal_slots[:1]
             full.append(
                 {
                     "role": "assistant",
@@ -351,6 +364,7 @@ async def run_streaming(
             )
 
             asked_check = False
+            suggested_topics = False
             for slot in ordered:
                 name = slot["name"]
                 call_id = slot["id"]
@@ -399,10 +413,13 @@ async def run_streaming(
                 # if this await is cancelled, so the cancel arm below can drain
                 # it before touching ctx.db from the main thread (SQLAlchemy
                 # Session is not thread-safe).
-                dispatch_task = asyncio.ensure_future(
-                    asyncio.to_thread(tools.dispatch, name, args, ctx)
-                )
-                result = await asyncio.shield(dispatch_task)
+                if name == topic_suggest_service.TOOL_NAME and not accumulated_text.strip():
+                    result = ToolResult(ok=False, status="failed", error=_SUGGEST_NEEDS_PROSE)
+                else:
+                    dispatch_task = asyncio.ensure_future(
+                        asyncio.to_thread(tools.dispatch, name, args, ctx)
+                    )
+                    result = await asyncio.shield(dispatch_task)
                 tool_calls_record.append(
                     ToolCallRecord(
                         name=name, args=args, status=result.status, error=result.error
@@ -428,21 +445,24 @@ async def run_streaming(
                             "gap": data.get("gap"),
                             "items": data.get("items", []),
                             "total": data.get("total", 0),
+                            "set_index": data.get("set_index"),
+                            "set_total": data.get("set_total"),
                         },
                     )
                     asked_check = True
 
+                if name == topic_suggest_service.TOOL_NAME and result.ok:
+                    # The card data is the validated args; on reload it is
+                    # read back from this call in tool_calls_json.
+                    yield StreamEvent("topic_suggestions", result.data or {})
+                    suggested_topics = True
+
                 if name == "retrieve_chunks" and result.ok:
                     raw_chunks = (result.data or {}).get("chunks", [])
-                    new_cites = [
-                        Citation(
-                            doc_id=str(ch.get("doc_id", "")),
-                            text=ch.get("text", ""),
-                            page=ch.get("page"),
-                            doc_name=ch.get("doc_name"),
-                        )
-                        for ch in raw_chunks
-                    ]
+                    # G-11: the similarity floor applies to what the user is
+                    # shown as a source; raw_chunks itself (what the model
+                    # sees) is deliberately unfiltered.
+                    new_cites = chunks_to_citations(raw_chunks)
                     # F-56: dedup against citations already present (a server
                     # prefetch, or an earlier retrieve_chunks call this turn)
                     # by (doc_id, text) identity, so overlapping chunks don't
@@ -489,13 +509,13 @@ async def run_streaming(
             # remaining iteration.
             context_budget.prune_superseded_excerpts(full)
 
-            if asked_check:
-                # Turn-terminating: check question handed to learner. Persist and
-                # stop. Grading happens on the next turn, not this one.
+            if asked_check or suggested_topics:
+                # Turn-terminating: a check or topic card handed to the learner.
+                # Persist and stop. Grading happens on the next turn, not this one.
                 # Cost for this LLM call was already recorded above (before the
                 # tool-dispatch section), so no extra metering needed here.
-                # Soft-cap warning is intentionally skipped here: the check-question
-                # is the active UI element; the next regular reply surfaces the warning.
+                # Soft-cap warning is intentionally skipped here: the card is
+                # the active UI element; the next regular reply surfaces the warning.
                 msg_id = _persist_assistant_message(
                     ctx,
                     accumulated_text,
@@ -503,7 +523,8 @@ async def run_streaming(
                     tool_calls=tool_calls_record,
                     citations=citations,
                 )
-                check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+                if asked_check:
+                    check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
                 yield StreamEvent("done", {"message_id": str(msg_id)})
                 return
 

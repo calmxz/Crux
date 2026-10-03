@@ -7,10 +7,22 @@ services:
     plan: free
     # Set region to match the Supabase project region to avoid cross-region latency.
     region: singapore
-    healthCheckPath: /health
+    # G-07: /ready also probes the database, so a Supabase outage fails the
+    # instance health check instead of serving 500s. /health stays liveness-only.
+    healthCheckPath: /ready
     envVars:
       - key: ENV
         value: prod
+      # G-12: pinned explicitly so a default change in backend/config.py
+      # cannot silently alter the deploy.
+      - key: MODEL
+        value: gemini/gemini-3.5-flash-lite
+      - key: EMBEDDING_MODEL
+        value: gemini/gemini-embedding-2
+      - key: DB_POOL_SIZE
+        value: "5"
+      - key: DB_MAX_OVERFLOW
+        value: "5"
       - key: LLM_STUB
         value: "false"
       - key: EMBEDDING_DIM
@@ -19,8 +31,12 @@ services:
         value: "50"
       - key: BURST_LIMIT_PER_MINUTE
         value: "20"
+      # B-08: lowered from 0.8 so the soft/urgent/hard tiers (urgent = hard *
+      # 0.9, see backend/services/cost_meter.py) aren't too tight to act on.
+      # Blueprint value only, not backend/config.py's local/dev default; see
+      # "Cost cap tiers" in docs/reference.md.
       - key: LLM_SOFT_CAP_USD
-        value: "0.8"
+        value: "0.50"
       - key: LLM_HARD_CAP_USD
         value: "1.00"
       - key: GEMINI_API_KEY

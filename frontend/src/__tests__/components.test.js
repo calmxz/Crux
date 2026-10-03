@@ -5,7 +5,9 @@ import BackButton from '@/components/BackButton.vue'
 import SessionEndedBanner from '@/components/SessionEndedBanner.vue'
 
 const back = vi.fn()
+
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ back, push }),
 }))
@@ -58,6 +60,7 @@ describe('SessionEndedBanner', () => {
       props: { endedAt: '2026-01-01T00:00:00Z' },
       global: { stubs },
     })
+
     // Relative-time wording is covered under fake timers in sessionEndedBanner.test.js.
     expect(wrapper.text()).toContain('Session ended')
     expect(wrapper.text()).toContain('Continue the topic in a new session')
@@ -68,6 +71,7 @@ describe('SessionEndedBanner', () => {
       props: { endedAt: '2026-01-01T00:00:00Z' },
       global: { stubs },
     })
+
     await wrapper.get('[data-testid="session-resume"]').trigger('click')
     expect(wrapper.emitted('resume')?.length).toBeGreaterThan(0)
   })
@@ -77,12 +81,14 @@ describe('SessionEndedBanner', () => {
       props: { endedAt: '2026-07-04T00:00:00Z', hasGaps: true },
       global: { stubs },
     })
+
     expect(withGaps.find('[data-testid="session-resume-gaps"]').exists()).toBe(true)
 
     const noGaps = mount(SessionEndedBanner, {
       props: { endedAt: '2026-07-04T00:00:00Z', hasGaps: false },
       global: { stubs },
     })
+
     expect(noGaps.find('[data-testid="session-resume-gaps"]').exists()).toBe(false)
   })
 
@@ -91,6 +97,7 @@ describe('SessionEndedBanner', () => {
       props: { endedAt: '2026-07-04T00:00:00Z', hasGaps: true },
       global: { stubs },
     })
+
     await w.find('[data-testid="session-resume-gaps"]').trigger('click')
     expect(w.emitted('resume-gaps')).toBeTruthy()
   })

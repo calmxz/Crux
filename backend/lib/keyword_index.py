@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 
 from db.models import Session as SessionModel
 
-
 STEMMER = snowballstemmer.stemmer("english")
 
 STOPWORDS = frozenset(

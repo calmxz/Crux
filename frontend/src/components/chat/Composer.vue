@@ -14,7 +14,7 @@
         type="button"
         class="composer-attach hit-44"
         data-testid="session-upload-btn"
-        :disabled="disabled || uploading || locked"
+        :disabled="disabled || uploading"
         :aria-label="uploading ? 'Uploading file' : 'Attach a reference file'"
         :title="uploading ? 'Uploading...' : 'Attach a reference file (PDF, PPTX, TXT, MD)'"
         @click="openFilePicker"
@@ -61,11 +61,11 @@
         data-testid="session-input"
         class="composer-input"
         rows="1"
-        :placeholder="placeholder"
+        placeholder="Ask anything."
         :disabled="disabled"
         :maxlength="MAX_DRAFT_LEN"
         aria-label="Message the tutor"
-        :aria-describedby="describedby || undefined"
+        :aria-describedby="describedbyIds"
         @input="onInput"
         @keydown="onKeydown"
       />
@@ -127,17 +127,6 @@
           <rect x="5" y="5" width="10" height="10" />
         </svg>
       </button>
-
-      <button
-        v-if="locked"
-        type="button"
-        class="composer-skip"
-        data-testid="composer-skip"
-        aria-label="Skip this question"
-        @click="emit('skip')"
-      >
-        Skip
-      </button>
     </div>
 
     <div class="composer-hints" :class="{ 'is-near-limit': nearCharLimit }">
@@ -154,10 +143,23 @@
       >
         {{ uploading ? 'Uploading file' : 'Sending message' }}
       </span>
-      <span v-if="modelValue.length" class="composer-count" aria-live="polite" data-tabular>
+      <!-- D-09: the counter itself is silent. It changes on every keystroke, so
+           announcing it would talk over the typing. The length rule is a static
+           description on the textarea instead, and only the last stretch before
+           the cap is announced, from the live region below. -->
+      <span v-if="modelValue.length" class="composer-count" data-tabular>
         {{ modelValue.length.toLocaleString() }} / {{ MAX_DRAFT_LEN.toLocaleString() }}
       </span>
     </div>
+
+    <span :id="LIMIT_HINT_ID" class="sr-only">
+      Up to {{ MAX_DRAFT_LEN.toLocaleString() }} characters.
+    </span>
+    <!-- Always in the DOM: a live region has to exist before its text changes
+         or the change is not announced. Empty until the draft is near the cap. -->
+    <span class="sr-only" role="status" aria-live="polite" data-testid="composer-limit-live">
+      {{ limitAnnouncement }}
+    </span>
   </div>
 </template>
 
@@ -173,33 +175,48 @@ const props = defineProps({
   // id(s) of an element explaining why the composer is disabled (e.g. the active
   // cap banner). Wired to aria-describedby so SR users hear the reason on focus.
   describedby: { type: String, default: null },
-  // When true, a check-question is active: show answer placeholder + Skip button,
-  // disable attach.
-  locked: { type: Boolean, default: false },
 })
 
-const emit = defineEmits(['update:modelValue', 'send', 'stop', 'attach', 'skip'])
+const emit = defineEmits(['update:modelValue', 'send', 'stop', 'attach'])
 
 const composerEl = ref(null)
+
 const fileInputEl = ref(null)
 
 // I-10: matches ChatRequest.message maxLength in the API contract.
 const MAX_DRAFT_LEN = 4000
+
 // Six pitches: the textarea grows from one ruled line to six, then scrolls.
 const COMPOSER_MAX_HEIGHT_PX = 168
 
 const nearCharLimit = computed(() => props.modelValue.length >= MAX_DRAFT_LEN * 0.9)
 
+// D-09: static description of the cap, announced once on focus.
+const LIMIT_HINT_ID = 'composer-char-limit'
+
+// The parent may point the composer at a cap banner too; both descriptions are
+// wanted, so the ids are merged rather than overwritten.
+const describedbyIds = computed(() => [props.describedby, LIMIT_HINT_ID].filter(Boolean).join(' '))
+
+// Silent until the draft is within 10% of the cap, then one short line per
+// change; at the cap the wording says so outright.
+const limitAnnouncement = computed(() => {
+  const left = MAX_DRAFT_LEN - props.modelValue.length
+
+  if (left <= 0) return 'Character limit reached'
+
+  if (!nearCharLimit.value) return ''
+
+  return `${left.toLocaleString()} character${left === 1 ? '' : 's'} left`
+})
+
 // A draft worth sending arms the send control: the drawn arrow sits on a
 // filled blue square instead of on the page.
 const sendArmed = computed(() => !props.disabled && Boolean(props.modelValue.trim()))
 
-const placeholder = computed(() =>
-  props.locked ? 'Pick an answer above, or Skip...' : 'Ask anything.',
-)
-
 function autoResize() {
   const inner = composerEl.value
+
   if (!inner) return
   inner.style.height = 'auto'
   const next = Math.min(inner.scrollHeight, COMPOSER_MAX_HEIGHT_PX)
@@ -240,6 +257,7 @@ function openFilePicker() {
 function onFileChange(event) {
   const file = event.target.files?.[0]
   event.target.value = ''
+
   if (file) {
     emit('attach', file)
   }
@@ -247,6 +265,7 @@ function onFileChange(event) {
 
 function focus() {
   const el = composerEl.value
+
   if (el) {
     el.focus()
     autoResize()
@@ -272,7 +291,9 @@ defineExpose({ focus })
   gap: 0.5rem;
   padding: 0.55rem 0.9rem;
   background: var(--card);
-  border: 1px solid var(--card-edge);
+  /* D-20: this is the resting edge of a text control, not card chrome, so it
+     takes the 3:1 token (base.css) rather than --card-edge. */
+  border: 1px solid var(--control-edge);
   border-radius: var(--radius-card);
   box-shadow: 0 1px 0 var(--card-drop);
   transition: border-color var(--motion-fast) ease;
@@ -282,6 +303,8 @@ defineExpose({ focus })
   border-color: var(--ink-learner);
 }
 
+/* A disabled control is exempt from 1.4.11, and the faint card edge is what
+   says it is out of play -- so this deliberately stays on --card-edge. */
 .composer.is-disabled {
   border-color: var(--card-edge);
 }
@@ -447,27 +470,6 @@ defineExpose({ focus })
 .composer-hints.is-near-limit .composer-count {
   color: var(--ink-marker-text);
   font-weight: 700;
-}
-
-.composer-skip {
-  grid-column: 3;
-  align-self: end;
-  background: transparent;
-  border: 0;
-  padding: 0 0.5rem;
-  height: 28px;
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  font-weight: 700;
-  color: var(--ink-learner);
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-}
-
-.composer-skip:focus-visible {
-  outline: 2px solid var(--color-accent-ring);
-  outline-offset: 2px;
 }
 
 /* .spin (base.css) does the rotation; the arc is a whole <svg> so it turns

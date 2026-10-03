@@ -5,13 +5,20 @@ claims a pending document from the queue. Opens its own SessionLocal because
 no request-scoped DB session exists in the worker.
 
 Pipeline:
-  1. Load Document; load the blob via services.object_store (R2 in prod,
-     local disk in dev), not settings.uploads_path directly.
+  1. Load Document, capture its identifiers as plain locals, then close the
+     session (F-02) so steps 2-3 hold no pooled DB connection. Load the blob
+     via services.object_store (R2 in prod, local disk in dev), not
+     settings.uploads_path directly. The Document is re-fetched by id before
+     step 4; every failure arm re-fetches by id too, never touching the
+     detached instance.
   2. _extract(blob, filename) -> [(page_num | None, text), ...] by extension.
      - .pdf  : pypdf -> [(page_num, text), ...]
      - .pptx : python-pptx -> [(slide_num, text), ...]
      - .txt / .md / .markdown : [(None, full_text)]
-  3. lib.chunking.chunk_text (500 / 50 overlap).
+  3. lib.chunking.chunk_text (500 / 50 overlap), streaming with
+     max_chunks=settings.max_chunks: an oversized document raises
+     ChunkLimitExceeded mid-stream and is marked failed without the
+     remaining pages ever being tokenised (F-03).
   4. _embed_and_store: per EMBED_BATCH slice (100 chunks) -- cap-check,
      embed (litellm.embedding), insert (pgvector_store.insert_chunks),
      meter (cost_meter.meter_embedding_response), commit. No DB transaction
@@ -35,7 +42,13 @@ boundary: merge_into_session only flushes, and the closing db.commit() after
 step 6 covers it (F-27 applies only to this tail, not to the already-durable
 embedding batches). On exception at any step: db.rollback() first (discards
 any unflushed/uncommitted work from this run -- committed batches are
-unaffected), then status=failed, error=str(exc)[:1000], committed alone.
+unaffected), then status=failed and a fixed error string, committed alone.
+
+C-11: `documents.error` is rendered verbatim by the frontend, so it never
+carries exception text (which can embed server paths, blob keys, or provider
+payloads). Every value this module writes is one of the constants collected
+in INGEST_ERROR_MESSAGES, selected by the pipeline stage that failed; the
+original exception goes to the log line only.
 """
 
 import io
@@ -45,7 +58,7 @@ import os
 import litellm
 from pptx import Presentation
 from pypdf import PdfReader
-from sqlalchemy import select
+from sqlalchemy import select, update
 
 from config import settings
 from db.database import SessionLocal
@@ -54,24 +67,59 @@ from db.models import Session as SessionModel
 from lib import chunking, keyword_index, llm_retry
 from services import cost_meter, object_store, pgvector_store
 
-
 log = logging.getLogger(__name__)
 
 EMBED_BATCH = 100
 
+# C-11: the complete inventory of strings that may reach `documents.error`.
+# The frontend renders this column verbatim (ReferenceStatusBanner.vue,
+# SessionView.vue), so each one is human-readable and free of any detail
+# derived from an exception, a path, or a provider response.
+ERR_EXTRACTION_FAILED = "text extraction failed"
+ERR_EMBEDDING_FAILED = "embedding failed"
+ERR_INGESTION_FAILED = "ingestion failed"
+ERR_CHUNK_LIMIT = "document too large to ingest (chunk limit)"
+ERR_COST_CAP = "daily cost cap reached; ingestion stopped"
+# Written by routes/upload.py when the blob write fails; listed here so this
+# frozenset stays the single inventory for the whole documents.error column.
+ERR_STORAGE_WRITE = "storage write failed"
 
-def _load_blob(store: "object_store.ObjectStore", doc: Document) -> bytes:
+INGEST_ERROR_MESSAGES: frozenset[str] = frozenset(
+    {
+        ERR_EXTRACTION_FAILED,
+        ERR_EMBEDDING_FAILED,
+        ERR_INGESTION_FAILED,
+        ERR_CHUNK_LIMIT,
+        ERR_COST_CAP,
+        ERR_STORAGE_WRITE,
+    }
+)
+
+# Pipeline stage -> persisted message for the generic failure arm.
+_STAGE_ERRORS = {
+    "extract": ERR_EXTRACTION_FAILED,
+    "embed": ERR_EMBEDDING_FAILED,
+    "other": ERR_INGESTION_FAILED,
+}
+
+
+def _load_blob(
+    store: "object_store.ObjectStore", document_id: int, filename: str
+) -> bytes:
+    """F-02: takes plain identifiers, not the ORM instance -- run() closes its
+    session before calling this, so `doc` is detached and every attribute read
+    would emit a refresh SELECT on a session that holds no connection."""
     try:
-        return store.get(object_store.key_for(doc.id, doc.filename))
+        return store.get(object_store.key_for(document_id, filename))
     except object_store.ObjectNotFound:
         # Not under the canonical key - try the legacy layout below.
-        log.debug("blob miss on canonical key for doc %s; trying legacy key", doc.id)
+        log.debug("blob miss on canonical key for doc %s; trying legacy key", document_id)
     # Legacy fallback: pre-F-15 uploads were stored under the bare filename.
-    # LocalDiskStore path-containment rejects traversal in doc.filename.
+    # LocalDiskStore path-containment rejects traversal in filename.
     try:
-        return store.get(doc.filename)
+        return store.get(filename)
     except object_store.ObjectNotFound:
-        raise RuntimeError(f"uploaded file not found in object store: {doc.filename}") from None
+        raise RuntimeError(f"uploaded file not found in object store: {filename}") from None
 
 
 def _extract_pages(blob: bytes) -> list[tuple[int, str]]:
@@ -138,7 +186,7 @@ def _embed_and_store(db, doc, chunks, *, user_id: str | None) -> int:
         db.commit()  # release the connection before the network call
         try:
             resp = llm_retry.retry_sync(
-                lambda: litellm.embedding(
+                lambda batch=batch: litellm.embedding(
                     model=settings.embedding_model,
                     input=[c.text for c in batch],
                     dimensions=settings.embedding_dim,
@@ -154,7 +202,7 @@ def _embed_and_store(db, doc, chunks, *, user_id: str | None) -> int:
                 c.text,
                 item["embedding"] if isinstance(item, dict) else item.embedding,
             )
-            for c, item in zip(batch, resp.data)
+            for c, item in zip(batch, resp.data, strict=True)
         ]
         stored += pgvector_store.insert_chunks(
             db, session_id=doc.session_id, document_id=doc.id, rows=rows
@@ -178,55 +226,101 @@ def run(document_id: int) -> None:
             log.warning("ingestion run: document %s not found", document_id)
             return
 
-        owner_id: str | None = None
-        # Hoisted local: except arms below read this after db.rollback(),
-        # which expires ORM instances -- reading doc.session_id there would
-        # trigger an implicit refresh SELECT that can itself raise if the
-        # original failure was DB/connection-related, skipping the
-        # mark-failed commit and stranding the doc in "pending".
+        # Hoisted locals: everything the rest of run() needs about the row,
+        # captured while the session is still open. The except arms below read
+        # these after db.rollback(), which expires ORM instances -- reading
+        # doc.session_id there would trigger an implicit refresh SELECT that
+        # can itself raise if the original failure was DB/connection-related,
+        # skipping the mark-failed commit and stranding the doc in "pending".
         session_id = doc.session_id
+        filename = doc.filename
+        owner_id: str | None = db.execute(
+            select(SessionModel.user_id).where(SessionModel.id == session_id)
+        ).scalar_one_or_none()
         log.info(
             "ingestion start document_id=%s session_id=%s filename=%s",
-            doc.id, session_id, doc.filename,
+            document_id, session_id, filename,
         )
+        # F-02: release the pooled connection for the slow, memory-heavy part
+        # (blob load, extraction, chunking). A SQLAlchemy 2.x Session is
+        # reusable after close(); the next statement checks out a fresh
+        # connection. `doc` is detached from here until the re-fetch below.
+        db.close()
+        # C-11: which stage is running decides which enumerated message the
+        # generic failure arm persists. Tracked here rather than inside the
+        # helpers so a raise from anywhere in the call tree is classified.
+        stage = "other"
         try:
-            blob = _load_blob(object_store.get_store(), doc)
-            pages = _extract(blob, doc.filename)
+            blob = _load_blob(object_store.get_store(), document_id, filename)
+            stage = "extract"
+            pages = _extract(blob, filename)
+            stage = "other"
+            # F-03: the cap is enforced inside the chunker so an oversized
+            # document aborts mid-stream instead of materialising every chunk
+            # first and only then failing the count check.
+            chunks = chunking.chunk_text(pages, max_chunks=settings.max_chunks)
             # Count only pages/slides that carry a page number; plaintext yields
             # (None, text) so its sum is 0, which we collapse to None (no page
             # concept). Degenerate inputs (0-slide pptx) likewise store None.
-            doc.page_count = sum(1 for p, _ in pages if p is not None) or None
+            page_count = sum(1 for p, _ in pages if p is not None) or None
+            del blob, pages
 
-            chunks = chunking.chunk_text(pages)
+            doc = db.get(Document, document_id)
+            if doc is None:
+                log.warning(
+                    "ingestion run: document %s vanished during extraction", document_id
+                )
+                return
+            doc.page_count = page_count
+
             if not chunks:
                 doc.status = "ready"
                 db.commit()
                 return
 
-            if len(chunks) > settings.max_chunks:
-                doc.status = "failed"
-                doc.error = "document too large to ingest (chunk limit)"
-                db.commit()
-                return
-
-            owner_id = db.execute(
-                select(SessionModel.user_id).where(SessionModel.id == doc.session_id)
-            ).scalar_one_or_none()
+            # F-05: new chunks move the session's mean embedding, so drop the
+            # materialised centroid; the next chat turn recomputes it once.
+            # Before _embed_and_store, not after: that loop commits per batch,
+            # so a failure part-way through leaves durable new chunks. Nulling
+            # first means the worst case is a stale NULL (recomputed on
+            # demand) instead of a stale centroid nothing would ever refresh.
+            db.execute(
+                update(SessionModel)
+                .where(SessionModel.id == session_id)
+                .values(chunk_centroid=None)
+            )
+            stage = "embed"
             _embed_and_store(db, doc, chunks, user_id=owner_id)
+            stage = "other"
 
             stems: set[str] = set()
             for c in chunks:
                 stems |= keyword_index.build_from_text(c.text)
             if stems:
-                keyword_index.merge_into_session(db, doc.session_id, stems)
+                keyword_index.merge_into_session(db, session_id, stems)
 
             log.info(
                 "ingestion done document_id=%s session_id=%s chunks=%s",
-                doc.id, doc.session_id, len(chunks),
+                document_id, session_id, len(chunks),
             )
             doc.status = "ready"
             doc.error = None
             db.commit()
+        except chunking.ChunkLimitExceeded:
+            # F-03: raised from inside chunk_text, i.e. in the no-session
+            # window, so re-fetch by id rather than touching the detached row.
+            db.rollback()
+            log.warning(
+                "ingestion stopped: chunk cap reached document_id=%s session_id=%s",
+                document_id, session_id,
+                extra={"doc_id": document_id},
+            )
+            doc = db.get(Document, document_id)
+            if doc is not None:
+                doc.status = "failed"
+                doc.error = ERR_CHUNK_LIMIT
+                db.commit()
+            return
         except cost_meter.CostCapExceeded:
             db.rollback()
             log.warning(
@@ -241,14 +335,14 @@ def run(document_id: int) -> None:
             doc = db.get(Document, document_id)
             if doc is not None:
                 doc.status = "failed"
-                doc.error = "daily cost cap reached; ingestion stopped"
+                doc.error = ERR_COST_CAP
                 db.commit()
             return
         except Exception as e:
             db.rollback()
             log.error(
-                "ingestion failed document_id=%s session_id=%s error=%s",
-                document_id, session_id, e,
+                "ingestion failed document_id=%s session_id=%s stage=%s error=%s",
+                document_id, session_id, stage, e,
                 extra={"err_type": type(e).__name__, "doc_id": document_id},
                 exc_info=settings.env != "prod",
             )
@@ -260,7 +354,8 @@ def run(document_id: int) -> None:
             doc = db.get(Document, document_id)
             if doc is not None:
                 doc.status = "failed"
-                doc.error = str(e)[:1000]
+                # C-11: never str(e) here -- the frontend renders this value.
+                doc.error = _STAGE_ERRORS[stage]
                 db.commit()
     finally:
         db.close()

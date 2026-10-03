@@ -18,6 +18,7 @@ export function costCapToastMessage(info, whenText) {
       summary: 'Service budget reached',
     }
   }
+
   return {
     message: `Daily cost limit reached ($${info.used_usd} / $${info.hard_cap_usd}). Resets at ${whenText}.`,
     summary: 'Cost cap reached',

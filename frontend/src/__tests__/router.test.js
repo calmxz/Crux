@@ -25,8 +25,10 @@ describe('router', () => {
         'home',
         'onboarding',
         'settings',
+        'account',
         'profile-aggregate',
         'new-session',
+        'recall',
         'session',
         'session-profile',
         'login',
@@ -42,11 +44,42 @@ describe('router', () => {
     expect(names).not.toContain('subject-mastery')
   })
 
+  it('redirects the old /review path to /recall', async () => {
+    const user = useUserStore()
+    user.onboardingComplete = true
+    await router.push('/review')
+    expect(router.currentRoute.value.path).toBe('/recall')
+    expect(router.currentRoute.value.name).toBe('recall')
+  })
+
   it('redirects unauthenticated user to /login', async () => {
     setAuth(false)
     const user = useUserStore()
     user.onboardingComplete = true
     await router.push({ name: 'home' })
+    expect(router.currentRoute.value.name).toBe('login')
+  })
+
+  it('/profile renders the aggregate profile page instead of redirecting (#362)', async () => {
+    const user = useUserStore()
+    user.onboardingComplete = true
+    const rec = router.getRoutes().find((r) => r.name === 'profile-aggregate')
+    expect(rec.redirect).toBeUndefined()
+    expect(rec.components.default).toBeTruthy()
+    await router.push('/profile')
+    expect(router.currentRoute.value.name).toBe('profile-aggregate')
+  })
+
+  it('redirects unauthenticated user away from /profile to /login', async () => {
+    setAuth(false)
+    await router.push({ name: 'profile-aggregate' })
+    expect(router.currentRoute.value.name).toBe('login')
+    expect(router.currentRoute.value.query.redirect).toBe('/profile')
+  })
+
+  it('redirects unauthenticated user away from /account to /login', async () => {
+    setAuth(false)
+    await router.push({ name: 'account' })
     expect(router.currentRoute.value.name).toBe('login')
   })
 
@@ -157,13 +190,39 @@ describe('router', () => {
     const user = useUserStore()
     user.onboardingComplete = false
     user.hydrated = false
+
     const spy = vi.spyOn(user, 'hydrateFromServer').mockImplementation(async () => {
       user.onboardingComplete = true
       user.hydrated = true
     })
+
     await router.push({ name: 'settings', params: { tab: 'profile' } })
     expect(spy).toHaveBeenCalled()
     expect(router.currentRoute.value.name).toBe('settings')
+  })
+
+  // E-09: a failed hydrate on a device with no local snapshot used to
+  // force-route into onboarding with no way out (hydrateFailed did not
+  // exist, so a hydrate failure looked identical to a real
+  // onboardingComplete=false). Once hydrate has failed, do not redirect.
+  it('does not force-route to onboarding when hydrate has failed (E-09)', async () => {
+    setAuth(true)
+    const user = useUserStore()
+    user.onboardingComplete = false
+    user.hydrated = true
+    user.hydrateFailed = true
+    await router.push({ name: 'home' })
+    expect(router.currentRoute.value.name).toBe('home')
+  })
+
+  it('still redirects to onboarding when hydrate succeeded and onboarding is incomplete (E-09)', async () => {
+    setAuth(true)
+    const user = useUserStore()
+    user.onboardingComplete = false
+    user.hydrated = true
+    user.hydrateFailed = false
+    await router.push({ name: 'settings', params: { tab: 'profile' } })
+    expect(router.currentRoute.value.name).toBe('onboarding')
   })
 
   it('focuses #main-content after push navigation', async () => {
@@ -178,5 +237,25 @@ describe('router', () => {
     await router.push({ name: 'settings', params: { tab: 'profile' } }) // any second authenticated route in this suite
     expect(document.activeElement).toBe(main)
     main.remove()
+  })
+
+  // D-15: a missing focus target used to fail silently, which is how the
+  // chrome-less routes went unnoticed. Navigation must still succeed.
+  it('warns in dev and does not throw when #main-content is missing', async () => {
+    setAuth(true)
+    const user = useUserStore()
+    user.onboardingComplete = true
+    document.getElementById('main-content')?.remove()
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await router.push('/') // establish an initial route first
+    await expect(
+      router.push({ name: 'settings', params: { tab: 'profile' } }),
+    ).resolves.toBeUndefined()
+    expect(router.currentRoute.value.name).toBe('settings')
+    expect(warn).toHaveBeenCalledWith(
+      '[router] focus target #main-content not found for',
+      '/settings/learning',
+    )
+    warn.mockRestore()
   })
 })

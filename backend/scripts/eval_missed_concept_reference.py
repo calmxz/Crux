@@ -71,7 +71,8 @@ def _seed_session() -> tuple[str, str]:
     plus a failed LearningEvent so GAP_ACCURACY is visible. Returns ids."""
     from contracts import TopicProfile
     from db.database import SessionLocal, create_tables
-    from db.models import LearningEvent, Session as SessionModel, User
+    from db.models import LearningEvent, User
+    from db.models import Session as SessionModel
 
     create_tables()
 

@@ -3,11 +3,11 @@ from pydantic import ValidationError
 
 from contracts import (
     AskCheckQuestionsArgs,
+    ChatRequest,
     CheckAnswerRequest,
     CheckAnswerResponse,
     CheckSkipRequest,
     CheckSkipResponse,
-    ChatRequest,
     Citation,
     HealthResponse,
     PendingCheck,
@@ -95,25 +95,48 @@ def _one_item():
     }
 
 
+_ONE_SET = {"set_index": 1, "set_total": 1}
+
+
 def test_ask_check_questions_args_required_fields():
-    args = AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()])
+    args = AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()], **_ONE_SET)
     assert args.gap == "atp"
     assert len(args.items) == 1
+    assert (args.set_index, args.set_total) == (1, 1)
+
+
+@pytest.mark.parametrize("missing", ["set_index", "set_total"])
+def test_ask_check_questions_args_set_fields_required(missing):
+    fields = {k: v for k, v in _ONE_SET.items() if k != missing}
+    with pytest.raises(ValidationError):
+        AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()], **fields)
+
+
+@pytest.mark.parametrize("field,value", [
+    ("set_index", 0), ("set_index", 4), ("set_total", 0), ("set_total", 4),
+])
+def test_ask_check_questions_args_set_fields_range(field, value):
+    with pytest.raises(ValidationError):
+        AskCheckQuestionsArgs(
+            session_id="s1", gap="atp", items=[_one_item()], **{**_ONE_SET, field: value}
+        )
 
 
 def test_ask_check_questions_args_rejects_empty_items():
     with pytest.raises(ValidationError):
-        AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[])
+        AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[], **_ONE_SET)
 
 
 def test_ask_check_questions_args_rejects_over_five_items():
     with pytest.raises(ValidationError):
-        AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()] * 6)
+        AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()] * 6, **_ONE_SET)
 
 
 def test_ask_check_questions_args_extra_fields_rejected():
     with pytest.raises(ValidationError):
-        AskCheckQuestionsArgs(session_id="s1", gap="g", items=[_one_item()], surprise="x")
+        AskCheckQuestionsArgs(
+            session_id="s1", gap="g", items=[_one_item()], surprise="x", **_ONE_SET
+        )
 
 
 def _one_pending_item():
@@ -334,6 +357,7 @@ def test_concept_entry_defaults():
 def test_concept_entry_rejects_inferred():
     import pytest
     from pydantic import ValidationError
+
     from contracts import ConceptEntry
 
     with pytest.raises(ValidationError):

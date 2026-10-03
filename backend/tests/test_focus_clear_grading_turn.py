@@ -18,10 +18,10 @@ import pytest
 
 from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile, UpdateTopicProfileArgs
-from db.models import Session as SessionModel, User
+from db.models import Session as SessionModel
+from db.models import User
 from services import check_question_service as cq
 from services import learning_event_service, profile_service
-
 
 SESSION_ID = "sess_a5"
 USER_ID = "u_a5"
@@ -104,6 +104,7 @@ def test_grade_then_clear_focus_tested_correct_same_turn(session_row, ctx, db_se
         turn_started_at=ctx.turn_started_at - timedelta(seconds=5),
     )
     cq.register(db_session, prior_ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=SESSION_ID,
         gap="g",
         items=[{"question": "q?", "options": ["a", "b"], "correct_index": 0, "explanation": "a."}],
@@ -161,6 +162,7 @@ def test_clear_focus_tested_correct_with_divergent_gap_label(session_row, ctx, d
         turn_started_at=ctx.turn_started_at - timedelta(seconds=5),
     )
     cq.register(db_session, prior_ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=SESSION_ID,
         gap=check_gap,
         items=[{

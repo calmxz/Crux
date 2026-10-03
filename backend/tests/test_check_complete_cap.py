@@ -9,7 +9,8 @@ from agent.stream_events import StreamEvent
 from agent.types import ToolContext
 from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import ChatMessage, Session as SessionModel, UsageCounter, User
+from db.models import ChatMessage, UsageCounter, User
+from db.models import Session as SessionModel
 from services import check_question_service, rate_limit
 
 USER_ID = "u_cap_1"
@@ -33,6 +34,7 @@ def resolved_batch_session(db_session):
     ctx = ToolContext(db=db_session, session_id=session.id, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session.id, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))
@@ -53,6 +55,7 @@ def open_batch_session(db_session):
     ctx = ToolContext(db=db_session, session_id=session.id, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session.id, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."},

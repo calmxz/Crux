@@ -7,8 +7,8 @@ from datetime import datetime, timedelta, timezone
 from sqlalchemy import event as _sa_event
 
 from contracts import TopicProfile
-from db.models import ChatMessage, LearningEvent, Session as SessionModel, User
-
+from db.models import ChatMessage, LearningEvent, User
+from db.models import Session as SessionModel
 
 USER_ID = "u_agg"
 
@@ -370,7 +370,7 @@ def test_concept_accuracy_empty_when_no_events(client, db_session):
 
 
 def test_weekly_mastery_buckets_first_correct_only(db_session):
-    from services.profile_service import aggregate_for_user
+    from services.profile_insights import aggregate_for_user
 
     _seed_session_for_insights(db_session)
     # mitosis: wrong then correct in week of 2026-06-29, correct again 2 weeks later
@@ -397,7 +397,7 @@ def test_weekly_mastery_buckets_first_correct_only(db_session):
 
 
 def test_weekly_mastery_outside_window_dropped(db_session):
-    from services.profile_service import aggregate_for_user
+    from services.profile_insights import aggregate_for_user
 
     _seed_session_for_insights(db_session)
     # first correct 20 weeks before `now` -> outside the 12-week window
@@ -409,7 +409,7 @@ def test_weekly_mastery_outside_window_dropped(db_session):
 
 
 def test_weekly_mastery_diagnostic_correct_not_counted(db_session):
-    from services.profile_service import aggregate_for_user
+    from services.profile_insights import aggregate_for_user
 
     _seed_session_for_insights(db_session)
     _seed_event_for_insights(db_session, "s1", "mitosis", True, T0, purpose="diagnostic")
@@ -516,3 +516,285 @@ def test_aggregate_makes_no_llm_call(client, db_session, monkeypatch):
     _seed_session_for_insights(db_session)
     _seed_event_for_insights(db_session, "s1", "mitosis", True, T0)
     assert client.get("/api/profile/aggregate").status_code == 200
+
+
+# --- F-08: bounded aggregate --------------------------------------------
+
+AGG_NOW = datetime(2026, 6, 15, 12, 0, 0, tzinfo=timezone.utc)
+AGG_T0 = datetime(2026, 5, 1, tzinfo=timezone.utc)
+PIN_USER = "u_pin"
+
+
+@contextmanager
+def capture_statements(db):
+    bind = db.get_bind()
+    stmts: list[str] = []
+
+    def _before(conn, cursor, statement, params, context, executemany):
+        stmts.append(statement)
+
+    _sa_event.listen(bind, "before_cursor_execute", _before)
+    try:
+        yield stmts
+    finally:
+        _sa_event.remove(bind, "before_cursor_execute", _before)
+
+
+def _mk_raw(db, sid, *, user_id, topic, profile_json, created_at, ended_at=None):
+    db.add(
+        SessionModel(
+            id=sid, user_id=user_id, topic=topic, topic_profile_json=profile_json
+        )
+    )
+    db.flush()
+    row = db.get(SessionModel, sid)
+    row.created_at = created_at
+    row.ended_at = ended_at
+
+
+def _seed_pin_fixture(db):
+    db.add(User(id=PIN_USER))
+    db.flush()
+    _mk_raw(
+        db, "p1", user_id=PIN_USER, topic="sql", created_at=AGG_T0,
+        profile_json=TopicProfile(
+            knowledge_level="beginner",
+            mastered_concepts=[{"name": "joins"}, {"name": "select"}],
+            confirmed_gaps=[{"name": "window-fns"}],
+        ).model_dump_json(),
+    )
+    _mk_raw(
+        db, "p2", user_id=PIN_USER, topic="sql-2",
+        created_at=AGG_T0 + timedelta(days=1),
+        ended_at=AGG_T0 + timedelta(days=2),
+        profile_json=TopicProfile(
+            knowledge_level="intermediate",
+            mastered_concepts=[{"name": "joins"}],
+            confirmed_gaps=[{"name": "window-fns"}, {"name": "ctes"}],
+        ).model_dump_json(),
+    )
+    # malformed blob -> tolerant parser yields an empty profile ("unknown" level)
+    _mk_raw(
+        db, "p3", user_id=PIN_USER, topic="broken",
+        created_at=AGG_T0 + timedelta(days=3), profile_json="{not json",
+    )
+    # legacy bare-string concept-list elements
+    _mk_raw(
+        db, "p4", user_id=PIN_USER, topic="legacy",
+        created_at=AGG_T0 + timedelta(days=4),
+        profile_json=json.dumps(
+            {
+                "knowledge_level": "advanced",
+                "mastered_concepts": ["joins"],
+                "confirmed_gaps": ["ctes"],
+            }
+        ),
+    )
+    db.add(
+        LearningEvent(
+            session_id="p1", gap_tested="ctes", question="q", correct=True,
+            created_at=AGG_T0 + timedelta(days=5),
+        )
+    )
+    db.add(
+        LearningEvent(
+            session_id="p1", gap_tested="joins", question="q", correct=False,
+            created_at=AGG_T0 + timedelta(days=5),
+        )
+    )
+    db.commit()
+
+
+# Captured from the pre-F-08 implementation on the fixture above. Any drift
+# here is a behaviour change, not an optimisation.
+AGGREGATE_PIN = {
+    "active_sessions": 3,
+    "ended_sessions": 1,
+    "total_sessions": 4,
+    "total_learning_events": 2,
+    "last_active_at": "2026-05-05T00:00:00",
+    "combined_confirmed_gaps": [
+        {"concept": "ctes", "count": 2, "first_seen_session_id": "p2"},
+        {"concept": "window-fns", "count": 2, "first_seen_session_id": "p1"},
+    ],
+    "combined_mastered_concepts": [
+        {"concept": "joins", "count": 3, "first_seen_session_id": "p1"},
+        {"concept": "select", "count": 1, "first_seen_session_id": "p1"},
+    ],
+    "concept_accuracy": [
+        {
+            "accuracy": 0.0, "concept": "joins", "correct_count": 0,
+            "first_seen_session_id": "p1", "last_results": [False],
+            "total_count": 1,
+        },
+        {
+            "accuracy": 1.0, "concept": "ctes", "correct_count": 1,
+            "first_seen_session_id": "p1", "last_results": [True],
+            "total_count": 1,
+        },
+    ],
+    "knowledge_level_distribution": {
+        "advanced": 1, "beginner": 1, "intermediate": 1, "unknown": 1,
+    },
+    "recent_topics": [
+        {
+            "created_at": "2026-05-05T00:00:00", "ended_at": None, "id": "p4",
+            "last_activity_at": None, "last_message_preview": None,
+            "last_session_summary": None, "message_count": 0,
+            "progress": {
+                "focus_target_gap": None, "level": "advanced", "mastered_count": 1,
+            },
+            "topic": "legacy",
+        },
+        {
+            "created_at": "2026-05-04T00:00:00", "ended_at": None, "id": "p3",
+            "last_activity_at": None, "last_message_preview": None,
+            "last_session_summary": None, "message_count": 0,
+            "progress": {
+                "focus_target_gap": None, "level": None, "mastered_count": 0,
+            },
+            "topic": "broken",
+        },
+        {
+            "created_at": "2026-05-02T00:00:00",
+            "ended_at": "2026-05-03T00:00:00", "id": "p2",
+            "last_activity_at": None, "last_message_preview": None,
+            "last_session_summary": None, "message_count": 0,
+            "progress": {
+                "focus_target_gap": None, "level": "intermediate",
+                "mastered_count": 1,
+            },
+            "topic": "sql-2",
+        },
+        {
+            "created_at": "2026-05-01T00:00:00", "ended_at": None, "id": "p1",
+            "last_activity_at": None, "last_message_preview": None,
+            "last_session_summary": None, "message_count": 0,
+            "progress": {
+                "focus_target_gap": None, "level": "beginner", "mastered_count": 2,
+            },
+            "topic": "sql",
+        },
+    ],
+    "weekly_mastery": [
+        {"count": 0, "week_start": "2026-03-30"},
+        {"count": 0, "week_start": "2026-04-06"},
+        {"count": 0, "week_start": "2026-04-13"},
+        {"count": 0, "week_start": "2026-04-20"},
+        {"count": 0, "week_start": "2026-04-27"},
+        {"count": 1, "week_start": "2026-05-04"},
+        {"count": 0, "week_start": "2026-05-11"},
+        {"count": 0, "week_start": "2026-05-18"},
+        {"count": 0, "week_start": "2026-05-25"},
+        {"count": 0, "week_start": "2026-06-01"},
+        {"count": 0, "week_start": "2026-06-08"},
+        {"count": 0, "week_start": "2026-06-15"},
+    ],
+}
+
+
+def test_aggregate_response_matches_pre_change_pin(db_session):
+    """F-08 regression pin: the optimisation must not move a single field."""
+    from services import profile_insights
+
+    _seed_pin_fixture(db_session)
+    result = profile_insights.aggregate_for_user(db_session, PIN_USER, now=AGG_NOW)
+    assert result.model_dump(mode="json") == AGGREGATE_PIN
+
+
+def test_aggregate_does_not_load_full_session_rows(db_session):
+    """F-08: the sessions scan must project only the columns the aggregate
+    reads. Loading whole ORM rows drags kw_index_json and the rolling summary
+    for every session the user has ever created."""
+    from services import profile_insights
+
+    _seed_pin_fixture(db_session)
+    with capture_statements(db_session) as stmts:
+        profile_insights.aggregate_for_user(db_session, PIN_USER, now=AGG_NOW)
+
+    session_selects = [s for s in stmts if "FROM sessions" in s]
+    assert session_selects, stmts
+    for s in session_selects:
+        assert "sessions.kw_index_json" not in s, s
+        assert "sessions.rolling_summary" not in s, s
+
+
+def test_aggregate_statement_count_does_not_grow_with_sessions(db_session):
+    """F-08: statement count is constant in the number of sessions."""
+    from services import profile_insights
+
+    _seed_pin_fixture(db_session)
+    with capture_statements(db_session) as small:
+        profile_insights.aggregate_for_user(db_session, PIN_USER, now=AGG_NOW)
+    baseline = len(small)
+
+    for i in range(50):
+        _mk_raw(
+            db_session, f"bulk{i}", user_id=PIN_USER, topic=f"t{i}",
+            created_at=AGG_T0 - timedelta(days=i + 1),
+            profile_json=TopicProfile(
+                knowledge_level="beginner",
+                mastered_concepts=[{"name": f"c{i}"}],
+            ).model_dump_json(),
+        )
+    db_session.commit()
+
+    with capture_statements(db_session) as large:
+        profile_insights.aggregate_for_user(db_session, PIN_USER, now=AGG_NOW)
+
+    assert len(large) == baseline, (baseline, len(large))
+    assert baseline <= 6, baseline
+
+
+# --- G-14: the insights half lives in its own module ---
+
+MOVED_NAMES = ("aggregate_for_user", "_learning_insights", "_monday")
+
+
+def test_insights_module_owns_the_moved_names():
+    from services import profile_insights
+
+    for name in MOVED_NAMES:
+        assert hasattr(profile_insights, name), name
+
+
+def test_profile_service_keeps_no_re_export_shim():
+    """A shim would leave the old coupling in place and hide missed callers."""
+    from services import profile_service
+
+    for name in MOVED_NAMES:
+        assert not hasattr(profile_service, name), name
+
+
+def test_profile_service_does_not_import_profile_insights():
+    """One-way dependency: insights -> service, never the reverse."""
+    import ast
+    from pathlib import Path
+
+    src = Path(__file__).resolve().parents[1] / "services" / "profile_service.py"
+    tree = ast.parse(src.read_text(encoding="utf-8"))
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                assert "profile_insights" not in alias.name, ast.dump(node)
+        elif isinstance(node, ast.ImportFrom):
+            assert "profile_insights" not in (node.module or ""), ast.dump(node)
+            for alias in node.names:
+                assert alias.name != "profile_insights", ast.dump(node)
+
+
+def test_aggregate_route_calls_the_insights_module(db_session, client, monkeypatch):
+    """The route is repointed, not just the tests."""
+    from services import profile_insights
+
+    calls: list[str] = []
+    real = profile_insights.aggregate_for_user
+
+    def _spy(db, user_id, now=None):
+        calls.append(user_id)
+        return real(db, user_id, now=now)
+
+    monkeypatch.setattr("routes.profile.profile_insights.aggregate_for_user", _spy)
+    r = client.get("/api/profile/aggregate")
+    assert r.status_code == 200, r.text
+    assert calls == ["test-user"]

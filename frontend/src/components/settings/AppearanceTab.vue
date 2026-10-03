@@ -47,7 +47,7 @@
             aria-hidden="true"
             focusable="false"
           >
-            <path d="M2 6.5 L4.8 9.2 L10 3.2" />
+            <path :d="TICK_PATH" />
           </svg>
         </span>
       </label>
@@ -57,6 +57,7 @@
 
 <script setup>
 import { useTheme } from '../../composables/useTheme.js'
+import { TICK_PATH } from '../chat/levelMark.js'
 
 const { override, setTheme } = useTheme()
 

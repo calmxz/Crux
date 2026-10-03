@@ -1,6 +1,7 @@
 """TDD: POST /api/upload (multipart PDF -> Document row, queued for the worker)."""
 
 import io
+from datetime import datetime, timezone
 from decimal import Decimal
 
 import pytest
@@ -8,10 +9,10 @@ from fastapi import HTTPException
 
 from config import settings
 from contracts import TopicProfile
-from db.models import Document, Session as SessionModel, User, UsageCounter
+from db.models import Document, UsageCounter, User
+from db.models import Session as SessionModel
 from routes.upload import _read_bounded
 from services import cost_meter
-
 
 SESSION_ID = "sess_up"
 USER_ID = "u_up"
@@ -138,6 +139,23 @@ def test_unknown_session_id_404(client, seeded):
     assert r.status_code == 404
 
 
+def test_upload_into_ended_session_409(client, seeded, db_session):
+    """C-07: an ended session is read-only. The 409 must land before the cost
+    gate and the rate limiter, so it burns no daily slot and writes no row."""
+    sess = db_session.get(SessionModel, SESSION_ID)
+    sess.ended_at = datetime.now(timezone.utc)
+    db_session.commit()
+
+    files = {"file": ("notes.pdf", io.BytesIO(b"%PDF-fake"), "application/pdf")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 409, r.text
+    assert r.json()["detail"]["code"] == "session_ended"
+    assert db_session.query(Document).count() == 0
+    assert db_session.query(UsageCounter).filter_by(user_id=USER_ID).count() == 0
+
+
 def test_missing_auth_header_401(client, seeded):
     # Phase 7: user_id no longer carried in form. Missing Authorization
     # header => 401. Override returns "test-user" default => /api/upload
@@ -245,6 +263,139 @@ def test_upload_leaves_document_pending_for_worker_to_claim(client, seeded, db_s
     assert r.status_code == 202
     doc = db_session.get(Document, r.json()["document_id"])
     assert doc.status == "pending"
+
+
+# ---------------------------------------------------------------------------
+# C-08: identical re-upload into the same session is idempotent.
+# ---------------------------------------------------------------------------
+
+PDF_BYTES = b"%PDF-dedupe-fixture"
+
+
+def _post_pdf(client, session_id=SESSION_ID, content=PDF_BYTES, name="notes.pdf"):
+    return client.post(
+        "/api/upload",
+        data={"user_id": USER_ID, "session_id": session_id},
+        files={"file": (name, io.BytesIO(content), "application/pdf")},
+    )
+
+
+def test_identical_reupload_returns_same_document_id(client, seeded, db_session, monkeypatch):
+    puts = []
+
+    class RecordingStore:
+        def put(self, key, data):
+            puts.append(key)
+
+    monkeypatch.setattr("routes.upload.object_store.get_store", lambda: RecordingStore())
+
+    first = _post_pdf(client)
+    assert first.status_code == 202, first.text
+    second = _post_pdf(client)
+    assert second.status_code == 202, second.text
+
+    assert second.json()["document_id"] == first.json()["document_id"]
+    assert db_session.query(Document).count() == 1
+    assert len(puts) == 1
+
+
+def test_identical_bytes_in_another_session_create_a_second_row(client, seeded, db_session):
+    other = "sess_up_2"
+    db_session.add(
+        SessionModel(
+            id=other,
+            user_id=USER_ID,
+            topic="sql-2",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
+    db_session.commit()
+
+    first = _post_pdf(client)
+    second = _post_pdf(client, session_id=other)
+    assert first.status_code == 202 and second.status_code == 202, second.text
+    assert first.json()["document_id"] != second.json()["document_id"]
+    assert db_session.query(Document).count() == 2
+
+
+def test_failed_row_does_not_block_a_retry(client, seeded, db_session):
+    import hashlib
+
+    db_session.add(
+        Document(
+            session_id=SESSION_ID,
+            filename="notes.pdf",
+            status="failed",
+            error="storage write failed",
+            content_sha256=hashlib.sha256(PDF_BYTES).hexdigest(),
+        )
+    )
+    db_session.commit()
+
+    r = _post_pdf(client)
+    assert r.status_code == 202, r.text
+    doc = db_session.get(Document, r.json()["document_id"])
+    assert doc.status == "pending"
+    assert db_session.query(Document).count() == 2
+
+
+def test_upload_populates_content_sha256(client, seeded, db_session):
+    import hashlib
+
+    r = _post_pdf(client)
+    assert r.status_code == 202, r.text
+    doc = db_session.get(Document, r.json()["document_id"])
+    assert doc.content_sha256 == hashlib.sha256(PDF_BYTES).hexdigest()
+
+
+def test_identical_reupload_does_not_burn_a_rate_limit_slot(client, seeded, db_session):
+    assert _post_pdf(client).status_code == 202
+    counter = db_session.query(UsageCounter).filter_by(user_id=USER_ID).one()
+    assert counter.count == 1
+
+    assert _post_pdf(client).status_code == 202
+    db_session.refresh(counter)
+    assert counter.count == 1
+
+
+def test_concurrent_identical_uploads_resolve_to_the_existing_row(
+    client, seeded, db_session, monkeypatch
+):
+    """C-08 race: another request commits the same (session_id, sha) between
+    our lookup and our flush. The partial unique index raises IntegrityError;
+    we roll back, re-select, and return the winner's payload."""
+    import hashlib
+
+    from routes import upload as upload_module
+
+    real_lookup = upload_module._find_existing_document
+    calls = {"n": 0}
+
+    def racing_lookup(db, session_id, sha):
+        calls["n"] += 1
+        if calls["n"] == 1:
+            db.add(
+                Document(
+                    session_id=session_id,
+                    filename="winner.pdf",
+                    status="pending",
+                    content_sha256=sha,
+                )
+            )
+            db.commit()
+            return None
+        return real_lookup(db, session_id, sha)
+
+    monkeypatch.setattr(upload_module, "_find_existing_document", racing_lookup)
+
+    r = _post_pdf(client)
+    assert r.status_code == 202, r.text
+    assert r.json()["filename"] == "winner.pdf"
+    assert db_session.query(Document).count() == 1
+    assert (
+        db_session.query(Document).one().content_sha256
+        == hashlib.sha256(PDF_BYTES).hexdigest()
+    )
 
 
 def test_read_bounded_returns_all_bytes_under_cap():
@@ -505,3 +656,74 @@ def test_pdf_upload_not_subject_to_byte_estimate(client, seeded, monkeypatch):
         files=files,
     )
     assert r.status_code == 202  # PDFs skip the estimate; worker cap catches them
+
+
+def _blank_pdf_bytes(pages: int) -> bytes:
+    from pypdf import PdfWriter
+
+    writer = PdfWriter()
+    for _ in range(pages):
+        writer.add_blank_page(width=72, height=72)
+    buf = io.BytesIO()
+    writer.write(buf)
+    return buf.getvalue()
+
+
+def test_pdf_over_page_limit_413(client, seeded, monkeypatch):
+    """F-03: an oversized PDF must be rejected at upload, before a worker ever
+    loads and tokenises the whole document."""
+    monkeypatch.setattr("routes.upload.settings.max_pages", 2)
+    files = {"file": ("big.pdf", io.BytesIO(_blank_pdf_bytes(3)), "application/pdf")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 413, r.text
+    detail = r.json()["detail"]
+    assert detail["code"] == "page_limit_exceeded"
+    assert detail["max_pages"] == 2
+    assert detail["page_count"] == 3
+
+
+def test_pdf_under_page_limit_accepted(client, seeded, monkeypatch):
+    monkeypatch.setattr("routes.upload.settings.max_pages", 5)
+    files = {"file": ("small.pdf", io.BytesIO(_blank_pdf_bytes(2)), "application/pdf")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 202, r.text
+
+
+def test_unparseable_pdf_passes_the_page_gate(client, seeded, monkeypatch):
+    """The gate is advisory: a file pypdf cannot open is let through so the
+    ingestion pipeline reports the extraction failure as it always has."""
+    monkeypatch.setattr("routes.upload.settings.max_pages", 1)
+    files = {"file": ("broken.pdf", io.BytesIO(b"%PDF-fake"), "application/pdf")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 202, r.text
+
+
+def test_pptx_over_slide_limit_413(client, seeded, monkeypatch):
+    from pptx import Presentation
+
+    monkeypatch.setattr("routes.upload.settings.max_pages", 1)
+    prs = Presentation()
+    for _ in range(2):
+        prs.slides.add_slide(prs.slide_layouts[6])
+    buf = io.BytesIO()
+    prs.save(buf)
+    files = {
+        "file": (
+            "deck.pptx",
+            io.BytesIO(buf.getvalue()),
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+    }
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 413, r.text
+    detail = r.json()["detail"]
+    assert detail["code"] == "page_limit_exceeded"
+    assert detail["page_count"] == 2

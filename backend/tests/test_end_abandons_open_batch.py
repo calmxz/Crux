@@ -7,8 +7,9 @@ surfaced a confusing "Could not ask questions" on a read-only ended session.
 
 abandon_open_batch resolves the dangling batch on end: remaining pending items
 become "skipped", the batch is frozen onto its message for honest history, and
-the pending pointer is cleared -- side-effect free (no learning events, no
-profile mutation). A later ask_check_questions then succeeds.
+the pending pointer is cleared -- no learning events and no mastery effects
+(the only profile write is grading an in-progress diagnostic, #340). A later
+ask_check_questions then succeeds.
 """
 
 import json
@@ -16,11 +17,11 @@ from datetime import datetime, timezone
 
 import pytest
 
-from contracts import AskCheckQuestionsArgs, TopicProfile
 from agent.types import ToolContext
-from db.models import ChatMessage, Session as SessionModel, User
+from contracts import AskCheckQuestionsArgs, TopicProfile
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services import check_question_service, pending_check_store
-
 
 USER_ID = "u_abandon_1"
 
@@ -41,6 +42,7 @@ def _open_batch(db, session_id, n=2):
     ctx = ToolContext(db=db, session_id=session_id, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     return check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session_id, gap="g",
         items=[{"question": f"Q{i}?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."} for i in range(n)]))
@@ -120,7 +122,7 @@ def test_abandon_clears_a_done_but_uncleared_batch(db_session, seeded_session):
     check_question_service.skip(db_session, sid, 0)
     check_question_service.skip(db_session, sid, 1)
     pc_done = pending_check_store.get_pending_check(db_session, sid)
-    assert check_question_service.is_done(pc_done) is True
+    assert pending_check_store.is_done(pc_done) is True
 
     assert check_question_service.abandon_open_batch(db_session, sid) is True
     assert pending_check_store.get_pending_check(db_session, sid) is None

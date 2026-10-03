@@ -12,6 +12,7 @@ describe('UploadStatus', () => {
     const wrapper = mount(UploadStatus, {
       props: { upload: { kind: 'pending', text: 'Uploading doc.pdf…' } },
     })
+
     const el = wrapper.find('[data-testid="upload-status-pending"]')
     expect(el.exists()).toBe(true)
     expect(el.text()).toContain('Uploading doc.pdf')
@@ -21,6 +22,7 @@ describe('UploadStatus', () => {
     const wrapper = mount(UploadStatus, {
       props: { upload: { kind: 'ready', text: 'doc.pdf is ready.' } },
     })
+
     const el = wrapper.find('[data-testid="upload-status-ready"]')
     expect(el.exists()).toBe(true)
     expect(el.classes()).toContain('upload-status-ready')
@@ -31,6 +33,7 @@ describe('UploadStatus', () => {
     const wrapper = mount(UploadStatus, {
       props: { upload: { kind: 'failed', text: 'Upload failed: too big' } },
     })
+
     const el = wrapper.find('[data-testid="upload-status-failed"]')
     expect(el.exists()).toBe(true)
     expect(el.classes()).toContain('upload-status-failed')
@@ -41,6 +44,7 @@ describe('UploadStatus', () => {
     const wrapper = mount(UploadStatus, {
       props: { upload: { kind: 'ready', text: 'doc.pdf is ready.' } },
     })
+
     const el = wrapper.find('[data-testid="upload-status-ready"]')
     expect(el.attributes('role')).toBe('status')
     expect(el.attributes('aria-live')).toBe('polite')

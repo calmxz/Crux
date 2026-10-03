@@ -19,4 +19,6 @@ def delete_document(
     try:
         documents_service.delete_document(db, document_id=document_id, user_id=user_id)
     except documents_service.DocumentNotFound:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="document_not_found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="document_not_found"
+        ) from None

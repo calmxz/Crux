@@ -70,7 +70,8 @@ def _seed_session() -> tuple[str, str]:
     """User + Session with a NULL knowledge_level so DIAGNOSTIC is REQUIRED."""
     from contracts import TopicProfile
     from db.database import SessionLocal, create_tables
-    from db.models import Session as SessionModel, User
+    from db.models import Session as SessionModel
+    from db.models import User
 
     create_tables()
 
@@ -97,8 +98,8 @@ async def _run_turn(db, session_id: str, user_id: str, messages: list[dict]):
     """One tutor turn. Returns (assistant_text, tool_calls)."""
     from agent import prompts, tutor
     from agent.types import ToolContext
-    from routes.chat import _build_prompt_state
     from db.models import Session as SessionModel
+    from routes.chat import _build_prompt_state
     from services import profile_service
 
     session = db.get(SessionModel, session_id)

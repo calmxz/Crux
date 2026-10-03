@@ -62,7 +62,7 @@ const router = createRouter({
     },
     {
       path: '/settings',
-      redirect: { name: 'settings', params: { tab: 'profile' } },
+      redirect: { name: 'settings', params: { tab: 'learning' } },
     },
     {
       path: '/settings/:tab',
@@ -70,19 +70,32 @@ const router = createRouter({
       component: () => import('../views/SettingsView.vue'),
       props: true,
       beforeEnter: (to) => {
-        const valid = ['profile', 'usage', 'account', 'appearance']
+        // Account moved to its own route (2026-09-23): the old Account tab
+        // URL redirects there instead of resolving as a Settings tab.
+        if (to.params.tab === 'account') {
+          return { name: 'account' }
+        }
+
+        const valid = ['learning', 'usage', 'appearance']
+
         if (!valid.includes(to.params.tab)) {
-          return { name: 'settings', params: { tab: 'profile' } }
+          return { name: 'settings', params: { tab: 'learning' } }
         }
       },
     },
     {
-      // Unified into Settings (2026-08-02): aggregate profile is now the
-      // Profile tab. Redirect kept so old links and router.push({name})
-      // calls keep working.
+      // The aggregate learner profile across every session (#362, shaped in
+      // #358). Replaces the interim redirect to the Learning tab.
       path: '/profile',
       name: 'profile-aggregate',
-      redirect: { name: 'settings', params: { tab: 'profile' } },
+      component: () => import('../views/AggregateProfileView.vue'),
+    },
+    {
+      // Account moved out of Settings and into its own page (2026-09-23):
+      // name, read-only email and password live here now.
+      path: '/account',
+      name: 'account',
+      component: () => import('../views/AccountView.vue'),
     },
     {
       // Unified into Home (2026-08-02): one canonical start experience.
@@ -92,9 +105,14 @@ const router = createRouter({
       redirect: { name: 'home' },
     },
     {
+      path: '/recall',
+      name: 'recall',
+      component: () => import('../views/RecallView.vue'),
+    },
+    {
+      // Renamed to Recall (#352). Redirect kept so old links keep working.
       path: '/review',
-      name: 'review',
-      component: () => import('../views/ReviewView.vue'),
+      redirect: { name: 'recall' },
     },
     {
       path: '/sessions',
@@ -135,6 +153,7 @@ router.beforeEach(() => {
 
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
+
   // If auth store hasn't booted yet (first navigation in tests/dev), do it
   // now so the guard has a deterministic answer.
   if (!auth.ready) {
@@ -147,15 +166,18 @@ router.beforeEach(async (to) => {
   }
 
   const isPublic = to.meta?.public === true
+
   if (!auth.isAuthenticated && !isPublic) {
     // F-49: carry the intended path through login so a deep link survives.
     return { name: 'login', query: { redirect: to.fullPath } }
   }
+
   if (auth.isAuthenticated && (to.name === 'login' || to.name === 'register')) {
     return { name: 'home' }
   }
 
   const user = useUserStore()
+
   if (auth.isAuthenticated && !user.hydrated) {
     // F-46: onboarding truth lives on the server; the localStorage snapshot
     // is only a warm cache. Await one hydrate so a new device does not
@@ -169,14 +191,17 @@ router.beforeEach(async (to) => {
       await user.hydrateFromServer()
     }
   }
+
   if (
     auth.isAuthenticated &&
     !user.onboardingComplete &&
+    !user.hydrateFailed &&
     to.name !== 'onboarding' &&
     to.name !== 'reset-password'
   ) {
     return { name: 'onboarding' }
   }
+
   if (user.onboardingComplete && to.name === 'onboarding' && to.query.retake !== '1') {
     return { name: 'home' }
   }
@@ -187,8 +212,22 @@ router.afterEach((to, from, failure) => {
   // to the main landmark on real navigations (skip the initial load so we
   // don't steal focus from the address bar / skip-link).
   if (failure || !from.name) return
+
   if (typeof document === 'undefined') return
-  document.getElementById('main-content')?.focus()
+  const el = document.getElementById('main-content')
+
+  // D-15: a missing target used to fail silently, which is how the chrome-less
+  // routes went unnoticed. App.vue now gives both branches the id; say so in
+  // dev if a new layout ever drops it again.
+  if (!el) {
+    if (import.meta.env.DEV) {
+      console.warn('[router] focus target #main-content not found for', to.path)
+    }
+
+    return
+  }
+
+  el.focus()
 })
 
 router.afterEach(() => {

@@ -4,9 +4,9 @@ import pytest
 
 from config import settings
 from contracts import TopicProfile
-from db.models import Document, Session as SessionModel, User
+from db.models import Document, User
+from db.models import Session as SessionModel
 from services import documents_service
-
 
 SID = "sess_docs"
 UID = "u_docs"
@@ -192,7 +192,7 @@ def test_delete_document_removes_row_chunks_and_file(db_session, monkeypatch, tm
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: calls.append(document_id) or 3,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
 
     doc = _seed_doc(db_session)
     disk = tmp_path / f"{doc.id}_{doc.filename}"
@@ -210,7 +210,7 @@ def test_delete_document_missing_raises_not_found(db_session, monkeypatch, tmp_p
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     with pytest.raises(documents_service.DocumentNotFound):
         documents_service.delete_document(db_session, document_id=999, user_id="u1")
 
@@ -220,7 +220,7 @@ def test_delete_document_other_user_raises_not_found(db_session, monkeypatch, tm
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     doc = _seed_doc(db_session, user_id="owner", session_id="s_owner")
     with pytest.raises(documents_service.DocumentNotFound):
         documents_service.delete_document(db_session, document_id=doc.id, user_id="intruder")
@@ -233,7 +233,7 @@ def test_delete_document_tolerates_missing_file(db_session, monkeypatch, tmp_pat
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     doc = _seed_doc(db_session)
     # No file on disk.
     documents_service.delete_document(db_session, document_id=doc.id, user_id="u1")
@@ -248,7 +248,7 @@ def test_delete_document_filename_traversal_is_contained(db_session, monkeypatch
     )
     uploads = tmp_path / "uploads"
     uploads.mkdir()
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(uploads))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(uploads))
 
     # A file one level above the uploads dir that a traversal filename would target.
     outside = tmp_path / "secret.txt"
@@ -268,7 +268,7 @@ def test_delete_document_tolerates_unlink_oserror(db_session, monkeypatch, tmp_p
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
 
     doc = _seed_doc(db_session)
     disk = tmp_path / f"{doc.id}_{doc.filename}"
@@ -318,3 +318,23 @@ def test_status_from_counts_treats_processing_as_in_flight(
         documents_service.status_from_counts(total, pending, ready, processing)
         == expected
     )
+
+
+def test_delete_document_invalidates_session_chunk_centroid(db_session, monkeypatch, tmp_path):
+    """F-05: removing a document changes the session's mean embedding, so the
+    materialised centroid must be dropped in the same transaction."""
+    monkeypatch.setattr(
+        "services.documents_service.pgvector_store.delete_document_chunks",
+        lambda db, document_id: 0,
+    )
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
+
+    doc = _seed_doc(db_session)
+    sess = db_session.get(SessionModel, doc.session_id)
+    sess.chunk_centroid = [0.4] * settings.embedding_dim
+    db_session.commit()
+
+    documents_service.delete_document(db_session, document_id=doc.id, user_id="u1")
+
+    db_session.expire_all()
+    assert db_session.get(SessionModel, "s1").chunk_centroid is None

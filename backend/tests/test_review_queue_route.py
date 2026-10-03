@@ -3,7 +3,8 @@ from datetime import datetime, timedelta, timezone
 
 from sqlalchemy import event as _sa_event
 
-from db.models import LearningEvent, Session as SessionModel, User
+from db.models import LearningEvent, User
+from db.models import Session as SessionModel
 
 
 @contextmanager
@@ -20,7 +21,10 @@ def count_queries(db):
     finally:
         _sa_event.remove(bind, "before_cursor_execute", _before)
 
-T0 = datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
+# F-07: the queue now only scans the last REVIEW_WINDOW_DAYS days, so the
+# shared fixture timestamp must stay relative to "now" -- a hard-coded date
+# silently falls out of the window as the calendar moves.
+T0 = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(days=3)
 
 
 def _seed_session(db, session_id="s1", user_id="test-user", topic="biology"):
@@ -67,8 +71,8 @@ def test_due_concept_appears_with_fields(client, db_session):
     assert item["source_session_id"] == "s1"
     assert item["source_topic"] == "biology"
     assert item["streak"] == 0
-    assert item["last_tested_at"].startswith("2026-07-01")
-    assert item["due_at"].startswith("2026-07-02")
+    assert item["last_tested_at"].startswith(T0.date().isoformat())
+    assert item["due_at"].startswith((T0 + timedelta(days=1)).date().isoformat())
 
 
 def test_not_yet_due_concept_excluded(client, db_session):
@@ -205,3 +209,52 @@ def test_grading_updates_schedule(client, db_session):
 
     # streak 2 -> interval 2 days from now -> no longer due
     assert client.get("/api/review/queue").json()["total"] == 0
+
+
+def test_events_outside_review_window_are_excluded(client, db_session):
+    """F-07: the queue scans a bounded window. A concept last touched more
+    than REVIEW_WINDOW_DAYS ago has fallen off the schedule and must not be
+    returned (nor scanned)."""
+    from services.review_queue_service import REVIEW_WINDOW_DAYS
+
+    _seed_session(db_session)
+    stale = datetime.now(timezone.utc) - timedelta(days=REVIEW_WINDOW_DAYS + 5)
+    _seed_event(db_session, "s1", "ancient", False, stale)
+    body = client.get("/api/review/queue").json()
+    assert body["total"] == 0
+    assert body["items"] == []
+
+
+def test_total_counts_only_due_concepts_inside_window(client, db_session):
+    """F-07: `total` must reflect the windowed due list, not every event."""
+    from services.review_queue_service import REVIEW_WINDOW_DAYS
+
+    _seed_session(db_session)
+    stale = datetime.now(timezone.utc) - timedelta(days=REVIEW_WINDOW_DAYS + 5)
+    _seed_event(db_session, "s1", "ancient", False, stale)
+    _seed_event(db_session, "s1", "recent", False, T0)
+    body = client.get("/api/review/queue").json()
+    assert body["total"] == 1
+    assert [i["concept"] for i in body["items"]] == ["recent"]
+
+
+def test_streak_uses_full_in_window_history_not_just_latest_event(client, db_session):
+    """F-07 regression guard: bounding the scan must not degrade into a
+    latest-event-only query -- streak is the trailing run of correct answers,
+    so three correct answers inside the window give streak 3 (interval 4 days)."""
+    now = datetime.now(timezone.utc)
+    _seed_session(db_session)
+    _seed_event(db_session, "s1", "mitosis", True, now - timedelta(days=12))
+    _seed_event(db_session, "s1", "mitosis", True, now - timedelta(days=9))
+    _seed_event(db_session, "s1", "mitosis", True, now - timedelta(days=6))
+    body = client.get("/api/review/queue").json()
+    assert body["total"] == 1
+    assert body["items"][0]["streak"] == 3
+
+
+def test_review_window_covers_the_longest_interval():
+    """The window must be at least MAX_INTERVAL_DAYS, or a concept scheduled
+    far out would be dropped before it ever became due."""
+    from services.review_queue_service import MAX_INTERVAL_DAYS, REVIEW_WINDOW_DAYS
+
+    assert REVIEW_WINDOW_DAYS >= MAX_INTERVAL_DAYS

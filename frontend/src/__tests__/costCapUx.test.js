@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { mount, flushPromises } from '@vue/test-utils'
 
-import { apiGet } from '@/services/apiClient.js'
+import { apiGet, _resetApiCache } from '@/services/apiClient.js'
 import { costBus } from '@/services/costBus.js'
 import { useSessionStore } from '@/stores/session.js'
 import { ERR_DAILY_COST_CAP_REACHED } from '@/lib/errorCodes.js'
@@ -18,6 +18,9 @@ describe('apiClient cost-warning bus', () => {
   let listener
   beforeEach(() => {
     setActivePinia(createPinia())
+    // F-18: apiClient's GET cache is module state -- without this the second
+    // GET /x is served from cache and never sees the new header.
+    _resetApiCache()
     fetchMock = vi.fn()
     globalThis.fetch = fetchMock
     listener = vi.fn()
@@ -30,7 +33,9 @@ describe('apiClient cost-warning bus', () => {
 
   function okWithHeader(body, header) {
     const headers = new Headers()
+
     if (header) headers.set('x-cost-warning', header)
+
     return Promise.resolve({
       ok: true,
       status: 200,
@@ -152,15 +157,25 @@ vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+// The session action bar calls useSessionActions, which calls useConfirm in
+// setup; jsdom has no ConfirmationService installed.
+vi.mock('primevue/useconfirm', () => ({
+  useConfirm: () => ({ require: vi.fn() }),
+}))
+
 vi.mock('@/services/uploadApi.js', () => ({
   uploadDocument: vi.fn().mockResolvedValue({ document_id: 1 }),
   validateFile: vi.fn(() => ({ ok: true })),
   getUploadStatus: vi.fn().mockResolvedValue({ id: 1, status: 'ready', error: null }),
+  // useReferencePoll (owned by SessionView) calls this at setup.
+  getSessionIngestion: vi.fn().mockResolvedValue({ status: null, documents: [] }),
   MAX_UPLOAD_BYTES: 25 * 1024 * 1024,
 }))
 
 const showError = vi.fn()
+
 const showWarn = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn, showSuccess: vi.fn() }),
 }))

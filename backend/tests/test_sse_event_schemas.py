@@ -4,8 +4,9 @@ Validates that the OpenAPI spec contains the vendor-extension SSE contract
 reference block and that every event has a data schema dict.
 """
 
-import yaml
 from pathlib import Path
+
+import yaml
 
 SPEC_PATH = Path(__file__).parent.parent.parent / "docs" / "api" / "openapi.yaml"
 
@@ -23,6 +24,7 @@ def test_openapi_has_x_sse_events():
         "cancelled",
         "error",
         "check_question",
+        "topic_suggestions",
         "followup_skipped",
     }
     assert set(doc["x-sse-events"].keys()) == expected

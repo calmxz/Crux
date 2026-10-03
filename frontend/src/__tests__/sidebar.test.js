@@ -3,25 +3,51 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { params: {}, fullPath: '/' }
+
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
+
 const showSuccess = vi.fn()
+
 const showError = vi.fn()
+
 const showWarn = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn, showSuccess }),
 }))
+
+// E-12: the row's End action goes through PrimeVue's confirm service, which is
+// not installed on a bare mount. The stub captures the config and accepts
+// straight away so the existing End assertions keep reading the same way; the
+// cancel path is covered in sidebarSessionRow.test.js.
+let lastConfirm = null
+
+vi.mock('primevue/useconfirm', () => ({
+  useConfirm: () => ({
+    require: (cfg) => {
+      lastConfirm = cfg
+      cfg.accept?.()
+    },
+  }),
+}))
+
 const apiReviewQueue = vi.fn()
+
 vi.mock('@/services/reviewApi.js', () => ({
   getReviewQueue: (...args) => apiReviewQueue(...args),
 }))
+
 const apiGetSessionLibrary = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
   const actual = await importOriginal()
+
   return {
     ...actual,
     getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
@@ -29,8 +55,10 @@ vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
 })
 
 import Sidebar from '@/components/sidebar/Sidebar.vue'
+import Logo from '@/components/Logo.vue'
 import { useSessionStore } from '@/stores/session.js'
 import { useAuthStore } from '@/stores/auth.js'
+import { useUserStore } from '@/stores/user.js'
 import { useSidebar, __test__ as sidebarTest } from '@/composables/useSidebar.js'
 import { RouterLink as MockRouterLink } from 'vue-router'
 
@@ -179,7 +207,7 @@ describe('Sidebar.vue — session list rendering', () => {
     expect(btn.attributes('aria-current')).toBe('page')
   })
 
-  it('collapsed tooltip is the plain session topic', async () => {
+  it('the collapsed rail renders no session rows; they return on unfold', async () => {
     sidebarTest._setExpanded(false)
     const store = useSessionStore()
     store.sessions = [
@@ -193,8 +221,11 @@ describe('Sidebar.vue — session list rendering', () => {
     ]
     wrapper = mount(Sidebar)
     await flushPromises()
-    const btn = wrapper.get('[data-testid="sidebar-row-a1"] [data-testid="sidebar-row-open"]')
-    expect(btn.attributes('title')).toBe('Glycolysis')
+    expect(wrapper.find('[data-session-id]').exists()).toBe(false)
+
+    await wrapper.get('[data-testid="sidebar-collapse-toggle"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
   })
 
   it('highlights the current session row', async () => {
@@ -212,6 +243,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('filters sessions via the search input and shows a match count', async () => {
     vi.useFakeTimers()
+
     try {
       const store = useSessionStore()
       store.sessions = [
@@ -242,6 +274,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('shows a no-match hint when search matches nothing', async () => {
     vi.useFakeTimers()
+
     try {
       const store = useSessionStore()
       store.sessions = [
@@ -303,7 +336,7 @@ describe('Sidebar.vue — session list rendering', () => {
     ).toBe(true)
   })
 
-  it('clears the search query when the sidebar collapses so the rail is not blank', async () => {
+  it('clears the search query when the sidebar collapses so unfolding shows the full list', async () => {
     const store = useSessionStore()
     store.sessions = [
       { id: 'a1', topic: 'Photosynthesis', created_at: new Date().toISOString(), ended_at: null },
@@ -317,7 +350,11 @@ describe('Sidebar.vue — session list rendering', () => {
     await flushPromises()
     // search input is gone (v-if on isExpanded)
     expect(wrapper.find('[data-testid="sidebar-search"]').exists()).toBe(false)
-    // collapsed rail must show the session row — fails before Fix 1 because searching stays true
+    // unfold: the query is gone and the plain list is back, not a stale search
+    await wrapper.find('[data-testid="sidebar-collapse-toggle"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-search"]').element.value).toBe('')
+    expect(wrapper.find('[data-testid="sidebar-search-count"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
   })
 })
@@ -361,9 +398,11 @@ describe('sidebar server-side search', () => {
 
   it('renders server results and total; store sessions array untouched', async () => {
     const store = useSessionStore()
+
     const seeded = [
       { id: 'a1', topic: 'Big-O', created_at: new Date().toISOString(), ended_at: null },
     ]
+
     store.sessions = seeded
     apiGetSessionLibrary.mockResolvedValue({
       items: [
@@ -405,9 +444,11 @@ describe('sidebar server-side search', () => {
     await flushPromises()
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-search"]')
     expect(viewAll.exists()).toBe(true)
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-search')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active', q: 'gly' },
@@ -423,7 +464,9 @@ describe('sidebar server-side search', () => {
     let resolveAb
     apiGetSessionLibrary.mockImplementation((params) => {
       if (params.q === 'a') return new Promise((resolve) => (resolveA = resolve))
+
       if (params.q === 'ab') return new Promise((resolve) => (resolveAb = resolve))
+
       return Promise.resolve({ items: [], total: 0 })
     })
     wrapper = mount(Sidebar)
@@ -460,9 +503,11 @@ describe('sidebar server-side search', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-search"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('9')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-search')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active', q: 'ab' },
@@ -478,7 +523,9 @@ describe('sidebar server-side search', () => {
     let resolveBb
     apiGetSessionLibrary.mockImplementation((params) => {
       if (params.q === 'aa') return new Promise((resolve) => (resolveAa = resolve))
+
       if (params.q === 'bb') return new Promise((resolve) => (resolveBb = resolve))
+
       return Promise.resolve({ items: [], total: 0 })
     })
     wrapper = mount(Sidebar)
@@ -557,9 +604,11 @@ describe('sidebar server-side search', () => {
       total: 1,
     })
     const api = await import('@/services/sessionsApi.js')
+
     const endSpy = vi
       .spyOn(api, 'endSession')
       .mockResolvedValue({ ended_at: '2026-05-21T10:00:00Z', summary: null })
+
     try {
       wrapper = mount(Sidebar, { attachTo: document.body })
       await flushPromises()
@@ -710,18 +759,20 @@ describe('Sidebar.vue — row interactions', () => {
     ).toBeUndefined()
   })
 
-  it('End session menu item calls store.endSession with row id', async () => {
+  it('End session menu item confirms first, then calls store.endSession with row id', async () => {
     const store = useSessionStore()
     store.sessions = [
       { id: 'a1', topic: 'Big-O', created_at: '2026-05-20T10:00:00Z', ended_at: null },
     ]
     const endSpy = vi.spyOn(store, 'endSession').mockResolvedValue({})
+    lastConfirm = null
     wrapper = mount(Sidebar, { attachTo: document.body })
     await flushPromises()
     await wrapper
       .find('[data-session-id="a1"] [data-testid="sidebar-row-menu-trigger"]')
       .trigger('click')
     await wrapper.find('[data-testid="sidebar-row-menu-end"]').trigger('click')
+    expect(lastConfirm).toMatchObject({ header: 'End session' })
     expect(endSpy).toHaveBeenCalledWith('a1')
   })
 
@@ -732,6 +783,7 @@ describe('Sidebar.vue — row interactions', () => {
     ]
     vi.spyOn(store, 'endSession').mockImplementation(async (id) => {
       store.pendingSummary = { sessionId: id, kind: 'summary', text: 'Great progress on Big-O.' }
+
       return {}
     })
     // Not on that session's own view — SessionView isn't mounted to consume it.
@@ -755,6 +807,7 @@ describe('Sidebar.vue — row interactions', () => {
     ]
     vi.spyOn(store, 'endSession').mockImplementation(async (id) => {
       store.pendingSummary = { sessionId: id, kind: 'summary', text: 'Great progress on Big-O.' }
+
       return {}
     })
     routeRef.name = 'session'
@@ -869,7 +922,9 @@ describe('Sidebar.vue — row interactions', () => {
     // spy flips real store state so the row relocates across sections
     vi.spyOn(store, 'setPinned').mockImplementation(async (id, pinned) => {
       const s = store.sessions.find((x) => x.id === id)
+
       if (s) s.pinned = pinned
+
       return {}
     })
     wrapper = mount(Sidebar, { attachTo: document.body })
@@ -880,9 +935,11 @@ describe('Sidebar.vue — row interactions', () => {
     await wrapper.find('[data-testid="sidebar-row-menu-pin"]').trigger('click')
     await flushPromises()
     const active = document.activeElement
+
     const a1Trigger = wrapper.find(
       '[data-session-id="a1"] [data-testid="sidebar-row-menu-trigger"]',
     ).element
+
     expect(active).toBe(a1Trigger)
   })
 
@@ -1018,18 +1075,20 @@ describe('Sidebar.vue — row interactions', () => {
     const input = wrapper.find('[data-session-id="a1"] [data-testid="sidebar-row-rename-input"]')
     await input.setValue('New')
     await input.trigger('keydown.enter')
+
     try {
       await input.trigger('blur')
     } catch {
       /* input may be detached after rename exits */
     }
+
     await flushPromises()
     expect(renameSpy).toHaveBeenCalledTimes(1)
     expect(renameSpy).toHaveBeenCalledWith('a1', 'New')
   })
 })
 
-describe('Sidebar.vue — footer rail labels', () => {
+describe('Sidebar.vue — footer', () => {
   let wrapper
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -1042,22 +1101,30 @@ describe('Sidebar.vue — footer rail labels', () => {
   })
   afterEach(() => wrapper?.unmount())
 
-  it('footer shows text labels when expanded', async () => {
+  // Settings is reached through the identity row's account menu; the foot
+  // carries no Settings link of its own in either state.
+  it.each([
+    ['expanded', true],
+    ['collapsed', false],
+  ])('footer carries the identity row alone, no Settings link, when %s', async (_s, expanded) => {
+    sidebarTest._setExpanded(expanded)
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1', email: 'ada@example.com' }, access_token: 't' }
     wrapper = mount(Sidebar)
     await flushPromises()
-    const footer = wrapper.find('[data-testid="sidebar-settings"]')
-    expect(footer.exists()).toBe(true)
-    expect(wrapper.find('[data-testid="sidebar-settings"]').text()).toContain('Settings')
+    const footer = wrapper.get('footer.sb-rail')
+    expect(footer.find('a').exists()).toBe(false)
+    expect(footer.findAll('button').map((b) => b.attributes('data-testid'))).toEqual([
+      'sidebar-user-trigger',
+    ])
+    expect(footer.classes().includes('sb-rail--column')).toBe(!expanded)
   })
 
-  it('footer hides text labels when collapsed', async () => {
-    sidebarTest._setExpanded(false)
+  // With no identity row to hold, the ruled foot would be an empty strip.
+  it('renders no footer when unauthenticated', async () => {
     wrapper = mount(Sidebar)
     await flushPromises()
-    // collapsed: footer carries sb-rail--column class
-    expect(wrapper.find('footer.sb-rail').classes()).toContain('sb-rail--column')
-    // no label text visible
-    expect(wrapper.find('[data-testid="sidebar-settings"]').text()).not.toContain('Settings')
+    expect(wrapper.find('footer.sb-rail').exists()).toBe(false)
   })
 
   it('footer rail no longer renders a theme control', async () => {
@@ -1066,20 +1133,20 @@ describe('Sidebar.vue — footer rail labels', () => {
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(wrapper.find('[data-testid="sidebar-theme-toggle"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="sidebar-settings"]').exists()).toBe(true)
   })
 
-  it('footer has a single Settings entry and no Profile entry', async () => {
+  // Profile lives beside Recall at the top (#362); the foot stays identity only.
+  it('footer has no Profile entry', async () => {
+    useAuthStore().session = { user: { id: 'u-1', email: 'a@b.c' }, access_token: 't' }
     wrapper = mount(Sidebar)
     await flushPromises()
-    expect(wrapper.find('[data-testid="sidebar-profile"]').exists()).toBe(false)
-    expect(wrapper.find('[data-testid="sidebar-settings"]').exists()).toBe(true)
+    expect(wrapper.get('footer').find('[data-testid="sidebar-profile"]').exists()).toBe(false)
   })
 })
 
-// Sign out moved out of Settings > Account and onto the footer rail: it is a
-// navigation act, not a setting.
-describe('Sidebar.vue — footer sign out', () => {
+// The foot's identity row opens the account menu: the sign-in email as a
+// head, then Settings, Usage and Account, a rule, and Sign out.
+describe('Sidebar.vue — identity row and account menu', () => {
   let wrapper
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -1091,47 +1158,366 @@ describe('Sidebar.vue — footer sign out', () => {
     routeRef.params = {}
     routeRef.fullPath = '/'
   })
-  afterEach(() => wrapper?.unmount())
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+    document.body.innerHTML = ''
+  })
+
+  function signIn({ name = 'ada lovelace', email = 'ada@example.com' } = {}) {
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1', email }, access_token: 't' }
+    useUserStore().name = name
+  }
+
+  async function openMenu() {
+    await wrapper.get('[data-testid="sidebar-user-trigger"]').trigger('click')
+    await flushPromises()
+  }
 
   it('is hidden when unauthenticated', async () => {
     wrapper = mount(Sidebar)
     await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-user-trigger"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sidebar-sign-out"]').exists()).toBe(false)
   })
 
-  it('renders a written Sign out line when authenticated and expanded', async () => {
-    const auth = useAuthStore()
-    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+  it('shows the upper-cased initial and the display name', async () => {
+    signIn()
     wrapper = mount(Sidebar)
     await flushPromises()
-    const btn = wrapper.get('[data-testid="sidebar-sign-out"]')
-    expect(btn.text()).toContain('Sign out')
-    expect(btn.attributes('aria-label')).toBe('Sign out')
+    expect(wrapper.get('[data-testid="sidebar-user-initial"]').text()).toBe('A')
+    expect(wrapper.get('[data-testid="sidebar-user-name"]').text()).toBe('ada lovelace')
+    const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+    expect(trigger.attributes('aria-label')).toBe('Account menu for ada lovelace')
+    expect(trigger.attributes('title')).toBe('ada lovelace')
+    expect(trigger.attributes('aria-haspopup')).toBe('menu')
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    // No dangling id reference while the menu is closed.
+    expect(trigger.attributes('aria-controls')).toBeUndefined()
+  })
+
+  it('never shows the full email in the row itself', async () => {
+    signIn()
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.text()).not.toContain('ada@example.com')
+  })
+
+  // stores/user.js writes 'Learner' when the name is left blank; the row
+  // treats that placeholder as unset and falls back to the email's local part.
+  it("treats the store's 'Learner' placeholder as no name", async () => {
+    signIn({ name: 'Learner', email: 'zed@example.com' })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-user-initial"]').text()).toBe('Z')
+    expect(wrapper.get('[data-testid="sidebar-user-name"]').text()).toBe('zed')
+  })
+
+  it("falls back to the email's local part when no name is set", async () => {
+    signIn({ name: null, email: 'zed@example.com' })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-user-initial"]').text()).toBe('Z')
+    expect(wrapper.get('[data-testid="sidebar-user-name"]').text()).toBe('zed')
+    expect(wrapper.get('[data-testid="sidebar-user-trigger"]').attributes('title')).toBe('zed')
+  })
+
+  it('treats a whitespace-only name as no name', async () => {
+    signIn({ name: '   ', email: 'zed@example.com' })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-user-name"]').text()).toBe('zed')
+  })
+
+  it('keeps Sign out inside the closed menu until the row is opened', async () => {
+    signIn()
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-sign-out"]').exists()).toBe(false)
+    await openMenu()
+    expect(wrapper.find('[data-testid="sidebar-sign-out"]').exists()).toBe(true)
+  })
+
+  it('opens a labelled menu with the email head, Settings, Usage, Account and Sign out', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+    const menu = wrapper.get('[data-testid="sidebar-user-menu"]')
+    // role=menu sits on the inner list, which holds only the menuitems; the
+    // email head stays outside it.
+    const list = menu.get('[role="menu"]')
+    expect(list.attributes('data-testid')).toBe('sidebar-user-menu-list')
+    expect(trigger.attributes('aria-expanded')).toBe('true')
+    expect(trigger.attributes('aria-controls')).toBe(list.attributes('id'))
+    expect(menu.attributes('role')).toBeUndefined()
+    expect(list.attributes('aria-label')).toBe('Account menu for ada lovelace')
+    const head = menu.get('[data-testid="sidebar-user-menu-email"]')
+    expect(head.text()).toBe('ada@example.com')
+    expect(list.element.contains(head.element)).toBe(false)
+    const items = list.findAll('[role="menuitem"]')
+    expect(items.map((i) => i.text())).toEqual(['Settings', 'Usage', 'Account', 'Sign out'])
+
+    // Every item carries a drawn icon, hidden from assistive tech.
+    for (const item of items) {
+      expect(item.get('svg').attributes('aria-hidden')).toBe('true')
+    }
+
+    // A rule sets Sign out apart from the navigation items.
+    expect(list.findAll('[role="separator"]')).toHaveLength(1)
+    // Focus moves into the menu on open.
+    expect(document.activeElement).toBe(items[0].element)
+  })
+
+  it('ArrowDown and Enter on the trigger open the menu on the first item', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+
+    for (const key of ['ArrowDown', 'Enter']) {
+      trigger.element.focus()
+      await trigger.trigger('keydown', { key })
+      await flushPromises()
+      expect(trigger.attributes('aria-expanded')).toBe('true')
+      expect(document.activeElement).toBe(
+        wrapper.get('[data-testid="sidebar-user-menu-settings"]').element,
+      )
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+      await flushPromises()
+      expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+    }
+  })
+
+  it('ArrowUp on the trigger opens the menu on the last item', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+    trigger.element.focus()
+    await trigger.trigger('keydown', { key: 'ArrowUp' })
+    await flushPromises()
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-sign-out"]').element)
+  })
+
+  it('ArrowDown and ArrowUp cycle the menu items, Home and End jump', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    const menu = wrapper.get('[data-testid="sidebar-user-menu"]')
+    const [settings, usage, , signOut] = menu.findAll('[role="menuitem"]')
+    await menu.trigger('keydown', { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(usage.element)
+    await menu.trigger('keydown', { key: 'ArrowUp' })
+    await menu.trigger('keydown', { key: 'ArrowUp' })
+    expect(document.activeElement).toBe(signOut.element)
+    await menu.trigger('keydown', { key: 'ArrowDown' })
+    expect(document.activeElement).toBe(settings.element)
+    await menu.trigger('keydown', { key: 'End' })
+    expect(document.activeElement).toBe(signOut.element)
+    await menu.trigger('keydown', { key: 'Home' })
+    expect(document.activeElement).toBe(settings.element)
+  })
+
+  it('Tab closes the menu and leaves focus on the trigger', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    const menu = wrapper.get('[data-testid="sidebar-user-menu"]')
+    const ev = new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    menu.element.dispatchEvent(ev)
+    await flushPromises()
+    expect(ev.defaultPrevented).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-user-trigger"]').element)
+  })
+
+  it.each([
+    ['settings', '/settings'],
+    ['usage', { name: 'settings', params: { tab: 'usage' } }],
+    ['account', { name: 'account' }],
+  ])('%s routes, closes, and refocuses the trigger', async (slug, to) => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    await wrapper.get(`[data-testid="sidebar-user-menu-${slug}"]`).trigger('click')
+    await flushPromises()
+    expect(routerPush).toHaveBeenCalledWith(to)
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-user-trigger"]').element)
+  })
+
+  it('a menu item in the mobile drawer closes the drawer as it routes', async () => {
+    setViewport(390)
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    useSidebar().openDrawer()
+    await flushPromises()
+    await openMenu()
+    await wrapper.get('[data-testid="sidebar-user-menu-settings"]').trigger('click')
+    await flushPromises()
+    expect(routerPush).toHaveBeenCalledWith('/settings')
+    expect(useSidebar().mode.value).not.toBe('drawer-open')
+  })
+
+  it('Escape closes the menu and returns focus to the trigger', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]')
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+    expect(trigger.attributes('aria-expanded')).toBe('false')
+    expect(document.activeElement).toBe(trigger.element)
+  })
+
+  it('Escape in the mobile drawer closes only the menu, not the drawer', async () => {
+    setViewport(390)
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    useSidebar().openDrawer()
+    await flushPromises()
+    await openMenu()
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(true)
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+    expect(wrapper.get('aside').attributes('data-mode')).toBe('drawer-open')
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-user-trigger"]').element)
+  })
+
+  it('an outside pointerdown closes the menu', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-user-menu"]').exists()).toBe(false)
+  })
+
+  it('folding the sidebar with the menu open closes it and refocuses the trigger', async () => {
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    await openMenu()
+    expect(document.activeElement).toBe(
+      wrapper.get('[data-testid="sidebar-user-menu-settings"]').element,
+    )
+    useSidebar().toggleDesktop()
+    await flushPromises()
+    expect(useSidebar().mode.value).toBe('collapsed')
+    expect(document.querySelector('[data-testid="sidebar-user-menu"]')).toBeNull()
+    expect(document.activeElement).toBe(wrapper.get('[data-testid="sidebar-user-trigger"]').element)
   })
 
   it('signs out and redirects to /login', async () => {
-    const auth = useAuthStore()
-    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    signIn()
     wrapper = mount(Sidebar)
     await flushPromises()
+    await openMenu()
     await wrapper.get('[data-testid="sidebar-sign-out"]').trigger('click')
     await flushPromises()
     expect(globalThis.__supabaseAuthStub.signOut).toHaveBeenCalled()
     expect(routerPush).toHaveBeenCalledWith('/login')
   })
 
-  it('surfaces an error toast and does not redirect on failure', async () => {
+  it('surfaces an error toast and still leaves the protected route on failure', async () => {
     globalThis.__supabaseAuthStub.signOut.mockResolvedValueOnce({
       error: new Error('network down'),
     })
-    const auth = useAuthStore()
-    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    signIn()
     wrapper = mount(Sidebar)
     await flushPromises()
+    await openMenu()
     await wrapper.get('[data-testid="sidebar-sign-out"]').trigger('click')
     await flushPromises()
     expect(showError).toHaveBeenCalledWith('network down')
-    expect(routerPush).not.toHaveBeenCalled()
+    // The store clears the local session in its finally, so the shell is
+    // already signed out; staying on a protected route would strand the
+    // learner behind a toast.
+    expect(routerPush).toHaveBeenCalledWith('/login')
+  })
+
+  it('the folded rail shows the initial alone, the name as tooltip, and still opens the menu', async () => {
+    sidebarTest._setExpanded(false)
+    signIn()
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-user-initial"]').text()).toBe('A')
+    expect(wrapper.find('[data-testid="sidebar-user-name"]').exists()).toBe(false)
+    expect(wrapper.get('[data-testid="sidebar-user-trigger"]').attributes('title')).toBe(
+      'ada lovelace',
+    )
+    await openMenu()
+    // Folded, the card lifts out of the clipped rail onto <body>.
+    const menu = document.querySelector('[data-testid="sidebar-user-menu"]')
+    expect(menu).not.toBeNull()
+    expect(wrapper.element.contains(menu)).toBe(false)
+    expect(menu.querySelector('[data-testid="sidebar-sign-out"]')).not.toBeNull()
+    expect(document.activeElement).toBe(
+      menu.querySelector('[data-testid="sidebar-user-menu-settings"]'),
+    )
+  })
+
+  // Folded, the menu opens where it does unfolded: directly above the avatar,
+  // its left edge on the avatar's, not out beside the rail.
+  it('the folded menu opens above the avatar, left-aligned with it', async () => {
+    sidebarTest._setExpanded(false)
+    const savedHeight = window.innerHeight
+    Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 })
+
+    try {
+      signIn()
+      wrapper = mount(Sidebar, { attachTo: document.body })
+      await flushPromises()
+      // Folded, the 36px trigger centres the 28px avatar, 4px in from its edge.
+      const trigger = wrapper.get('[data-testid="sidebar-user-trigger"]').element
+      const avatar = wrapper.get('[data-testid="sidebar-user-initial"]').element
+      vi.spyOn(trigger, 'getBoundingClientRect').mockReturnValue({
+        left: 6,
+        right: 42,
+        top: 700,
+        bottom: 736,
+        width: 36,
+        height: 36,
+      })
+      vi.spyOn(avatar, 'getBoundingClientRect').mockReturnValue({
+        left: 10,
+        right: 38,
+        top: 704,
+        bottom: 732,
+        width: 28,
+        height: 28,
+      })
+      await openMenu()
+      const menu = document.querySelector('[data-testid="sidebar-user-menu"]')
+      expect(menu.style.left).toBe('10px')
+      // 0.25rem (4px) gap above the trigger's top edge, as unfolded.
+      expect(menu.style.bottom).toBe('104px')
+    } finally {
+      Object.defineProperty(window, 'innerHeight', { configurable: true, value: savedHeight })
+    }
+  })
+
+  it('the mobile drawer shows the identity row with the name', async () => {
+    setViewport(390)
+    signIn()
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    useSidebar().openDrawer()
+    await flushPromises()
+    expect(wrapper.get('[data-testid="sidebar-user-initial"]').text()).toBe('A')
+    expect(wrapper.get('[data-testid="sidebar-user-name"]').text()).toBe('ada lovelace')
   })
 })
 
@@ -1177,7 +1563,7 @@ describe('Sidebar.vue — mount fetch', () => {
   })
 })
 
-describe('Sidebar.vue — review entry', () => {
+describe('Sidebar.vue — recall entry', () => {
   let wrapper
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -1200,8 +1586,10 @@ describe('Sidebar.vue — review entry', () => {
     // run synchronously so the existing badge assertions still hold.
     globalThis.requestIdleCallback = (cb) => {
       cb()
+
       return 1
     }
+
     globalThis.cancelIdleCallback = () => {}
   })
   afterEach(() => {
@@ -1210,44 +1598,56 @@ describe('Sidebar.vue — review entry', () => {
     delete globalThis.cancelIdleCallback
   })
 
-  it('shows the review entry with a count when concepts are due', async () => {
+  it('shows the recall entry with a count when concepts are due', async () => {
     apiReviewQueue.mockResolvedValue({ items: [], total: 13, limit: 1, offset: 0 })
     wrapper = mount(Sidebar)
     await flushPromises()
-    const entry = wrapper.get('[data-testid="sidebar-review"]')
-    expect(entry.text()).toContain('Review')
+    const entry = wrapper.get('[data-testid="sidebar-recall"]')
+    expect(entry.text()).toContain('Recall')
     expect(entry.text()).toContain('13')
     expect(apiReviewQueue).toHaveBeenCalledWith({ limit: 1, offset: 0 }, { silent: true })
   })
 
-  it('hides the review entry when nothing is due', async () => {
+  it('hides the recall entry when nothing is due', async () => {
     apiReviewQueue.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 })
     wrapper = mount(Sidebar)
     await flushPromises()
-    expect(wrapper.find('[data-testid="sidebar-review"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-recall"]').exists()).toBe(false)
   })
 
-  it('hides the review entry when the fetch fails', async () => {
+  it('hides the recall entry when the fetch fails', async () => {
     apiReviewQueue.mockRejectedValue(new Error('boom'))
     wrapper = mount(Sidebar)
     await flushPromises()
-    expect(wrapper.find('[data-testid="sidebar-review"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-recall"]').exists()).toBe(false)
   })
 
-  it('hides the review entry in icon-rail (collapsed) mode even with a count due', async () => {
+  it('keeps the recall entry in the icon rail (collapsed) with the due count', async () => {
     sidebarTest._setExpanded(false)
     apiReviewQueue.mockResolvedValue({ items: [], total: 13, limit: 1, offset: 0 })
     wrapper = mount(Sidebar)
     await flushPromises()
-    expect(wrapper.find('[data-testid="sidebar-review"]').exists()).toBe(false)
+    const entry = wrapper.get('[data-testid="sidebar-recall"]')
+    expect(entry.text()).toContain('13')
+    expect(entry.attributes('aria-label')).toBe('Recall: 13 concepts due')
+  })
+
+  it('hides the rail recall entry when nothing is due', async () => {
+    sidebarTest._setExpanded(false)
+    apiReviewQueue.mockResolvedValue({ items: [], total: 0, limit: 1, offset: 0 })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-recall"]').exists()).toBe(false)
   })
 
   it('does not fetch the badge before the idle callback runs', async () => {
     let idleCb
     globalThis.requestIdleCallback = (cb) => {
       idleCb = cb
+
       return 1
     }
+
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(apiReviewQueue).not.toHaveBeenCalled()
@@ -1267,10 +1667,10 @@ describe('Sidebar.vue — review entry', () => {
   })
 })
 
-// Card Box redesign (Task 5): the desktop collapse toggle is a visible
-// half-tab on the sidebar's right edge instead of an icon buried in the
-// header, and the collapsed rail marks sessions as dots instead of strokes.
-describe('Sidebar.vue — card box collapse toggle and collapsed dots', () => {
+// The desktop collapse toggle is a drawn sidebar icon in the head (the old
+// right-edge half-tab overlapped the mark in the rail), and the collapsed rail
+// marks sessions as dots instead of strokes.
+describe('Sidebar.vue — collapse toggle and empty rail', () => {
   let wrapper
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -1282,13 +1682,15 @@ describe('Sidebar.vue — card box collapse toggle and collapsed dots', () => {
   })
   afterEach(() => wrapper?.unmount())
 
-  it('the half-tab collapse toggle carries hit-44 and a descriptive aria-label', async () => {
+  it('the head sidebar-icon toggle carries hit-44 and a descriptive aria-label', async () => {
     sidebarTest._setExpanded(true)
     wrapper = mount(Sidebar)
     await flushPromises()
     const toggle = wrapper.get('[data-testid="sidebar-collapse-toggle"]')
     expect(toggle.classes()).toContain('hit-44')
-    expect(toggle.classes()).toContain('sb-toggle--edge')
+    expect(toggle.classes()).toContain('sb-toggle--head')
+    expect(toggle.classes()).not.toContain('sb-toggle--edge')
+    expect(toggle.element.closest('.sb-header')).not.toBeNull()
     expect(toggle.attributes('aria-label')).toBe('Collapse sidebar')
 
     await toggle.trigger('click')
@@ -1298,7 +1700,7 @@ describe('Sidebar.vue — card box collapse toggle and collapsed dots', () => {
     )
   })
 
-  it('renders one dot per session in the collapsed rail, current session marked', async () => {
+  it('the collapsed rail draws no session markers, even for the current session', async () => {
     sidebarTest._setExpanded(false)
     routeRef.params = { id: 'a1' }
     const store = useSessionStore()
@@ -1308,9 +1710,9 @@ describe('Sidebar.vue — card box collapse toggle and collapsed dots', () => {
     ]
     wrapper = mount(Sidebar)
     await flushPromises()
-    const marks = wrapper.findAll('.sb-session-list--collapsed .sb-row-mark')
-    expect(marks).toHaveLength(2)
-    expect(wrapper.find('[data-session-id="a1"]').classes()).toContain('sb-row--current')
+    expect(wrapper.find('.sb-row-mark').exists()).toBe(false)
+    expect(wrapper.find('.sb-session-list').exists()).toBe(false)
+    expect(wrapper.find('[data-session-id]').exists()).toBe(false)
   })
 })
 
@@ -1415,15 +1817,13 @@ describe('Sidebar.vue — header states', () => {
     expect(toggle.attributes('aria-label')).toBe('Collapse sidebar')
   })
 
-  // The collapsed rail carries the page mark (mark-only logo, no wordmark)
-  // above the expand toggle, so .sb-brand is present but "Crux" is not.
-  it('collapsed desktop header shows the page mark and the expand toggle', async () => {
+  // The collapsed rail carries no logo: it starts at the expand toggle.
+  it('collapsed desktop header shows only the expand toggle, no logo', async () => {
     sidebarTest._setExpanded(false)
     wrapper = mount(Sidebar)
     await flushPromises()
-    const brand = wrapper.find('.sb-brand')
-    expect(brand.exists()).toBe(true)
-    expect(brand.text()).not.toContain('Crux')
+    expect(wrapper.find('.sb-brand').exists()).toBe(false)
+    expect(wrapper.find('.sb-header').findComponent(Logo).exists()).toBe(false)
     const toggle = wrapper.find('[data-testid="sidebar-collapse-toggle"]')
     expect(toggle.exists()).toBe(true)
     expect(toggle.attributes('aria-label')).toBe('Expand sidebar')
@@ -1446,6 +1846,7 @@ describe('Sidebar.vue — header states', () => {
 // (most-recent first) when the component slices down to the cap.
 function makeActiveSessions(count, { pinned = false, prefix = 'u' } = {}) {
   const now = Date.now()
+
   return Array.from({ length: count }, (_, i) => ({
     id: `${prefix}${i}`,
     topic: `${prefix}${i}`,
@@ -1458,6 +1859,7 @@ function makeActiveSessions(count, { pinned = false, prefix = 'u' } = {}) {
 
 function makeEndedSessions(count) {
   const now = Date.now()
+
   return Array.from({ length: count }, (_, i) => ({
     id: `e${i}`,
     topic: `e${i}`,
@@ -1515,9 +1917,11 @@ describe('sidebar row cap and View all links', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-active"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('View all 28 sessions')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-active')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'active' },
@@ -1538,16 +1942,6 @@ describe('sidebar row cap and View all links', () => {
     expect(wrapper.findAll('[data-testid="sidebar-quick-group"] [data-session-id]')).toHaveLength(0)
   })
 
-  it('caps the collapsed icon rail at 15 pinned rows too', async () => {
-    sidebarTest._setExpanded(false)
-    const store = useSessionStore()
-    store.sessions = makeActiveSessions(25, { pinned: true, prefix: 'p' })
-    store.activeTotal = 25
-    wrapper = mount(Sidebar)
-    await flushPromises()
-    expect(wrapper.findAll('.sb-session-list--collapsed [data-session-id]')).toHaveLength(15)
-  })
-
   it('caps the ended tab at 15 and links with status=ended', async () => {
     const store = useSessionStore()
     store.sessions = makeEndedSessions(22)
@@ -1561,9 +1955,11 @@ describe('sidebar row cap and View all links', () => {
     const viewAll = wrapper.find('[data-testid="sidebar-view-all-ended"]')
     expect(viewAll.exists()).toBe(true)
     expect(viewAll.text()).toContain('40')
+
     const viewAllComponent = wrapper
       .findAllComponents(MockRouterLink)
       .find((c) => c.attributes('data-testid') === 'sidebar-view-all-ended')
+
     expect(viewAllComponent.props('to')).toEqual({
       name: 'sessions-library',
       query: { status: 'ended' },
@@ -1660,6 +2056,7 @@ describe('sidebar row cap and View all links', () => {
   // every case above still sees the 15-row floor.
   it('renders as many rows as the measured list height allows, up to 40', async () => {
     installResizeObserverStub(28 * 31)
+
     try {
       const store = useSessionStore()
       store.sessions = makeActiveSessions(40)
@@ -1676,6 +2073,7 @@ describe('sidebar row cap and View all links', () => {
 
   it('keeps the 15-row floor when the measured height fits fewer rows', async () => {
     installResizeObserverStub(100)
+
     try {
       const store = useSessionStore()
       store.sessions = makeActiveSessions(40)
@@ -1700,5 +2098,82 @@ describe('sidebar row cap and View all links', () => {
     await wrapper.find('[data-testid="sidebar-status-ended"]').trigger('click')
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-view-all-ended"]').exists()).toBe(false)
+  })
+})
+
+describe('Sidebar.vue — profile entry (#362)', () => {
+  let wrapper
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    routerPush.mockClear()
+    localStorage.clear()
+    setViewport(1400)
+    sidebarTest._setExpanded(true)
+    routeRef.params = {}
+    routeRef.fullPath = '/'
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    const store = useSessionStore()
+    vi.spyOn(store, 'listSessions').mockResolvedValue([])
+    globalThis.requestIdleCallback = (cb) => {
+      cb()
+
+      return 1
+    }
+
+    globalThis.cancelIdleCallback = () => {}
+  })
+  afterEach(() => {
+    wrapper?.unmount()
+    delete globalThis.requestIdleCallback
+    delete globalThis.cancelIdleCallback
+  })
+
+  const profileLink = () =>
+    wrapper
+      .findAllComponents(MockRouterLink)
+      .find((l) => l.attributes('data-testid') === 'sidebar-profile')
+
+  it('shows a Profile line to /profile even when nothing is due for recall', async () => {
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-recall"]').exists()).toBe(false)
+    const link = profileLink()
+    expect(link).toBeTruthy()
+    expect(link.props('to')).toEqual({ name: 'profile-aggregate' })
+    expect(link.text()).toContain('Profile')
+    expect(link.find('svg').exists()).toBe(true)
+  })
+
+  it('sits directly beside Recall when Recall is shown', async () => {
+    apiReviewQueue.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    const profile = wrapper.get('[data-testid="sidebar-profile"]').element
+    expect(profile.nextElementSibling?.getAttribute('data-testid')).toBe('sidebar-recall')
+  })
+
+  it('keeps Profile in the folded rail as a titled icon, beside Recall', async () => {
+    sidebarTest._setExpanded(false)
+    apiReviewQueue.mockResolvedValue({ items: [], total: 2, limit: 1, offset: 0 })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    const el = wrapper.get('[data-testid="sidebar-profile"]')
+    expect(el.attributes('title')).toBe('Profile')
+    expect(el.attributes('aria-label')).toBe('Profile')
+    expect(el.text()).toBe('')
+    expect(el.element.nextElementSibling?.getAttribute('data-testid')).toBe('sidebar-recall')
+  })
+
+  it('shows Profile in the mobile drawer and closes the drawer on click', async () => {
+    setViewport(390)
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    useSidebar().openDrawer()
+    await flushPromises()
+    const el = wrapper.get('[data-testid="sidebar-profile"]')
+    expect(el.text()).toContain('Profile')
+    await el.trigger('click')
+    expect(useSidebar().mode.value).not.toBe('drawer-open')
   })
 })

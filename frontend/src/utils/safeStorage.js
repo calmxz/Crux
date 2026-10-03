@@ -17,6 +17,7 @@ export function storageGet(getStorage, key) {
 export function storageSet(getStorage, key, value) {
   try {
     getStorage().setItem(key, value)
+
     return true
   } catch {
     return false
@@ -26,6 +27,7 @@ export function storageSet(getStorage, key, value) {
 export function storageRemove(getStorage, key) {
   try {
     getStorage().removeItem(key)
+
     return true
   } catch {
     return false
@@ -34,4 +36,5 @@ export function storageRemove(getStorage, key) {
 
 // The two storages this app uses, as thunks ready to pass in.
 export const session = () => sessionStorage
+
 export const local = () => localStorage

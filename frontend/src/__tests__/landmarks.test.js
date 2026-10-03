@@ -38,6 +38,7 @@ async function mountWithRouter(component, props) {
   const router = makeRouter()
   await router.push('/')
   await router.isReady()
+
   return mount(component, { props, global: { plugins: [router], stubs } })
 }
 

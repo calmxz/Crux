@@ -7,10 +7,15 @@ on:
 
 permissions:
   contents: read
+  # G-10: the failure alert opens/comments on an issue via the gh CLI.
+  issues: write
 
 jobs:
   backup:
     runs-on: ubuntu-latest
+    # G-10: a hung pg_dump or R2 upload would otherwise burn the 6h runner
+    # limit and overlap the next night's run.
+    timeout-minutes: 15
     defaults:
       run:
         working-directory: backend
@@ -48,3 +53,31 @@ jobs:
         run: |
           python -m scripts.backup upload dump.pgc
           python -m scripts.backup prune --keep 7
+
+      # G-10: a scheduled workflow that fails silently is indistinguishable
+      # from a working one until a restore is needed. Uses the preinstalled
+      # gh CLI -- no third-party action to SHA-pin.
+      # cancelled() too: a job killed by timeout-minutes is marked cancelled,
+      # not failed, and that hang is exactly the case the timeout guards.
+      - name: Alert on failure
+        if: failure() || cancelled()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          gh label create backup-failure \
+            --color B60205 \
+            --description "Automated nightly database backup failed" \
+            || true
+          existing=$(gh issue list --label backup-failure --state open --limit 1 --json number --jq '.[0].number // empty')
+          today=$(date -u +%Y-%m-%d)
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" \
+              --body "db-backup failed again on $today (UTC). Run: $RUN_URL"
+          else
+            gh issue create \
+              --title "db-backup failed $today" \
+              --label backup-failure \
+              --body "The scheduled database backup job failed. Run: $RUN_URL"
+          fi

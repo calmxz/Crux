@@ -1,7 +1,8 @@
 import json
 from datetime import datetime, timedelta, timezone
 
-from db.models import ChatMessage, Session as SessionModel, User
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services.session_enrichment import compute_enrichment
 
 USER_ID = "u1"

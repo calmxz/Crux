@@ -125,22 +125,31 @@ import { useRoute, useRouter } from 'vue-router'
 import InputText from 'primevue/inputtext'
 
 import AuthCover from '../components/auth/AuthCover.vue'
+import { authErrorCopy, isEmailNotConfirmed } from '../lib/authErrors.js'
 import { useAuthStore } from '../stores/auth.js'
 import { isValidEmail } from '../utils/validation.js'
 import { safeRedirect } from '../utils/safeRedirect.js'
 
 const route = useRoute()
+
 const router = useRouter()
+
 const resetDone = computed(() => route.query.reset === '1')
 
 const auth = useAuthStore()
 
 const email = ref('')
+
 const password = ref('')
+
 const showPassword = ref(false)
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const needsConfirm = ref(false)
+
 const resent = ref(false)
 
 const canSubmit = computed(() => isValidEmail(email.value.trim()) && password.value.length > 0)
@@ -151,6 +160,7 @@ async function submit() {
   needsConfirm.value = false
   resent.value = false
   submitting.value = true
+
   try {
     await auth.signIn(email.value.trim(), password.value)
     // signInWithPassword updates the store reactively, but the router guard
@@ -163,11 +173,13 @@ async function submit() {
     await (target ? router.push(target) : router.push({ name: 'home' }))
   } catch (e) {
     // Supabase AuthErrors carry an HTTP status, so friendlyError() would
-    // replace their copy with a generic status message and break the
-    // "not confirmed" detection below. Surface the SDK message instead.
-    const msg = e?.message || 'Could not sign in. Try again.'
-    error.value = msg
-    if (/not confirmed/i.test(msg)) needsConfirm.value = true
+    // replace their copy with a generic status message (constraint from commit
+    // 1d0f4aa). lib/authErrors.js keys on the SDK's machine-readable
+    // AuthError.code instead, so neither the copy nor the unconfirmed-address
+    // detection depends on SDK prose.
+    error.value = authErrorCopy(e, 'Could not sign in. Try again.')
+
+    if (isEmailNotConfirmed(e)) needsConfirm.value = true
   } finally {
     submitting.value = false
   }
@@ -175,11 +187,12 @@ async function submit() {
 
 async function resend() {
   resent.value = false
+
   try {
     await auth.resendConfirmation(email.value.trim())
     resent.value = true
   } catch (e) {
-    error.value = e?.message || 'Could not resend. Try again.'
+    error.value = authErrorCopy(e, 'Could not resend. Try again.')
   }
 }
 </script>

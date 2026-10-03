@@ -9,15 +9,31 @@ SQLite in unit tests) the query is never executed because tests patch this
 module.
 """
 
+import functools
+import logging
 from dataclasses import dataclass
 from typing import Sequence
 from uuid import uuid4
 
-from sqlalchemy import delete as _delete, select
+from sqlalchemy import delete as _delete
+from sqlalchemy import select, text
+from sqlalchemy.exc import ProgrammingError
 from sqlalchemy.orm import Session
 
+from config import settings
 from db.models import ChunkEmbedding, Document
 from services.sql_dialect import dialect_insert
+
+log = logging.getLogger(__name__)
+
+
+# Cached so it warns at most once per process if the server rejects the HNSW GUCs.
+@functools.cache
+def _warn_hnsw_tuning_rejected() -> None:
+    log.warning(
+        "hnsw search tuning rejected by the server; "
+        "falling back to pgvector defaults (needs pgvector >= 0.8)"
+    )
 
 
 @dataclass(frozen=True)
@@ -80,6 +96,45 @@ def delete_document_chunks(db: Session, document_id: int) -> int:
     return result.rowcount or 0
 
 
+def _apply_hnsw_tuning(db: Session) -> None:
+    """F-10: widen the HNSW candidate list for the search transaction.
+
+    The search post-filters on `documents.status = 'ready'`, so an HNSW scan
+    that returns exactly k candidates can yield fewer than k usable rows.
+    `hnsw.ef_search` enlarges the per-scan candidate list, and pgvector 0.8's
+    `hnsw.iterative_scan = strict_order` re-scans deeper until k rows survive
+    the filter while preserving exact distance ordering (`relaxed_order` would
+    return rows slightly out of order).
+
+    Both are `SET LOCAL`, i.e. transaction-scoped, so they must be issued in
+    the same transaction as the search, immediately before it. SET cannot take
+    bind parameters, so `ef_search` goes through `set_config(name, value,
+    is_local=true)` (the bind-safe equivalent of SET LOCAL); int() is the
+    validation. The pair runs inside a SAVEPOINT: on a pgvector < 0.8 server
+    `iterative_scan` is an unknown GUC and raises, which would otherwise abort
+    the whole transaction and take the search down with it.
+
+    The savepoint is taken at Core level (`db.connection().begin_nested()`)
+    rather than via `Session.begin_nested()`, which unconditionally flushes
+    pending ORM state regardless of autoflush. This session runs with
+    autoflush=False by design, and retrieval is invoked mid-turn with
+    profile/event rows potentially pending; forcing a flush here would
+    surface an unrelated write error as a retrieval failure.
+    """
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    ef_search = int(settings.hnsw_ef_search)
+    try:
+        with db.connection().begin_nested():
+            db.execute(
+                text("SELECT set_config('hnsw.ef_search', :v, true)"),
+                {"v": str(ef_search)},
+            )
+            db.execute(text("SET LOCAL hnsw.iterative_scan = strict_order"))
+    except ProgrammingError:
+        _warn_hnsw_tuning_rejected()
+
+
 def query_chunks(
     db: Session,
     session_id: str,
@@ -87,6 +142,7 @@ def query_chunks(
     k: int,
 ) -> list[RetrievedChunk]:
     """Return top-k chunks for the session, ordered by cosine distance asc."""
+    _apply_hnsw_tuning(db)
     distance = ChunkEmbedding.embedding.cosine_distance(query_embedding)
     stmt = (
         select(ChunkEmbedding, distance.label("score"), Document.filename)

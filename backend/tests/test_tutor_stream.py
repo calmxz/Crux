@@ -29,10 +29,10 @@ import pytest
 from agent.types import ToolContext
 from config import settings
 from contracts import Citation, ToolResult, TopicProfile
-from db.models import ChatMessage, LlmCallLog, Session as SessionModel, User
+from db.models import ChatMessage, LlmCallLog, User
+from db.models import Session as SessionModel
 from services import cost_meter
 from services.cost_meter import CapStatus
-
 
 # ---------------------------------------------------------------------------
 # Streaming chunk builders

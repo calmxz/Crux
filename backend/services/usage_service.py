@@ -11,8 +11,9 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from contracts import DailySpend, SessionSpend, UsageSummaryResponse
-from db.models import DailyCostLedger, LlmCallLog, Session as SessionModel
-from services.cost_meter import check_cap_from_spend
+from db.models import DailyCostLedger, LlmCallLog
+from db.models import Session as SessionModel
+from services.cost_meter import check_cap_from_spend, next_midnight_utc
 
 WINDOW_DAYS = 14
 TOP_SESSIONS = 3
@@ -21,7 +22,8 @@ TOP_SESSIONS = 3
 def usage_summary(
     db: Session, user_id: str, now: datetime | None = None
 ) -> UsageSummaryResponse:
-    today = (now or datetime.now(timezone.utc)).date()
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
     window = [today - timedelta(days=i) for i in range(WINDOW_DAYS - 1, -1, -1)]
     keys = [d.isoformat() for d in window]
 
@@ -62,4 +64,5 @@ def usage_summary(
         urgent_cap_usd=float(caps.urgent_cap),
         hard_cap_usd=float(caps.hard_cap),
         top_sessions=top_sessions,
+        resets_at=next_midnight_utc(now),
     )

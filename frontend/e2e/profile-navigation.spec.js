@@ -24,7 +24,7 @@ test.describe.skip('profile navigation', () => {
     // Home -> Combined profile
     await page.getByTestId('home-profile-link').click()
     await expect(page).toHaveURL(/\/profile$/)
-    await expect(page.getByTestId('agg-profile')).toBeVisible()
+    await expect(page.getByTestId('agg-learning')).toBeVisible()
 
     // Empty state on first run.
     await expect(page.getByTestId('agg-empty')).toBeVisible()

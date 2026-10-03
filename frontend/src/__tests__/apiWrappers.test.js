@@ -46,6 +46,15 @@ describe('api wrappers', () => {
     fetchMock.mockReturnValueOnce(ok([]))
     await sessionsApi.listSessions()
     expect(fetchMock.mock.calls[0][0]).not.toContain('user_id=')
+    expect(fetchMock.mock.calls[0][0]).not.toContain('limit=')
+    expect(fetchMock.mock.calls[0][0]).not.toContain('offset=')
+  })
+
+  it('listSessions forwards limit/offset when given (F-06)', async () => {
+    fetchMock.mockReturnValueOnce(ok([]))
+    await sessionsApi.listSessions({ limit: 5, offset: 10 })
+    expect(fetchMock.mock.calls[0][0]).toContain('limit=5')
+    expect(fetchMock.mock.calls[0][0]).toContain('offset=10')
   })
 
   it('getSession hits /sessions/:id without user_id query', async () => {

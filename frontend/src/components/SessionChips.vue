@@ -1,5 +1,5 @@
 <script setup>
-import { LEVEL_MARK_PATH, levelStroke } from './chat/levelMark.js'
+import { LEVEL_MARK_PATH, TICK_PATH, levelStroke } from './chat/levelMark.js'
 
 defineProps({
   /** Optional id so consumers can reference the chip row from aria-describedby. */
@@ -45,7 +45,7 @@ defineProps({
       >
         <span class="chip-glyph" aria-hidden="true">
           <svg viewBox="0 0 12 12" width="10" height="10" focusable="false">
-            <path d="M2 6.5 L4.8 9.2 L10 3.2" />
+            <path :d="TICK_PATH" />
           </svg>
         </span>
         <span class="chip-text">{{ variant === 'card' ? chip.label : chip.count }}</span>

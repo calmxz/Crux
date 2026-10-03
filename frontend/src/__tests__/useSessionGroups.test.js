@@ -23,6 +23,7 @@ describe('useSessionGroups', () => {
       sess({ id: 'today', created_at: iso('2026-05-30T08:00:00Z') }),
       sess({ id: 'week', created_at: iso('2026-05-27T08:00:00Z') }),
     ])
+
     const { activeRows } = useSessionGroups(sessions, ref(''))
     expect(activeRows.value.map((r) => r.id)).toEqual(['today', 'week', 'older'])
   })
@@ -32,6 +33,7 @@ describe('useSessionGroups', () => {
       sess({ id: 'p', pinned: true, created_at: iso('2026-05-01T08:00:00Z') }),
       sess({ id: 'today', created_at: iso('2026-05-30T08:00:00Z') }),
     ])
+
     const { pinnedActive, activeRows } = useSessionGroups(sessions, ref(''))
     expect(pinnedActive.value.map((r) => r.id)).toEqual(['p'])
     expect(activeRows.value.map((r) => r.id)).not.toContain('p')
@@ -42,6 +44,7 @@ describe('useSessionGroups', () => {
       sess({ id: 'p-old', pinned: true, last_activity_at: iso('2026-05-30T06:00:00Z') }),
       sess({ id: 'p-new', pinned: true, last_activity_at: iso('2026-05-30T11:00:00Z') }),
     ])
+
     const { pinnedActive } = useSessionGroups(sessions, ref(''))
     expect(pinnedActive.value.map((r) => r.id)).toEqual(['p-new', 'p-old'])
   })
@@ -51,6 +54,7 @@ describe('useSessionGroups', () => {
       sess({ id: 'e', ended_at: iso('2026-05-29T08:00:00Z'), pinned: true }),
       sess({ id: 'a', created_at: iso('2026-05-30T08:00:00Z') }),
     ])
+
     const { endedRows, pinnedActive, activeRows } = useSessionGroups(sessions, ref(''))
     expect(endedRows.value.map((r) => r.id)).toEqual(['e'])
     expect(pinnedActive.value).toEqual([])
@@ -62,10 +66,12 @@ describe('useSessionGroups', () => {
       sess({ id: 'a', topic: 'Photosynthesis', pinned: true }),
       sess({ id: 'b', topic: 'Big-O notation', ended_at: iso('2026-05-29T08:00:00Z') }),
     ])
+
     const { searching, activeRows, pinnedActive, endedRows } = useSessionGroups(
       sessions,
       ref('big'),
     )
+
     expect(searching.value).toBe(true)
     expect(activeRows.value).toEqual([])
     expect(pinnedActive.value).toEqual([])
@@ -87,6 +93,7 @@ describe('useSessionGroups', () => {
       }),
       sess({ id: 'made-later', created_at: iso('2026-05-20T08:00:00Z') }),
     ])
+
     const { activeRows } = useSessionGroups(sessions, ref(''))
     expect(activeRows.value.map((r) => r.id)).toEqual(['touched', 'made-later'])
   })
@@ -96,6 +103,7 @@ describe('useSessionGroups', () => {
       sess({ id: 'noact', created_at: iso('2026-05-30T08:00:00Z'), last_activity_at: null }),
       sess({ id: 'older', created_at: iso('2026-05-02T08:00:00Z'), last_activity_at: null }),
     ])
+
     const { activeRows } = useSessionGroups(sessions, ref(''))
     expect(activeRows.value.map((r) => r.id)).toEqual(['noact', 'older'])
   })
@@ -113,6 +121,7 @@ describe('useSessionGroups', () => {
         last_activity_at: iso('2026-05-30T08:00:00Z'),
       }),
     ])
+
     const { endedRows } = useSessionGroups(sessions, ref(''))
     expect(endedRows.value.map((r) => r.id)).toEqual(['e-today', 'e-old'])
   })

@@ -3,9 +3,8 @@
 Revision ID: 0015_llm_call_log_tokens
 Revises: 0014_llm_call_log
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "0015_llm_call_log_tokens"
 down_revision = "0014_llm_call_log"

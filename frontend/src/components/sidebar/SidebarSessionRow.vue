@@ -2,8 +2,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useSidebar } from '@/composables/useSidebar.js'
-import { useSessionStore } from '@/stores/session.js'
-import { useToast } from '@/composables/useToast.js'
+import { useSessionActions } from '@/composables/useSessionActions.js'
 import SidebarRowMenu from './SidebarRowMenu.vue'
 
 const props = defineProps({
@@ -13,35 +12,43 @@ const props = defineProps({
 })
 
 const route = useRoute()
-const router = useRouter()
-const store = useSessionStore()
-const { mode, closeDrawer } = useSidebar()
-const { showSuccess, showError } = useToast()
 
-const busy = ref(false)
+const router = useRouter()
+
+const { closeDrawer } = useSidebar()
+
+const actions = useSessionActions()
+
+const { busy } = actions
 
 const renaming = ref(false)
+
 const draft = ref('')
+
 const inputEl = ref(null)
+
 const menuEl = ref(null)
 
 const isCurrent = computed(() => route.params.id === props.session.id)
-const isCollapsed = computed(() => mode.value === 'collapsed')
-
-const tooltip = computed(() => props.session.topic || 'Untitled')
 
 // Row label cells. SessionListItem.progress carries focus_target_gap, level,
 // and mastered_count. Only the topic is shown on the row; the rest still feed
 // the aria-label for screen readers.
 const masteredCount = computed(() => props.session.progress?.mastered_count || 0)
+
 const focusCue = computed(() => props.session.progress?.focus_target_gap || '')
+
 const level = computed(() => props.session.progress?.level || null)
 
 const rowLabel = computed(() => {
   const parts = [`Open session: ${props.session.topic || 'Untitled'}`]
+
   if (level.value) parts.push(`level ${level.value}`)
+
   if (focusCue.value) parts.push(`focus ${focusCue.value}`)
+
   if (masteredCount.value) parts.push(`${masteredCount.value} mastered`)
+
   return parts.join(', ')
 })
 
@@ -50,52 +57,20 @@ function openSession() {
   router.push({ name: 'session', params: { id: props.session.id } })
 }
 
-async function onEnd() {
-  if (busy.value) return
-  busy.value = true
-  try {
-    await store.endSession(props.session.id)
-    // F-44: the summary dialog lives in SessionView; ending from anywhere
-    // else would silently drop the pending summary. Toast it instead.
-    const s = store.pendingSummary
-    const onThatSession = route.name === 'session' && route.params.id === props.session.id
-    if (s && s.sessionId === props.session.id && !onThatSession) {
-      showSuccess(s.text)
-      store.consumePendingSummary()
-    }
-  } catch {
-    /* store.error populated */
-  } finally {
-    busy.value = false
-  }
+// E-12: ending a session is one-way from the row's point of view -- there is no
+// undo on the row and the learner may be several screens from the transcript --
+// so it asks first. Same dialog contract as the file delete in
+// ReferenceStatusBanner: no icon, neutral cancel, strong destructive accept.
+function onEnd() {
+  actions.confirmEnd(props.session)
 }
 
-async function onResume() {
-  if (busy.value) return
-  busy.value = true
-  try {
-    await store.reopenSession(props.session.id)
-    closeDrawer()
-    router.push({ name: 'session', params: { id: props.session.id } })
-  } catch {
-    /* store.error populated */
-  } finally {
-    busy.value = false
-  }
+function onResume() {
+  actions.resume(props.session)
 }
 
-async function onContinueTopic() {
-  if (busy.value) return
-  busy.value = true
-  try {
-    const created = await store.continueTopic(props.session)
-    if (created) router.push({ name: 'session', params: { id: created.id } })
-    closeDrawer()
-  } catch {
-    /* F-06: store.error populated; without this the rethrow is unhandled */
-  } finally {
-    busy.value = false
-  }
+function onContinueTopic() {
+  actions.continueTopic(props.session)
 }
 
 // Rename never moves the row between lists, so this instance's own menu is
@@ -117,9 +92,7 @@ function refocusRowTrigger(id) {
 
 function setPin(on) {
   const id = props.session.id
-  store
-    .setPinned(id, on)
-    .catch(() => showError(on ? 'Could not pin the session.' : 'Could not unpin the session.'))
+  actions.setPinned(props.session, on)
   refocusRowTrigger(id)
 }
 
@@ -139,14 +112,9 @@ function cancelRename() {
 
 async function commitRename() {
   if (!renaming.value) return
-  const next = draft.value.trim()
+  const next = draft.value
   renaming.value = false
-  if (!next || next === (props.session.topic || '')) return
-  try {
-    await store.renameSession(props.session.id, next)
-  } catch {
-    showError('Could not rename the session.')
-  }
+  await actions.rename(props.session, next)
 }
 
 function commitRenameFromKey() {
@@ -161,23 +129,20 @@ function commitRenameFromKey() {
     :class="{
       'sb-row--current': isCurrent,
       'sb-row--ended': state === 'ended',
-      'sb-row--collapsed': isCollapsed,
     }"
     :data-session-id="session.id"
     :data-testid="`sidebar-row-${session.id}`"
   >
     <button
       type="button"
-      class="sb-row-button"
+      class="sb-row-button hit-44"
       :aria-current="isCurrent ? 'page' : undefined"
       :aria-label="rowLabel"
-      :title="isCollapsed ? tooltip : ''"
       data-testid="sidebar-row-open"
       @click="openSession"
     >
-      <span v-if="isCollapsed" class="sb-row-mark" aria-hidden="true" />
       <input
-        v-else-if="renaming"
+        v-if="renaming"
         ref="inputEl"
         v-model="draft"
         type="text"
@@ -210,7 +175,6 @@ function commitRenameFromKey() {
       </span>
     </button>
     <SidebarRowMenu
-      v-if="!isCollapsed"
       ref="menuEl"
       :state="state"
       :busy="busy"
@@ -244,16 +208,15 @@ function commitRenameFromKey() {
 }
 
 /* The current session sits on its own white card, the one row on the
-   contents page that is allowed to lift off the ground. Collapsed rail rows
-   stay dots only (below), so the card treatment is expanded-only. */
-.sb-row--current:not(.sb-row--collapsed) {
+   contents page that is allowed to lift off the ground. */
+.sb-row--current {
   background: var(--card);
   border: 1px solid var(--card-edge);
   box-shadow: 0 1px 0 var(--card-drop);
 }
 
-.sb-row--current:not(.sb-row--collapsed):hover,
-.sb-row--current:not(.sb-row--collapsed):focus-within {
+.sb-row--current:hover,
+.sb-row--current:focus-within {
   background: var(--card);
 }
 
@@ -306,36 +269,6 @@ function commitRenameFromKey() {
 
 .sb-row--current .sb-row-topic {
   font-weight: 700;
-}
-
-/* Collapsed rail: the row is a short pencil stroke; current turns blue. */
-.sb-row--collapsed {
-  justify-content: center;
-}
-
-.sb-row--collapsed .sb-row-button {
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-
-/* Collapsed spine: one dot per session, current turns blue. */
-.sb-row-mark {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--pencil);
-  opacity: 0.6;
-}
-
-.sb-row--ended .sb-row-mark {
-  background: var(--rule-strong);
-  opacity: 1;
-}
-
-.sb-row--current .sb-row-mark {
-  background: var(--color-accent);
-  opacity: 1;
 }
 
 /* Renaming writes on the same rule the row sits on. */

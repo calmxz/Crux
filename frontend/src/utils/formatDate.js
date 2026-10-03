@@ -41,10 +41,12 @@ export const formatRelative = (iso) => {
   if (!iso) return ''
   const diffSec = (new Date(iso).getTime() - Date.now()) / 1000
   const absSec = Math.abs(diffSec)
+
   for (const { limit, divisor, unit } of STEPS) {
     if (absSec < limit) {
       return RTF.format(Math.round(diffSec / divisor), unit)
     }
   }
+
   return RTF.format(Math.round(diffSec / 31557600), 'year')
 }
