@@ -567,3 +567,38 @@ async def test_disconnect_drains_producer_before_releasing_reserve(
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000"), (
         "the per-turn reserve was left on the ledger"
     )
+
+
+@pytest.mark.asyncio
+async def test_prepare_failure_under_cancel_releases_the_reservation(
+    db_session, seeded_session, monkeypatch
+):
+    """#421: a cancel after the cost reservation (B-05) is committed, but
+    before the stream starts, must still hand the reservation back. Under a
+    level-triggered cancel an unshielded release is cancelled with it.
+    """
+    import anyio
+
+    from routes import chat as chat_route
+    from services import cost_meter
+
+    uid = seeded_session.user_id
+    before = cost_meter.current_spend(db_session, uid)
+    reserved = asyncio.Event()
+
+    async def hang_after_guards(*args, **kwargs):
+        reserved.set()
+        await asyncio.sleep(3600)
+
+    monkeypatch.setattr(chat_route, "_prepare_turn_after_guards", hang_after_guards)
+
+    req = ChatRequest(session_id=seeded_session.id, message="hi")
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(_prepare_turn, req, uid, db_session)
+        await reserved.wait()
+        assert cost_meter.current_spend(db_session, uid) > before
+        tg.cancel_scope.cancel()
+
+    assert cost_meter.current_spend(db_session, uid) == before, (
+        "the per-turn reservation was left on the ledger"
+    )
