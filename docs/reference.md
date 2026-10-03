@@ -77,9 +77,22 @@ the PRE-increment total. Concurrent turns serialise on the ledger row, so each
 sees a distinct total and only those below the hard cap are admitted. The turn
 releases the reserve with `adjust_cost(db, user_id, -reserve)` on every exit path
 of `chat_stream` (normal, cancel, exception); a rate-limit reject after
-`ensure_user` has committed releases explicitly. Consequences: the usage ledger
-reads `reserve` high for the duration of a turn, and a process crash mid-turn
-leaves the reserve on the ledger until UTC midnight.
+`ensure_user` has committed releases explicitly, and a failure between the guards
+and the stream start releases in `_prepare_turn`'s `except BaseException` arm.
+Consequences: the usage ledger reads `reserve` high for the duration of a turn,
+and a process crash mid-turn leaves the reserve on the ledger until UTC midnight.
+
+### Stream cleanup must be shielded (#421)
+
+Starlette cancels a streaming response's task on client disconnect (and on
+shutdown), and anyio's cancel is level-triggered: once the scope is cancelled,
+every later `await` in cleanup raises `CancelledError` at once. An unshielded
+`await task` also forwards the cancel into the producer, killing the tutor's
+cancel arm before it persists the partial reply and its cost. So any cleanup that
+must finish (draining the producer, releasing the B-05 reserve) runs inside
+`anyio.CancelScope(shield=True)`: `chat_stream`'s finally, the check follow-up
+pump in `routes/sessions.py`, and `_prepare_turn`'s release-on-failure. Drain
+before release, in one shield, because both touch the same `Session`.
 
 ### Liveness vs readiness (G-07)
 

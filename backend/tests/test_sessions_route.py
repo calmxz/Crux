@@ -994,7 +994,7 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
     db_session.add(SessionModel(id=sid, user_id=USER_ID, topic="sql"))
     db_session.commit()
 
-    state = {"arm_done": False}
+    arm_done = asyncio.Event()
     started = asyncio.Event()
 
     async def fake_run_streaming(messages, system_prompt, ctx):
@@ -1016,7 +1016,7 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
             )
             await asyncio.sleep(0.05)
             ctx.db.commit()
-            state["arm_done"] = True
+            arm_done.set()
             raise
 
     monkeypatch.setattr(sessions_route.tutor, "run_streaming", fake_run_streaming)
@@ -1043,12 +1043,10 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
         # Simulate Starlette's disconnect handling: cancel the scope the
         # response body iterator runs in.
         tg.cancel_scope.cancel()
-    assert state["arm_done"] is True, (
+    assert arm_done.is_set(), (
         "the pump returned while the tutor's cancel arm was still unwinding"
     )
-    # Stand-in for get_db teardown closing the request Session. It runs after
-    # the pump returns, so the row must already be committed; the ordering
-    # assert above is what proves the drain.
+    # get_db teardown stand-in; the assert above is what proves the drain.
     db_session.close()
 
     cancelled = db_session.execute(

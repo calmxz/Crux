@@ -592,13 +592,9 @@ async def test_prepare_failure_under_cancel_releases_the_reservation(
 
     monkeypatch.setattr(chat_route, "_prepare_turn_after_guards", hang_after_guards)
 
-    async def prepare():
-        await _prepare_turn(
-            ChatRequest(session_id=seeded_session.id, message="hi"), uid, db_session
-        )
-
+    req = ChatRequest(session_id=seeded_session.id, message="hi")
     async with anyio.create_task_group() as tg:
-        tg.start_soon(prepare)
+        tg.start_soon(_prepare_turn, req, uid, db_session)
         await reserved.wait()
         assert cost_meter.current_spend(db_session, uid) > before
         tg.cancel_scope.cancel()
