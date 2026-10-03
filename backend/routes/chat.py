@@ -484,7 +484,10 @@ async def _prepare_turn(
             req, user_id, db, session, ingestion_status, learner_prefs
         )
     except BaseException:
-        await run_in_threadpool(_release_reserve, db, user_id)
+        # #421: shielded, or a cancel here cancels the release too (see
+        # chat_stream's finally).
+        with anyio.CancelScope(shield=True):
+            await run_in_threadpool(_release_reserve, db, user_id)
         raise
 
 

@@ -969,3 +969,89 @@ def test_patch_session_empty_topic_is_422(client, seeded_user, db_session):
     db_session.commit()
     r = client.patch("/api/sessions/s-ws2", json={"topic": ""})
     assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
+    db_session, seeded_user, monkeypatch
+):
+    """#421: on a disconnect the ambient cancel is level-triggered, so an
+    unshielded drain of the follow-up producer forwards the cancel into the
+    tutor's cancel arm and kills it at its first suspension (the drain of an
+    in-flight tool call), before the partial reply is committed. The drain
+    must run shielded, as in chat_stream.
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    import anyio
+    from sqlalchemy import func, select
+
+    from agent.stream_events import StreamEvent
+    from routes import sessions as sessions_route
+
+    sid = "s-followup-cancel"
+    db_session.add(SessionModel(id=sid, user_id=USER_ID, topic="sql"))
+    db_session.commit()
+
+    state = {"arm_done": False}
+    started = asyncio.Event()
+
+    async def fake_run_streaming(messages, system_prompt, ctx):
+        try:
+            yield StreamEvent("assistant_delta", {"text": "partial"})
+            started.set()
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            # Mirrors tutor.py's cancel arm with a tool call in flight: stage
+            # the row, suspend on the dispatch drain, then commit.
+            ctx.db.add(
+                ChatMessage(
+                    session_id=sid,
+                    role="assistant",
+                    content="partial",
+                    status="cancelled",
+                    cancelled_at=datetime.now(timezone.utc),
+                )
+            )
+            await asyncio.sleep(0.05)
+            ctx.db.commit()
+            state["arm_done"] = True
+            raise
+
+    monkeypatch.setattr(sessions_route.tutor, "run_streaming", fake_run_streaming)
+
+    async def _not_disconnected():
+        return False
+
+    request = SimpleNamespace(headers={}, is_disconnected=_not_disconnected)
+    ctx = ToolContext(
+        db=db_session,
+        session_id=sid,
+        user_id=USER_ID,
+        turn_started_at=datetime.now(timezone.utc),
+    )
+    resp = sessions_route._followup_response(request, True, [], "", ctx)
+
+    async def consume():
+        async for _chunk in resp.body_iterator:
+            pass
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(consume)
+        await started.wait()
+        # Simulate Starlette's disconnect handling: cancel the scope the
+        # response body iterator runs in.
+        tg.cancel_scope.cancel()
+    assert state["arm_done"] is True, (
+        "the pump returned while the tutor's cancel arm was still unwinding"
+    )
+    # Stand-in for get_db teardown closing the request Session.
+    db_session.close()
+
+    cancelled = db_session.execute(
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(ChatMessage.session_id == sid, ChatMessage.status == "cancelled")
+    ).scalar_one()
+    assert cancelled == 1, "the partial follow-up reply was not persisted"

@@ -6,6 +6,7 @@ import uuid
 from datetime import datetime, timezone
 from typing import Literal
 
+import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select, update
@@ -984,16 +985,20 @@ def _followup_response(request: Request, allowed, messages, system_prompt, ctx):
                 if event.type in ("done", "error", "cancelled"):
                     break
         finally:
-            if not task.done():
-                task.cancel()
-                try:
-                    await task
-                except asyncio.CancelledError:
-                    pass  # expected: we just cancelled the producer task
-                except Exception:
-                    logger.exception(
-                        "Unexpected error while cancelling follow-up streaming task"
-                    )
+            # #421: drain shielded, or the disconnect cancel is forwarded into
+            # the tutor's cancel arm and loses the partial reply and its cost.
+            # Same pump as chat_stream; see its finally for the reasoning.
+            with anyio.CancelScope(shield=True):
+                if not task.done():
+                    task.cancel()
+                    try:
+                        await task
+                    except asyncio.CancelledError:
+                        pass  # expected: we just cancelled the producer task
+                    except Exception:
+                        logger.exception(
+                            "Unexpected error while cancelling follow-up streaming task"
+                        )
 
     return StreamingResponse(
         event_stream(),
