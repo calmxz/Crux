@@ -197,8 +197,15 @@ def lock_session_row(db: Session, session_id: str) -> SessionModel:
     read-modify-write spans on Postgres (blind whole-blob writes were losing
     concurrent updates). No-op on SQLite (single-writer). The lock releases at
     the transaction's commit/rollback -- callers must commit promptly and must
-    NEVER hold it across an LLM await. Raises ValueError when missing."""
-    row = db.get(SessionModel, session_id, with_for_update=True)
+    NEVER hold it across an LLM await. Raises ValueError when missing.
+
+    #417: the returned row is fresh as of the lock (populate_existing), not
+    the identity-map copy. Flushes first so the refresh keeps the caller's
+    own pending edits (sessions run autoflush=False)."""
+    db.flush()
+    row = db.get(
+        SessionModel, session_id, with_for_update=True, populate_existing=True
+    )
     if row is None:
         raise ValueError(f"session not found: {session_id}")
     return row
