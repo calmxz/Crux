@@ -1,5 +1,5 @@
 import { useAuthStore } from '../stores/auth.js'
-import { reportCostWarning } from './costBus.js'
+import { reportCostWarningFrom } from './costBus.js'
 import { reportApiError } from './errorBus.js'
 
 // Set VITE_API_BASE_URL in frontend/.env or frontend/.env.local to override.
@@ -367,9 +367,7 @@ async function request(
     throw err
   }
 
-  const warn = resp.headers?.get?.('x-cost-warning')
-
-  if (warn) reportCostWarning({ header: warn, path })
+  reportCostWarningFrom(resp, path)
 
   // Written even for fresh: true -- the response is current either way, and a
   // poller's fresh read is exactly what a following cached read should see.
