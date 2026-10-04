@@ -424,6 +424,94 @@ def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
     assert profile == TopicProfile()
 
 
+def _seed_one_bad_entry(db_session):
+    """#436 probe seed: one mastered entry carries a retired evidence_type."""
+    row = db_session.get(SessionModel, SESSION_ID)
+    row.topic_profile_json = json.dumps(
+        {
+            "knowledge_level": "intermediate",
+            "mastered_concepts": [
+                {"name": "joins", "evidence_type": "declared"},
+                {"name": "views", "evidence_type": "inferred"},
+            ],
+            "confirmed_gaps": [{"name": "indexes"}],
+            "last_session_summary": "covered joins",
+        }
+    )
+    db_session.commit()
+
+
+def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session):
+    _seed_one_bad_entry(db_session)
+
+    profile = profile_service.load_profile(db_session, SESSION_ID)
+    assert profile.knowledge_level == "intermediate"
+    assert concept_names(profile.mastered_concepts) == ["joins"]
+    assert concept_names(profile.confirmed_gaps) == ["indexes"]
+    assert profile.last_session_summary == "covered joins"
+
+
+def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session):
+    _seed_one_bad_entry(db_session)
+
+    profile_service.apply_user_patch(db_session, SESSION_ID, add_gap="subqueries")
+
+    stored = json.loads(db_session.get(SessionModel, SESSION_ID).topic_profile_json)
+    assert stored["knowledge_level"] == "intermediate"
+    assert [e["name"] for e in stored["mastered_concepts"]] == ["joins"]
+    assert [e["name"] for e in stored["confirmed_gaps"]] == ["indexes", "subqueries"]
+    assert stored["last_session_summary"] == "covered joins"
+
+
+def test_invalid_level_is_dropped_lists_are_kept():
+    p = _parse_profile(
+        '{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}'
+    )
+    assert p.knowledge_level is None
+    assert concept_names(p.mastered_concepts) == ["joins"]
+
+
+def test_bad_subtopic_level_dropped_others_kept():
+    p = _parse_profile('{"subtopic_levels": {"a": "beginner", "b": "wizard"}}')
+    assert p.subtopic_levels == {"a": "beginner"}
+
+
+def test_salvage_drops_bad_elements_and_unlistable_fields():
+    p = _parse_profile(
+        json.dumps(
+            {
+                "confirmed_gaps": [{"name": "a", "stale": 1}, "b"],
+                "mastered_concepts": "not a list",
+                "retired_field": True,
+            }
+        )
+    )
+    assert concept_names(p.confirmed_gaps) == ["b"]
+    assert p.mastered_concepts == []
+
+
+def test_salvage_warning_carries_no_learner_text(caplog):
+    with caplog.at_level("WARNING", logger="services.profile_service"):
+        _parse_profile(
+            json.dumps(
+                {
+                    "knowledge_level": "expert",
+                    "mastered_concepts": [
+                        {"name": "secret-concept", "evidence_type": "inferred"}
+                    ],
+                    "confirmed_gaps": [{"name": "secret-gap", "x": 1}],
+                    "focus_target_gap": 7,
+                    "last_session_summary": "secret summary",
+                    "subtopic_levels": {"secret-sub": "wizard"},
+                }
+            )
+        )
+    text = caplog.text
+    assert "salvaged" in text
+    for secret in ("secret-concept", "secret-gap", "secret summary", "secret-sub"):
+        assert secret not in text
+
+
 def test_save_profile_commit_false_defers_write(session_row, db_session):
     """commit=False leaves the write in the open transaction so a caller can
     batch it into one atomic commit (used by record_from_answer to close the

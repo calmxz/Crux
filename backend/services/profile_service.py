@@ -39,6 +39,7 @@ from db.models import Session as SessionModel
 log = logging.getLogger(__name__)
 
 MAX_SUBTOPICS = 20
+_CONCEPT_LIST_KEYS = ("mastered_concepts", "confirmed_gaps")
 
 
 def canon(name: str) -> str:
@@ -95,7 +96,7 @@ def _upgrade_concept_lists(data: dict) -> dict:
     """Element-level legacy upgrade: bare-string concepts become ConceptEntry
     dicts. Permanent, not a transition shim: seed_from_prior copies raw JSON
     forward on resume, so pre-slice-8 blobs can arrive indefinitely."""
-    for key in ("mastered_concepts", "confirmed_gaps"):
+    for key in _CONCEPT_LIST_KEYS:
         items = data.get(key)
         if isinstance(items, list):
             data[key] = [
@@ -105,6 +106,50 @@ def _upgrade_concept_lists(data: dict) -> dict:
                 for it in items
             ]
     return data
+
+
+def _validates(validate, value) -> bool:
+    try:
+        validate(value)
+    except ValidationError:
+        return False
+    return True
+
+
+def _salvage_profile(known: dict) -> tuple[TopicProfile, dict[str, int]]:
+    """#436: keep every field, list element and subtopic entry that validates
+    on its own; drop the rest. All-or-nothing here would blank the profile on
+    read, and the next load -> mutate -> save of any writer would persist the
+    blank. Returns the profile and a per-field count of dropped values (an
+    unsalvageable field counts as 1)."""
+    kept: dict = {}
+    dropped: dict[str, int] = {}
+    for key, value in known.items():
+        if key in _CONCEPT_LIST_KEYS and isinstance(value, list):
+            good = [
+                v for v in value if _validates(ConceptEntry.model_validate, v)
+            ]
+        elif key == "subtopic_levels" and isinstance(value, dict):
+            good = {
+                k: v
+                for k, v in value.items()
+                if _validates(TopicProfile.model_validate, {key: {k: v}})
+            }
+        elif _validates(TopicProfile.model_validate, {key: value}):
+            kept[key] = value
+            continue
+        else:
+            dropped[key] = 1
+            continue
+        kept[key] = good
+        if len(good) < len(value):
+            dropped[key] = len(value) - len(good)
+    try:
+        return TopicProfile.model_validate(kept), dropped
+    except ValidationError:
+        # Unreachable while TopicProfile has no cross-field validators; keeps
+        # the never-raises contract if one is ever added.
+        return TopicProfile(), {k: 1 for k in known}
 
 
 def _parse_profile(raw: str | None) -> TopicProfile:
@@ -117,7 +162,8 @@ def _parse_profile(raw: str | None) -> TopicProfile:
     forward (sessions.py / seed_from_prior); a retired field left in an old row
     would otherwise raise ValidationError and 500 every read of that session
     (and the whole /profile aggregate). So: try strict parse, then drop unknown
-    keys and re-validate, then fall back to an empty profile. Never raises.
+    keys and re-validate, then salvage field by field (_salvage_profile). Only
+    a non-dict or non-JSON blob gives an empty profile. Never raises.
     Also upgrades legacy bare-string concept-list elements to ConceptEntry
     dicts before validation (see _upgrade_concept_lists).
     """
@@ -137,13 +183,20 @@ def _parse_profile(raw: str | None) -> TopicProfile:
         log.debug("topic_profile strict validation failed; retrying on known fields")
     known = {k: v for k, v in data.items() if k in TopicProfile.model_fields}
     dropped = sorted(set(data) - set(known))
+    salvaged: dict[str, int] = {}
     try:
         profile = TopicProfile.model_validate(known)
     except ValidationError:
-        log.warning("topic_profile failed strict reparse; using empty profile")
-        return TopicProfile()
-    if dropped:
-        log.warning("dropped legacy topic_profile fields on load: %s", dropped)
+        profile, salvaged = _salvage_profile(known)
+    if dropped or salvaged:
+        # Field names and counts only: concept, gap and summary text is
+        # learner free text (G-05).
+        log.warning(
+            "repaired topic_profile on load; dropped legacy fields %s, "
+            "salvaged invalid values per field %s",
+            dropped,
+            salvaged,
+        )
     return profile
 
 
