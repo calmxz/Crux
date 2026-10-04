@@ -9,7 +9,7 @@ const props = defineProps({
   streamingMessage: { type: Object, default: null },
   awaiting: { type: Boolean, default: false },
   // Cue-lands: the latest tutor turn changed the profile, so its gutter
-  // carries the blue tick until the learner writes again.
+  // carries the blue tick until the next tutor turn starts.
   landed: { type: Boolean, default: false },
 })
 
