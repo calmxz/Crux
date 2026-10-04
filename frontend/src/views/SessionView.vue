@@ -421,7 +421,6 @@ const topicCard = computed(() => {
 async function onTopicPick(text) {
   if (!canSend.value) return
   lastError.value = null
-  cuesLanded.value = false
   sending.value = true
 
   try {
@@ -454,7 +453,7 @@ async function loadDiagProfile(id) {
 // non-idle -> idle (finish), not every individual hop.
 const streamAnnouncement = ref('')
 
-// Both things this view does on a stream-state edge, in one watcher.
+// Everything this view does on a stream-state edge, in one watcher.
 //
 // F2: the agent may have conversationally recorded a declared level
 // (update_topic_profile) during the turn -- that only becomes visible to us
@@ -471,6 +470,8 @@ watch(
   (next, prev) => {
     if (prev === 'idle' && next !== 'idle') {
       streamAnnouncement.value = 'Tutor is replying.'
+      // A new tutor turn spends the previous turn's tick, whatever started it.
+      cuesLanded.value = false
 
       return
     }
@@ -540,7 +541,7 @@ const canSend = computed(() => canEnd.value && !store.dailyCapReached && !store.
 
 // Cue-lands: CueColumn diffs the live profile and tells us when new cues were
 // written; the gutter of the latest tutor turn then carries the blue tick
-// until the learner writes again.
+// until the next tutor turn starts (the stream-state watcher clears it).
 const cuesLanded = ref(false)
 
 function onCuesLanded() {
@@ -945,8 +946,6 @@ async function send() {
   draft.value = ''
   lastSentText.value = text
   lastError.value = null
-  // The learner is writing again: the previous turn's landed tick is spent.
-  cuesLanded.value = false
   sending.value = true
 
   try {

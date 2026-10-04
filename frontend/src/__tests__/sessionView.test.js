@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
@@ -8,6 +8,7 @@ import SessionHeader from '@/components/chat/SessionHeader.vue'
 import SessionEndedBanner from '@/components/SessionEndedBanner.vue'
 import CheckQuestion from '@/components/chat/CheckQuestion.vue'
 import Composer from '@/components/chat/Composer.vue'
+import MessageList from '@/components/chat/MessageList.vue'
 import { StreamAbortedError } from '@/lib/errors.js'
 import { REDUCED_MOTION_QUERY } from '@/composables/useMediaQuery.js'
 import { WATCH_CEILING_MS } from '@/composables/useReferencePoll.js'
@@ -19,7 +20,7 @@ const push = vi.fn()
 // Writes the mutation back into the shared mock route so the query-strip
 // watcher/re-trigger interaction is actually exercised (a bare vi.fn() would
 // leave route.query.review_gap set, hiding a double-send regression).
-const route = { query: {} }
+let route = { query: {} }
 
 const replace = vi.fn((to) => {
   Object.assign(route.query, to.query)
@@ -2311,6 +2312,132 @@ describe('SessionView', () => {
       store.checkAnswering = true
       await nextTick()
       expect(card.props('answering')).toBe(true)
+    })
+  })
+
+  // #443: the blue tick on the latest tutor turn belongs to the reply that
+  // filed the cue. Cues land the way they do in the app: a stream finishes and
+  // the profile refetch returns an entry the real CueColumn has not seen.
+  describe('cue tick (#443)', () => {
+    const profile = (gaps = []) => ({
+      profile: {
+        knowledge_level: null,
+        confirmed_gaps: gaps.map((name) => ({ name, evidence_type: null, last_event_at: null })),
+      },
+      etag: 't1',
+    })
+
+    // A tutor turn as the store runs it: idle -> streaming -> idle, with the
+    // reply appended. The nextTick lets the stream-state watcher see both edges.
+    function reply(store) {
+      return async () => {
+        store.streamState = 'streaming'
+        await nextTick()
+        store.messages = [
+          ...store.messages,
+          { role: 'assistant', content: `reply ${store.messages.length}` },
+        ]
+        store.streamState = 'idle'
+      }
+    }
+
+    const landed = (wrapper) => wrapper.findComponent(MessageList).props('landed')
+
+    // A real router route is reactive; the query cases need the watchers to see
+    // a query set after mount.
+    beforeEach(() => {
+      route = reactive({ query: {} })
+    })
+
+    afterEach(() => {
+      route = { query: {} }
+    })
+
+    async function mountWithLandedCue() {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: [{ role: 'assistant', content: 'hi' }] })
+      })
+      vi.spyOn(store, 'sendMessageStreaming').mockImplementation(reply(store))
+      getSessionProfile.mockResolvedValue(profile())
+      const wrapper = mountView()
+      await flushPromises()
+      getSessionProfile.mockResolvedValue(profile(['joins']))
+      await wrapper.get('[data-testid="session-input"]').setValue('teach me joins')
+      await wrapper.get('[data-testid="session-send"]').trigger('click')
+      await flushPromises()
+      expect(landed(wrapper)).toBe(true)
+
+      return { store, wrapper }
+    }
+
+    const senders = {
+      'the quiz button': async ({ wrapper }) => {
+        await wrapper.get('[data-testid="diag-quiz"]').trigger('click')
+      },
+      'the level declaration': async ({ wrapper }) => {
+        patchProfile.mockResolvedValue({ ...profile(['joins']), etag: 't2' })
+        await wrapper.get('[data-testid="diag-level-advanced"]').trigger('click')
+      },
+      'a review seed': async () => {
+        route.query.review_gap = 'joins'
+      },
+      'a ?quiz link': async () => {
+        route.query.quiz = '1'
+      },
+      'a check follow-up': async ({ store, wrapper }) => {
+        store.pendingCheck = {
+          gap: 'joins',
+          total: 1,
+          currentIndex: 1,
+          viewIndex: 0,
+          items: [
+            {
+              question: 'Which join keeps unmatched left rows?',
+              options: ['inner', 'left'],
+              status: 'answered',
+              selectedIndex: 1,
+              correctIndex: 1,
+              correct: true,
+              explanation: null,
+            },
+          ],
+        }
+        vi.spyOn(store, 'completeCheck').mockImplementation(async () => {
+          store.pendingCheck = null
+          await reply(store)()
+        })
+        await nextTick()
+        wrapper.findComponent(CheckQuestion).vm.$emit('done')
+      },
+    }
+
+    it.each(Object.keys(senders))(
+      'a reply that lands no cue does not carry the previous tick: %s',
+      async (name) => {
+        const ctx = await mountWithLandedCue()
+        const before = ctx.store.messages.length
+        await senders[name](ctx)
+        await flushPromises()
+        expect(ctx.store.messages.length).toBe(before + 1)
+        expect(landed(ctx.wrapper)).toBe(false)
+      },
+    )
+
+    it('a reply that lands a cue gets the tick', async () => {
+      const ctx = await mountWithLandedCue()
+      getSessionProfile.mockResolvedValue(profile(['joins', 'subqueries']))
+      await ctx.wrapper.get('[data-testid="diag-quiz"]').trigger('click')
+      await flushPromises()
+      expect(landed(ctx.wrapper)).toBe(true)
+    })
+
+    it('typing clears the tick', async () => {
+      const { wrapper } = await mountWithLandedCue()
+      await wrapper.get('[data-testid="session-input"]').setValue('and outer joins?')
+      await wrapper.get('[data-testid="session-send"]').trigger('click')
+      await flushPromises()
+      expect(landed(wrapper)).toBe(false)
     })
   })
 })
