@@ -144,6 +144,29 @@ def test_aggregate_knowledge_level_distribution(client, db_session):
     }
 
 
+def test_aggregate_counts_valid_parts_of_a_partly_bad_row(client, db_session):
+    """#436: one retired evidence_type no longer blanks the whole row."""
+    db_session.add(User(id=USER_ID))
+    db_session.flush()
+    s = _mk_session(db_session, "bad", topic="sql")
+    s.topic_profile_json = json.dumps(
+        {
+            "knowledge_level": "advanced",
+            "mastered_concepts": [
+                {"name": "joins"},
+                {"name": "views", "evidence_type": "inferred"},
+            ],
+            "confirmed_gaps": [{"name": "indexes"}],
+        }
+    )
+    db_session.commit()
+
+    body = client.get("/api/profile/aggregate", params={"user_id": USER_ID}).json()
+    assert body["knowledge_level_distribution"]["advanced"] == 1
+    assert [c["concept"] for c in body["combined_mastered_concepts"]] == ["joins"]
+    assert [g["concept"] for g in body["combined_confirmed_gaps"]] == ["indexes"]
+
+
 def test_aggregate_event_count_and_recent_topics(client, db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()

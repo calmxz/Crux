@@ -112,16 +112,16 @@ def aggregate_for_user(
     each) for a response that never mentions them.
 
     The per-row profile parse stays in Python deliberately (plan deviation,
-    recorded here on purpose). _parse_profile's failure mode is all-or-
-    nothing per row: ConceptEntry and TopicProfile are both extra="forbid"
-    and evidence_type is a Literal, so one stale key or one retired
-    evidence_type on a single list element fails both validation attempts and
-    the ENTIRE row collapses to an empty profile -- contributing no concepts
-    and no knowledge_level. A jsonb aggregation in SQL would happily count
-    that row's other elements, so the two paths cannot be made equal, and the
-    disagreement would land on exactly the legacy rows the tolerant parser
-    exists for. Revisit if the aggregate moves to a materialised column or
-    the stored profile shape is version-stamped.
+    recorded here on purpose). _parse_profile salvages per field and element
+    (#436): ConceptEntry and TopicProfile are both extra="forbid" and
+    evidence_type is a Literal, so a list element with a stale key or a
+    retired evidence_type is dropped, an invalid scalar falls back to its
+    default, and the row's valid concepts and knowledge_level still count. A
+    jsonb aggregation in SQL would count those invalid elements too, so the
+    two paths still cannot be made equal, and the disagreement would land on
+    exactly the legacy rows the tolerant parser exists for. Revisit if the
+    aggregate moves to a materialised column or the stored profile shape is
+    version-stamped.
     """
     sessions = db.execute(
         select(
