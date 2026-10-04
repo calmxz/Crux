@@ -10,6 +10,7 @@ chat time to compute a boolean `retrieval_required` flag for prompt injection.
 
 import json
 import re
+from collections.abc import Iterable
 
 import snowballstemmer
 from sqlalchemy.orm import Session
@@ -47,6 +48,19 @@ def build_from_text(text: str) -> set[str]:
     return set(STEMMER.stemWords(tokens))
 
 
+def build_from_texts(texts: Iterable[str]) -> set[str]:
+    stems: set[str] = set()
+    for text in texts:
+        stems |= build_from_text(text)
+    return stems
+
+
+def replace_session_index(row: SessionModel, stems: set[str]) -> None:
+    """Write stems as the session's whole index. The caller holds the
+    session row lock (merge_into_session, or delete's rebuild in #430)."""
+    row.kw_index_json = json.dumps(sorted(stems))
+
+
 def merge_into_session(db: Session, session_id: str, new_stems: set[str]) -> None:
     # B-13: FOR UPDATE on the read-union-write; concurrent ingestions for one
     # session otherwise last-write-win with a stale base set. No-op on SQLite.
@@ -56,8 +70,7 @@ def merge_into_session(db: Session, session_id: str, new_stems: set[str]) -> Non
     if row is None:
         raise ValueError(f"session not found: {session_id}")
     current = set(json.loads(row.kw_index_json or "[]"))
-    merged = current | set(new_stems)
-    row.kw_index_json = json.dumps(sorted(merged))
+    replace_session_index(row, current | set(new_stems))
 
 
 def match_required(query: str, kw_index) -> bool:

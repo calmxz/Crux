@@ -727,3 +727,51 @@ def test_pptx_over_slide_limit_413(client, seeded, monkeypatch):
     detail = r.json()["detail"]
     assert detail["code"] == "page_limit_exceeded"
     assert detail["page_count"] == 2
+
+
+def _usage_count(db_session) -> int:
+    row = db_session.query(UsageCounter).filter_by(user_id=USER_ID).one_or_none()
+    return 0 if row is None else row.count
+
+
+@pytest.mark.parametrize(
+    ("setting", "limit", "name", "content", "status", "code"),
+    [
+        (None, None, "fake.pdf", b"not a pdf", 415, "CONTENT_TYPE_MISMATCH"),
+        ("max_chunks", 10, "notes.txt", b"a" * 60_000, 413, "chunk_limit_exceeded"),
+        ("max_pages", 2, "big.pdf", lambda: _blank_pdf_bytes(3), 413, "page_limit_exceeded"),
+    ],
+    ids=["magic_bytes", "chunk_estimate", "page_count"],
+)
+def test_content_check_rejection_does_not_burn_slot(
+    client, seeded, db_session, monkeypatch, setting, limit, name, content, status, code
+):
+    """#430: the free content checks run before the daily slot (B-07)."""
+    if setting:
+        monkeypatch.setattr(f"routes.upload.settings.{setting}", limit)
+    if callable(content):
+        content = content()
+    files = {"file": (name, io.BytesIO(content), "application/octet-stream")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == status, r.text
+    assert r.json()["detail"]["code"] == code
+    db_session.expire_all()
+    assert _usage_count(db_session) == 0
+
+
+def test_cost_capped_invalid_upload_reports_415_not_429(
+    client, db_session, seeded, monkeypatch
+):
+    """#430 / #423 precedence: what is wrong with the request is reported
+    before what is wrong with the account's budget."""
+    monkeypatch.setattr("services.cost_meter.settings.llm_hard_cap_usd", 0.10)
+    cost_meter.record_cost(db_session, USER_ID, Decimal("0.2000"))
+    db_session.commit()
+    files = {"file": ("fake.pdf", io.BytesIO(b"not a pdf"), "application/pdf")}
+    r = client.post(
+        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
+    )
+    assert r.status_code == 415, r.text
+    assert r.json()["detail"]["code"] == "CONTENT_TYPE_MISMATCH"

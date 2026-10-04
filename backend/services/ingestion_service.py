@@ -293,9 +293,7 @@ def run(document_id: int) -> None:
             _embed_and_store(db, doc, chunks, user_id=owner_id)
             stage = "other"
 
-            stems: set[str] = set()
-            for c in chunks:
-                stems |= keyword_index.build_from_text(c.text)
+            stems = keyword_index.build_from_texts(c.text for c in chunks)
             if stems:
                 keyword_index.merge_into_session(db, session_id, stems)
 

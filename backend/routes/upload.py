@@ -176,36 +176,7 @@ def upload_file(
             status=existing.status,
         )
 
-    # B-01: cost caps gate before the rate-limit slot is consumed, mirroring
-    # the chat turn's guard order (routes/chat.py:141-153) - a capped account
-    # must not be able to burn a daily upload slot on a rejected request.
-    try:
-        cost_meter.assert_within_caps(db, user_id)
-    except cost_meter.CostCapExceeded as e:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "code": e.code,
-                "resets_at": cost_meter.midnight_utc_iso(),
-            },
-        ) from e
-
-    # B-07: rate limit only after extension + ownership pass, mirroring
-    # _prepare_turn's guard order - a rejected upload must not consume a
-    # daily slot. Ownership-before-increment also guarantees the users row
-    # exists for the usage_counters FK (owning a session implies it).
-    allowed, used = rate_limit.check_and_increment(db, user_id)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "code": DAILY_CAP_REACHED,
-                "cap": settings.daily_cap,
-                "used": used,
-                "resets_at": cost_meter.midnight_utc_iso(),
-            },
-        )
-
+    # #430: free content checks, before the cost gate and the slot (see B-07).
     if ext in _PLAINTEXT_EXTENSIONS:
         estimated_chunks = len(data) / _CHARS_PER_TOKEN / _CHUNK_STRIDE_TOKENS
         if estimated_chunks > settings.max_chunks:
@@ -239,6 +210,36 @@ def upload_file(
                 "code": PAGE_LIMIT_EXCEEDED,
                 "max_pages": settings.max_pages,
                 "page_count": page_count,
+            },
+        )
+
+    # B-01: cost caps gate before the rate-limit slot is consumed, mirroring
+    # the chat turn's guard order (routes/chat.py:141-153) - a capped account
+    # must not be able to burn a daily upload slot on a rejected request.
+    try:
+        cost_meter.assert_within_caps(db, user_id)
+    except cost_meter.CostCapExceeded as e:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": e.code,
+                "resets_at": cost_meter.midnight_utc_iso(),
+            },
+        ) from e
+
+    # B-07: rate limit only after the extension, ownership and content checks
+    # pass - a rejected upload must not consume a daily slot. Order, and the
+    # unrefunded 507 slot: docs/decisions.md 2026-09-30 B5. Owning a session
+    # also guarantees the users row exists for the usage_counters FK.
+    allowed, used = rate_limit.check_and_increment(db, user_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": DAILY_CAP_REACHED,
+                "cap": settings.daily_cap,
+                "used": used,
+                "resets_at": cost_meter.midnight_utc_iso(),
             },
         )
 

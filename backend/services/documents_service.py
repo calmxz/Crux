@@ -11,12 +11,13 @@ from collections.abc import Iterable
 from pathlib import Path
 from typing import Literal
 
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from db.models import Document
 from db.models import Session as SessionModel
-from services import object_store, pgvector_store
+from lib import keyword_index
+from services import object_store, pgvector_store, profile_service
 
 logger = logging.getLogger(__name__)
 
@@ -113,6 +114,11 @@ def delete_document(db: Session, document_id: int, user_id: str) -> None:
     filename = doc.filename
     session_id = doc.session_id
 
+    # #430: lock the session row before deleting or reading chunks, so an
+    # ingestion finishing concurrently waits in merge_into_session and then
+    # unions its stems onto the rebuilt index instead of losing them.
+    sess = profile_service.lock_session_row(db, session_id)
+
     # F-28: chunk delete + row delete in ONE transaction, so a crash between
     # them can no longer leave a "ready" doc with zero chunks or orphaned
     # vectors. (Migration 0018 also adds ON DELETE CASCADE as a backstop.)
@@ -120,10 +126,13 @@ def delete_document(db: Session, document_id: int, user_id: str) -> None:
     db.delete(doc)
     # F-05: the removed chunks were part of the session's mean embedding.
     # Drop the materialised centroid in the same transaction as the delete.
-    db.execute(
-        update(SessionModel)
-        .where(SessionModel.id == session_id)
-        .values(chunk_centroid=None)
+    sess.chunk_centroid = None
+    # #430: rebuild the lexical-gate index from the surviving ready chunks,
+    # stemmed exactly as ingestion stems them. No ready documents left -> [].
+    # The flush makes the row delete visible to the query (autoflush=False).
+    db.flush()
+    keyword_index.replace_session_index(
+        sess, keyword_index.build_from_texts(pgvector_store.ready_chunk_texts(db, session_id))
     )
     db.commit()
 
