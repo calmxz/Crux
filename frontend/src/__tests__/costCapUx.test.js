@@ -166,7 +166,6 @@ vi.mock('primevue/useconfirm', () => ({
 vi.mock('@/services/uploadApi.js', () => ({
   uploadDocument: vi.fn().mockResolvedValue({ document_id: 1 }),
   validateFile: vi.fn(() => ({ ok: true })),
-  getUploadStatus: vi.fn().mockResolvedValue({ id: 1, status: 'ready', error: null }),
   // useReferencePoll (owned by SessionView) calls this at setup.
   getSessionIngestion: vi.fn().mockResolvedValue({ status: null, documents: [] }),
   MAX_UPLOAD_BYTES: 25 * 1024 * 1024,
