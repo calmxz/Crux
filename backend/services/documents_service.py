@@ -129,6 +129,7 @@ def delete_document(db: Session, document_id: int, user_id: str) -> None:
     sess.chunk_centroid = None
     # #430: rebuild the lexical-gate index from the surviving ready chunks,
     # stemmed exactly as ingestion stems them. No ready documents left -> [].
+    # The flush makes the row delete visible to the query (autoflush=False).
     db.flush()
     keyword_index.replace_session_index(
         sess, keyword_index.build_from_texts(pgvector_store.ready_chunk_texts(db, session_id))

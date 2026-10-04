@@ -379,10 +379,10 @@ def test_delete_document_rebuilds_keyword_index_from_survivors(
     db_session.flush()
     db_session.add(SessionModel(id="s1", user_id="u1", topic="t", topic_profile_json="{}"))
     db_session.commit()
-    photo = _add_doc_with_text(
+    bio_doc = _add_doc_with_text(
         db_session, "s1", "bio.pdf", ["photosynthesis chlorophyll", "mitochondria"]
     )
-    tcp = _add_doc_with_text(db_session, "s1", "net.pdf", ["router packets"])
+    net_doc = _add_doc_with_text(db_session, "s1", "net.pdf", ["router packets"])
     # A non-ready document's chunks are not part of the index.
     _add_doc_with_text(db_session, "s1", "wip.pdf", ["volcano"], status="pending")
     sess = db_session.get(SessionModel, "s1")
@@ -391,10 +391,10 @@ def test_delete_document_rebuilds_keyword_index_from_survivors(
     )
     db_session.commit()
 
-    documents_service.delete_document(db_session, photo.id, "u1")
+    documents_service.delete_document(db_session, bio_doc.id, "u1")
     assert _kw_index(db_session, "s1") == sorted(keyword_index.build_from_text("router packets"))
 
-    documents_service.delete_document(db_session, tcp.id, "u1")
+    documents_service.delete_document(db_session, net_doc.id, "u1")
     assert _kw_index(db_session, "s1") == []
 
 
@@ -416,7 +416,14 @@ def test_delete_document_locks_session_before_touching_chunks(
         return real_delete(db, document_id)
 
     monkeypatch.setattr(documents_service.profile_service, "lock_session_row", spy_lock)
+    real_read = documents_service.pgvector_store.ready_chunk_texts
+
+    def spy_read(db, session_id):
+        calls.append("read_chunks")
+        return real_read(db, session_id)
+
     monkeypatch.setattr(documents_service.pgvector_store, "delete_document_chunks", spy_delete)
+    monkeypatch.setattr(documents_service.pgvector_store, "ready_chunk_texts", spy_read)
 
     documents_service.delete_document(db_session, seeded_doc_with_chunks.id, USER_ID)
-    assert calls == ["lock", "delete_chunks"]
+    assert calls == ["lock", "delete_chunks", "read_chunks"]

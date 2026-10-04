@@ -228,13 +228,9 @@ def upload_file(
         ) from e
 
     # B-07: rate limit only after the extension, ownership and content checks
-    # pass, mirroring _prepare_turn's guard order - a rejected upload must not
-    # consume a daily slot, and an invalid file is reported before the budget
-    # (#423 precedence). The slot cannot move after db.add(doc) instead: this
-    # commits, which would publish the pending row before its blob exists.
-    # A 507 storage failure below still uses the slot; refund deferred (see
-    # docs/decisions.md 2026-09-30 B5). Ownership-before-increment also
-    # guarantees the users row exists for the usage_counters FK.
+    # pass - a rejected upload must not consume a daily slot. Order, and the
+    # unrefunded 507 slot: docs/decisions.md 2026-09-30 B5. Owning a session
+    # also guarantees the users row exists for the usage_counters FK.
     allowed, used = rate_limit.check_and_increment(db, user_id)
     if not allowed:
         raise HTTPException(

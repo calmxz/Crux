@@ -739,8 +739,9 @@ def _usage_count(db_session) -> int:
     [
         (None, None, "fake.pdf", b"not a pdf", 415, "CONTENT_TYPE_MISMATCH"),
         ("max_chunks", 10, "notes.txt", b"a" * 60_000, 413, "chunk_limit_exceeded"),
-        ("max_pages", 2, "big.pdf", "blank_pdf_3", 413, "page_limit_exceeded"),
-    ],    ids=["magic_bytes", "chunk_estimate", "page_count"],
+        ("max_pages", 2, "big.pdf", lambda: _blank_pdf_bytes(3), 413, "page_limit_exceeded"),
+    ],
+    ids=["magic_bytes", "chunk_estimate", "page_count"],
 )
 def test_content_check_rejection_does_not_burn_slot(
     client, seeded, db_session, monkeypatch, setting, limit, name, content, status, code
@@ -748,8 +749,8 @@ def test_content_check_rejection_does_not_burn_slot(
     """#430: the free content checks run before the daily slot (B-07)."""
     if setting:
         monkeypatch.setattr(f"routes.upload.settings.{setting}", limit)
-    if content == "blank_pdf_3":
-        content = _blank_pdf_bytes(3)
+    if callable(content):
+        content = content()
     files = {"file": (name, io.BytesIO(content), "application/octet-stream")}
     r = client.post(
         "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
