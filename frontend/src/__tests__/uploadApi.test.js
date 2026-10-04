@@ -205,10 +205,15 @@ describe('uploadApi', () => {
     })
 
     it('dispatches cost-warning when the upload response carries x-cost-warning', async () => {
-      fetchMock.mockReturnValueOnce(ok({ document_id: 'd1' }, { 'x-cost-warning': 'near-cap' }))
+      fetchMock.mockReturnValueOnce(
+        ok({ document_id: 'd1' }, { 'x-cost-warning': 'level=urgent; used=95; soft_cap=100' }),
+      )
       await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
       expect(listener).toHaveBeenCalledTimes(1)
-      expect(listener.mock.calls[0][0].detail).toEqual({ header: 'near-cap', path: '/upload' })
+      expect(listener.mock.calls[0][0].detail).toEqual({
+        header: 'level=urgent; used=95; soft_cap=100',
+        path: '/upload',
+      })
     })
 
     it('does not dispatch when the header is absent', async () => {

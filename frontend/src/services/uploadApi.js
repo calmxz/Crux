@@ -108,8 +108,6 @@ export async function uploadDocument({ sessionId, file }) {
     throw new ApiError(resp.status, parsed ?? text, '/upload')
   }
 
-  // #398: request() reports this header; the raw fetch here must too, or the
-  // near-cap banner never fires for uploads.
   reportCostWarningFrom(resp, '/upload')
 
   return parsed
