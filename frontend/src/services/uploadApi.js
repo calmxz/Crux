@@ -113,11 +113,6 @@ export async function uploadDocument({ sessionId, file }) {
   return parsed
 }
 
-/** @deprecated Back-compat alias for existing PDF-only call sites; use uploadDocument. */
-export const uploadPdf = uploadDocument
-
-export const getUploadStatus = (documentId) => apiGet(`/upload/${documentId}`)
-
 // opts is forwarded to request(): useReferencePoll passes { silent: true } (the
 // banner's "References unavailable" row is the sole error surface, so errorBus
 // must not also toast every failed poll) and { fresh: true } to bypass the
