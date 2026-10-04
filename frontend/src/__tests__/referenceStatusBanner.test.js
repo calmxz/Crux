@@ -58,6 +58,22 @@ describe('ReferenceStatusBanner', () => {
     expect(wrapper.get('[data-testid="reference-status"]').text()).toMatch(/indexing/i)
   })
 
+  it('counts only in-flight documents in the indexing message', () => {
+    const wrapper = mountBanner({
+      status: 'pending',
+      documents: [
+        { id: 1, filename: 'a.pdf', status: 'ready' },
+        { id: 2, filename: 'b.pdf', status: 'ready' },
+        { id: 3, filename: 'c.pdf', status: 'ready' },
+        { id: 4, filename: 'd.pdf', status: 'pending' },
+      ],
+    })
+
+    expect(wrapper.get('[data-testid="reference-status"]').text()).toContain(
+      'Indexing 1 reference...',
+    )
+  })
+
   it('shows a ready message when all documents are ready', () => {
     const wrapper = mountBanner({
       status: 'ready',

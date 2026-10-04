@@ -96,6 +96,16 @@ def delete_document_chunks(db: Session, document_id: int) -> int:
     return result.rowcount or 0
 
 
+def ready_chunk_texts(db: Session, session_id: str) -> Sequence[str]:
+    """chunk_text of every chunk in the session whose document is ready --
+    the same text ingestion stems into the keyword index (#430)."""
+    return db.scalars(
+        select(ChunkEmbedding.chunk_text)
+        .join(Document, ChunkEmbedding.document_id == Document.id)
+        .where(ChunkEmbedding.session_id == session_id, Document.status == "ready")
+    ).all()
+
+
 def _apply_hnsw_tuning(db: Session) -> None:
     """F-10: widen the HNSW candidate list for the search transaction.
 

@@ -155,11 +155,14 @@ const readyCount = computed(() => props.documents.filter((d) => d.status === 're
 
 const failedCount = computed(() => props.documents.filter((d) => d.status === 'failed').length)
 
-const total = computed(() => props.documents.length)
+// #430: only in-flight files are being indexed; ready ones already are.
+const indexingCount = computed(
+  () => props.documents.filter((d) => d.status === 'pending' || d.status === 'processing').length,
+)
 
 const message = computed(() => {
   if (props.status === 'pending') {
-    return `Indexing ${total.value} reference${total.value === 1 ? '' : 's'}... you can start chatting now.`
+    return `Indexing ${indexingCount.value} reference${indexingCount.value === 1 ? '' : 's'}... you can start chatting now.`
   }
 
   if (props.status === 'failed') {
