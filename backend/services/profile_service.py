@@ -18,8 +18,9 @@ Rules:
 import hashlib
 import json
 import logging
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import ValidationError
 from sqlalchemy import select
@@ -108,12 +109,33 @@ def _upgrade_concept_lists(data: dict) -> dict:
     return data
 
 
-def _validates(validate, value) -> bool:
+def _validates(validate: Callable[[Any], object], value: Any) -> bool:
     try:
         validate(value)
     except ValidationError:
         return False
     return True
+
+
+def _drop_focus_on_dropped_gap(
+    known: dict, kept: dict, dropped: dict[str, int]
+) -> None:
+    """F-22: a focus naming a gap entry that salvage dropped would dangle.
+    A focus outside confirmed_gaps is otherwise legal (apply_patch sets it
+    freely), so only a focus on a dropped entry is cleared."""
+    focus = kept.get("focus_target_gap")
+    gaps = known.get("confirmed_gaps")
+    if not focus or "confirmed_gaps" not in dropped or not isinstance(gaps, list):
+        return
+    surviving = {canon(g["name"]) for g in kept["confirmed_gaps"]}
+    lost = {
+        canon(g["name"])
+        for g in gaps
+        if isinstance(g, dict) and isinstance(g.get("name"), str)
+    } - surviving
+    if canon(focus) in lost:
+        del kept["focus_target_gap"]
+        dropped["focus_target_gap"] = 1
 
 
 def _salvage_profile(known: dict) -> tuple[TopicProfile, dict[str, int]]:
@@ -126,24 +148,25 @@ def _salvage_profile(known: dict) -> tuple[TopicProfile, dict[str, int]]:
     dropped: dict[str, int] = {}
     for key, value in known.items():
         if key in _CONCEPT_LIST_KEYS and isinstance(value, list):
-            good = [
+            kept[key] = [
                 v for v in value if _validates(ConceptEntry.model_validate, v)
             ]
+            lost = len(value) - len(kept[key])
         elif key == "subtopic_levels" and isinstance(value, dict):
-            good = {
+            kept[key] = {
                 k: v
                 for k, v in value.items()
                 if _validates(TopicProfile.model_validate, {key: {k: v}})
             }
+            lost = len(value) - len(kept[key])
         elif _validates(TopicProfile.model_validate, {key: value}):
             kept[key] = value
-            continue
+            lost = 0
         else:
-            dropped[key] = 1
-            continue
-        kept[key] = good
-        if len(good) < len(value):
-            dropped[key] = len(value) - len(good)
+            lost = 1
+        if lost:
+            dropped[key] = lost
+    _drop_focus_on_dropped_gap(known, kept, dropped)
     try:
         return TopicProfile.model_validate(kept), dropped
     except ValidationError:

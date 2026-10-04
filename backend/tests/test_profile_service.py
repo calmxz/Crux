@@ -490,6 +490,29 @@ def test_salvage_drops_bad_elements_and_unlistable_fields():
     assert p.mastered_concepts == []
 
 
+@pytest.mark.parametrize(
+    ("focus", "expected"),
+    [("Views", None), ("indexes", "indexes"), ("unlisted", "unlisted")],
+    ids=["on-dropped-gap", "on-kept-gap", "outside-gaps"],
+)
+def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected):
+    """F-22: dropping the focused gap would leave focus dangling. A focus
+    outside confirmed_gaps is legal on its own and survives."""
+    p = _parse_profile(
+        json.dumps(
+            {
+                "confirmed_gaps": [
+                    {"name": "indexes"},
+                    {"name": "views", "evidence_type": "inferred"},
+                ],
+                "focus_target_gap": focus,
+            }
+        )
+    )
+    assert concept_names(p.confirmed_gaps) == ["indexes"]
+    assert p.focus_target_gap == expected
+
+
 def test_salvage_warning_carries_no_learner_text(caplog):
     with caplog.at_level("WARNING", logger="services.profile_service"):
         _parse_profile(
