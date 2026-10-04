@@ -7,6 +7,7 @@ import {
   _onAuthExpired,
   invalidateGetCache,
 } from './apiClient.js'
+import { reportCostWarningFrom } from './costBus.js'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -106,6 +107,8 @@ export async function uploadDocument({ sessionId, file }) {
     if (resp.status === 401 && retried) await _onAuthExpired()
     throw new ApiError(resp.status, parsed ?? text, '/upload')
   }
+
+  reportCostWarningFrom(resp, '/upload')
 
   return parsed
 }

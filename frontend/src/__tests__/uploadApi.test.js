@@ -11,6 +11,7 @@ import {
   deleteDocument,
 } from '@/services/uploadApi.js'
 import { ApiError, setUnauthorizedHandler } from '@/services/apiClient.js'
+import { costBus } from '@/services/costBus.js'
 
 function fakeFile(name, size) {
   return { name, size }
@@ -58,10 +59,11 @@ describe('uploadApi', () => {
     vi.restoreAllMocks()
   })
 
-  function ok(body) {
+  function ok(body, headers = {}) {
     return Promise.resolve({
       ok: true,
       status: 200,
+      headers: new Headers(headers),
       text: () => Promise.resolve(JSON.stringify(body)),
     })
   }
@@ -190,5 +192,34 @@ describe('uploadApi', () => {
     ).rejects.toBeInstanceOf(ApiError)
     fetchMock.mockResolvedValueOnce(json({ n: 3 }))
     await expect(apiGet('/sessions/s1')).resolves.toEqual({ n: 3 })
+  })
+
+  describe('cost warning (#398)', () => {
+    let listener
+    beforeEach(() => {
+      listener = vi.fn()
+      costBus.addEventListener('cost-warning', listener)
+    })
+    afterEach(() => {
+      costBus.removeEventListener('cost-warning', listener)
+    })
+
+    it('dispatches cost-warning when the upload response carries x-cost-warning', async () => {
+      fetchMock.mockReturnValueOnce(
+        ok({ document_id: 'd1' }, { 'x-cost-warning': 'level=urgent; used=95; soft_cap=100' }),
+      )
+      await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].detail).toEqual({
+        header: 'level=urgent; used=95; soft_cap=100',
+        path: '/upload',
+      })
+    })
+
+    it('does not dispatch when the header is absent', async () => {
+      fetchMock.mockReturnValueOnce(ok({ document_id: 'd1' }))
+      await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
+      expect(listener).not.toHaveBeenCalled()
+    })
   })
 })
