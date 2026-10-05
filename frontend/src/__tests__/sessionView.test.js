@@ -13,6 +13,7 @@ import { StreamAbortedError } from '@/lib/errors.js'
 import { REDUCED_MOTION_QUERY } from '@/composables/useMediaQuery.js'
 import { WATCH_CEILING_MS } from '@/composables/useReferencePoll.js'
 import { useSessionStore } from '@/stores/session.js'
+import * as sessionsApi from '@/services/sessionsApi.js'
 import { getSessionProfile, patchProfile } from '@/services/profileApi.js'
 
 const push = vi.fn()
@@ -428,6 +429,62 @@ describe('SessionView', () => {
     expect(wrapper.get('[data-testid="session-error"]').text()).toContain('ended elsewhere')
     expect(wrapper.find('[data-testid="session-error-retry"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
+  })
+
+  // #460: a check answer on a session ended elsewhere flips the page the same
+  // way a chat send does, through the store's real 409 path.
+  it('answering a check on a session ended elsewhere flips the page to ended', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+      store.handleCheckQuestion({
+        gap: 'ATP yield',
+        items: [{ question: 'How many ATP?', options: ['30', '38'] }],
+      })
+    })
+    vi.spyOn(sessionsApi, 'answerCheck').mockRejectedValueOnce(
+      Object.assign(new Error('409'), {
+        status: 409,
+        body: { detail: { code: 'session_ended' } },
+      }),
+    )
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="check-option"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="session-error"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="session-error"]').text()).toContain('ended elsewhere')
+    expect(wrapper.find('[data-testid="session-error-retry"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="session-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="check-card"]').exists()).toBe(false)
+  })
+
+  // #460: the ended banner says it once; no "Upload failed" chip on top.
+  it('an upload on a session ended elsewhere flips the page to ended with no failed chip', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+    })
+    validateFile.mockReturnValue({ ok: true })
+    uploadDocument.mockRejectedValue(
+      Object.assign(new Error('409'), {
+        status: 409,
+        body: { detail: { code: 'session_ended' } },
+      }),
+    )
+    const wrapper = mountView()
+    await flushPromises()
+    const file = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('[data-testid="session-upload-input"]')
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+    expect(store.currentSession.ended_at).toBeTruthy()
+    expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="session-error"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="session-error"]').text()).toContain('ended elsewhere')
+    expect(wrapper.text()).not.toContain('Upload failed')
   })
 
   // F-9 (E-05): the 401 arm redirects to login, unmounting this view. Stash the

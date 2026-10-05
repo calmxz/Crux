@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { useSessionStore } from '@/stores/session.js'
 import * as sessionsApi from '@/services/sessionsApi.js'
 import * as streamSvc from '@/services/chatStreamService.js'
+import { SESSION_ENDED_COPY, StreamAbortedError } from '@/lib/errors.js'
 
 vi.mock('@/services/sessionsApi.js')
 
@@ -415,6 +416,66 @@ describe('multi-check store', () => {
     streamSvc.streamCheckComplete.mockRejectedValue(new ApiErrorLike(0, { detail: 'offline' }))
     await store.completeCheck().catch(() => {})
     expect(store.pendingCheck).not.toBeNull()
+  })
+
+  // #460: a check action on a session ended elsewhere flips the page to ended
+  // like the chat send does, and the card does not survive it.
+  describe('session_ended 409', () => {
+    const ended = () => new ApiErrorLike(409, { detail: { code: 'session_ended' } })
+
+    function openStore() {
+      const s = useSessionStore()
+      s.currentSessionId = 'sid'
+      s.currentSession = { id: 'sid', ended_at: null }
+      s.handleCheckQuestion(batchEvent())
+
+      return s
+    }
+
+    async function expectEnded(s, action) {
+      await expect(action()).rejects.toSatisfy(
+        (e) => e instanceof StreamAbortedError && e.reason === 'session_ended',
+      )
+      expect(s.error).toBe(SESSION_ENDED_COPY)
+      expect(s.currentSession.ended_at).toBeTruthy()
+      expect(s.pendingCheck).toBeNull()
+    }
+
+    it('answerCheck marks the session ended', async () => {
+      const s = openStore()
+      sessionsApi.answerCheck.mockRejectedValue(ended())
+      await expectEnded(s, () => s.answerCheck(0))
+      expect(s.checkAnswering).toBe(false)
+    })
+
+    it('skipCheck marks the session ended', async () => {
+      const s = openStore()
+      sessionsApi.skipCheck.mockRejectedValue(ended())
+      await expectEnded(s, () => s.skipCheck())
+      expect(s.checkAnswering).toBe(false)
+    })
+
+    it('completeCheck marks the session ended and does not restore the card', async () => {
+      const s = openStore()
+      streamSvc.streamCheckComplete.mockRejectedValue(ended())
+      await expectEnded(s, () => s.completeCheck())
+      expect(s.streamState).toBe('idle')
+    })
+
+    it('stopCheck marks the session ended and does not restore the card', async () => {
+      const s = openStore()
+      streamSvc.streamCheckStop.mockRejectedValue(ended())
+      await expectEnded(s, () => s.stopCheck())
+      expect(s.streamState).toBe('idle')
+    })
+
+    it('an unrelated 409 does not mark the session ended', async () => {
+      const s = openStore()
+      sessionsApi.answerCheck.mockRejectedValue(new ApiErrorLike(409, { detail: {} }))
+      await expect(s.answerCheck(0)).rejects.not.toBeInstanceOf(StreamAbortedError)
+      expect(s.currentSession.ended_at).toBeNull()
+      expect(s.pendingCheck).not.toBeNull()
+    })
   })
 
   // E-17: the in-flight guard was invisible to the view, so the card kept its

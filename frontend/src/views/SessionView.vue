@@ -262,7 +262,7 @@ import SessionEndedBanner from '../components/SessionEndedBanner.vue'
 import TopicSuggestCard from '../components/TopicSuggestCard.vue'
 import ReferenceStatusBanner from '../components/chat/ReferenceStatusBanner.vue'
 import UploadStatus from '../components/chat/UploadStatus.vue'
-import { friendlyError, StreamAbortedError } from '../lib/errors.js'
+import { friendlyError, isSessionEndedError, StreamAbortedError } from '../lib/errors.js'
 import { useSessionStore } from '../stores/session.js'
 import { REDUCED_MOTION_QUERY, useMediaQuery } from '../composables/useMediaQuery.js'
 import { usePanel } from '../composables/usePanel.js'
@@ -1132,6 +1132,15 @@ async function onAttachFile(file) {
     applyUploadOutcome(outcome, file.name)
   } catch (e) {
     if (gen !== uploadGen) return
+
+    // #460: the ended banner says it once; no "Upload failed" chip on top.
+    if (isSessionEndedError(e)) {
+      store.markSessionEnded()
+      uploadStatus.value = null
+
+      return
+    }
+
     // I-09: the 415 (and friends) carry an actionable server message -
     // prefer it over the generic friendlyError copy.
     const serverMsg = e?.body?.detail?.message
@@ -1273,11 +1282,17 @@ async function handleQuizQuery() {
   }
 }
 
+// #460: a session_ended rejection already put the store's copy on the error
+// line; adding lastError would show it twice and offer a Retry.
+function onCheckActionError(e) {
+  if (!(e instanceof StreamAbortedError && e.reason === 'session_ended')) lastError.value = e
+}
+
 async function onAnswerCheck(index) {
   try {
     await store.answerCheck(index)
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
@@ -1285,7 +1300,7 @@ async function onSkipCheck() {
   try {
     await store.skipCheck()
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
@@ -1295,7 +1310,7 @@ async function onStopCheck() {
   try {
     await store.stopCheck()
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
@@ -1308,7 +1323,7 @@ async function onDoneCheck() {
     // stays gone. No second fetch here.
     await store.completeCheck()
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
