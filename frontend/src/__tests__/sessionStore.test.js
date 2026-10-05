@@ -19,7 +19,7 @@ import * as sessionsApi from '@/services/sessionsApi.js'
 import { getSessionLibrary } from '@/services/sessionsApi.js'
 import * as streamSvc from '@/services/chatStreamService.js'
 import { ERR_DAILY_CAP_REACHED, ERR_DAILY_COST_CAP_REACHED } from '@/lib/errorCodes.js'
-import { StreamAbortedError } from '@/lib/errors.js'
+import { SESSION_ENDED_COPY, StreamAbortedError } from '@/lib/errors.js'
 
 class ApiErrorLike extends Error {
   constructor(status, body) {
@@ -986,6 +986,18 @@ describe('session store — streaming', () => {
     expect(s.error).toMatch(/ended/i)
     expect(s.streamState).toBe('idle')
     expect(s.currentSession.ended_at).not.toBeNull()
+  })
+
+  // #460: the one place a session_ended 409 flips the page to ended.
+  it('markSessionEnded sets the copy, stamps ended_at and clears pendingCheck', () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    s.currentSession = { id: 's1', ended_at: null }
+    s.handleCheckQuestion({ gap: 'g', items: [{ question: 'Q', options: ['a', 'b'] }] })
+    s.markSessionEnded()
+    expect(s.error).toBe(SESSION_ENDED_COPY)
+    expect(s.currentSession.ended_at).toBeTruthy()
+    expect(s.pendingCheck).toBeNull()
   })
 
   // I-10 follow-up: a session_ended 409 is a pre-stream failure and must

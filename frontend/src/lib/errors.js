@@ -91,6 +91,11 @@ export function friendlyError(err) {
   return String(err)
 }
 
+// The server refused an action because the session was ended elsewhere.
+export function isSessionEndedError(err) {
+  return err?.status === 409 && err?.body?.detail?.code === ERR_SESSION_ENDED
+}
+
 // Thrown by the session store when a send-stream is aborted for a reason the
 // view must react to (restore the draft) rather than silently swallow.
 export class StreamAbortedError extends Error {

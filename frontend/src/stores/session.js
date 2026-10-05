@@ -6,11 +6,11 @@ import { streamChat, streamCheckComplete, streamCheckStop } from '../services/ch
 import { reportCostWarning } from '../services/costBus.js'
 import {
   friendlyError,
+  isSessionEndedError,
   sseErrorCopy,
   SESSION_ENDED_COPY,
   StreamAbortedError,
 } from '../lib/errors.js'
-import { ERR_SESSION_ENDED } from '../lib/errorCodes.js'
 import { mapCapError } from '../lib/capErrors.js'
 import { createDeltaBatcher } from '../lib/deltaBatcher.js'
 
@@ -177,6 +177,22 @@ export const useSessionStore = defineStore('session', () => {
 
   function setError(msg) {
     error.value = msg
+  }
+
+  // #460: the one place a session_ended 409 flips the page to ended. Ending a
+  // session abandons its open check batch server-side, so the card goes too.
+  function markSessionEnded() {
+    error.value = SESSION_ENDED_COPY
+
+    if (currentSession.value) currentSession.value.ended_at = new Date().toISOString()
+    pendingCheck.value = null
+  }
+
+  // Rethrows a session_ended 409 as StreamAbortedError so the view shows the
+  // store's copy once, with no Retry.
+  function _throwSessionEnded(e) {
+    markSessionEnded()
+    throw new StreamAbortedError('session_ended', e)
   }
 
   async function listSessions() {
@@ -663,6 +679,9 @@ export const useSessionStore = defineStore('session', () => {
       item.correctIndex = resp.correct_index
       item.explanation = resp.explanation
       pc.currentIndex = resp.current_index
+    } catch (e) {
+      if (isSessionEndedError(e)) _throwSessionEnded(e)
+      throw e
     } finally {
       checkAnswering.value = false
     }
@@ -714,6 +733,9 @@ export const useSessionStore = defineStore('session', () => {
       resp = await sessionsApi.skipCheck(id, i)
       item.status = 'skipped'
       pc.currentIndex = resp.current_index
+    } catch (e) {
+      if (isSessionEndedError(e)) _throwSessionEnded(e)
+      throw e
     } finally {
       checkAnswering.value = false
     }
@@ -836,6 +858,13 @@ export const useSessionStore = defineStore('session', () => {
         _clearStreamState()
 
         return
+      }
+
+      // Before the F-17 restore: the server abandoned the batch on session
+      // end, so the card must not come back.
+      if (isSessionEndedError(e)) {
+        _clearStreamState()
+        _throwSessionEnded(e)
       }
 
       if (!sawAnyEvent && !pendingCheck.value) pendingCheck.value = savedCheck
@@ -1139,14 +1168,11 @@ export const useSessionStore = defineStore('session', () => {
         throw new StreamAbortedError('auth_expired', e)
       }
 
-      if (e?.status === 409 && e?.body?.detail?.code === ERR_SESSION_ENDED) {
-        error.value = SESSION_ENDED_COPY
-
-        if (currentSession.value) currentSession.value.ended_at = new Date().toISOString()
+      if (isSessionEndedError(e)) {
         _clearStreamState()
         // E-11: rethrow so the view restores the draft instead of running
         // its success path.
-        throw new StreamAbortedError('session_ended', e)
+        _throwSessionEnded(e)
       }
 
       if (e?.status === 429) _applyCapError(e?.body?.detail)
@@ -1202,6 +1228,7 @@ export const useSessionStore = defineStore('session', () => {
     duplicateReopen,
     consumePendingSummary,
     pendingCheck,
+    markSessionEnded,
     checkAnswering,
     streamingMessage,
     streamState,
