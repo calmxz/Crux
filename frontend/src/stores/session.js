@@ -109,18 +109,46 @@ export const useSessionStore = defineStore('session', () => {
   // (A->B->A, B resolving last) cannot clobber currentSession/messages for the
   // session the user is actually viewing. Module-scoped (not reactive).
   let _latestRequestedId = null
+  // #414: bumped by reset() (sign-out). An async action captures it via
+  // _epochGuard() before its first await and drops every later state write
+  // once it has moved, so a request in flight at sign-out cannot write the
+  // previous account's data into the reset store (F-02 class). What the
+  // action returns or rethrows to its caller is unchanged.
+  let _resetEpoch = 0
+
+  function _epochGuard() {
+    const epoch = _resetEpoch
+
+    return () => epoch === _resetEpoch
+  }
+
+  // Joins a pending `key` request or starts one. The entry is removed only if
+  // it is still this promise: reset() clears the map, and a stale settle must
+  // never remove the next account's entry.
+  function _shareInflight(key, run) {
+    if (_inflight.has(key)) return _inflight.get(key)
+
+    const p = run().finally(() => {
+      if (_inflight.get(key) === p) _inflight.delete(key)
+    })
+
+    _inflight.set(key, p)
+
+    return p
+  }
 
   // E-06: silent because the library page owns the failure copy (and its retry
   // control) for its own first load. A raw store-held message was rendered
   // nowhere, and a toast on top of the page's own empty/error state duplicates
   // it. Rethrows, so the caller still sees the failure.
   async function fetchLibrary(params) {
+    const live = _epochGuard()
     libraryLoading.value = true
 
     try {
       return await sessionsApi.getSessionLibrary(params, { silent: true })
     } finally {
-      libraryLoading.value = false
+      if (live()) libraryLoading.value = false
     }
   }
 
@@ -170,8 +198,10 @@ export const useSessionStore = defineStore('session', () => {
     return kind !== null
   }
 
-  function _setError(e) {
-    error.value = friendlyError(e)
+  // `live` (from _epochGuard) skips the write for an action that outlived a
+  // reset(); the rethrow to the caller is unconditional.
+  function _setError(e, live = null) {
+    if (!live || live()) error.value = friendlyError(e)
     throw e
   }
 
@@ -195,10 +225,9 @@ export const useSessionStore = defineStore('session', () => {
     throw new StreamAbortedError('session_ended', e)
   }
 
-  async function listSessions() {
-    if (_inflight.has('list')) return _inflight.get('list')
-
-    const p = (async () => {
+  function listSessions() {
+    return _shareInflight('list', async () => {
+      const live = _epochGuard()
       loading.value = true
       error.value = null
 
@@ -231,25 +260,22 @@ export const useSessionStore = defineStore('session', () => {
           merged.push(item)
         }
 
+        if (!live()) return merged
         sessions.value = merged
         activeTotal.value = activePage.total
         endedTotal.value = endedPage.total
 
         return sessions.value
       } catch (e) {
-        _setError(e)
+        _setError(e, live)
       } finally {
-        loading.value = false
-        _inflight.delete('list')
+        if (live()) loading.value = false
       }
-    })()
-
-    _inflight.set('list', p)
-
-    return p
+    })
   }
 
   async function createSession({ topic, seedMode, priorSessionId, declaredLevel } = {}) {
+    const live = _epochGuard()
     loading.value = true
     error.value = null
 
@@ -261,6 +287,7 @@ export const useSessionStore = defineStore('session', () => {
         declaredLevel,
       })
 
+      if (!live()) return created
       // A freshly created session is always active server-side; count it
       // unconditionally even though it isn't added to the (windowed)
       // `sessions` list here.
@@ -271,9 +298,9 @@ export const useSessionStore = defineStore('session', () => {
 
       return created
     } catch (e) {
-      _setError(e)
+      _setError(e, live)
     } finally {
-      loading.value = false
+      if (live()) loading.value = false
     }
   }
 
@@ -292,9 +319,8 @@ export const useSessionStore = defineStore('session', () => {
     if (id !== currentSessionId.value && abortController.value) abandonStream()
     _latestRequestedId = id
 
-    if (_inflight.has(id)) return _inflight.get(id)
-
-    const p = (async () => {
+    return _shareInflight(id, async () => {
+      const live = _epochGuard()
       loading.value = true
       detailLoading.value = true
       error.value = null
@@ -303,7 +329,7 @@ export const useSessionStore = defineStore('session', () => {
       try {
         const s = await sessionsApi.getSession(id)
 
-        if (_latestRequestedId !== id) return s // superseded by a newer load; drop the write
+        if (!live() || _latestRequestedId !== id) return s // superseded by a newer load; drop the write
         currentSession.value = s
         currentSessionId.value = s.id
         messages.value = (s.messages || []).map(toUiMessage)
@@ -333,6 +359,11 @@ export const useSessionStore = defineStore('session', () => {
 
         return s
       } catch (e) {
+        // Checked first: reset() nulls _latestRequestedId, and a load from
+        // before it must still rethrow to its caller rather than be swallowed
+        // as superseded below.
+        if (!live()) throw e
+
         // Same discriminator as the success path: a superseded load (the user
         // already navigated on) must not surface its error over the session now
         // being viewed. Drop it silently — the active load owns error state.
@@ -342,18 +373,12 @@ export const useSessionStore = defineStore('session', () => {
         // F-13: mirror the write discriminator - only the latest-requested
         // load may clear the shared flags, else a superseded load drops the
         // skeleton while the real target is still in flight.
-        if (_latestRequestedId === id) {
+        if (live() && _latestRequestedId === id) {
           loading.value = false
           detailLoading.value = false
         }
-
-        _inflight.delete(id)
       }
-    })()
-
-    _inflight.set(id, p)
-
-    return p
+    })
   }
 
   // F-16: an unbounded transcript grows for the life of the page - a long
@@ -415,6 +440,7 @@ export const useSessionStore = defineStore('session', () => {
     const sid = currentSessionId.value
 
     if (oldest == null || !sid) return
+    const live = _epochGuard()
     loadingEarlier.value = true
     loadEarlierError.value = null
 
@@ -426,9 +452,9 @@ export const useSessionStore = defineStore('session', () => {
       messages.value = [...(page.items || []).map(toUiMessage), ...messages.value]
       hasMoreMessages.value = !!page.has_more
     } catch (e) {
-      loadEarlierError.value = e?.message || 'Failed to load earlier messages'
+      if (live()) loadEarlierError.value = e?.message || 'Failed to load earlier messages'
     } finally {
-      loadingEarlier.value = false
+      if (live()) loadingEarlier.value = false
     }
   }
 
@@ -444,11 +470,14 @@ export const useSessionStore = defineStore('session', () => {
     const id = sessionId || currentSessionId.value
 
     if (!id) throw new Error('no active session')
+    const live = _epochGuard()
     loading.value = true
     error.value = null
 
     try {
       const resp = await sessionsApi.endSession(id)
+
+      if (!live()) return resp
       const summaryText = resp?.summary?.text ?? ''
       // Snapshot the observation BEFORE patching anything: once a copy's
       // ended_at is written it reads as "already ended" and would silently
@@ -490,9 +519,9 @@ export const useSessionStore = defineStore('session', () => {
 
       return resp
     } catch (e) {
-      _setError(e)
+      _setError(e, live)
     } finally {
-      loading.value = false
+      if (live()) loading.value = false
     }
   }
 
@@ -501,12 +530,15 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function reopenSession(sessionId) {
+    const live = _epochGuard()
     loading.value = true
     error.value = null
     duplicateReopen.value = null
 
     try {
       const resp = await sessionsApi.reopenSession(sessionId)
+
+      if (!live()) return resp
       // Same reasoning as endSession: snapshot before patching.
       const observed = _observedRows(sessionId)
       const alreadyActive = observed.length > 0 && observed.every((r) => !r.ended_at)
@@ -520,6 +552,8 @@ export const useSessionStore = defineStore('session', () => {
 
       return resp
     } catch (e) {
+      if (!live()) throw e
+
       // I-05: the contract hands over the conflicting session id - surface
       // it as an affordance instead of the generic dead end.
       if (e?.status === 409 && e?.body?.detail?.code === 'duplicate_topic') {
@@ -530,11 +564,12 @@ export const useSessionStore = defineStore('session', () => {
 
       _setError(e)
     } finally {
-      loading.value = false
+      if (live()) loading.value = false
     }
   }
 
   async function continueTopic(prior) {
+    const live = _epochGuard()
     loading.value = true
     error.value = null
 
@@ -544,6 +579,8 @@ export const useSessionStore = defineStore('session', () => {
         seedMode: 'resume',
         priorSessionId: prior.id,
       })
+
+      if (!live()) return created
 
       // Backend auto-ends the prior session on resume-create; reflect it
       // locally so ended-state UI updates without a refetch. Same
@@ -578,13 +615,14 @@ export const useSessionStore = defineStore('session', () => {
 
       return created
     } catch (e) {
-      _setError(e)
+      _setError(e, live)
     } finally {
-      loading.value = false
+      if (live()) loading.value = false
     }
   }
 
   async function renameSession(id, topic) {
+    const live = _epochGuard()
     error.value = null
     // Every observed copy is a mutation target -- a search row can be the
     // only rendered copy of a session outside the loaded window. Each copy
@@ -599,9 +637,12 @@ export const useSessionStore = defineStore('session', () => {
     try {
       return await sessionsApi.renameSession(id, topic)
     } catch (e) {
-      observed.forEach((r, i) => {
-        r.topic = prevs[i]
-      })
+      if (live()) {
+        observed.forEach((r, i) => {
+          r.topic = prevs[i]
+        })
+      }
+
       // F-07: background action - rollback and rethrow, but never write the
       // global error (it unmounts unrelated screens). Callers toast.
       throw e
@@ -609,6 +650,7 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   async function setPinned(id, pinned) {
+    const live = _epochGuard()
     error.value = null
     const observed = _observedRows(id)
     const prevs = observed.map((r) => r.pinned)
@@ -618,9 +660,12 @@ export const useSessionStore = defineStore('session', () => {
     try {
       return await sessionsApi.setPinned(id, pinned)
     } catch (e) {
-      observed.forEach((r, i) => {
-        r.pinned = prevs[i]
-      })
+      if (live()) {
+        observed.forEach((r, i) => {
+          r.pinned = prevs[i]
+        })
+      }
+
       // F-07: background action - rollback and rethrow, but never write the
       // global error (it unmounts unrelated screens). Callers toast.
       throw e
@@ -669,6 +714,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!item || item.status !== 'pending') return
 
     if (checkAnswering.value) return
+    const live = _epochGuard()
     checkAnswering.value = true
 
     try {
@@ -680,10 +726,12 @@ export const useSessionStore = defineStore('session', () => {
       item.explanation = resp.explanation
       pc.currentIndex = resp.current_index
     } catch (e) {
-      if (isSessionEndedError(e)) _throwSessionEnded(e)
+      // #414: markSessionEnded writes the global error, so a 409 that
+      // outlived a reset() must not reach it.
+      if (live() && isSessionEndedError(e)) _throwSessionEnded(e)
       throw e
     } finally {
-      checkAnswering.value = false
+      if (live()) checkAnswering.value = false
     }
   }
 
@@ -726,6 +774,7 @@ export const useSessionStore = defineStore('session', () => {
     // double-POST, and the second hits a 409 since the item is already
     // resolved.
     if (checkAnswering.value) return
+    const live = _epochGuard()
     checkAnswering.value = true
     let resp
 
@@ -734,10 +783,10 @@ export const useSessionStore = defineStore('session', () => {
       item.status = 'skipped'
       pc.currentIndex = resp.current_index
     } catch (e) {
-      if (isSessionEndedError(e)) _throwSessionEnded(e)
+      if (live() && isSessionEndedError(e)) _throwSessionEnded(e)
       throw e
     } finally {
-      checkAnswering.value = false
+      if (live()) checkAnswering.value = false
     }
 
     if (resp.done) {
@@ -770,6 +819,7 @@ export const useSessionStore = defineStore('session', () => {
     // orphan the first stream's abort handle. The check card stays open, so
     // Done can be clicked again once the active stream settles.
     if (streamState.value !== 'idle') return
+    const live = _epochGuard()
     checkCompleting.value = true
     // F-17: remember the batch until the stream is proven underway - a
     // pre-flight failure must put the card back, not strand it server-open.
@@ -877,12 +927,12 @@ export const useSessionStore = defineStore('session', () => {
       }
 
       if (e?.status === 429) _applyCapError(e?.body?.detail)
-      streamingMessage.value = null
-      streamState.value = 'idle'
-      abortController.value = null
+      // #414: same E-03 settle as the send path. The server persists the
+      // streamed follow-up text on a client disconnect, so keep it on screen.
+      _settleWithError()
       _setError(e)
     } finally {
-      checkCompleting.value = false
+      if (live()) checkCompleting.value = false
     }
   }
 
@@ -892,7 +942,10 @@ export const useSessionStore = defineStore('session', () => {
   // F-01: the session id the in-flight stream belongs to. Terminal handlers
   // compare it against currentSessionId so a stream that outlived a session
   // switch can never push its output (or errors) into the new session's
-  // transcript. `null` means "no stream may deliver" (abandoned).
+  // transcript. ABANDONED means "no stream may deliver": a sentinel, not
+  // null, because after reset() currentSessionId is null too and a null
+  // _streamSid would read as current (#414).
+  const ABANDONED = Symbol('abandoned')
   let _streamSid = null
 
   function _streamSuperseded() {
@@ -909,7 +962,7 @@ export const useSessionStore = defineStore('session', () => {
     // F-01: silently discard an in-flight stream (session switch / view
     // unmount). Unlike stopStream -- the user-visible Stop, which persists a
     // cancelled bubble -- nothing may be pushed into messages or error state.
-    _streamSid = null
+    _streamSid = ABANDONED
 
     if (abortController.value) abortController.value.abort()
     _clearStreamState()
@@ -1184,6 +1237,14 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   function reset() {
+    // #414: sign-out lands here, so a live stream must be aborted (else the
+    // server keeps generating and billing the turn) and marked abandoned
+    // before anything else is cleared. E-05 still holds: the 401 that
+    // triggered sign-out is already in hand, and the send catch rethrows it.
+    abandonStream()
+    _resetEpoch += 1
+    _inflight.clear()
+    _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
     sessions.value = []
@@ -1194,15 +1255,17 @@ export const useSessionStore = defineStore('session', () => {
     hasMoreMessages.value = false
     loadingEarlier.value = false
     loadEarlierError.value = null
+    loading.value = false
+    detailLoading.value = false
+    libraryLoading.value = false
+    checkAnswering.value = false
+    checkCompleting.value = false
     error.value = null
     dailyCapInfo.value = null
     costCapInfo.value = null
     pendingSummary.value = null
     duplicateReopen.value = null
     pendingCheck.value = null
-    streamingMessage.value = null
-    streamState.value = 'idle'
-    abortController.value = null
     followupNotice.value = null
   }
 

@@ -301,6 +301,35 @@ describe('chatStreamService', () => {
     expect(fetchMock).toHaveBeenCalledTimes(2)
   })
 
+  // E-05 at the transport: on the second 401, _onAuthExpired signs out and
+  // the store's reset() aborts the caller's signal after the headers arrived.
+  // The caller must still get the 401, not an AbortError, so the view can
+  // stash the draft. Binds the F1 (#403) rewrite of this code.
+  it('rejects with the 401 even when the unauthorized handler aborts the caller', async () => {
+    const { setUnauthorizedHandler } = await import('@/services/apiClient.js')
+    globalThis.__supabaseAuthStub.getSession.mockResolvedValue({
+      data: { session: { access_token: 'still-dead', user: { id: 'u1' } } },
+    })
+    fetchMock.mockResolvedValue(mock401Response())
+    const callerCtrl = new AbortController()
+    setUnauthorizedHandler(() => callerCtrl.abort())
+
+    try {
+      const err = await streamChat({
+        sessionId: 's1',
+        message: 'hi',
+        onEvent: () => {},
+        signal: callerCtrl.signal,
+      }).catch((e) => e)
+
+      expect(callerCtrl.signal.aborted).toBe(true)
+      expect(err.name).not.toBe('AbortError')
+      expect(err).toMatchObject({ status: 401 })
+    } finally {
+      setUnauthorizedHandler(null)
+    }
+  })
+
   // F-18 review finding: the SSE POST is a raw fetch, so it must drop the
   // session tree from the short GET cache itself or a re-open within the TTL
   // would show the pre-turn transcript.
