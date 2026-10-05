@@ -13,6 +13,7 @@ import { StreamAbortedError } from '@/lib/errors.js'
 import { REDUCED_MOTION_QUERY } from '@/composables/useMediaQuery.js'
 import { WATCH_CEILING_MS } from '@/composables/useReferencePoll.js'
 import { useSessionStore } from '@/stores/session.js'
+import * as sessionsApi from '@/services/sessionsApi.js'
 import { getSessionProfile, patchProfile } from '@/services/profileApi.js'
 
 const push = vi.fn()
@@ -431,7 +432,7 @@ describe('SessionView', () => {
   })
 
   // #460: a check answer on a session ended elsewhere flips the page the same
-  // way a chat send does. The store's real 409 side effects run first.
+  // way a chat send does, through the store's real 409 path.
   it('answering a check on a session ended elsewhere flips the page to ended', async () => {
     const store = useSessionStore()
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
@@ -441,10 +442,12 @@ describe('SessionView', () => {
         items: [{ question: 'How many ATP?', options: ['30', '38'] }],
       })
     })
-    vi.spyOn(store, 'answerCheck').mockImplementationOnce(async () => {
-      store.markSessionEnded()
-      throw new StreamAbortedError('session_ended')
-    })
+    vi.spyOn(sessionsApi, 'answerCheck').mockRejectedValueOnce(
+      Object.assign(new Error('409'), {
+        status: 409,
+        body: { detail: { code: 'session_ended' } },
+      }),
+    )
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-testid="check-option"]').trigger('click')
