@@ -706,4 +706,161 @@ describe('SessionProfileView (per-session)', () => {
 
     expect(wrapper.find('[data-testid="sprof-conflict"]').exists()).toBe(false)
   })
+
+  // #459: queued writes die with the page they were aimed at, and a failed
+  // add puts its text back in its box.
+  const conflictErr = () => Object.assign(new Error('x'), { status: 412 })
+
+  it('a 412 drops the queued add, keeps the notice up, and restores the first add (#459)', async () => {
+    const rejecters = []
+
+    const patchProfile = vi
+      .spyOn(profileApi, 'patchProfile')
+      .mockImplementation(() => new Promise((_, rej) => rejecters.push(rej)))
+
+    const wrapper = await mountProfile({ etag: 'e0' })
+    const input = () => wrapper.get('[data-testid="add-gap"]')
+
+    await input().setValue('alpha')
+    await input().trigger('keydown.enter')
+    await input().setValue('beta')
+    await input().trigger('keydown.enter')
+    await flushPromises()
+
+    rejecters[0](conflictErr())
+    await flushPromises()
+
+    expect(patchProfile).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="sprof-conflict"]').exists()).toBe(true)
+    expect(input().element.value).toBe('alpha')
+  })
+
+  it('a single add rejected 412 puts its text back and shows the notice (#459)', async () => {
+    vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(conflictErr())
+    const wrapper = await mountProfile({ etag: 'e0' })
+
+    await wrapper.get('[data-testid="add-gap"]').setValue('alpha')
+    await wrapper.get('[data-testid="add-gap-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sprof-conflict"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="add-gap"]').element.value).toBe('alpha')
+  })
+
+  it('a single add rejected 500 puts its text back and shows the write error (#459)', async () => {
+    vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(
+      Object.assign(new Error('boom'), { status: 500 }),
+    )
+    const wrapper = await mountProfile({ etag: 'e0' })
+
+    await wrapper.get('[data-testid="add-mastered"]').setValue('loops')
+    await wrapper.get('[data-testid="add-mastered-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="sprof-write-error"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="add-mastered"]').element.value).toBe('loops')
+  })
+
+  it('a failed add keeps text the learner typed since (#459)', async () => {
+    let rejectWrite
+    vi.spyOn(profileApi, 'patchProfile').mockReturnValueOnce(
+      new Promise((_, rej) => {
+        rejectWrite = rej
+      }),
+    )
+    const wrapper = await mountProfile({ etag: 'e0' })
+    const input = wrapper.get('[data-testid="add-gap"]')
+
+    await input.setValue('alpha')
+    await input.trigger('keydown.enter')
+    await input.setValue('newer')
+
+    rejectWrite(Object.assign(new Error('boom'), { status: 500 }))
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="add-gap"]').element.value).toBe('newer')
+  })
+
+  it('the conflict notice says the change was not saved (#459)', async () => {
+    vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(conflictErr())
+    const wrapper = await mountProfile({ etag: 'e0' })
+
+    await wrapper.get('[data-testid="add-gap"]').setValue('alpha')
+    await wrapper.get('[data-testid="add-gap-submit"]').trigger('click')
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="sprof-conflict"]').text()).toBe(
+      "Profile changed elsewhere, so your change wasn't saved. Reloaded with the latest.",
+    )
+  })
+
+  it('an add queued during the 412 recovery reload is dropped (#459)', async () => {
+    const wrapper = await mountProfile({ etag: 'e0' })
+
+    let resolveReload
+    vi.spyOn(profileApi, 'getSessionProfile').mockReturnValueOnce(
+      new Promise((r) => {
+        resolveReload = r
+      }),
+    )
+    const patchProfile = vi.spyOn(profileApi, 'patchProfile').mockRejectedValueOnce(conflictErr())
+
+    await wrapper.get('[data-testid="add-gap"]').setValue('alpha')
+    await wrapper.get('[data-testid="add-gap"]').trigger('keydown.enter')
+    await flushPromises()
+
+    // The reload hides the form behind the skeleton, so drive the handler
+    // directly: this is the Enter that would otherwise clear the notice.
+    wrapper.vm.drafts.mastered_concepts = 'gamma'
+    wrapper.vm.addItem(wrapper.vm.CUE_SECTIONS[1])
+
+    resolveReload({
+      profile: { knowledge_level: 'beginner', confirmed_gaps: [], mastered_concepts: [] },
+      etag: 'e1',
+      recent_learning_events: [],
+    })
+    await flushPromises()
+
+    expect(patchProfile).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('[data-testid="sprof-conflict"]').exists()).toBe(true)
+  })
+
+  it('a session change drops the queue and frees the controls at once (#459)', async () => {
+    vi.spyOn(profileApi, 'getSessionProfile').mockImplementation(async (id) => ({
+      profile: { knowledge_level: 'beginner', confirmed_gaps: [], mastered_concepts: [] },
+      etag: `etag-${id}`,
+      recent_learning_events: [],
+    }))
+
+    let resolveAlpha
+
+    const patchProfile = vi.spyOn(profileApi, 'patchProfile').mockImplementation(
+      () =>
+        new Promise((r) => {
+          resolveAlpha = r
+        }),
+    )
+
+    const wrapper = mount(ProfileView, { props: { id: 's1' }, global: { stubs } })
+    await flushPromises()
+
+    const input = () => wrapper.get('[data-testid="add-gap"]')
+    await input().setValue('alpha')
+    await input().trigger('keydown.enter')
+    await input().setValue('beta')
+    await input().trigger('keydown.enter')
+    await flushPromises()
+
+    await wrapper.setProps({ id: 's2' })
+    await flushPromises()
+
+    expect(wrapper.get('[data-testid="add-gap-submit"]').attributes('disabled')).toBeUndefined()
+
+    resolveAlpha({ profile: { mastered_concepts: [], confirmed_gaps: [] }, etag: 'etag-s1-x' })
+    await flushPromises()
+
+    expect(patchProfile).toHaveBeenCalledTimes(1)
+    expect(patchProfile).not.toHaveBeenCalledWith('s2', expect.anything(), expect.anything())
+    expect(input().element.value).toBe('')
+  })
 })
