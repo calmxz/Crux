@@ -35,7 +35,7 @@
 
     <template v-else-if="data">
       <p v-if="conflict" class="conflict" data-testid="sprof-conflict" role="status">
-        Profile changed elsewhere — reloaded with the latest.
+        Profile changed elsewhere, so your change wasn't saved. Reloaded with the latest.
       </p>
       <p v-if="writeError" class="error" data-testid="sprof-write-error" role="alert">
         {{ writeError }}
@@ -409,62 +409,106 @@ async function load() {
 // Re-entrancy is handled by serialising rather than by dropping: the mutating
 // controls are disabled for the duration, and anything that still gets through
 // (an Enter on the still-enabled text field) runs after the write ahead of it
-// instead of racing it.
+// instead of racing it. A queued write is dropped only when the page it was
+// aimed at is gone (#459, below).
 let _writeQueue = Promise.resolve()
 
 let _pendingWrites = 0
 
+// #459: queued writes die with the page they were aimed at. Each write
+// captures both generations when it is queued and checks them when it runs.
+// `_conflictGen` is bumped once a 412 recovery reload has finished, so every
+// write queued before the notice became visible (including one queued during
+// the reload) is dropped instead of clearing the notice. `_sessionGen` is
+// bumped on an id change, so nothing queued on session A is sent to B.
+let _conflictGen = 0
+
+let _sessionGen = 0
+
+// Resolves to 'saved' | 'conflict' | 'failed' | 'dropped' | 'stale'.
 function _applyWrite(fn) {
+  const ticket = { conflictGen: _conflictGen, sessionGen: _sessionGen }
   _pendingWrites += 1
   writing.value = true
-  const run = _writeQueue.then(() => _doWrite(fn))
+  const run = _writeQueue.then(() => _doWrite(fn, ticket))
   _writeQueue = run.catch(() => {})
 
   return run
 }
 
-async function _doWrite(fn) {
-  conflict.value = false
-  writeError.value = ''
-  // A write started on session A must not paint its result, its error, or
-  // its conflict notice onto session B if the user navigated mid-flight.
-  const idAtWrite = props.id
+async function _doWrite(fn, ticket) {
+  // A write queued on session A must not paint its result, its error, or its
+  // conflict notice onto session B, nor touch B's `writing` state.
+  const isStale = () => ticket.sessionGen !== _sessionGen
 
   try {
+    if (isStale()) return 'stale'
+
+    if (ticket.conflictGen !== _conflictGen) return 'dropped'
+    conflict.value = false
+    writeError.value = ''
     const res = await fn()
 
-    if (props.id !== idAtWrite) return
+    if (isStale()) return 'stale'
     // One source of truth for the etag: keeping a separate ref alongside
     // data.etag let the spread re-seed the stale value on the next write.
     data.value = { ...data.value, profile: res.profile, etag: res.etag }
+
+    return 'saved'
   } catch (e) {
-    if (props.id !== idAtWrite) return
+    if (isStale()) return 'stale'
 
-    if (e?.status === 412) {
-      // load() resets conflict at its top (stale-sibling-state fix), so the
-      // flag must be set after the recovery reload finishes, not before --
-      // otherwise load() would immediately wipe the notice it is meant to
-      // introduce.
-      await load()
-
-      if (props.id === idAtWrite) conflict.value = true
-    } else {
+    if (e?.status !== 412) {
       writeError.value = friendlyError(e)
-    }
-  } finally {
-    _pendingWrites -= 1
 
-    if (_pendingWrites === 0) writing.value = false
+      return 'failed'
+    }
+
+    // load() resets conflict at its top (stale-sibling-state fix), so the
+    // flag must be set after the recovery reload finishes, not before --
+    // otherwise load() would immediately wipe the notice it is meant to
+    // introduce.
+    await load()
+
+    if (isStale()) return 'stale'
+    _conflictGen += 1
+    conflict.value = true
+
+    return 'conflict'
+  } finally {
+    // A stale write's count was already zeroed by _dropQueuedWrites.
+    if (!isStale()) {
+      _pendingWrites -= 1
+
+      if (_pendingWrites === 0) writing.value = false
+    }
   }
 }
 
-function addItem(sec) {
+// Session change: _doWrite skips the `_pendingWrites` decrement for stale
+// writes, so the counter is reset here instead.
+function _dropQueuedWrites() {
+  _sessionGen += 1
+  _writeQueue = Promise.resolve()
+  _pendingWrites = 0
+  writing.value = false
+}
+
+async function addItem(sec) {
   const v = drafts[sec.key].trim()
 
   if (!v) return
   drafts[sec.key] = ''
 
-  return _applyWrite(() => patchProfile(props.id, { [sec.patchKey]: v }, data.value.etag))
+  const outcome = await _applyWrite(() =>
+    patchProfile(props.id, { [sec.patchKey]: v }, data.value.etag),
+  )
+
+  // #459: a failed add puts its text back unless the learner has typed since.
+  // A stale write never restores: drafts now belong to another session.
+  const lost = outcome === 'conflict' || outcome === 'failed' || outcome === 'dropped'
+
+  if (lost && drafts[sec.key] === '') drafts[sec.key] = v
 }
 
 function setLevel(level) {
@@ -515,7 +559,13 @@ function goReview(gap) {
 
 onMounted(load)
 
-watch(() => props.id, load)
+watch(
+  () => props.id,
+  () => {
+    _dropQueuedWrites()
+    load()
+  },
+)
 </script>
 
 <style scoped>
