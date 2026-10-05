@@ -789,6 +789,9 @@ export const useSessionStore = defineStore('session', () => {
       if (live()) checkAnswering.value = false
     }
 
+    // A stale skip must not start the next account's follow-up stream.
+    if (!live()) return
+
     if (resp.done) {
       await completeCheck()
     } else {

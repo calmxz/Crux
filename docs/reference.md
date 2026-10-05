@@ -313,6 +313,19 @@ literal `'pending'`. `MessageList` keys on a real `message_id`, then
 `client_id`, then index. Never write a client value into `message_id`:
 `_hasServerId` and the `before` pagination cursor read it.
 
+### Reset epoch (#414)
+
+`stores/session.js` `reset()` (sign-out) aborts the live stream first, then
+bumps `_resetEpoch`, clears `_inflight` and nulls `_latestRequestedId`. Any
+async action must call `const live = _epochGuard()` before its first `await`
+and gate every later state write on `live()`: data writes, `finally` flag
+clears, and the error write (`_setError(e, live)`). Return or rethrow to the
+caller unchanged. Without the gate, a request in flight at sign-out writes the
+previous account's data into the next one's store. Streams use the separate
+`ABANDONED` sentinel on `_streamSid` instead (`_streamSuperseded()`).
+Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
+only if it is still the same promise.
+
 ### Favicon generation
 
 `frontend/scripts/gen-favicon.py` regenerates `frontend/public/favicon.ico` from the
