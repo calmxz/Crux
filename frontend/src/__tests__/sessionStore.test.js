@@ -1313,6 +1313,33 @@ describe('session store — streaming', () => {
     expect(s.streamingMessage).toBeNull()
   })
 
+  // #414 fix 2: sign-out runs reset(), which must abort the live stream (else
+  // the server keeps generating and billing the turn) and leave the reset
+  // store untouched when the aborted stream settles.
+  it('reset() mid-send aborts the stream and writes nothing after', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    let signal
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(
+      (opts) =>
+        new Promise((_res, rej) => {
+          signal = opts.signal
+          opts.onEvent({ event: 'assistant_delta', data: { text: 'partial' } })
+          signal.addEventListener('abort', () =>
+            rej(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+          )
+        }),
+    )
+    const p = s.sendMessageStreaming({ text: 'q' })
+    s.reset()
+    expect(signal.aborted).toBe(true)
+    await p
+    expect(s.messages).toEqual([])
+    expect(s.error).toBeNull()
+    expect(s.streamState).toBe('idle')
+    expect(s.streamingMessage).toBeNull()
+  })
+
   it('loadSession to a different id abandons the in-flight stream (F-01)', async () => {
     sessionsApi.getSession.mockResolvedValueOnce({ id: 's2', messages: [] })
     const s = useSessionStore()
@@ -1335,6 +1362,120 @@ describe('session store — streaming', () => {
     s.abortController = { abort }
     await s.loadSession('s1')
     expect(abort).not.toHaveBeenCalled()
+  })
+})
+
+// #414 fix 3: a request still in flight at sign-out must not write the
+// previous account's data into the reset store (F-02 class).
+describe('session store - late results after reset()', () => {
+  function deferred() {
+    let resolve, reject
+
+    const promise = new Promise((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+
+    return { promise, resolve, reject }
+  }
+
+  const page = (items, total) => ({ items, total, limit: 40, offset: 0 })
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('listSessions: a stale list writes nothing and never touches the next call', async () => {
+    const s = useSessionStore()
+    const oldActive = deferred()
+    const oldEnded = deferred()
+    getSessionLibrary.mockReturnValueOnce(oldActive.promise).mockReturnValueOnce(oldEnded.promise)
+    const stale = s.listSessions()
+    s.reset()
+
+    const newActive = deferred()
+    const newEnded = deferred()
+    getSessionLibrary.mockReturnValueOnce(newActive.promise).mockReturnValueOnce(newEnded.promise)
+    const fresh = s.listSessions()
+    // A fresh request, not a join onto the old account's promise.
+    expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+    expect(s.loading).toBe(true)
+
+    oldActive.resolve(page([{ id: 'old-a' }], 5))
+    oldEnded.resolve(page([{ id: 'old-e' }], 6))
+    await stale
+    expect(s.sessions).toEqual([])
+    expect(s.activeTotal).toBe(0)
+    expect(s.endedTotal).toBe(0)
+    // The stale finally left the new call's spinner and in-flight entry alone.
+    expect(s.loading).toBe(true)
+    getSessionLibrary.mockClear()
+    const joined = s.listSessions()
+    expect(getSessionLibrary).not.toHaveBeenCalled()
+
+    newActive.resolve(page([{ id: 'new-a' }], 1))
+    newEnded.resolve(page([], 0))
+    await fresh
+    await joined
+    expect(s.sessions.map((r) => r.id)).toEqual(['new-a'])
+    expect(s.activeTotal).toBe(1)
+    expect(s.loading).toBe(false)
+  })
+
+  it('loadSession: a stale detail writes nothing', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.getSession.mockReturnValueOnce(d.promise)
+    const stale = s.loadSession('s1')
+    s.reset()
+    d.resolve({
+      id: 's1',
+      messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+      pending_check: { gap: 'g', total: 1, current_index: 0, items: [{ question: 'Q' }] },
+    })
+    await stale
+    expect(s.currentSession).toBeNull()
+    expect(s.currentSessionId).toBeNull()
+    expect(s.messages).toEqual([])
+    expect(s.pendingCheck).toBeNull()
+    expect(s.loading).toBe(false)
+    expect(s.detailLoading).toBe(false)
+  })
+
+  it('loadSession: a same-id load after reset issues a fresh request', async () => {
+    const s = useSessionStore()
+    sessionsApi.getSession.mockReturnValueOnce(deferred().promise)
+    s.loadSession('s1')
+    s.reset()
+    sessionsApi.getSession.mockResolvedValueOnce({ id: 's1', messages: [] })
+    await s.loadSession('s1')
+    expect(sessionsApi.getSession).toHaveBeenCalledTimes(2)
+    expect(s.currentSessionId).toBe('s1')
+  })
+
+  it('createSession: a stale create writes nothing', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.createSession.mockReturnValueOnce(d.promise)
+    const stale = s.createSession({ topic: 't' })
+    s.reset()
+    d.resolve({ id: 'new' })
+    expect(await stale).toEqual({ id: 'new' })
+    expect(s.activeTotal).toBe(0)
+    expect(s.currentSessionId).toBeNull()
+    expect(s.currentSession).toBeNull()
+  })
+
+  it('a stale failure rethrows without writing error', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.endSession.mockReturnValueOnce(d.promise)
+    const stale = s.endSession('s1')
+    s.reset()
+    d.reject(new ApiErrorLike(500, {}))
+    await expect(stale).rejects.toBeInstanceOf(ApiErrorLike)
+    expect(s.error).toBeNull()
   })
 })
 

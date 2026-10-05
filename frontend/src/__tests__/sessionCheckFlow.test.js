@@ -478,6 +478,79 @@ describe('multi-check store', () => {
     })
   })
 
+  // #414 fix 1: the server persists already-streamed follow-up text when the
+  // client disconnects, so a network drop must keep it on screen like send.
+  describe('network drop mid follow-up keeps the streamed text', () => {
+    it.each([
+      ['completeCheck', 'streamCheckComplete'],
+      ['stopCheck', 'streamCheckStop'],
+    ])('%s', async (action, streamFn) => {
+      const s = useSessionStore()
+      s.currentSessionId = 'sid'
+      s.handleCheckQuestion(batchEvent())
+      streamSvc[streamFn].mockImplementation(async ({ onEvent }) => {
+        onEvent({ event: 'assistant_delta', data: { text: 'Nice ' } })
+        onEvent({ event: 'assistant_delta', data: { text: 'work' } })
+        throw new ApiErrorLike(0, { detail: 'network error' })
+      })
+      await expect(s[action]()).rejects.toBeInstanceOf(ApiErrorLike)
+      const last = s.messages.at(-1)
+      expect(last.role).toBe('assistant')
+      expect(last.content).toBe('Nice work')
+      expect(last.status).toBe('error')
+      expect(s.error).toBeTruthy()
+      expect(s.streamState).toBe('idle')
+    })
+  })
+
+  // #414 fix 2: sign-out must abort a live follow-up stream, and nothing the
+  // aborted stream settles with may land in the reset store. No event arrives
+  // first, so a stream that still looked current would hit the F-17 arm and
+  // restore the previous account's check card.
+  it('reset() mid follow-up aborts the stream and writes nothing after', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 'sid'
+    s.handleCheckQuestion(batchEvent())
+    let signal
+    streamSvc.streamCheckComplete.mockImplementation(
+      (opts) =>
+        new Promise((_res, rej) => {
+          signal = opts.signal
+          signal.addEventListener('abort', () =>
+            rej(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+          )
+        }),
+    )
+    const p = s.completeCheck()
+    s.reset()
+    expect(signal.aborted).toBe(true)
+    await p
+    expect(s.messages).toEqual([])
+    expect(s.error).toBeNull()
+    expect(s.pendingCheck).toBeNull()
+    expect(s.streamState).toBe('idle')
+  })
+
+  // #414: a session_ended 409 that lands after sign-out must not write the
+  // ended copy into the reset store.
+  it.each(['answerCheck', 'skipCheck'])('%s 409 after reset() writes nothing', async (action) => {
+    const s = useSessionStore()
+    s.currentSessionId = 'sid'
+    s.handleCheckQuestion(batchEvent())
+    let reject
+    sessionsApi[action].mockReturnValue(
+      new Promise((_res, rej) => {
+        reject = rej
+      }),
+    )
+    const p = s[action](0)
+    s.reset()
+    reject(new ApiErrorLike(409, { detail: { code: 'session_ended' } }))
+    await expect(p).rejects.toBeInstanceOf(ApiErrorLike)
+    expect(s.error).toBeNull()
+    expect(s.checkAnswering).toBe(false)
+  })
+
   // E-17: the in-flight guard was invisible to the view, so the card kept its
   // options live while the POST was out and swallowed the second click.
   it('exposes checkAnswering while an answer POST is in flight', async () => {
