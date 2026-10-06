@@ -16,6 +16,10 @@ export default defineConfig(({ mode }) => {
       vueDevTools(),
       cspPlugin(env.VITE_API_BASE_URL || ''),
     ],
+    define: {
+      // Vercel sets VERCEL=1 during its builds; see src/lib/analytics.js.
+      'import.meta.env.VITE_VERCEL_ANALYTICS': JSON.stringify(process.env.VERCEL === '1' ? '1' : ''),
+    },
     resolve: {
       alias: {
         '@': fileURLToPath(new URL('./src', import.meta.url))

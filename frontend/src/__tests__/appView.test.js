@@ -27,6 +27,17 @@ vi.mock('primevue/toast', () => ({
   default: { template: '<div data-testid="toast" />' },
 }))
 
+vi.mock('@vercel/analytics/vue', () => ({
+  Analytics: { template: '<div data-testid="vercel-analytics" />' },
+}))
+
+// Tests run outside a Vercel build, where the flag is off; force it on so the
+// mount point is covered.
+vi.mock('@/lib/analytics.js', () => ({
+  analyticsEnabled: true,
+  scrubAnalyticsEvent: (event) => event,
+}))
+
 import App from '@/App.vue'
 import { reportApiError } from '@/services/errorBus.js'
 
@@ -241,5 +252,32 @@ describe('D-15: both App branches carry a focusable #main-content', () => {
     expect(el.getAttribute('tabindex')).toBe('-1')
     el.focus()
     expect(document.activeElement).toBe(el)
+  })
+})
+
+// Vercel Web Analytics mounts once at the app root, outside the shell branch,
+// so chrome-less routes (login, legal, 404) report page views too.
+describe('Vercel Web Analytics', () => {
+  let wrapper
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    routeMeta = {}
+  })
+  afterEach(() => {
+    wrapper?.unmount()
+    wrapper = null
+    routeMeta = {}
+  })
+
+  it('mounts on shell routes', () => {
+    wrapper = mount(App)
+    expect(wrapper.findAll('[data-testid="vercel-analytics"]')).toHaveLength(1)
+  })
+
+  it('mounts on chrome-less routes', () => {
+    routeMeta = { sidebar: false }
+    wrapper = mount(App)
+    expect(wrapper.findAll('[data-testid="vercel-analytics"]')).toHaveLength(1)
   })
 })

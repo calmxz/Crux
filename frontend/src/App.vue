@@ -3,11 +3,13 @@ import { computed, onBeforeUnmount, onMounted, watch } from 'vue'
 import { RouterView, useRoute } from 'vue-router'
 import Toast from 'primevue/toast'
 import ConfirmDialog from 'primevue/confirmdialog'
+import { Analytics } from '@vercel/analytics/vue'
 import { useToast } from './composables/useToast.js'
 import { useSidebar } from './composables/useSidebar.js'
 import { usePanel } from './composables/usePanel.js'
 import { errorBus } from './services/errorBus.js'
 import { friendlyError } from './lib/errors.js'
+import { analyticsEnabled, scrubAnalyticsEvent } from './lib/analytics.js'
 import Sidebar from './components/sidebar/Sidebar.vue'
 import SidebarMobileTopStrip from './components/sidebar/SidebarMobileTopStrip.vue'
 import RouteProgressBar from './components/RouteProgressBar.vue'
@@ -163,6 +165,7 @@ onBeforeUnmount(() => {
   </div>
   <Toast position="top-right" />
   <ConfirmDialog />
+  <Analytics v-if="analyticsEnabled" :before-send="scrubAnalyticsEvent" />
 </template>
 
 <style>
