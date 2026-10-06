@@ -9,7 +9,7 @@ const props = defineProps({
   streamingMessage: { type: Object, default: null },
   awaiting: { type: Boolean, default: false },
   // Cue-lands: the latest tutor turn changed the profile, so its gutter
-  // carries the blue tick until the learner writes again.
+  // carries the blue tick until the next tutor turn starts.
   landed: { type: Boolean, default: false },
 })
 
@@ -19,6 +19,7 @@ const props = defineProps({
 // skipped. Cancelled/partial rows keep their marker even without text.
 function _renderable(m) {
   if (m.role === 'user') return true
+
   return Boolean(
     m.content ||
     m.check_batch ||
@@ -36,41 +37,89 @@ const lastAssistantIndex = computed(() => {
   for (let i = visibleMessages.value.length - 1; i >= 0; i -= 1) {
     if (visibleMessages.value[i].role !== 'user') return i
   }
+
   return -1
 })
 
 function tickAt(i) {
   return props.landed && !props.streamingMessage && i === lastAssistantIndex.value
 }
+
+// Speaker-change gap: the rhythm of the thread grows when the voice changes.
+// Based on visibleMessages (the rendered list), not the raw messages array,
+// so a skipped-empty assistant row (U-01) never counts as a voice change.
+function speakerChangeAt(i) {
+  if (i === 0) return false
+
+  return visibleMessages.value[i].role !== visibleMessages.value[i - 1].role
+}
+
+// The typing/streaming row is always the tutor; it grows the gap only when
+// the last rendered turn was the learner's.
+const trailingSpeakerChange = computed(() => {
+  const last = visibleMessages.value[visibleMessages.value.length - 1]
+
+  return last ? last.role === 'user' : false
+})
 </script>
 
 <template>
   <div class="message-list">
     <TransitionGroup name="msg-fade" tag="div" class="msg-list">
-      <template v-for="(m, i) in visibleMessages" :key="m.message_id || `m-${i}`">
+      <!-- F-21: an optimistic user row has no server id until the turn is
+           reloaded, so two of them in a row both fell back to the index and
+           shared a key. client_id is the local stand-in; message_id still
+           wins wherever it exists (it is also the pagination cursor, so a
+           client value must never be written into it). Dup-key fix: a
+           locally-cancelled assistant row carries the literal message_id
+           'pending' (session.js handleCancelled) until reload, so two Stop
+           clicks in one session shared that same string key -- 'pending'
+           must be treated as no server id too. -->
+      <template
+        v-for="(m, i) in visibleMessages"
+        :key="
+          (m.message_id && m.message_id !== 'pending' ? m.message_id : null) ??
+          m.client_id ??
+          `m-${i}`
+        "
+      >
         <UserBubble
           v-if="m.role === 'user'"
+          :class="{ 'msg-row--speaker-change': speakerChangeAt(i) }"
           :content="m.content || ''"
           :created-at="m.created_at || null"
         />
-        <AssistantBubble v-else :message="m" :streaming="false" :landed="tickAt(i)" />
+        <AssistantBubble
+          v-else
+          :class="{ 'msg-row--speaker-change': speakerChangeAt(i) }"
+          :message="m"
+          :streaming="false"
+          :landed="tickAt(i)"
+        />
       </template>
     </TransitionGroup>
     <article
       v-if="awaiting && !streamingMessage"
-      class="msg assistant typing"
+      :class="['msg', 'assistant', 'typing', { 'msg-row--speaker-change': trailingSpeakerChange }]"
       data-testid="msg-typing"
     >
       <div class="msg-gutter">
         <span class="role-tag">tutor</span>
       </div>
       <div class="msg-body">
-        <p class="content typing-dots" aria-label="Tutor is thinking">
-          <span></span><span></span><span></span>
-        </p>
+        <!-- D-07: aria-label on a <p> is not a supported name source. The dots
+             are decoration; the text lives in a visually-hidden sibling so
+             `.typing-dots span` cannot style it as a fourth dot. -->
+        <span class="sr-only">Tutor is thinking</span>
+        <p class="content typing-dots"><span></span><span></span><span></span></p>
       </div>
     </article>
-    <AssistantBubble v-if="streamingMessage" :message="streamingMessage" :streaming="true" />
+    <AssistantBubble
+      v-if="streamingMessage"
+      :class="{ 'msg-row--speaker-change': trailingSpeakerChange }"
+      :message="streamingMessage"
+      :streaming="true"
+    />
   </div>
 </template>
 
@@ -79,6 +128,12 @@ function tickAt(i) {
   display: flex;
   flex-direction: column;
   gap: 0.75rem;
+}
+
+/* Speaker-change gap: 0.75rem inside one voice (the flex gap above), 1.5rem
+   when the voice changes -- the extra margin stacks on top of the gap. */
+.msg-list > .msg-row--speaker-change {
+  margin-top: 0.75rem;
 }
 
 /* A card appears; it never slides. */
@@ -105,19 +160,21 @@ function tickAt(i) {
   margin-top: 0.75rem;
 }
 
-/* Typing indicator: a tutor card with three dots instead of prose. Scoped to
-   .typing so it never collides with the learner card's own rule. */
+.msg-list + .msg.typing.msg-row--speaker-change,
+.msg-list + .msg.assistant.msg-row--speaker-change {
+  margin-top: 1.5rem;
+}
+
+/* Typing indicator: a flat tutor turn with three dots instead of prose, the
+   same measure as the settled turn so nothing jumps when the first token
+   lands. Scoped to .typing so it never collides with the learner card. */
 .msg.typing {
   align-self: flex-start;
+  width: 78%;
   max-width: 78%;
   display: flex;
   flex-direction: column;
   gap: 0.35rem;
-  background: var(--card);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-card);
-  box-shadow: 0 1px 0 var(--card-drop);
-  padding: 0.55rem 0.9rem 0.7rem;
 }
 
 .msg.typing .msg-gutter {

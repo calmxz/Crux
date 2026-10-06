@@ -1,0 +1,6 @@
+{
+  "pythonVersion": "3.12",
+  "typeCheckingMode": "basic",
+  "exclude": [".venv", "db/alembic/versions", "contracts/models.py"],
+  "ignore": ["tests"]
+}

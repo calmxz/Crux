@@ -30,13 +30,23 @@ def _build_engine_kwargs(url: str) -> dict:
         # clients. psycopg3 names prepared statements `_pg3_N` per connection and
         # collides when the pooler hands the same backend to a new client. Disable
         # statement prepare entirely. See psycopg docs §"Pgbouncer".
-        kwargs["connect_args"] = {"prepare_threshold": None}
+        # G-07 follow-up: psycopg's connect_timeout (seconds) bounds the TCP
+        # connect. Without it a DB-level hang is unbounded, so a probe or any
+        # sync route blocks a worker thread -- holding an anyio limiter token
+        # and a pool slot -- until the OS gives up.
+        kwargs["connect_args"] = {
+            "prepare_threshold": None,
+            "connect_timeout": int(settings.db_connect_timeout_s),
+        }
         # B-10: detect dead pooled connections after idle (pre_ping) and make
         # pool sizing explicit + env-tunable instead of SQLAlchemy defaults.
         kwargs["pool_pre_ping"] = True
         kwargs["pool_size"] = settings.db_pool_size
         kwargs["max_overflow"] = settings.db_max_overflow
         kwargs["pool_recycle"] = 1800
+        # F-01: shed load instead of hanging 30 s (SQLAlchemy's default) on
+        # pool exhaustion -- a fast 500 beats a queue of stalled requests.
+        kwargs["pool_timeout"] = settings.db_pool_timeout_s
     return kwargs
 
 

@@ -5,6 +5,9 @@
 .crux-dialog .p-dialog,
 .p-dialog.crux-dialog,
 .p-confirmdialog {
+  /* D-12: a dialog given a fixed width in rem overflows a 320px viewport.
+     One gutter each side is the floor, whatever width the dialog asks for. */
+  max-width: calc(100vw - 2rem);
   border-radius: var(--radius-card);
   border: 1px solid var(--card-edge);
   background: var(--card);
@@ -50,6 +53,24 @@
   padding: 0.5rem 1.25rem;
   font-family: var(--font-sans);
   font-weight: 600;
+}
+
+/* The footer .p-button rule above is (0,4,0) and beats base.css's
+   .p-button.confirm-delete-strong (0,2,0), so a destructive submit rendered
+   blue instead of text-safe red. This (0,5,0) override restores it -- and
+   fixes the same specificity bug for the End-session / file-delete confirms
+   that also live in a .p-confirmdialog footer. */
+.p-dialog.crux-dialog .p-dialog-footer .p-button.confirm-delete-strong,
+.p-confirmdialog .p-dialog-footer .p-button.confirm-delete-strong {
+  background: var(--ink-marker-text);
+  border-color: var(--ink-marker-text);
+  color: var(--color-text-on-accent);
+}
+.p-dialog.crux-dialog .p-dialog-footer .p-button.confirm-delete-strong:hover,
+.p-confirmdialog .p-dialog-footer .p-button.confirm-delete-strong:hover {
+  background: var(--ink-marker-text-hover);
+  border-color: var(--ink-marker-text-hover);
+  color: var(--color-text-on-accent);
 }
 
 /* Fields sit on a rule, not in a rounded well. */

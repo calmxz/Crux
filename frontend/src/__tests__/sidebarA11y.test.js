@@ -3,20 +3,32 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const routerPush = vi.fn()
+
 const routeRef = { params: {}, fullPath: '/', meta: {} }
+
 vi.mock('vue-router', () => ({
   RouterLink: { template: '<a><slot /></a>', props: ['to'] },
   RouterView: { template: '<div data-testid="router-view" />' },
   useRouter: () => ({ push: routerPush }),
   useRoute: () => routeRef,
 }))
+
 vi.mock('primevue/toast', () => ({
   default: { template: '<div />' },
 }))
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError: vi.fn(), showWarn: vi.fn(), showSuccess: vi.fn() }),
 }))
+
+// E-12: SidebarSessionRow asks PrimeVue's confirm service before ending a
+// session, and the service is not installed on a bare mount.
+vi.mock('primevue/useconfirm', () => ({
+  useConfirm: () => ({ require: (cfg) => cfg.accept?.() }),
+}))
+
 const apiReviewQueue = vi.fn()
+
 vi.mock('@/services/reviewApi.js', () => ({
   getReviewQueue: (...args) => apiReviewQueue(...args),
 }))
@@ -46,11 +58,15 @@ async function mountSidebarWithReview(total) {
   apiReviewQueue.mockResolvedValue({ items: [], total, limit: 1, offset: 0 })
   globalThis.requestIdleCallback = (cb) => {
     cb()
+
     return 1
   }
+
   globalThis.cancelIdleCallback = () => {}
+
   const w = mount(Sidebar, { attachTo: document.body })
   await flushPromises()
+
   return w
 }
 
@@ -153,6 +169,7 @@ describe('Mobile drawer a11y — focus trap', () => {
       ?.querySelectorAll(
         'a[href], button:not([disabled]), input:not([disabled]), [tabindex]:not([tabindex="-1"])',
       )
+
     expect(focusables.length).toBeGreaterThan(0)
 
     const last = focusables[focusables.length - 1]
@@ -205,7 +222,7 @@ describe('Sidebar a11y — inert when closed (D-03)', () => {
   })
 })
 
-describe('Sidebar a11y — review badge unit', () => {
+describe('Sidebar a11y — recall badge unit', () => {
   let wrapper
   beforeEach(() => {
     setActivePinia(createPinia())
@@ -219,10 +236,10 @@ describe('Sidebar a11y — review badge unit', () => {
     delete globalThis.cancelIdleCallback
   })
 
-  it('review link exposes the count with a unit', async () => {
+  it('recall link exposes the count with a unit', async () => {
     wrapper = await mountSidebarWithReview(20)
-    const link = wrapper.get('[data-testid="sidebar-review"]')
-    expect(link.attributes('aria-label')).toBe('Review: 20 concepts due')
+    const link = wrapper.get('[data-testid="sidebar-recall"]')
+    expect(link.attributes('aria-label')).toBe('Recall: 20 concepts due')
   })
 })
 

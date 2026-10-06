@@ -7,6 +7,7 @@ describe('costCapToastMessage', () => {
       { used_usd: null, hard_cap_usd: null, scope: 'global' },
       '5:00 PM',
     )
+
     expect(r.message).not.toContain('$null')
     expect(r.message).toContain('Service daily budget')
     expect(r.message).toBe('Service daily budget reached. Resets at 5:00 PM.')
@@ -18,6 +19,7 @@ describe('costCapToastMessage', () => {
       { used_usd: '3.01', hard_cap_usd: '3.00', scope: 'user' },
       '5:00 PM',
     )
+
     expect(r.message).toBe('Daily cost limit reached ($3.01 / $3.00). Resets at 5:00 PM.')
     expect(r.summary).toBe('Cost cap reached')
   })
@@ -27,6 +29,7 @@ describe('costCapToastMessage', () => {
       { used_usd: '1.50', hard_cap_usd: '2.00', scope: 'user' },
       'midnight UTC',
     )
+
     expect(r.message).toBe('Daily cost limit reached ($1.50 / $2.00). Resets at midnight UTC.')
   })
 })

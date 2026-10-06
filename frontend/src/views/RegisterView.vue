@@ -124,22 +124,32 @@ import { computed, ref } from 'vue'
 import InputText from 'primevue/inputtext'
 
 import AuthCover from '../components/auth/AuthCover.vue'
+import { authErrorCopy } from '../lib/authErrors.js'
 import { useAuthStore } from '../stores/auth.js'
 import { isValidEmail, isValidPassword, passwordsMismatch } from '../utils/validation.js'
 
 const auth = useAuthStore()
 
 const email = ref('')
+
 const password = ref('')
+
 const confirm = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const sent = ref(false)
+
 const consent = ref(false)
 
 const emailValid = computed(() => isValidEmail(email.value.trim()))
+
 const passwordValid = computed(() => isValidPassword(password.value))
+
 const mismatch = computed(() => passwordsMismatch(password.value, confirm.value))
+
 const canSubmit = computed(
   () =>
     emailValid.value && passwordValid.value && confirm.value === password.value && consent.value,
@@ -149,6 +159,7 @@ async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.register(email.value.trim(), password.value)
     sent.value = true
@@ -156,7 +167,8 @@ async function submit() {
     // Supabase AuthErrors carry an HTTP status, so friendlyError() would swap
     // their specific copy ("User already registered") for a generic status
     // message. Surface the SDK message instead.
-    error.value = e?.message || 'Could not create account. Try again.'
+    // E-13: code-keyed copy, never SDK prose (see lib/authErrors.js).
+    error.value = authErrorCopy(e, 'Could not create account. Try again.')
   } finally {
     submitting.value = false
   }

@@ -16,11 +16,11 @@ import pytest
 from agent import tutor
 from agent.types import ToolContext
 from config import settings
-from db.models import ChatMessage, Session as SessionModel, User as UserModel
-
+from db.models import ChatMessage
+from db.models import Session as SessionModel
+from db.models import User as UserModel
 from services import check_question_service, profile_service
 from services.cost_meter import CapStatus
-
 
 # ---------------------------------------------------------------------------
 # Streaming chunk builders (copied verbatim from test_tutor_stream.py)
@@ -141,7 +141,7 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
                 arguments=json.dumps(
                     {
                         "session_id": SESSION_ID,
-                        "gap": "linear_algebra",
+                        "set_index": 1, "set_total": 1, "gap": "linear_algebra",
                         "items": [
                             {
                                 "question": "Inputs?",
@@ -223,7 +223,7 @@ async def test_stream_check_question_event_shape(monkeypatch, db_session):
                 arguments=json.dumps(
                     {
                         "session_id": sid,
-                        "gap": "derivatives",
+                        "set_index": 1, "set_total": 1, "gap": "derivatives",
                         "items": [
                             {
                                 "question": "What is d/dx x^2?",
@@ -391,7 +391,7 @@ async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_sessi
                 arguments=json.dumps(
                     {
                         "session_id": sid,
-                        "gap": "chain rule",
+                        "set_index": 1, "set_total": 1, "gap": "chain rule",
                         "items": [
                             {
                                 "question": "What is d/dx f(g(x))?",
@@ -465,7 +465,7 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
                 id="tc_ask1",
                 name="ask_check_questions",
                 arguments=json.dumps(
-                    {"session_id": sid, "gap": "first_gap", "items": [item]}
+                    {"session_id": sid, "set_index": 1, "set_total": 1, "gap": "first_gap", "items": [item]}
                 ),
             ),
             _tool_fragment(
@@ -473,7 +473,7 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
                 id="tc_ask2",
                 name="ask_check_questions",
                 arguments=json.dumps(
-                    {"session_id": sid, "gap": "second_gap", "items": [item]}
+                    {"session_id": sid, "set_index": 1, "set_total": 1, "gap": "second_gap", "items": [item]}
                 ),
             ),
         ),

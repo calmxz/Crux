@@ -99,15 +99,20 @@ import { useRouter } from 'vue-router'
 import InputText from 'primevue/inputtext'
 
 import AuthCover from '../components/auth/AuthCover.vue'
+import { authErrorCopy } from '../lib/authErrors.js'
 import { useAuthStore } from '../stores/auth.js'
 import { isValidPassword, passwordsMismatch } from '../utils/validation.js'
 
 const auth = useAuthStore()
+
 const router = useRouter()
 
 const password = ref('')
+
 const confirm = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
 
 // Supabase exchanges the recovery hash asynchronously after init(), so the
@@ -116,25 +121,29 @@ const error = ref('')
 const recoveryHash = ref(
   typeof window !== 'undefined' && window.location.hash.includes('type=recovery'),
 )
+
 const hasRecovery = computed(() => recoveryHash.value || !auth.ready || !!auth.session)
 
 const passwordValid = computed(() => isValidPassword(password.value))
+
 const mismatch = computed(() => passwordsMismatch(password.value, confirm.value))
+
 const canSubmit = computed(() => passwordValid.value && confirm.value === password.value)
 
 async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.updatePassword(password.value)
     await auth.signOut()
     router.push('/login?reset=1')
   } catch (e) {
     // Supabase AuthErrors carry an HTTP status, so friendlyError() would swap
-    // their specific copy ("Auth session missing!") for a generic status
-    // message. Surface the SDK message instead.
-    error.value = e?.message || 'Could not update password. The link may have expired.'
+    // their specific copy for a generic status message (commit 1d0f4aa).
+    // E-13: lib/authErrors.js keys on AuthError.code instead of SDK prose.
+    error.value = authErrorCopy(e, 'Could not update password. The link may have expired.')
   } finally {
     submitting.value = false
   }

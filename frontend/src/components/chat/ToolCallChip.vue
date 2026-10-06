@@ -15,6 +15,7 @@ const display = computed(() => {
   if (props.state === 'done' && props.tool_call.summary) {
     return props.tool_call.summary
   }
+
   return labelFor(props.tool_call.name, props.state)
 })
 </script>

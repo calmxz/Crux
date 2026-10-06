@@ -3,9 +3,8 @@
 Revision ID: 0012_terms_acceptance
 Revises: 0011_drop_subjects_lessons
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "0012_terms_acceptance"
 down_revision = "0011_drop_subjects_lessons"

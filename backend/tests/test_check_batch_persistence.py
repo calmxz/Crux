@@ -1,15 +1,16 @@
 """Persistence of resolved check batches onto the asking ChatMessage."""
 
 import json as _json
-import pytest
 from datetime import datetime, timezone
 
-from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import ChatMessage, LearningEvent, Session as SessionModel, User
+import pytest
+
 from agent import tutor
 from agent.types import ToolContext
+from contracts import AskCheckQuestionsArgs, TopicProfile
+from db.models import ChatMessage, LearningEvent, User
+from db.models import Session as SessionModel
 from services import check_question_service
-
 
 USER_ID = "u_batch_1"
 SID = "s_batch_1"
@@ -40,6 +41,7 @@ def _register_batch(db, gap="atp"):
     ctx = ToolContext(db=db, session_id=SID, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=SID, gap=gap,
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a is right."}]))
@@ -225,6 +227,7 @@ def test_streaming_ask_attaches_message_id(seeded):
     ctx = ToolContext(db=db, session_id=SID, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=SID, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))

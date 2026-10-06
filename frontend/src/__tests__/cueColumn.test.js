@@ -56,8 +56,10 @@ describe('CueColumn', () => {
   it('steps the level mark stroke weight across the enum, hairline when unset', () => {
     const stroke = (lvl) => {
       const w = mountCue(profile({ knowledge_level: lvl }))
+
       return Number(w.get('[data-testid="cue-level"] path').attributes('stroke-width'))
     }
+
     const unset = stroke(null)
     const beginner = stroke('beginner')
     const intermediate = stroke('intermediate')
@@ -76,6 +78,7 @@ describe('CueColumn', () => {
     const w = mountCue(
       profile({ knowledge_level: 'beginner', subtopic_levels: { fermentation: 'advanced' } }),
     )
+
     const row = w.get('[data-testid="cue-subtopic"]')
     expect(row.text()).toContain('fermentation')
     expect(Number(row.get('path').attributes('stroke-width'))).toBeGreaterThan(
@@ -130,6 +133,7 @@ describe('CueColumn', () => {
     )
       .get('[data-testid="cue-strip"]')
       .text()
+
     expect(strip).toContain('0 gaps')
   })
 
@@ -145,6 +149,7 @@ describe('CueColumn', () => {
   // case that touches it has to hand the module back the way it found it.
   afterEach(() => {
     panelTest._setExpanded(true)
+
     try {
       window.localStorage.removeItem(panelTest.LS_KEY)
     } catch {
@@ -173,6 +178,7 @@ describe('CueColumn', () => {
     const w = mountCue(
       profile({ confirmed_gaps: [], mastered_concepts: [], focus_target_gap: null }),
     )
+
     expect(w.text()).toContain('no focus cue yet')
     expect(w.text()).toContain('none open')
     expect(w.text()).toContain('none yet')

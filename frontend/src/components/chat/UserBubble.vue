@@ -73,6 +73,10 @@ const timeLabel = computed(() => formatTime(props.createdAt))
   font-size: var(--fs-body);
   line-height: var(--lh-body);
   color: var(--ink-learner);
+  /* D-13: a pasted URL or a long token has no break opportunity, so without
+     these it widens the bubble past the column instead of wrapping. */
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 @media (max-width: 599px) {

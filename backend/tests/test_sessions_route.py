@@ -7,10 +7,10 @@ import pytest
 from agent.types import ToolContext
 from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import ChatMessage, Document, Session as SessionModel, UsageCounter, User
+from db.models import ChatMessage, Document, UsageCounter, User
+from db.models import Session as SessionModel
 from lib.error_codes import TOO_MANY_REQUESTS
 from services import check_question_service, summary_service, velocity_limit
-
 
 USER_ID = "u1"
 
@@ -224,6 +224,54 @@ def test_get_list_filters_by_user_desc(client, db_session, seeded_user):
     assert r.status_code == 200
     rows = r.json()
     assert [row["id"] for row in rows] == ["s_new", "s_old"]
+
+
+def _seed_n_sessions(db_session, n):
+    """n sessions with strictly decreasing created_at so ordering is
+    deterministic on sqlite (default timestamps can collide)."""
+    base = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    for i in range(n):
+        db_session.add(
+            SessionModel(
+                id=f"p{i}",
+                user_id=USER_ID,
+                topic=f"topic {i}",
+                topic_profile_json=TopicProfile().model_dump_json(),
+                created_at=base + timedelta(hours=i),
+            )
+        )
+    db_session.commit()
+    # newest first
+    return [f"p{i}" for i in reversed(range(n))]
+
+
+def test_list_rejects_limit_over_max(client, db_session, seeded_user):
+    r = client.get(f"/api/sessions?user_id={USER_ID}&limit=201")
+    assert r.status_code == 422, r.text
+
+
+def test_list_rejects_limit_zero(client, db_session, seeded_user):
+    r = client.get(f"/api/sessions?user_id={USER_ID}&limit=0")
+    assert r.status_code == 422, r.text
+
+
+def test_list_rejects_negative_offset(client, db_session, seeded_user):
+    r = client.get(f"/api/sessions?user_id={USER_ID}&offset=-1")
+    assert r.status_code == 422, r.text
+
+
+def test_list_limit_offset_slices_newest_first(client, db_session, seeded_user):
+    order = _seed_n_sessions(db_session, 5)
+    r = client.get(f"/api/sessions?user_id={USER_ID}&limit=2&offset=2")
+    assert r.status_code == 200, r.text
+    assert [row["id"] for row in r.json()] == order[2:4]
+
+
+def test_list_default_returns_up_to_100(client, db_session, seeded_user):
+    order = _seed_n_sessions(db_session, 5)
+    r = client.get(f"/api/sessions?user_id={USER_ID}")
+    assert r.status_code == 200, r.text
+    assert [row["id"] for row in r.json()] == order
 
 
 def test_list_returns_tz_aware_timestamps(client, db_session, seeded_user):
@@ -691,6 +739,7 @@ def _open_batch(db, session_id, user_id=USER_ID, n=2):
     return check_question_service.register(
         db, ctx,
         AskCheckQuestionsArgs(
+            set_index=1, set_total=1,
             session_id=session_id,
             gap="g",
             items=[
@@ -862,3 +911,147 @@ def test_post_fresh_without_declared_level_unchanged(client, seeded_user):
     assert r.status_code == 201, r.text
     profile = TopicProfile.model_validate(r.json()["topic_profile"])
     assert profile.knowledge_level is None
+
+
+# --- C-09: whitespace-only topics ---
+
+
+def test_post_sessions_whitespace_topic_is_422(client, seeded_user, db_session):
+    from db.models import Session as SessionModel
+
+    r = client.post(
+        "/api/sessions",
+        json={"user_id": USER_ID, "topic": "   ", "seed_mode": "fresh"},
+    )
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"] == {"code": "empty_topic"}
+    assert db_session.query(SessionModel).count() == 0
+
+
+def test_post_sessions_empty_topic_is_422(client, seeded_user):
+    r = client.post(
+        "/api/sessions",
+        json={"user_id": USER_ID, "topic": "", "seed_mode": "fresh"},
+    )
+    assert r.status_code == 422, r.text
+
+
+def test_patch_session_whitespace_topic_is_422(client, seeded_user, db_session):
+    from db.models import Session as SessionModel
+
+    db_session.add(
+        SessionModel(
+            id="s-ws",
+            user_id=USER_ID,
+            topic="sql joins",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
+    db_session.commit()
+    r = client.patch("/api/sessions/s-ws", json={"topic": "  "})
+    assert r.status_code == 422, r.text
+    assert r.json()["detail"] == {"code": "empty_topic"}
+    db_session.expire_all()
+    assert db_session.get(SessionModel, "s-ws").topic == "sql joins"
+
+
+def test_patch_session_empty_topic_is_422(client, seeded_user, db_session):
+    from db.models import Session as SessionModel
+
+    db_session.add(
+        SessionModel(
+            id="s-ws2",
+            user_id=USER_ID,
+            topic="sql joins",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
+    db_session.commit()
+    r = client.patch("/api/sessions/s-ws2", json={"topic": ""})
+    assert r.status_code == 422, r.text
+
+
+@pytest.mark.asyncio
+async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
+    db_session, seeded_user, monkeypatch
+):
+    """#421: on a disconnect the ambient cancel is level-triggered, so an
+    unshielded drain of the follow-up producer forwards the cancel into the
+    tutor's cancel arm and kills it at its first suspension (the drain of an
+    in-flight tool call), before the partial reply is committed. The drain
+    must run shielded, as in chat_stream.
+    """
+    import asyncio
+    from types import SimpleNamespace
+
+    import anyio
+    from sqlalchemy import func, select
+
+    from agent.stream_events import StreamEvent
+    from routes import sessions as sessions_route
+
+    sid = "s-followup-cancel"
+    db_session.add(SessionModel(id=sid, user_id=USER_ID, topic="sql"))
+    db_session.commit()
+
+    arm_done = asyncio.Event()
+    started = asyncio.Event()
+
+    async def fake_run_streaming(messages, system_prompt, ctx):
+        try:
+            yield StreamEvent("assistant_delta", {"text": "partial"})
+            started.set()
+            await asyncio.sleep(3600)
+        except asyncio.CancelledError:
+            # Mirrors tutor.py's cancel arm with a tool call in flight: stage
+            # the row, suspend on the dispatch drain, then commit.
+            ctx.db.add(
+                ChatMessage(
+                    session_id=sid,
+                    role="assistant",
+                    content="partial",
+                    status="cancelled",
+                    cancelled_at=datetime.now(timezone.utc),
+                )
+            )
+            await asyncio.sleep(0.05)
+            ctx.db.commit()
+            arm_done.set()
+            raise
+
+    monkeypatch.setattr(sessions_route.tutor, "run_streaming", fake_run_streaming)
+
+    async def _not_disconnected():
+        return False
+
+    request = SimpleNamespace(headers={}, is_disconnected=_not_disconnected)
+    ctx = ToolContext(
+        db=db_session,
+        session_id=sid,
+        user_id=USER_ID,
+        turn_started_at=datetime.now(timezone.utc),
+    )
+    resp = sessions_route._followup_response(request, True, [], "", ctx)
+
+    async def consume():
+        async for _chunk in resp.body_iterator:
+            pass
+
+    async with anyio.create_task_group() as tg:
+        tg.start_soon(consume)
+        await started.wait()
+        # Simulate Starlette's disconnect handling: cancel the scope the
+        # response body iterator runs in.
+        tg.cancel_scope.cancel()
+    assert arm_done.is_set(), (
+        "the pump returned while the tutor's cancel arm was still unwinding"
+    )
+    # get_db teardown stand-in; the assert above is what proves the drain.
+    db_session.close()
+
+    cancelled = db_session.execute(
+        select(func.count())
+        .select_from(ChatMessage)
+        .where(ChatMessage.session_id == sid, ChatMessage.status == "cancelled")
+    ).scalar_one()
+    assert cancelled == 1, "the partial follow-up reply was not persisted"

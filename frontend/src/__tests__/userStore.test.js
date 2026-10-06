@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { useUserStore } from '@/stores/user.js'
+import { _resetApiCache } from '@/services/apiClient.js'
 
 const key = (uid) => `crux:user:v1:${uid}`
 
@@ -23,6 +24,9 @@ describe('user store', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     localStorage.clear()
+    // F-18: apiClient's GET cache is module state; without this a later case
+    // gets an earlier case's /me body.
+    _resetApiCache()
     fetchMock = vi.fn().mockReturnValue(ok({}))
     globalThis.fetch = fetchMock
   })
@@ -96,6 +100,22 @@ describe('user store', () => {
     expect(localStorage.getItem(key('u1'))).toBeNull()
   })
 
+  // R2-25: clearForAccountDeletion is called right after DELETE /me succeeds.
+  // It delegates to resetOnboarding() for the wipe -- same behavior, kept as
+  // its own name so the call site reads as "account just got deleted", not
+  // "onboarding restarted".
+  it('clearForAccountDeletion wipes memory and removes the persisted key', async () => {
+    const u = useUserStore()
+    u.setActiveUser('user-a')
+    await u.completeOnboarding({ name: 'Alice', feedback: 'direct' })
+    expect(localStorage.getItem(key('user-a'))).not.toBeNull()
+
+    u.clearForAccountDeletion()
+    expect(u.name).toBeNull()
+    expect(u.onboardingComplete).toBe(false)
+    expect(localStorage.getItem(key('user-a'))).toBeNull()
+  })
+
   it('updateProfile merges name and feedback', async () => {
     const u = useUserStore()
     u.setActiveUser('u1')
@@ -105,6 +125,53 @@ describe('user store', () => {
     expect(u.interactionPreferences.feedback).toBe('hints')
     await u.updateProfile({ feedback: 'direct_answers' })
     expect(u.interactionPreferences.feedback).toBe('direct_answers')
+  })
+
+  // #357: each Learning-tab control autosaves on its own, so one change is one
+  // PATCH carrying only that field.
+  it('updateProfile sends check_ins alone and merges it into preferences', async () => {
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    await u.completeOnboarding({ name: 'A', feedback: 'hints' })
+    fetchMock.mockClear()
+    await u.updateProfile({ checkIns: 'often' })
+    expect(fetchMock).toHaveBeenCalledOnce()
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ check_ins: 'often' })
+    expect(u.interactionPreferences).toEqual({ feedback: 'hints', checkIns: 'often' })
+    expect(JSON.parse(localStorage.getItem(key('u1'))).interactionPreferences.checkIns).toBe(
+      'often',
+    )
+  })
+
+  it('updateProfile sends reply_length alone and merges it into preferences', async () => {
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    await u.completeOnboarding({ name: 'A', feedback: 'hints' })
+    fetchMock.mockClear()
+    await u.updateProfile({ replyLength: 'thorough' })
+    expect(JSON.parse(fetchMock.mock.calls[0][1].body)).toEqual({ reply_length: 'thorough' })
+    expect(u.interactionPreferences.replyLength).toBe('thorough')
+    expect(u.interactionPreferences.feedback).toBe('hints')
+  })
+
+  it('completeOnboarding keeps hydrated check-ins and reply length', async () => {
+    fetchMock.mockReturnValue(
+      ok({
+        feedback_pref: 'hints',
+        check_ins: 'often',
+        reply_length: 'brief',
+        onboarding_complete: false,
+      }),
+    )
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    await u.hydrateFromServer()
+    await u.completeOnboarding({ name: 'A', feedback: 'direct_answers' })
+    expect(u.interactionPreferences).toEqual({
+      feedback: 'direct_answers',
+      checkIns: 'often',
+      replyLength: 'brief',
+    })
   })
 
   it('updateProfile trims and falls back to "Learner"', async () => {
@@ -169,7 +236,9 @@ describe('user store', () => {
   it('setActiveUser(null) resets hydrated so a re-login re-hydrates', async () => {
     const u = useUserStore()
     u.setActiveUser('user-a')
-    fetchMock.mockReturnValue(ok({ display_name: null, feedback_pref: null, onboarding_complete: false }))
+    fetchMock.mockReturnValue(
+      ok({ display_name: null, feedback_pref: null, onboarding_complete: false }),
+    )
     await u.hydrateFromServer()
     expect(u.hydrated).toBe(true)
 
@@ -196,6 +265,26 @@ describe('user store', () => {
     expect(u.hydrated).toBe(true)
   })
 
+  it('hydrateFromServer carries check_ins and reply_length', async () => {
+    fetchMock.mockReturnValue(
+      ok({
+        display_name: 'Ada',
+        feedback_pref: 'hints',
+        check_ins: 'only_when_asked',
+        reply_length: 'brief',
+        onboarding_complete: true,
+      }),
+    )
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    await u.hydrateFromServer()
+    expect(u.interactionPreferences).toEqual({
+      feedback: 'hints',
+      checkIns: 'only_when_asked',
+      replyLength: 'brief',
+    })
+  })
+
   it('hydrateFromServer failure keeps local snapshot and still sets hydrated', async () => {
     localStorage.setItem(
       key('u1'),
@@ -213,5 +302,31 @@ describe('user store', () => {
     expect(u.hydrated).toBe(true)
     expect(u.onboardingComplete).toBe(true)
     expect(u.name).toBe('Eddy')
+  })
+
+  // E-09: a failed hydrate used to be indistinguishable from a successful one
+  // that found onboardingComplete=false, which force-routed the learner into
+  // onboarding with no way out. hydrateFailed lets the router guard tell the
+  // two cases apart.
+  it('hydrateFromServer failure sets hydrateFailed and leaves onboardingComplete unchanged (E-09)', async () => {
+    fetchMock.mockReturnValue(Promise.reject(new Error('network down')))
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    expect(u.onboardingComplete).toBe(false)
+    await u.hydrateFromServer()
+    expect(u.hydrateFailed).toBe(true)
+    expect(u.hydrated).toBe(true)
+    expect(u.onboardingComplete).toBe(false)
+  })
+
+  it('hydrateFromServer success clears hydrateFailed (E-09)', async () => {
+    fetchMock.mockReturnValue(
+      ok({ display_name: 'Ada', feedback_pref: 'direct', onboarding_complete: true }),
+    )
+    const u = useUserStore()
+    u.setActiveUser('u1')
+    u.hydrateFailed = true
+    await u.hydrateFromServer()
+    expect(u.hydrateFailed).toBe(false)
   })
 })

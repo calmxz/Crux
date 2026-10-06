@@ -139,11 +139,14 @@ DATABASE_URL=postgresql+psycopg://postgres:test@127.0.0.1:55432/crux_test \
 The `pgvector/pgvector:pg16` image ships with the extension pre-installed;
 the Alembic baseline runs `CREATE EXTENSION IF NOT EXISTS vector` for you.
 
-## 7. Backup notes (forward-looking)
+## 7. Backups
 
-Phase 8 (Fly.io deploy) will add R2 backups. Until then, Supabase's built-in
-daily backups (free tier: 7-day retention) are the only recovery point. Take
-a manual `pg_dump` before any destructive migration:
+Daily `pg_dump -Fc` snapshots go to Cloudflare R2 via
+`.github/workflows/backup.yml` (retention: newest 7). Restore procedure and the
+proven restore log live in `docs/deploy/RESTORE.md`. Supabase's built-in daily
+backups (free tier: 7-day retention) are the secondary recovery point.
+
+Before any destructive migration, take a manual dump as well:
 
 ```bash
 pg_dump "$DATABASE_URL" --no-owner --no-acl > backup_$(date +%Y%m%d).sql

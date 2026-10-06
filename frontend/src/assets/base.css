@@ -135,6 +135,16 @@
   --desk-deep: #dfe2e7;
   --card: #ffffff;
   --card-edge: #cfd3da;
+  /* D-20 (WCAG 1.4.11): --card-edge is card chrome and only reaches 1.50:1 on
+     --card, which is fine for a decorative box but not for the resting edge of
+     a control the learner has to find. --control-edge is the same edge drawn
+     dark enough to clear 3:1 against --card (light 4.20:1, dark 3.32:1). Use it
+     on text inputs and textareas; leave card chrome on --card-edge. */
+  --control-edge: #767c86;
+  /* Past-day columns in the Usage week chart: a muted accent that still
+     clears 3:1 (WCAG 1.4.11) on --desk-deep (light 3.30:1, dark 3.46:1),
+     so today in full --color-accent stays the strongest column. */
+  --chart-bar-past: #5a78c2;
   --card-drop: #c4c8d0;
   --card-learner: #dbe6fb;
   --card-learner-edge: #b9cdf5;
@@ -213,6 +223,8 @@
   --desk-deep: #1b1d22;
   --card: #22252b;
   --card-edge: #2e323a;
+  --control-edge: #6e7584;
+  --chart-bar-past: #5570ad;
   --card-drop: #0b0c0e;
   --card-learner: #1e2a44;
   --card-learner-edge: #2f4470;
@@ -273,6 +285,8 @@
     --desk-deep: #1b1d22;
     --card: #22252b;
     --card-edge: #2e323a;
+    --control-edge: #6e7584;
+    --chart-bar-past: #5570ad;
     --card-drop: #0b0c0e;
     --card-learner: #1e2a44;
     --card-learner-edge: #2f4470;

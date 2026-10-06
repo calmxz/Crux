@@ -35,6 +35,10 @@ vi.mock('@supabase/supabase-js', () => ({
 
 globalThis.__supabaseAuthStub = authStub
 
+// jsdom has no layout, so its window.scrollTo only logs "Not implemented".
+// SessionView scrolls the document (#346); tests that care spy on this.
+if (typeof window !== 'undefined') window.scrollTo = () => {}
+
 beforeEach(() => {
   authStub.getSession.mockClear()
   authStub.getSession.mockResolvedValue({ data: { session: null }, error: null })

@@ -9,16 +9,21 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 // would make the toggle a silent no-op on every 1024-1279 laptop. isDesktop is
 // still exposed for consumers that want it.
 const BREAKPOINT = 1280
+
 const LS_KEY = 'crux.panel.expanded'
 
 const viewport = ref(typeof window !== 'undefined' ? window.innerWidth : BREAKPOINT)
+
 const desktopExpanded = ref(_readPersisted())
 
 function _readPersisted() {
   if (typeof window === 'undefined') return true
+
   try {
     const raw = window.localStorage.getItem(LS_KEY)
+
     if (raw === null) return true
+
     return raw === '1'
   } catch {
     return true
@@ -27,6 +32,7 @@ function _readPersisted() {
 
 function _persist(v) {
   if (typeof window === 'undefined') return
+
   try {
     window.localStorage.setItem(LS_KEY, v ? '1' : '0')
   } catch {

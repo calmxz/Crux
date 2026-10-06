@@ -3,9 +3,8 @@
 Revision ID: 0016_session_rolling_summary
 Revises: 0015_llm_call_log_tokens
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "0016_session_rolling_summary"
 down_revision = "0015_llm_call_log_tokens"

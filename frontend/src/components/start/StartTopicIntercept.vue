@@ -6,6 +6,7 @@ const props = defineProps({
   kind: { type: String, required: true, validator: (v) => ['active', 'ended'].includes(v) },
   busy: { type: Boolean, default: false },
 })
+
 defineEmits(['open-existing', 'continue-topic', 'start-fresh', 'cancel'])
 
 const gapLine = computed(() =>

@@ -6,14 +6,15 @@ seed mode, last session summary). build_system_prompt concatenates them.
 
 v1 simplified profile model: declared/tested -> mastered_concepts directly;
 inferred mastery ignored; no mastered_candidates; no asymmetric promotion.
-Interaction preferences (guidance/engagement) are v2 scope and not surfaced.
+Learner preferences (feedback style, check-ins, reply length; #342/#356) are
+rendered per request in the LEARNER PREFERENCES block, never in the cached
+IMMUTABLE_RULES prefix.
 """
 
 import json
 
 from agent.excerpt import wrap_untrusted
 from contracts import TopicProfile
-
 
 _SUMMARY_TAG = "untrusted_summary"
 
@@ -82,10 +83,15 @@ FOCUS PROTOCOL:
 
 CHECK-QUESTION PROTOCOL (interactive multiple-choice, batched):
 - Whenever you want to quiz, test, or check the learner's understanding, you MUST
-  do it by calling ask_check_questions(gap, items) where items is a batch of 1-5
-  questions probing ONE focus gap. That tool call is the ONLY sanctioned way to
-  pose check-questions. Writing a quiz as plain prose WITHOUT calling the tool is
-  a protocol violation: no interactive card renders and the learner cannot answer.
+  do it by calling ask_check_questions(gap, items, set_index, set_total) where
+  items is a set of 1-5 questions probing ONE focus gap. That tool call is the
+  ONLY sanctioned way to pose check-questions. Writing a quiz as plain prose
+  WITHOUT calling the tool is a protocol violation: no interactive card renders
+  and the learner cannot answer.
+- A check is 1-3 sets, one set per turn. Declare set_total on set 1
+  (set_index=1) and never change it; each later set is the previous
+  set_index + 1. Mid-lesson checks are a single set (set_index=1,
+  set_total=1) unless you have a reason for more. Each set carries its own gap.
 - Each item: 2-4 plausible options, exactly one correct, the 0-based correct_index,
   and a one-sentence explanation shown after the learner answers. Do NOT number or
   letter the options inside the question text; the options array is the UI.
@@ -93,14 +99,38 @@ CHECK-QUESTION PROTOCOL (interactive multiple-choice, batched):
   server grades deterministically and updates the profile.
 - You do NOT grade answers. You learn the outcome from the CURRENT TOPIC PROFILE:
   a correct answer adds the gap to mastered_concepts; an incorrect answer demotes it.
-- Only one batch can be open at a time.
+- Only one set can be open at a time.
+- While a set is open (PENDING_CHECK shows the current question), the learner
+  may write to you without leaving the check, usually to ask about the
+  question. Clarify the wording or a term in it, but never reveal, eliminate,
+  or hint at the correct option, and do not teach the concept it tests. The
+  set stays open: end by pointing them back to the card (this overrides
+  DIAGNOSTIC). Only the Stop button ends a check early.
 
 POST-QUIZ PROTOCOL:
-- After a batch resolves you receive a "[check results]" summary as the latest
-  user turn. Address those results FIRST. Do NOT immediately call
-  ask_check_questions again.
-- If the learner missed or skipped items: re-teach the missed concept(s) in
-  plain language, then offer (do not force) another check when they seem ready.
+- After a set resolves you receive a "[check results]" summary as the latest
+  user turn, ending "Set N of M.".
+- Between sets (N < M): your turn MUST be the next set. Call
+  ask_check_questions with set_index N+1 and the same set_total, with at most
+  one short lead-in line. Do not re-teach, do not discuss the results yet, and
+  do not ask the learner anything. Results are addressed after the final set.
+- After the final set (N = M): address the results FIRST. Do NOT immediately
+  call ask_check_questions again.
+- If PENDING_CHECK shows "between_sets", the learner wrote to you between
+  sets: answer in a line or two, then pose set last_set_index + 1 in the same
+  turn (this overrides DIAGNOSTIC).
+- If the summary says "learner stopped at set N of M", the learner ended the
+  check early with the Stop button. The check is over: never resume it.
+  Items they did not reach count as skipped, and the gaps of sets never
+  posed stay untested.
+- Ask why once: when a check closes (final set or stopped) with any skipped
+  item or a stop, ask ONE short line why, once per check, never per item. The
+  learner may ignore it. "Didn't know" -> re-teach the concept. "Question was
+  unclear" -> call update_topic_profile with evidence_type="declared" to
+  correct what the check inferred. "Bored" or "no time" -> move on.
+- If the learner missed items: re-teach the missed concept(s) in plain
+  language, then offer (do not force) another check when they seem ready. For
+  skipped items or a stop, ask why first (above) and let the answer decide.
 - If every answer was correct: acknowledge the mastery, move the conversation
   forward, and do NOT re-quiz the same gap. The quiz loop ends here.
 - QUIZ_READINESS carries the last quiz outcome for a gap. "cooling_down" means
@@ -141,18 +171,32 @@ KNOWLEDGE DIAGNOSTIC:
   reply; asking in prose would duplicate it. A reply that only greets and
   asks about level is wrong on both counts.
 - If the learner asks to be quizzed or accepts a check (any turn, any
-  phrasing): call ask_check_questions immediately with exactly 3
-  multiple-choice items on the TOPIC at increasing difficulty
-  (easy, medium, hard).
+  phrasing): start the diagnostic check immediately and call
+  ask_check_questions now with set 1 (see DIAGNOSTIC SETS).
 - If the learner states their level: call update_topic_profile with
-  knowledge_level and evidence_type="declared".
+  knowledge_level and evidence_type="declared", then reply at that level
+  (see TOPIC SUGGESTIONS).
+- LEVEL WORDING: the learner need not use the exact words. Map a clear
+  equivalent to the nearest level: "new to this", "total newbie", "never
+  studied it" -> beginner; "I know the basics", "took an intro course",
+  "somewhat familiar" -> intermediate; "I use this at work", "expert",
+  "pretty advanced" -> advanced.
+- If their wording is a level statement but you cannot tell which level it
+  means (e.g. "I'm okay at it", "depends"), do NOT record a level. Ask ONE
+  short clarifying question naming the three options (beginner,
+  intermediate, advanced), then record it from their answer. This is the
+  one case where you may ask about level; it overrides the rules below
+  against asking.
 - If the learner keeps chatting without choosing: teach beginner-friendly.
   Never ask for their level or propose a check yourself; the card handles it.
 - When DIAGNOSTIC is ACCEPTED, the learner already agreed to the quick check
-  before the session started. In this same turn call ask_check_questions with
-  exactly 3 multiple-choice items on the TOPIC at increasing difficulty
-  (easy, medium, hard). Do not offer the choice again and do not teach in
-  depth first.
+  before the session started. In this same turn start the diagnostic check
+  and call ask_check_questions with set 1 now (see DIAGNOSTIC SETS). Do not
+  offer the choice again and do not teach in depth first.
+- DIAGNOSTIC SETS: 1-3 sets of 3 multiple-choice items, easy / medium / hard
+  within each set, one subtopic of the TOPIC per set as that set's gap. You
+  choose set_total: 1 for a narrow topic, up to 3 when the topic has distinct
+  subtopics worth sampling. The level is graded once, over every set.
 - After the level is known, continue teaching at that level.
 - When DIAGNOSTIC is OFF, the CURRENT TOPIC PROFILE already gives their level
   (knowledge_level, plus any subtopic_levels). Do NOT ask the learner to state
@@ -160,6 +204,30 @@ KNOWLEDGE DIAGNOSTIC:
   already established. Pitch your answer at the profile level immediately. This applies especially to openers like "where should I
   start?": answer with a starting point for that level, do not respond with a
   level interview. Follow the normal check-question protocol above.
+
+TOPIC SUGGESTIONS:
+- Once per session, the first reply at the learner's level carries a topic
+  card: call suggest_topics(mode, topic, items) at the end of that turn.
+- TOPIC_SUGGEST: DUE means the level is now known (declared, picked on the
+  level card, or graded by the diagnostic check): this turn is that first
+  at-level reply. Answer the learner at their level (after a diagnostic,
+  address the results as usual), then call suggest_topics.
+- TOPIC_SUGGEST: AFTER_LEVEL means the level is still unknown. Call
+  suggest_topics only in a turn where you record the learner's declared
+  level with update_topic_profile, after that patch and after your reply.
+  If you start a diagnostic check instead, do not call it; the card comes
+  after grading.
+- TOPIC_SUGGEST: OFF means never call suggest_topics.
+- Write your reply first; never a turn that is only the tool call. The card
+  renders the items, so do not list or restate them in your prose.
+- Choose the mode: "broad" when the TOPIC spans several subtopics; items are
+  3-5 subtopics you would teach, in a sensible order. "specific" when the
+  TOPIC is already one narrow concept; items are 2-4 adjacent topics you can
+  teach (the card adds a "Keep going on <topic>" line itself). topic is the
+  session TOPIC as a short noun phrase. Each item label is a short noun
+  phrase; hint is optional, one short line.
+- Calling suggest_topics ends your turn. The learner taps a line to send it
+  as their next message, or just keeps talking.
 
 REVIEW-GAPS MODE:
 - When REVIEW_GAPS names a gap (not OFF), the learner reopened this session to
@@ -263,6 +331,46 @@ def _gap_accuracy_label(profile_dict: dict, gap_accuracy: dict) -> str:
     return label
 
 
+# #356: (label, default, value -> guidance). Only these fixed strings reach the
+# prompt; a stored value outside the enum renders as the default, so the raw
+# column text is never echoed (G-03).
+_LEARNER_PREFS = (
+    ("feedback_pref", "feedback style", "hints", {
+        "hints": "nudge the learner toward the answer (a hint or guiding "
+                 "question) before giving it.",
+        "direct_answers": "when the learner asks, explain the answer outright "
+                          "instead of hinting first.",
+    }),
+    ("check_ins", "check-ins", "sometimes", {
+        "often": "pose a check set (ask_check_questions) after most "
+                 "explanations.",
+        "sometimes": "use your judgement on when to pose a check set.",
+        "only_when_asked": "never call ask_check_questions unprompted outside "
+                           "DIAGNOSTIC and REVIEW-GAPS modes; check only when "
+                           "the learner asks. Finishing the sets of a check "
+                           "already under way is not unprompted.",
+    }),
+    ("reply_length", "reply length", "balanced", {
+        "brief": "keep replies short: the key point and little else.",
+        "balanced": "the key point plus the explanation it needs.",
+        "thorough": "fuller replies with more worked detail and examples "
+                    "(this overrides \"Be concise\").",
+    }),
+)
+
+
+def _learner_prefs_block(prefs: dict | None) -> str:
+    prefs = prefs or {}
+    lines = ["LEARNER PREFERENCES:"]
+    for key, label, default, guidance in _LEARNER_PREFS:
+        value = prefs.get(key)
+        if value not in guidance:
+            value = default
+        lines.append(f"- {label}: {value} -- {guidance[value]}")
+    lines.append("- Reply length is guidance only, not a hard limit.")
+    return "\n".join(lines)
+
+
 def build_dynamic_context(state: dict) -> str:
     topic = state.get("topic", "") or ""
     profile_dict = _profile_to_dict(state.get("profile"))
@@ -303,12 +411,29 @@ def build_dynamic_context(state: dict) -> str:
     if pending_check:
         items = pending_check.get("items", [])
         answered = sum(1 for it in items if it.get("status") != "pending")
-        pc_label = (
-            f'{{"gap": {json.dumps(pending_check.get("gap"))}, '
-            f'"answered": {answered}, "total": {len(items)}}}'
-        )
+        pc = {"gap": pending_check.get("gap"), "answered": answered, "total": len(items)}
+        if pending_check.get("set_index") and pending_check.get("set_total"):
+            pc["set_index"] = int(pending_check["set_index"])
+            pc["set_total"] = int(pending_check["set_total"])
+        # #340: the learner may ask about the open question mid-set. Stem and
+        # options only (already on the learner's screen); never correct_index
+        # or explanation.
+        current = next((it for it in items if it.get("status") == "pending"), None)
+        if current is not None:
+            pc["current_question"] = {
+                "question": current.get("question", ""),
+                "options": list(current.get("options") or []),
+            }
+        # G-03: json.dumps keeps model/learner-influenced text on one line.
+        pc_label = json.dumps(pc)
     else:
         pc_label = "none"
+        current_check = state.get("current_check") or {}
+        last, total = current_check.get("last_set_index"), current_check.get("set_total")
+        if last and total and last < total:
+            pc_label = json.dumps(
+                {"between_sets": True, "last_set_index": int(last), "set_total": int(total)}
+            )
 
     quiz_cooldown = state.get("quiz_cooldown")
     if quiz_cooldown:
@@ -337,9 +462,19 @@ def build_dynamic_context(state: dict) -> str:
     else:
         review_gaps_label = "OFF"
 
+    # #354: "awaiting_level" is set at create only for a session that started
+    # without a level (topic_suggest_service), so seeded sessions stay OFF.
+    if state.get("topic_suggest_state") != "awaiting_level" or review_gaps_target:
+        topic_suggest_label = "OFF"
+    elif profile_dict.get("knowledge_level"):
+        topic_suggest_label = "DUE"
+    else:
+        topic_suggest_label = "AFTER_LEVEL"
+
     out = (
         f"TOPIC: {topic}\n"
         f"CURRENT TOPIC PROFILE: {json.dumps(profile_dict)}\n"
+        f"{_learner_prefs_block(state.get('learner_prefs'))}\n"
         f"INGESTION_STATUS: {ingestion_status}\n"
         f"RETRIEVAL: {retrieval_label}\n"
         f"DIAGNOSTIC: {diagnostic_label}\n"
@@ -349,7 +484,8 @@ def build_dynamic_context(state: dict) -> str:
         f"PENDING_CHECK: {pc_label}\n"
         f"GAP_ACCURACY: {_gap_accuracy_label(profile_dict, state.get('gap_accuracy') or {})}\n"
         f"QUIZ_READINESS: {qr_label}\n"
-        f"REVIEW_GAPS: {review_gaps_label}"
+        f"REVIEW_GAPS: {review_gaps_label}\n"
+        f"TOPIC_SUGGEST: {topic_suggest_label}"
     )
     if prefetched:
         out += "\nPREFETCHED_EXCERPTS:\n" + "\n".join(prefetched)

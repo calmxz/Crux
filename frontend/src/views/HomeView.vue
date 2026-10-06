@@ -3,56 +3,59 @@
     <div class="home-card">
       <h1 class="home-head">What do you want to learn?</h1>
 
-      <p v-if="store.error && !store.sessions.length" class="error" data-testid="home-error">
-        {{ friendlyError(store.error) }}
-      </p>
-
-      <template v-else>
-        <div class="quick" data-testid="home-mode-quick">
-          <label for="home-topic" class="sr-only">Topic</label>
-          <input
-            id="home-topic"
-            v-model="quickTopic"
-            class="quick-input"
-            data-testid="home-quick-topic"
-            placeholder="a topic, a chapter, a thing that will not stick..."
-            autocomplete="off"
-            @keydown.enter="startQuick"
-          />
-
-          <p class="quick-go">
-            <button
-              type="button"
-              class="cta-primary hit-44"
-              data-testid="home-quick-go"
-              :disabled="busy"
-              @click="startQuick"
-            >
-              <span>{{ startLabel }}</span>
-              <svg
-                class="cta-mark"
-                viewBox="0 0 20 20"
-                width="18"
-                height="18"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M4 10 L15 10 M10.5 5.5 L15 10 L10.5 14.5" />
-              </svg>
-            </button>
-          </p>
-        </div>
-        <StartTopicIntercept
-          v-if="stage === 'intercept'"
-          :match="interceptMatch"
-          :kind="interceptKind"
-          :busy="busy"
-          @open-existing="openExisting"
-          @continue-topic="continuePrior"
-          @start-fresh="startFresh"
-          @cancel="cancel"
+      <div class="quick" data-testid="home-mode-quick">
+        <label for="home-topic" class="sr-only">Topic</label>
+        <input
+          id="home-topic"
+          v-model="quickTopic"
+          class="quick-input"
+          data-testid="home-quick-topic"
+          placeholder="a topic, a chapter, a thing that will not stick..."
+          autocomplete="off"
+          @keydown.enter="startQuick"
         />
-      </template>
+
+        <p class="quick-go">
+          <button
+            type="button"
+            class="cta-primary hit-44"
+            data-testid="home-quick-go"
+            :disabled="busy"
+            @click="startQuick"
+          >
+            <span>{{ startLabel }}</span>
+            <svg
+              class="cta-mark"
+              viewBox="0 0 20 20"
+              width="18"
+              height="18"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <path d="M4 10 L15 10 M10.5 5.5 L15 10 L10.5 14.5" />
+            </svg>
+          </button>
+        </p>
+      </div>
+      <StartTopicIntercept
+        v-if="stage === 'intercept'"
+        :match="interceptMatch"
+        :kind="interceptKind"
+        :busy="busy"
+        @open-existing="openExisting"
+        @continue-topic="handleContinuePrior"
+        @start-fresh="handleStartFresh"
+        @cancel="cancel"
+      />
+
+      <!-- E-01: the form above must stay mounted regardless of store.error --
+           this paragraph only ever adds a message underneath it. It shows
+           either a start-attempt failure (createSession/lookupTopic/
+           continueTopic rejecting) or, absent that, a boot-time list failure
+           when there are no sessions yet to show instead. -->
+      <p v-if="displayError" class="error" data-testid="home-error" role="alert">
+        {{ displayError }}
+      </p>
     </div>
   </section>
 </template>
@@ -67,8 +70,12 @@ import { useSessionStore } from '../stores/session.js'
 import { friendlyError } from '../lib/errors.js'
 
 const router = useRouter()
+
 const store = useSessionStore()
+
 const quickTopic = ref('')
+
+const startError = ref(null)
 
 const {
   stage,
@@ -86,6 +93,12 @@ watch(quickTopic, () => cancel())
 
 const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 
+const bootError = computed(() =>
+  store.error && !store.sessions.length ? friendlyError(store.error) : null,
+)
+
+const displayError = computed(() => startError.value || bootError.value)
+
 onMounted(() => {
   // U-05: boot-path load - failure is handled locally (store error state), so
   // a transient backend hiccup must not toast on Home's first mount. Silence
@@ -94,8 +107,38 @@ onMounted(() => {
   store.listSessions().catch(() => {})
 })
 
-function startQuick() {
-  begin(quickTopic.value)
+// E-01: begin()/continuePrior()/startFresh() can reject (createSession,
+// lookupTopic, continueTopic) and the composable does not swallow that --
+// an unawaited/uncaught rejection here used to leave the form frozen with no
+// feedback. Catch at the call site and surface inline instead.
+async function startQuick() {
+  startError.value = null
+
+  try {
+    await begin(quickTopic.value)
+  } catch (e) {
+    startError.value = friendlyError(e)
+  }
+}
+
+async function handleContinuePrior() {
+  startError.value = null
+
+  try {
+    await continuePrior()
+  } catch (e) {
+    startError.value = friendlyError(e)
+  }
+}
+
+async function handleStartFresh() {
+  startError.value = null
+
+  try {
+    await startFresh()
+  } catch (e) {
+    startError.value = friendlyError(e)
+  }
 }
 </script>
 

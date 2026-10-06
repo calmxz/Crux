@@ -19,7 +19,10 @@ export const lookupTopic = (topic) => apiGet('/sessions/lookup', { topic }, { si
 // every current caller fires this fire-and-forget from onMounted, and the
 // store's in-flight de-dupe (session.js:listSessions) could otherwise drop
 // the flag if a different caller's non-silent call wins the race.
-export const listSessions = () => apiGet('/sessions', undefined, { silent: true })
+// F-06: the route is bounded (limit default 100, max 200). params is
+// optional: { limit?: number, offset?: number }. Callers that pass nothing
+// keep the previous URL exactly (apiClient drops undefined/null params).
+export const listSessions = (params) => apiGet('/sessions', params, { silent: true })
 
 // H1: default the contract array key so a malformed/partial {} or null
 // response from the backend can't throw in render (e.g. `items.length`)
@@ -34,7 +37,11 @@ const normalizeSessionLibraryPage = (res) => ({
 export const getSessionLibrary = (params, opts) =>
   apiGet('/sessions/library', params, opts).then(normalizeSessionLibraryPage)
 
-export const getSession = (sessionId) => apiGet(`/sessions/${sessionId}`)
+// fresh: the session body carries ingestion_status, pending_check and the
+// topic profile, all of which change server-side during a turn or an upload
+// (raw-fetch writers). Never serve it from the short GET cache.
+export const getSession = (sessionId) =>
+  apiGet(`/sessions/${sessionId}`, undefined, { fresh: true })
 
 // P3: SessionView shows its own inline error/loading for the "load earlier"
 // button; silent stops the errorBus double-toast (same opt-out pattern as

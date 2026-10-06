@@ -3,10 +3,13 @@ defineProps({
   busy: { type: Boolean, default: false },
   error: { type: String, default: '' },
 })
+
 defineEmits(['quiz', 'level', 'dismiss'])
 
 const LEVELS = ['beginner', 'intermediate', 'advanced']
+
 const LABELS = { beginner: 'Beginner', intermediate: 'Intermediate', advanced: 'Advanced' }
+
 const LETTERS = { beginner: 'A', intermediate: 'B', advanced: 'C' }
 </script>
 

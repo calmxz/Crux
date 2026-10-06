@@ -3,8 +3,8 @@
 import pytest
 
 from contracts import TopicProfile
-from db.models import LearningEvent, Session as SessionModel, User
-
+from db.models import LearningEvent, User
+from db.models import Session as SessionModel
 
 SESSION_ID = "sess_1"
 USER_ID = "u1"

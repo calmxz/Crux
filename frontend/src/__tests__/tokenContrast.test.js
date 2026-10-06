@@ -7,20 +7,27 @@ import { resolve } from 'node:path'
 const css = readFileSync(resolve(process.cwd(), 'src/assets/base.css'), 'utf8')
 
 const DARK_MARKER = "[data-theme='dark']"
+
 const light = css.slice(0, css.indexOf(DARK_MARKER))
+
 const dark = css.slice(css.indexOf(DARK_MARKER))
 
 function hex(varName, block) {
   const re = new RegExp(`${varName}:\\s*(#[0-9a-fA-F]{6})`, 'g')
   const matches = [...block.matchAll(re)].map((m) => m[1])
+
   if (!matches.length) throw new Error(`token ${varName} not found`)
+
   return matches
 }
+
 function lum(h) {
   const c = [1, 3, 5].map((i) => parseInt(h.slice(i, i + 2), 16) / 255)
   const l = c.map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4))
+
   return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]
 }
+
 const ratio = (a, b) => (Math.max(lum(a), lum(b)) + 0.05) / (Math.min(lum(a), lum(b)) + 0.05)
 
 // Every ink that ever sets text, checked against the ground it sits on. The
@@ -46,6 +53,7 @@ describe('base.css tokens', () => {
     it(`${themeName}: every text ink is >= 4.5:1 on --color-background in every block`, () => {
       const bgs = hex('--color-background', block)
       expect(bgs.length).toBeGreaterThan(0)
+
       for (const token of FOREGROUNDS) {
         const inks = hex(token, block)
         expect(inks.length, `${token} must be declared once per ${themeName} block`).toBe(
@@ -84,8 +92,38 @@ describe('base.css tokens', () => {
       })
     })
 
+    // D-20 (WCAG 1.4.11 Non-text Contrast): the resting edge of a text control
+    // is a UI component boundary and needs 3:1, which --card-edge (card chrome)
+    // does not reach. --control-edge is the token controls use instead.
+    it(`${themeName}: --control-edge is >= 3:1 on --card in every block`, () => {
+      const cards = hex('--card', block)
+      const edges = hex('--control-edge', block)
+      expect(edges.length).toBe(cards.length)
+      edges.forEach((edge, i) => {
+        expect(
+          ratio(edge, cards[i]),
+          `--control-edge on --card (${themeName})`,
+        ).toBeGreaterThanOrEqual(3)
+      })
+    })
+
+    // WCAG 1.4.11: past-day columns in the Usage week chart are graphical
+    // marks on --desk-deep and need 3:1.
+    it(`${themeName}: --chart-bar-past is >= 3:1 on --desk-deep in every block`, () => {
+      const grounds = hex('--desk-deep', block)
+      const bars = hex('--chart-bar-past', block)
+      expect(bars.length).toBe(grounds.length)
+      bars.forEach((bar, i) => {
+        expect(
+          ratio(bar, grounds[i]),
+          `--chart-bar-past on --desk-deep (${themeName})`,
+        ).toBeGreaterThanOrEqual(3)
+      })
+    })
+
     it(`${themeName}: --tab-ink is >= 4.5:1 on every --tab-* fill`, () => {
       const inks = hex('--tab-ink', block)
+
       for (const tabToken of ['--tab-focus', '--tab-gaps', '--tab-mastered', '--tab-level']) {
         const fills = hex(tabToken, block)
         expect(fills.length).toBe(inks.length)
@@ -106,20 +144,24 @@ describe('base.css tokens', () => {
 // can tell the two dark blocks apart from each other and from :root.
 function blockBody(fullCss, selectorMarker) {
   const start = fullCss.indexOf(selectorMarker)
+
   if (start === -1) throw new Error(`selector "${selectorMarker}" not found in base.css`)
   const braceStart = fullCss.indexOf('{', start)
   let depth = 1
   let i = braceStart + 1
+
   while (depth > 0) {
     if (fullCss[i] === '{') depth++
     else if (fullCss[i] === '}') depth--
     i++
   }
+
   return fullCss.slice(braceStart + 1, i - 1)
 }
 
 function customPropNames(body) {
   const re = /--[a-z0-9-]+(?=\s*:)/g
+
   return new Set([...body.matchAll(re)].map((m) => m[0]))
 }
 

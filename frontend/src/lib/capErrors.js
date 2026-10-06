@@ -12,12 +12,14 @@ import {
 
 export function mapCapError(detail) {
   const d = detail && typeof detail === 'object' ? detail : {}
+
   if (d.code === ERR_DAILY_CAP_REACHED) {
     return {
       kind: 'daily',
       info: { cap: d.cap ?? null, used: d.used ?? null, resets_at: d.resets_at ?? null },
     }
   }
+
   if (d.code === ERR_DAILY_COST_CAP_REACHED || d.code === ERR_GLOBAL_COST_CAP_REACHED) {
     // Global (service-wide budget) envelope has no per-user spend fields,
     // so those come through as null via the ?? fallback below.
@@ -32,5 +34,6 @@ export function mapCapError(detail) {
       },
     }
   }
+
   return { kind: null, info: null }
 }

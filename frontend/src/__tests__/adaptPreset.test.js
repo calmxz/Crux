@@ -4,12 +4,16 @@ import { adaptPresetConfig } from '@/theme/adaptPreset.js'
 // WCAG relative luminance + contrast ratio from a #RRGGBB hex string.
 function relativeLuminance(hex) {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex)
+
   if (!m) throw new Error(`not a 6-digit hex: ${hex}`)
   const int = parseInt(m[1], 16)
+
   const chan = [(int >> 16) & 255, (int >> 8) & 255, int & 255].map((v) => {
     const s = v / 255
+
     return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
   })
+
   return 0.2126 * chan[0] + 0.7152 * chan[1] + 0.0722 * chan[2]
 }
 
@@ -17,6 +21,7 @@ function contrastRatio(a, b) {
   const la = relativeLuminance(a)
   const lb = relativeLuminance(b)
   const [hi, lo] = la >= lb ? [la, lb] : [lb, la]
+
   return (hi + 0.05) / (lo + 0.05)
 }
 
@@ -31,6 +36,7 @@ describe('adaptPreset surface ramps', () => {
     it(`${scheme} ramp is monotonic light -> dark (0 lightest, 950 darkest)`, () => {
       const surface = adaptPresetConfig.semantic.colorScheme[scheme].surface
       const lums = RAMP_STEPS.map((s) => relativeLuminance(surface[s]))
+
       for (let i = 1; i < lums.length; i++) {
         // Each higher index must be no lighter than the previous one.
         expect(lums[i]).toBeLessThanOrEqual(lums[i - 1])

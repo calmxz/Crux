@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from 'vitest'
-import { nextTick } from 'vue'
+import { nextTick, reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
@@ -8,37 +8,62 @@ import SessionHeader from '@/components/chat/SessionHeader.vue'
 import SessionEndedBanner from '@/components/SessionEndedBanner.vue'
 import CheckQuestion from '@/components/chat/CheckQuestion.vue'
 import Composer from '@/components/chat/Composer.vue'
+import MessageList from '@/components/chat/MessageList.vue'
 import { StreamAbortedError } from '@/lib/errors.js'
+import { REDUCED_MOTION_QUERY } from '@/composables/useMediaQuery.js'
+import { WATCH_CEILING_MS } from '@/composables/useReferencePoll.js'
 import { useSessionStore } from '@/stores/session.js'
+import * as sessionsApi from '@/services/sessionsApi.js'
 import { getSessionProfile, patchProfile } from '@/services/profileApi.js'
 
 const push = vi.fn()
+
 // Writes the mutation back into the shared mock route so the query-strip
 // watcher/re-trigger interaction is actually exercised (a bare vi.fn() would
 // leave route.query.review_gap set, hiding a double-send regression).
-const route = { query: {} }
+let route = { query: {} }
+
 const replace = vi.fn((to) => {
   Object.assign(route.query, to.query)
 })
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push, replace }),
   useRoute: () => route,
   RouterLink: { template: '<a><slot /></a>' },
 }))
 
+// Ticket 10: the session action bar calls useSessionActions, which calls
+// useConfirm in setup. Capture the last dialog config so a test can accept it.
+let lastConfirm = null
+
+vi.mock('primevue/useconfirm', () => ({
+  useConfirm: () => ({
+    require: (cfg) => {
+      lastConfirm = cfg
+    },
+  }),
+}))
+
 const showError = vi.fn()
+
 vi.mock('@/composables/useToast.js', () => ({
   useToast: () => ({ showError, showWarn: vi.fn(), showSuccess: vi.fn() }),
 }))
 
 const uploadDocument = vi.fn()
+
 const validateFile = vi.fn()
-const getUploadStatus = vi.fn()
-const bannerRefresh = vi.fn()
+
+// F-12: the upload chip is driven by useReferencePoll's per-document
+// transitions now, so the view polls /sessions/:id/ingestion (once per session
+// at setup, then with backoff) instead of /upload/:documentId.
+const getSessionIngestion = vi.fn()
+
 vi.mock('@/services/uploadApi.js', () => ({
   uploadDocument: (...args) => uploadDocument(...args),
   validateFile: (...args) => validateFile(...args),
-  getUploadStatus: (...args) => getUploadStatus(...args),
+  getSessionIngestion: (...args) => getSessionIngestion(...args),
   MAX_UPLOAD_BYTES: 25 * 1024 * 1024,
 }))
 
@@ -47,9 +72,15 @@ vi.mock('@/services/profileApi.js', () => ({
   patchProfile: vi.fn(),
 }))
 
+const ReferenceStatusBannerStub = {
+  name: 'ReferenceStatusBanner',
+  props: ['status', 'documents', 'failed'],
+  template: '<div />',
+}
+
 const stubs = {
   BackButton: { template: '<button data-testid="back" />' },
-  ReferenceStatusBanner: { methods: { refresh: bannerRefresh }, template: '<div />' },
+  ReferenceStatusBanner: ReferenceStatusBannerStub,
   SessionEndedBanner: {
     props: ['endedAt', 'loading', 'hasGaps'],
     emits: ['resume', 'resume-gaps'],
@@ -93,7 +124,9 @@ function setupSession({
   store.currentSessionId = id
   store.messages = messages
   store.hasMoreMessages = hasMoreMessages
+
   if (dailyCap) store.dailyCapInfo = dailyCap
+
   return store
 }
 
@@ -109,9 +142,9 @@ describe('SessionView', () => {
     route.query = {}
     showError.mockClear()
     uploadDocument.mockReset()
-    bannerRefresh.mockReset()
     validateFile.mockReset()
-    getUploadStatus.mockReset()
+    getSessionIngestion.mockReset()
+    getSessionIngestion.mockResolvedValue({ status: null, documents: [] })
     getSessionProfile.mockReset()
     patchProfile.mockReset()
     sessionStorage.clear()
@@ -139,15 +172,17 @@ describe('SessionView', () => {
     // Header renders inline (no teleport); topic comes from props
     const header = wrapper.findComponent(SessionHeader)
     expect(header.exists()).toBe(true)
-    expect(header.props('topic')).toBe('Calculus')
+    expect(header.props('session').topic).toBe('Calculus')
     expect(wrapper.find('[data-testid="session-header"]').exists()).toBe(true)
   })
 
   it('reloads when the route id prop changes without a remount', async () => {
     const store = useSessionStore()
+
     const load = vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const wrapper = mountView({ id: 's1' })
     await flushPromises()
     expect(load).toHaveBeenCalledWith('s1')
@@ -161,12 +196,14 @@ describe('SessionView', () => {
   it('clears a prior 404 state when navigating to a valid session', async () => {
     const store = useSessionStore()
     const err = Object.assign(new Error('not found'), { status: 404 })
+
     const load = vi
       .spyOn(store, 'loadSession')
       .mockRejectedValueOnce(err)
       .mockImplementationOnce(async () => {
         setupSession()
       })
+
     const wrapper = mountView({ id: 'gone' })
     await flushPromises()
     expect(wrapper.find('[data-testid="session-not-found"]').exists()).toBe(true)
@@ -186,9 +223,11 @@ describe('SessionView', () => {
           rejectGone = () => rej(Object.assign(new Error('not found'), { status: 404 }))
         })
       }
+
       store.currentSession = { id, topic: 'Calculus', ended_at: null }
       store.currentSessionId = id
       store.messages = []
+
       return Promise.resolve()
     })
     const wrapper = mountView({ id: 'gone' })
@@ -212,7 +251,7 @@ describe('SessionView', () => {
     store.detailLoading = true
     const wrapper = mountView({ id: 's2' })
     await flushPromises()
-    expect(wrapper.findComponent(SessionHeader).props('topic')).toBe('Thermodynamics')
+    expect(wrapper.findComponent(SessionHeader).props('session')?.topic).toBe('Thermodynamics')
   })
 
   it('shows the message skeleton while detailLoading and hides empty-state + stale check card', async () => {
@@ -245,7 +284,7 @@ describe('SessionView', () => {
     store.messages = [{ role: 'assistant', content: 'hi', message_id: 'm1', citations: [] }]
     await nextTick()
     expect(wrapper.find('[data-testid="session-messages-skeleton"]').exists()).toBe(false)
-    expect(wrapper.findComponent(SessionHeader).props('topic')).toBe('Calculus')
+    expect(wrapper.findComponent(SessionHeader).props('session')?.topic).toBe('Calculus')
   })
 
   it('prefers the target list row topic over a stale previous session during load', async () => {
@@ -257,7 +296,7 @@ describe('SessionView', () => {
     store.detailLoading = true
     const wrapper = mountView({ id: 's2' })
     await flushPromises()
-    expect(wrapper.findComponent(SessionHeader).props('topic')).toBe('Thermodynamics')
+    expect(wrapper.findComponent(SessionHeader).props('session')?.topic).toBe('Thermodynamics')
   })
 
   it('hides the previous ended-session banner while loading a different session', async () => {
@@ -327,10 +366,12 @@ describe('SessionView', () => {
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const sendSpy = vi
       .spyOn(store, 'sendMessageStreaming')
       .mockRejectedValueOnce(new Error('boom'))
       .mockResolvedValueOnce()
+
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-testid="session-input"]').setValue('retry me')
@@ -390,6 +431,62 @@ describe('SessionView', () => {
     expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
   })
 
+  // #460: a check answer on a session ended elsewhere flips the page the same
+  // way a chat send does, through the store's real 409 path.
+  it('answering a check on a session ended elsewhere flips the page to ended', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+      store.handleCheckQuestion({
+        gap: 'ATP yield',
+        items: [{ question: 'How many ATP?', options: ['30', '38'] }],
+      })
+    })
+    vi.spyOn(sessionsApi, 'answerCheck').mockRejectedValueOnce(
+      Object.assign(new Error('409'), {
+        status: 409,
+        body: { detail: { code: 'session_ended' } },
+      }),
+    )
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="check-option"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.findAll('[data-testid="session-error"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="session-error"]').text()).toContain('ended elsewhere')
+    expect(wrapper.find('[data-testid="session-error-retry"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="session-input"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="check-card"]').exists()).toBe(false)
+  })
+
+  // #460: the ended banner says it once; no "Upload failed" chip on top.
+  it('an upload on a session ended elsewhere flips the page to ended with no failed chip', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+    })
+    validateFile.mockReturnValue({ ok: true })
+    uploadDocument.mockRejectedValue(
+      Object.assign(new Error('409'), {
+        status: 409,
+        body: { detail: { code: 'session_ended' } },
+      }),
+    )
+    const wrapper = mountView()
+    await flushPromises()
+    const file = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('[data-testid="session-upload-input"]')
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+    expect(store.currentSession.ended_at).toBeTruthy()
+    expect(wrapper.find('[data-testid="ended-banner"]').exists()).toBe(true)
+    expect(wrapper.findAll('[data-testid="session-error"]')).toHaveLength(1)
+    expect(wrapper.get('[data-testid="session-error"]').text()).toContain('ended elsewhere')
+    expect(wrapper.text()).not.toContain('Upload failed')
+  })
+
   // F-9 (E-05): the 401 arm redirects to login, unmounting this view. Stash the
   // draft so the login round-trip does not eat what the user typed.
   it('stashes the draft to sessionStorage on auth expiry (E-05)', async () => {
@@ -428,9 +525,11 @@ describe('SessionView', () => {
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
+
     const sendSpy = vi
       .spyOn(store, 'sendMessageStreaming')
       .mockRejectedValueOnce(Object.assign(new Error('500'), { status: 500 }))
+
     const wrapper = mountView()
     await flushPromises()
     await wrapper.get('[data-testid="session-input"]').setValue('original')
@@ -540,6 +639,116 @@ describe('SessionView', () => {
     )
     expect(store.pendingSummary).toBe(null)
   })
+
+  it('ending from the action bar still opens the summary dialog here (ticket 10)', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+    })
+    vi.spyOn(store, 'endSession').mockImplementation(async (id) => {
+      store.currentSession.ended_at = new Date().toISOString()
+      store.pendingSummary = { sessionId: id, kind: 'summary', text: 'Ended from the head.' }
+    })
+    route.name = 'session'
+    route.params = { id: 's1' }
+
+    try {
+      lastConfirm = null
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-testid="session-action-end"]').trigger('click')
+      expect(lastConfirm?.header).toBe('End session')
+      await lastConfirm.accept()
+      await flushPromises()
+      expect(store.endSession).toHaveBeenCalledWith('s1')
+      expect(wrapper.get('[data-testid="session-summary-summary"]').text()).toContain(
+        'Ended from the head.',
+      )
+      expect(wrapper.find('[data-testid="session-action-end"]').exists()).toBe(false)
+      expect(wrapper.find('[data-testid="session-action-resume"]').exists()).toBe(true)
+    } finally {
+      delete route.name
+      delete route.params
+    }
+  })
+
+  it('passes the header the session object with pinned and ended_at', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession({ ended: true })
+      store.currentSession.pinned = true
+      store.currentSession.created_at = '2026-09-20T10:00:00Z'
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    const session = wrapper.findComponent(SessionHeader).props('session')
+    expect(session).toMatchObject({
+      id: 's1',
+      topic: 'Calculus',
+      created_at: '2026-09-20T10:00:00Z',
+      pinned: true,
+    })
+    expect(session.ended_at).toBeTruthy()
+  })
+
+  // The header dot reads the already-fetched aggregate (refStatus from
+  // useReferencePoll, itself the backend's documents_service.aggregate_status
+  // value), not a re-derivation from the raw document list -- so it always
+  // agrees with ReferenceStatusBanner, which reads the same aggregate. 'ready'
+  // wins even with a failed doc present in the list because the backend
+  // aggregate itself already resolved to 'ready' (e.g. the failed doc was
+  // since replaced); re-ranking from the documents here previously produced a
+  // conflicting verdict against the banner.
+  // End must not stay clickable while the tutor stream is mid-turn (ending
+  // then would leave the stream running unaborted). SessionView forwards the
+  // live stream state; SessionHeader's own disabled logic is covered in
+  // sessionHeader.test.js.
+  it('forwards the live stream state to the header as `streaming`', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+    })
+    const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.findComponent(SessionHeader).props('streaming')).toBe(false)
+    store.streamState = 'streaming'
+    await nextTick()
+    expect(wrapper.findComponent(SessionHeader).props('streaming')).toBe(true)
+    store.streamState = 'tool_running'
+    await nextTick()
+    expect(wrapper.findComponent(SessionHeader).props('streaming')).toBe(true)
+    store.streamState = 'idle'
+    await nextTick()
+    expect(wrapper.findComponent(SessionHeader).props('streaming')).toBe(false)
+  })
+
+  it.each([
+    ['pending', [], 'processing'],
+    ['processing', [], 'processing'],
+    [
+      'ready',
+      [
+        { id: 'a', status: 'ready' },
+        { id: 'c', status: 'failed' },
+      ],
+      'ready',
+    ],
+    ['failed', [{ id: 'c', status: 'failed' }], 'failed'],
+    [null, [], null],
+  ])(
+    'derives the header refStatus from the ingestion aggregate (status=%s, docs=%j -> %s)',
+    async (status, docs, want) => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+      })
+      getSessionIngestion.mockResolvedValue({ status, documents: docs })
+      const wrapper = mountView()
+      await flushPromises()
+      expect(wrapper.findComponent(SessionHeader).props('refStatus')).toBe(want)
+      expect(wrapper.find('[data-testid="session-ref-status"]').exists()).toBe(want !== null)
+    },
+  )
 
   it('summary dialog carries the shared dialog chrome class', async () => {
     const store = useSessionStore()
@@ -683,9 +892,11 @@ describe('SessionView', () => {
 
   it('navigating to a different session id with review_gap query present sends into the new session only', async () => {
     const store = useSessionStore()
+
     const load = vi.spyOn(store, 'loadSession').mockImplementation(async (id) => {
       setupSession({ id, confirmedGaps: ['x'] })
     })
+
     const sendSpy = vi.spyOn(store, 'sendMessageStreaming').mockResolvedValue()
     const wrapper = mountView({ id: 's1' })
     await flushPromises()
@@ -794,14 +1005,17 @@ describe('SessionView', () => {
     expect(showError).toHaveBeenCalled()
   })
 
-  it('upload triggers uploadDocument and polls status', async () => {
+  it('upload triggers uploadDocument and drives the chip from the shared poller', async () => {
     const store = useSessionStore()
     vi.spyOn(store, 'loadSession').mockImplementation(async () => {
       setupSession()
     })
     validateFile.mockReturnValue({ ok: true })
     uploadDocument.mockResolvedValue({ document_id: 'doc-1' })
-    getUploadStatus.mockResolvedValue({ status: 'ready' })
+    getSessionIngestion.mockResolvedValue({
+      status: 'ready',
+      documents: [{ id: 'doc-1', filename: 'notes.pdf', status: 'ready' }],
+    })
     const wrapper = mountView()
     await flushPromises()
     const file = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' })
@@ -811,10 +1025,70 @@ describe('SessionView', () => {
     await flushPromises()
     await flushPromises()
     expect(uploadDocument).toHaveBeenCalledWith({ sessionId: 's1', file })
-    expect(getUploadStatus).toHaveBeenCalledWith('doc-1')
+    expect(getSessionIngestion).toHaveBeenCalledWith('s1', { fresh: true, silent: true })
     expect(wrapper.find('[data-testid="upload-status-ready"]').exists()).toBe(true)
-    // Banner is refreshed so the newly uploaded doc's ingestion status appears.
-    expect(bannerRefresh).toHaveBeenCalled()
+    // Same poll feeds the banner, so the newly uploaded doc appears there too.
+    expect(wrapper.findComponent(ReferenceStatusBannerStub).props('status')).toBe('ready')
+  })
+
+  // E-07: the first poll after an upload can throw with status still null. The
+  // chip must say so rather than wait out the 90s ceiling.
+  it('surfaces an unavailable chip when the ingestion poll throws', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+      setupSession()
+    })
+    validateFile.mockReturnValue({ ok: true })
+    uploadDocument.mockResolvedValue({ document_id: 'doc-1' })
+    getSessionIngestion.mockRejectedValue(Object.assign(new Error('boom'), { status: 0 }))
+    const wrapper = mountView()
+    await flushPromises()
+    const file = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' })
+    const input = wrapper.get('[data-testid="session-upload-input"]')
+    Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+    await input.trigger('change')
+    await flushPromises()
+    await flushPromises()
+    const failed = wrapper.find('[data-testid="upload-status-failed"]')
+    expect(failed.exists()).toBe(true)
+    expect(failed.text()).toContain('Upload status unavailable')
+    // And the banner gets the failed flag so it can offer Retry.
+    expect(wrapper.findComponent(ReferenceStatusBannerStub).props('failed')).toBe(true)
+  })
+
+  // E-15: still pending at the wall-clock ceiling is not a chip-worthy outcome.
+  // ReferenceStatusBanner owns steady-state ingestion status, so the chip clears
+  // and the banner carries it from there - nothing is left stuck.
+  it('clears the upload chip at the poll ceiling and leaves the banner to it', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+      })
+      validateFile.mockReturnValue({ ok: true })
+      uploadDocument.mockResolvedValue({ document_id: 'doc-1' })
+      getSessionIngestion.mockResolvedValue({
+        status: 'pending',
+        documents: [{ id: 'doc-1', filename: 'notes.pdf', status: 'pending' }],
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      const file = new File(['pdf-bytes'], 'notes.pdf', { type: 'application/pdf' })
+      const input = wrapper.get('[data-testid="session-upload-input"]')
+      Object.defineProperty(input.element, 'files', { value: [file], configurable: true })
+      await input.trigger('change')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="upload-status-pending"]').text()).toContain('Uploading')
+
+      await vi.advanceTimersByTimeAsync(WATCH_CEILING_MS)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="upload-status-pending"]').exists()).toBe(false)
+      expect(wrapper.text()).not.toContain('still processing')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   // A poll started in session A must not paint A's status into session B after
@@ -828,7 +1102,7 @@ describe('SessionView', () => {
     validateFile.mockReturnValue({ ok: true })
     uploadDocument.mockResolvedValue({ document_id: 'doc-1' })
     let resolveStatus
-    getUploadStatus.mockImplementation(
+    getSessionIngestion.mockImplementation(
       () =>
         new Promise((res) => {
           resolveStatus = res
@@ -848,7 +1122,8 @@ describe('SessionView', () => {
     // B must not inherit A's upload lock while the stale poll is still pending.
     expect(wrapper.findComponent(Composer).props('uploading')).toBe(false)
 
-    resolveStatus({ status: 'ready' }) // the superseded poll resolves late
+    // the superseded poll resolves late
+    resolveStatus({ status: 'ready', documents: [{ id: 'doc-1', status: 'ready' }] })
     await flushPromises()
 
     // The stale result must not paint A's status banner into B.
@@ -1121,6 +1396,78 @@ describe('SessionView', () => {
       await wrapper.get('[data-testid="diag-level-advanced"]').trigger('click')
       await flushPromises()
       expect(sendSpy).toHaveBeenCalledWith({ text: "I'd say my level is advanced." })
+    })
+
+    // #354: the topic card under the first at-level reply.
+    const TOPIC_CARD = {
+      mode: 'broad',
+      topic: 'Calculus',
+      items: [
+        { label: 'Limits', hint: null },
+        { label: 'Derivatives', hint: null },
+        { label: 'Integrals', hint: null },
+      ],
+    }
+
+    const withCard = (extra = []) => [
+      { role: 'assistant', content: 'Calculus studies change.', topic_suggestions: TOPIC_CARD },
+      ...extra,
+    ]
+
+    const levelSet = () =>
+      getSessionProfile.mockResolvedValue({ profile: { knowledge_level: 'beginner' }, etag: 't1' })
+
+    it('renders the topic card under the latest tutor reply that carries one', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: withCard() })
+      })
+      levelSet()
+      const wrapper = mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="topic-suggest-card"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="diagnostic-consent-card"]').exists()).toBe(false)
+    })
+
+    it('a tapped topic line sends a learner message', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: withCard() })
+      })
+      const sendSpy = vi.spyOn(store, 'sendMessageStreaming').mockResolvedValue()
+      levelSet()
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-testid="topic-line-1"]').trigger('click')
+      await flushPromises()
+      expect(sendSpy).toHaveBeenCalledWith({ text: "Let's start with Derivatives" })
+    })
+
+    it('closes once a learner turn follows the card (reload or tap)', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: withCard([{ role: 'user', content: 'Limits please' }]) })
+      })
+      levelSet()
+      const wrapper = mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="topic-suggest-card"]').exists()).toBe(false)
+    })
+
+    it('dismiss hides the card and survives a reload of the session', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: withCard() })
+      })
+      levelSet()
+      const wrapper = mountView()
+      await flushPromises()
+      await wrapper.get('[data-testid="topic-dismiss"]').trigger('click')
+      expect(wrapper.find('[data-testid="topic-suggest-card"]').exists()).toBe(false)
+      wrapper.unmount()
+      const again = mountView()
+      await flushPromises()
+      expect(again.find('[data-testid="topic-suggest-card"]').exists()).toBe(false)
     })
 
     it('level button does not send a declaration message when the PATCH fails', async () => {
@@ -1600,9 +1947,9 @@ describe('SessionView', () => {
   })
 
   // R2 (UI audit 2026-09-13): at 390x844 the check card pinned in the foot took
-  // ~420px and left the transcript ~190px (0px with the cue strip expanded). The
-  // card now scrolls with the transcript below 900px. The two placements are
-  // v-if/v-else on one matchMedia flag, so exactly one card exists at any width.
+  // ~420px and left the transcript ~190px (0px with the cue strip expanded).
+  // #346 made the transcript the card's only home; the width stub guards
+  // against a width-dependent placement coming back.
   describe('check card placement', () => {
     const realMatchMedia = window.matchMedia
 
@@ -1628,8 +1975,13 @@ describe('SessionView', () => {
       window.matchMedia = realMatchMedia
     })
 
-    it('renders the card inside the messages scroller below 900px', async () => {
-      stubMatchMedia(true)
+    // #346: the document is the scroller, so the card scrolls with the page at
+    // every width -- the foot carries only the status slot and the composer.
+    it.each([
+      ['below 900px', true],
+      ['at 900px and above', false],
+    ])('renders the card in the transcript %s', async (_label, narrow) => {
+      stubMatchMedia(narrow)
       const store = useSessionStore()
       vi.spyOn(store, 'loadSession').mockImplementation(async () => {
         setupSession({ messages: [{ role: 'user', content: 'hi', message_id: 9 }] })
@@ -1644,22 +1996,505 @@ describe('SessionView', () => {
       ).toBe(true)
       expect(wrapper.find('.notes-foot [data-testid="check-card"]').exists()).toBe(false)
     })
+  })
 
-    it('keeps the card in the foot at 900px and above', async () => {
-      stubMatchMedia(false)
+  // #346: whole-page scroll. The document scrolls, not the .messages box; the
+  // level picker scrolls with the transcript and autoscroll drives the window.
+  describe('whole-page scroll', () => {
+    let scrollSpy
+
+    beforeEach(() => {
+      scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      scrollSpy.mockRestore()
+      delete document.documentElement.scrollHeight
+      delete window.scrollY
+    })
+
+    function stubDocHeight(getHeight) {
+      Object.defineProperty(document.documentElement, 'scrollHeight', {
+        configurable: true,
+        get: getHeight,
+      })
+    }
+
+    it('does not lock document scroll while mounted', async () => {
       const store = useSessionStore()
       vi.spyOn(store, 'loadSession').mockImplementation(async () => {
-        setupSession({ messages: [{ role: 'user', content: 'hi', message_id: 9 }] })
-        openBatch(store)
+        setupSession()
       })
       const wrapper = mountView()
       await flushPromises()
 
-      expect(wrapper.findAllComponents(CheckQuestion)).toHaveLength(1)
-      expect(wrapper.find('.notes-foot [data-testid="check-card"]').exists()).toBe(true)
+      expect(document.body.classList.contains('chat-locked')).toBe(false)
+      expect(document.body.classList.contains('session-page')).toBe(true)
+      wrapper.unmount()
+      expect(document.body.classList.contains('session-page')).toBe(false)
+    })
+
+    it('resets the document scroll on leave so the next route starts at the top', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      scrollSpy.mockClear()
+
+      wrapper.unmount()
+      expect(scrollSpy).toHaveBeenCalledWith(0, 0)
+    })
+
+    it('renders the level picker in the transcript, not the foot', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+      })
+      getSessionProfile.mockResolvedValue({ profile: { knowledge_level: null }, etag: 't1' })
+      const wrapper = mountView()
+      await flushPromises()
+
       expect(
-        wrapper.find('[data-testid="session-messages"] [data-testid="check-card"]').exists(),
-      ).toBe(false)
+        wrapper
+          .find('[data-testid="session-messages"] [data-testid="diagnostic-consent-card"]')
+          .exists(),
+      ).toBe(true)
+      expect(wrapper.find('.notes-foot [data-testid="diagnostic-consent-card"]').exists()).toBe(
+        false,
+      )
+    })
+
+    it('scrolls the window to the bottom when a message lands', async () => {
+      stubDocHeight(() => 1500)
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: [{ role: 'user', content: 'hi', message_id: 9 }] })
+      })
+      mountView()
+      await flushPromises()
+      scrollSpy.mockClear()
+
+      store.messages = [...store.messages, { role: 'assistant', content: 'yo', message_id: 10 }]
+      await flushPromises()
+
+      expect(scrollSpy).toHaveBeenCalledWith(0, 1500)
+    })
+
+    it('keeps the reading position when earlier messages are prepended', async () => {
+      let height = 1000
+      stubDocHeight(() => height)
+      Object.defineProperty(window, 'scrollY', { configurable: true, value: 200 })
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({
+          messages: [{ role: 'user', content: 'hi', message_id: 9 }],
+          hasMoreMessages: true,
+        })
+      })
+      vi.spyOn(store, 'loadEarlierMessages').mockImplementation(async () => {
+        store.messages = [{ role: 'user', content: 'older', message_id: 8 }, ...store.messages]
+        height = 1600
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      scrollSpy.mockClear()
+
+      await wrapper.get('[data-testid="load-earlier"]').trigger('click')
+      await flushPromises()
+
+      expect(scrollSpy).toHaveBeenCalledTimes(1)
+      expect(scrollSpy).toHaveBeenCalledWith(0, 800)
+    })
+
+    // #347: follow the stream, stop the moment the learner scrolls up, resume
+    // when they return to the bottom. jsdom's innerHeight is 768, so with a
+    // 1500px document the bottom is scrollY 732.
+    describe('follow-the-stream autoscroll', () => {
+      const realMatchMedia = window.matchMedia
+
+      afterEach(() => {
+        window.matchMedia = realMatchMedia
+      })
+
+      const BOTTOM_Y = 1500 - 768
+
+      function setScrollY(y) {
+        Object.defineProperty(window, 'scrollY', { configurable: true, value: y })
+        window.dispatchEvent(new Event('scroll'))
+      }
+
+      function scrollUpFromBottom(to = 300) {
+        setScrollY(BOTTOM_Y)
+        setScrollY(to)
+      }
+
+      async function mountStreaming() {
+        stubDocHeight(() => 1500)
+        const store = useSessionStore()
+        vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+          setupSession({ messages: [{ role: 'user', content: 'hi', message_id: 9 }] })
+        })
+        mountView()
+        await flushPromises()
+        store.streamingMessage = { role: 'assistant', content: '', tool_calls: [], citations: [] }
+        await flushPromises()
+        scrollSpy.mockClear()
+
+        return store
+      }
+
+      async function growStream(store) {
+        store.streamingMessage.content += 'more tokens '
+        await flushPromises()
+      }
+
+      it('scrolls to the bottom as streamed text grows', async () => {
+        const store = await mountStreaming()
+        await growStream(store)
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it('follows tool calls appended mid-stream', async () => {
+        const store = await mountStreaming()
+        store.streamingMessage.tool_calls.push({ id: 't1', name: 'search', state: 'running' })
+        await flushPromises()
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it('follows a tool call settling from running to done', async () => {
+        const store = await mountStreaming()
+        store.streamingMessage.tool_calls.push({ id: 't1', name: 'search', state: 'running' })
+        await flushPromises()
+        scrollSpy.mockClear()
+        store.streamingMessage.tool_calls[0].state = 'done'
+        await flushPromises()
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it('stops following on a small upward nudge within the bottom slack', async () => {
+        const store = await mountStreaming()
+        scrollUpFromBottom(BOTTOM_Y - 10)
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).not.toHaveBeenCalled()
+      })
+
+      it('stops following on an upward wheel before the scroll event lands', async () => {
+        const store = await mountStreaming()
+        setScrollY(BOTTOM_Y)
+        window.dispatchEvent(new WheelEvent('wheel', { deltaY: -40 }))
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).not.toHaveBeenCalled()
+      })
+
+      it('keeps following when a shrink clamps the view to the bottom', async () => {
+        let height = 1500
+        stubDocHeight(() => height)
+        const store = await mountStreaming()
+        stubDocHeight(() => height)
+        setScrollY(BOTTOM_Y)
+        height = 1400
+        setScrollY(BOTTOM_Y - 100)
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1400 }))
+      })
+
+      it('stops following once the learner scrolls up', async () => {
+        const store = await mountStreaming()
+        scrollUpFromBottom()
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).not.toHaveBeenCalled()
+      })
+
+      it('resumes following when the learner returns to the bottom', async () => {
+        const store = await mountStreaming()
+        scrollUpFromBottom()
+        setScrollY(BOTTOM_Y)
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it('does not cancel on downward scrolling short of the bottom', async () => {
+        const store = await mountStreaming()
+        setScrollY(100)
+        setScrollY(400)
+        scrollSpy.mockClear()
+        await growStream(store)
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it('does not yank a scrolled-up learner down when the reply lands', async () => {
+        const store = await mountStreaming()
+        scrollUpFromBottom()
+        scrollSpy.mockClear()
+        store.streamingMessage = null
+        store.messages = [...store.messages, { role: 'assistant', content: 'yo', message_id: 10 }]
+        await flushPromises()
+        expect(scrollSpy).not.toHaveBeenCalled()
+      })
+
+      it('re-arms following when the learner sends a message', async () => {
+        const store = await mountStreaming()
+        store.streamingMessage = null
+        scrollUpFromBottom()
+        scrollSpy.mockClear()
+        store.messages = [...store.messages, { role: 'user', content: 'next', message_id: 11 }]
+        await flushPromises()
+        expect(scrollSpy).toHaveBeenCalledWith(0, 1500)
+        scrollSpy.mockClear()
+        store.streamingMessage = { role: 'assistant', content: 'a', tool_calls: [], citations: [] }
+        await flushPromises()
+        expect(scrollSpy).toHaveBeenCalledWith(expect.objectContaining({ top: 1500 }))
+      })
+
+      it.each([
+        ['smooth by default', false, 'smooth'],
+        ['instant under prefers-reduced-motion', true, 'instant'],
+      ])('scrolls %s', async (_label, reduce, behavior) => {
+        window.matchMedia = vi.fn((query) => ({
+          matches: reduce && query === REDUCED_MOTION_QUERY,
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+        }))
+        const store = await mountStreaming()
+        await growStream(store)
+        expect(scrollSpy).toHaveBeenCalledWith({ top: 1500, behavior })
+      })
+    })
+  })
+
+  // D-21: SessionHeader's h1 is gated on a resolved topic, so before the detail
+  // fetch lands the page had no h1 at all. A visually-hidden fallback fills the
+  // gap -- and only while the gap exists, so the page never carries two h1s.
+  describe('page heading (D-21)', () => {
+    it('renders a visually-hidden fallback h1 before the topic resolves', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(() => new Promise(() => {}))
+      const wrapper = mountView()
+      await flushPromises()
+      const headings = wrapper.findAll('h1')
+      expect(headings).toHaveLength(1)
+      expect(headings[0].text()).toBe('Session')
+      expect(headings[0].classes()).toContain('sr-only')
+    })
+
+    it('drops the fallback once the topic resolves, leaving exactly one h1', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      const headings = wrapper.findAll('h1')
+      expect(headings).toHaveLength(1)
+      expect(headings[0].text()).toBe('Calculus')
+    })
+
+    it('renders only the not-found h1 on the 404 branch', async () => {
+      const store = useSessionStore()
+      const err = Object.assign(new Error('not found'), { status: 404 })
+      vi.spyOn(store, 'loadSession').mockRejectedValue(err)
+      const wrapper = mountView({ id: 'gone' })
+      await flushPromises()
+      const headings = wrapper.findAll('h1')
+      expect(headings).toHaveLength(1)
+      expect(headings[0].text()).toBe('Session not found')
+    })
+  })
+
+  // E-20 / D-25: the composer never locked on an open check (checkLocked was a
+  // constant false), so the prop, its Skip button and the store computed went.
+  // CheckQuestion owns Skip.
+  describe('composer has no check lock (E-20)', () => {
+    it('does not render a composer Skip button while a check batch is open', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+        store.pendingCheck = {
+          gap: 'ATP yield',
+          total: 1,
+          currentIndex: 0,
+          viewIndex: 0,
+          items: [{ question: 'How many ATP?', options: ['30', '38'], status: 'pending' }],
+        }
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="composer-skip"]').exists()).toBe(false)
+      expect(wrapper.findComponent(Composer).props()).not.toHaveProperty('locked')
+      expect(store.checkLocked).toBeUndefined()
+    })
+  })
+
+  // E-17: options were gated on `answered` only, which flips after the POST
+  // returns - the in-flight window accepted a second click that the store then
+  // dropped silently.
+  describe('check answering (E-17)', () => {
+    function openBatch(store) {
+      store.pendingCheck = {
+        gap: 'ATP yield',
+        total: 1,
+        currentIndex: 0,
+        viewIndex: 0,
+        items: [
+          {
+            question: 'How many ATP?',
+            options: ['30', '38'],
+            status: 'pending',
+            selectedIndex: null,
+            correctIndex: null,
+            correct: null,
+            explanation: null,
+          },
+        ],
+      }
+    }
+
+    it('passes the store answering flag down to the check card', async () => {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession()
+        openBatch(store)
+      })
+      const wrapper = mountView()
+      await flushPromises()
+      const card = wrapper.findComponent(CheckQuestion)
+      expect(card.props('answering')).toBe(false)
+      store.checkAnswering = true
+      await nextTick()
+      expect(card.props('answering')).toBe(true)
+    })
+  })
+
+  // #443: the blue tick on the latest tutor turn belongs to the reply that
+  // filed the cue. Cues land the way they do in the app: a stream finishes and
+  // the profile refetch returns an entry the real CueColumn has not seen.
+  describe('cue tick (#443)', () => {
+    const profile = (gaps = []) => ({
+      profile: {
+        knowledge_level: null,
+        confirmed_gaps: gaps.map((name) => ({ name, evidence_type: null, last_event_at: null })),
+      },
+      etag: 't1',
+    })
+
+    // A tutor turn as the store runs it: idle -> streaming -> idle, with the
+    // reply appended. The nextTick lets the stream-state watcher see both edges.
+    function reply(store) {
+      return async () => {
+        store.streamState = 'streaming'
+        await nextTick()
+        store.messages = [
+          ...store.messages,
+          { role: 'assistant', content: `reply ${store.messages.length}` },
+        ]
+        store.streamState = 'idle'
+      }
+    }
+
+    const landed = (wrapper) => wrapper.findComponent(MessageList).props('landed')
+
+    // A real router route is reactive; the query cases need the watchers to see
+    // a query set after mount.
+    beforeEach(() => {
+      route = reactive({ query: {} })
+    })
+
+    afterEach(() => {
+      route = { query: {} }
+    })
+
+    async function mountWithLandedCue() {
+      const store = useSessionStore()
+      vi.spyOn(store, 'loadSession').mockImplementation(async () => {
+        setupSession({ messages: [{ role: 'assistant', content: 'hi' }] })
+      })
+      vi.spyOn(store, 'sendMessageStreaming').mockImplementation(reply(store))
+      getSessionProfile.mockResolvedValue(profile())
+      const wrapper = mountView()
+      await flushPromises()
+      getSessionProfile.mockResolvedValue(profile(['joins']))
+      await wrapper.get('[data-testid="session-input"]').setValue('teach me joins')
+      await wrapper.get('[data-testid="session-send"]').trigger('click')
+      await flushPromises()
+      expect(landed(wrapper)).toBe(true)
+
+      return { store, wrapper }
+    }
+
+    const senders = {
+      'the quiz button': async ({ wrapper }) => {
+        await wrapper.get('[data-testid="diag-quiz"]').trigger('click')
+      },
+      'the level declaration': async ({ wrapper }) => {
+        patchProfile.mockResolvedValue({ ...profile(['joins']), etag: 't2' })
+        await wrapper.get('[data-testid="diag-level-advanced"]').trigger('click')
+      },
+      'a review seed': async () => {
+        route.query.review_gap = 'joins'
+      },
+      'a ?quiz link': async () => {
+        route.query.quiz = '1'
+      },
+      'a check follow-up': async ({ store, wrapper }) => {
+        store.pendingCheck = {
+          gap: 'joins',
+          total: 1,
+          currentIndex: 1,
+          viewIndex: 0,
+          items: [
+            {
+              question: 'Which join keeps unmatched left rows?',
+              options: ['inner', 'left'],
+              status: 'answered',
+              selectedIndex: 1,
+              correctIndex: 1,
+              correct: true,
+              explanation: null,
+            },
+          ],
+        }
+        vi.spyOn(store, 'completeCheck').mockImplementation(async () => {
+          store.pendingCheck = null
+          await reply(store)()
+        })
+        await nextTick()
+        wrapper.findComponent(CheckQuestion).vm.$emit('done')
+      },
+    }
+
+    it.each(Object.keys(senders))(
+      'a reply that lands no cue does not carry the previous tick: %s',
+      async (name) => {
+        const ctx = await mountWithLandedCue()
+        const before = ctx.store.messages.length
+        await senders[name](ctx)
+        await flushPromises()
+        expect(ctx.store.messages.length).toBe(before + 1)
+        expect(landed(ctx.wrapper)).toBe(false)
+      },
+    )
+
+    it('a reply that lands a cue gets the tick', async () => {
+      const ctx = await mountWithLandedCue()
+      getSessionProfile.mockResolvedValue(profile(['joins', 'subqueries']))
+      await ctx.wrapper.get('[data-testid="diag-quiz"]').trigger('click')
+      await flushPromises()
+      expect(landed(ctx.wrapper)).toBe(true)
+    })
+
+    it('typing clears the tick', async () => {
+      const { wrapper } = await mountWithLandedCue()
+      await wrapper.get('[data-testid="session-input"]').setValue('and outer joins?')
+      await wrapper.get('[data-testid="session-send"]').trigger('click')
+      await flushPromises()
+      expect(landed(wrapper)).toBe(false)
     })
   })
 })

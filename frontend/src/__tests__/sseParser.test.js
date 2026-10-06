@@ -5,9 +5,15 @@ import { parseSSEStream } from '../lib/sseParser.js'
 function readableFromChunks(chunks) {
   const encoder = new TextEncoder()
   let i = 0
+
   return new ReadableStream({
     pull(controller) {
-      if (i >= chunks.length) { controller.close(); return }
+      if (i >= chunks.length) {
+        controller.close()
+
+        return
+      }
+
       controller.enqueue(encoder.encode(chunks[i++]))
     },
   })
@@ -25,7 +31,10 @@ describe('parseSSEStream', () => {
     const stream = readableFromChunks(['event: a\ndata: 1\n\nevent: b\ndata: 2\n\n'])
     const events = []
     await parseSSEStream(stream, (ev) => events.push(ev))
-    expect(events).toEqual([{ event: 'a', data: 1 }, { event: 'b', data: 2 }])
+    expect(events).toEqual([
+      { event: 'a', data: 1 },
+      { event: 'b', data: 2 },
+    ])
   })
 
   it('parses an event split across multiple chunks', async () => {
@@ -58,7 +67,13 @@ describe('parseSSEStream', () => {
 
   it('aborts cleanly via AbortSignal', async () => {
     const ctrl = new AbortController()
-    const stream = new ReadableStream({ pull() { /* never resolves */ } })
+
+    const stream = new ReadableStream({
+      pull() {
+        /* never resolves */
+      },
+    })
+
     const promise = parseSSEStream(stream, () => {}, { signal: ctrl.signal })
     ctrl.abort()
     await expect(promise).rejects.toThrow(/abort/i)

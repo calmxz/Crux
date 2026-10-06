@@ -7,7 +7,12 @@ from sqlalchemy import event as _sa_event
 
 from contracts import TopicProfile  # noqa: F401  (ensures schema exists)
 from db.database import Base
-from db.models import ChatMessage, LearningEvent, Session as SessionModel, User  # noqa: F401  (registers models on Base.metadata)
+from db.models import (  # noqa: F401  (registers models on Base.metadata)
+    ChatMessage,
+    LearningEvent,
+    User,
+)
+from db.models import Session as SessionModel
 
 
 @contextmanager
@@ -296,6 +301,56 @@ def test_library_route_not_shadowed_by_session_id(client, db_session, seeded_use
 def test_library_rejects_invalid_params(client, db_session, seeded_user, qs):
     r = client.get(f"/api/sessions/library?{qs}&user_id={USER_ID}")
     assert r.status_code == 422, f"expected 422 for {qs}, got {r.status_code}: {r.text}"
+
+
+def test_library_rejects_overlong_q(client, db_session, seeded_user):
+    """C-17: `q` is interpolated into a LIKE pattern and scanned against every
+    topic the user owns. Uncapped, it is an unbounded-work knob; the sibling
+    /sessions/lookup `topic` param has been capped at 200 all along."""
+    r = client.get(
+        "/api/sessions/library", params={"q": "x" * 201, "user_id": USER_ID}
+    )
+    assert r.status_code == 422, r.text
+    r_ok = client.get(
+        "/api/sessions/library", params={"q": "x" * 200, "user_id": USER_ID}
+    )
+    assert r_ok.status_code == 200, r_ok.text
+
+
+def test_library_q_treats_percent_as_a_literal(client, db_session, seeded_user):
+    """C-17: unescaped, `%` is a LIKE wildcard, so searching "50%" matched
+    every topic starting with "50" (and a bare "%" matched everything)."""
+    _seed_simple(db_session, "lib_pct", "Save 50% now")
+    _seed_simple(db_session, "lib_plain", "Save 500 now")
+    body = client.get(
+        "/api/sessions/library", params={"q": "50%", "user_id": USER_ID}
+    ).json()
+    assert {i["id"] for i in body["items"]} == {"lib_pct"}
+    assert body["total"] == 1
+
+
+def test_library_q_treats_underscore_as_a_literal(client, db_session, seeded_user):
+    """C-17: `_` is LIKE's single-character wildcard."""
+    _seed_simple(db_session, "lib_us", "a_b topic")
+    _seed_simple(db_session, "lib_any", "axb topic")
+    body = client.get(
+        "/api/sessions/library", params={"q": "a_b", "user_id": USER_ID}
+    ).json()
+    assert {i["id"] for i in body["items"]} == {"lib_us"}
+    assert body["total"] == 1
+
+
+def test_library_q_treats_backslash_as_a_literal(client, db_session, seeded_user):
+    """C-17: the escape character itself must be escaped first, or a trailing
+    backslash in `q` produces a malformed pattern."""
+    _seed_simple(db_session, "lib_bs", r"path a\b here")
+    _seed_simple(db_session, "lib_nobs", "path ab here")
+    r = client.get(
+        "/api/sessions/library", params={"q": "a\\b", "user_id": USER_ID}
+    )
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert {i["id"] for i in body["items"]} == {"lib_bs"}
 
 
 def test_library_sort_topic_is_stable_by_id(client, db_session, seeded_user):

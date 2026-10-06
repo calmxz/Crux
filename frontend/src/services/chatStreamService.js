@@ -1,5 +1,11 @@
 import { parseSSEStream } from '@/lib/sseParser.js'
-import { ApiError, _onAuthExpired, _refreshAccessToken, getFreshAccessToken } from './apiClient.js'
+import {
+  ApiError,
+  _onAuthExpired,
+  _refreshAccessToken,
+  getFreshAccessToken,
+  invalidateGetCache,
+} from './apiClient.js'
 
 const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
@@ -7,6 +13,7 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api
 // duration -- multi-tool turns legitimately run long, and the backend's
 // per-iteration llm_timeout_s bounds each silent gap well under 60s.
 export const SSE_HEADER_TIMEOUT_MS = 30000
+
 export const SSE_IDLE_TIMEOUT_MS = 60000
 
 function _timeoutError() {
@@ -16,12 +23,14 @@ function _timeoutError() {
 async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = false) {
   const headers = { 'content-type': 'application/json' }
   const token = _retried ? await _refreshAccessToken() : await getFreshAccessToken()
+
   if (token) headers['authorization'] = `Bearer ${token}`
 
   // Internal controller: layers the header/idle timeouts on top of whatever
   // signal the caller passed in (e.g. the "stop" button), without mutating
   // or replacing the caller's own AbortController.
   const ctrl = new AbortController()
+
   if (signal) {
     if (signal.aborted) ctrl.abort(signal.reason)
     else signal.addEventListener('abort', () => ctrl.abort(signal.reason), { once: true })
@@ -31,6 +40,7 @@ async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = fal
   // solely on the abort signal reaching fetch -- guarantees the 30s cap
   // fires even against fetch implementations/mocks that don't act on abort.
   let headerTimer
+
   const headerTimeout = new Promise((_, reject) => {
     headerTimer = setTimeout(() => {
       ctrl.abort(_timeoutError())
@@ -39,6 +49,7 @@ async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = fal
   })
 
   let resp
+
   try {
     // Race the ORIGINAL fetch promise, not a .catch()-wrapped copy (that
     // would return a new promise and leave this one un-raced). When the
@@ -53,10 +64,12 @@ async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = fal
       body: JSON.stringify(payload),
       signal: ctrl.signal,
     })
+
     fetchPromise.catch(() => {})
     resp = await Promise.race([fetchPromise, headerTimeout])
   } catch (e) {
     if (e instanceof ApiError) throw e
+
     if (e?.name === 'TimeoutError') throw new ApiError(0, { detail: 'request timed out' }, path)
     throw e instanceof TypeError ? new ApiError(0, { detail: e.message }, path) : e
   } finally {
@@ -69,29 +82,35 @@ async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = fal
       // been consumed yet, so the whole POST can simply be re-issued.
       return _fetchSse(url, payload, { onEvent, signal, path }, true)
     }
+
     if (resp.status === 401) await _onAuthExpired()
     const text = await resp.text().catch(() => '')
     let body
+
     try {
       body = text ? JSON.parse(text) : null
     } catch {
       body = text
     }
+
     throw new ApiError(resp.status, body, path)
   }
 
   const timedOut = () => ctrl.signal.aborted && ctrl.signal.reason?.name === 'TimeoutError'
 
   let idleTimer = setTimeout(() => ctrl.abort(_timeoutError()), SSE_IDLE_TIMEOUT_MS)
+
   const wrappedOnEvent = (evt) => {
     clearTimeout(idleTimer)
     idleTimer = setTimeout(() => ctrl.abort(_timeoutError()), SSE_IDLE_TIMEOUT_MS)
     onEvent(evt)
   }
+
   try {
     await parseSSEStream(resp.body, wrappedOnEvent, { signal: ctrl.signal })
   } catch (e) {
     if (timedOut()) throw new ApiError(0, { detail: 'stream timed out' }, path)
+
     // Not a timeout: if the internal controller was aborted, it's because the
     // caller's own signal aborted (a mid-stream user cancel). sseParser's
     // reader.cancel() resolves the pending read() with {done: true} and then
@@ -102,7 +121,12 @@ async function _fetchSse(url, payload, { onEvent, signal, path }, _retried = fal
       const reason = ctrl.signal.reason
       throw reason?.name === 'AbortError' ? reason : new DOMException('aborted', 'AbortError')
     }
-    throw e
+
+    // E-02: a connection that dies mid-body rejects the read with a bare
+    // TypeError ("network error"). Normalize it the same way the header phase
+    // does (see :61) so callers get the status-0 ApiError contract instead of
+    // a raw TypeError that friendlyError can only render as its own message.
+    throw e instanceof TypeError ? new ApiError(0, { detail: e.message }, path) : e
   } finally {
     clearTimeout(idleTimer)
   }
@@ -118,15 +142,42 @@ export async function streamChat({
   signal,
 }) {
   const payload = { session_id: sessionId, message, review_gaps: reviewGaps }
+
   if (reviewGap) payload.review_gap = reviewGap
+
   if (diagnosticAccepted) payload.diagnostic_accepted = true
-  await _fetchSse(`${BASE_URL}/chat/stream`, payload, { onEvent, signal, path: '/chat/stream' })
+
+  try {
+    await _fetchSse(`${BASE_URL}/chat/stream`, payload, { onEvent, signal, path: '/chat/stream' })
+  } finally {
+    // Raw fetch bypasses request(), so the session tree (messages, profile,
+    // pending check) must be dropped from the GET cache here, success or not.
+    invalidateGetCache(`/sessions/${sessionId}`)
+  }
 }
 
 export async function streamCheckComplete({ sessionId, onEvent, signal }) {
-  await _fetchSse(
-    `${BASE_URL}/sessions/${sessionId}/check/complete`,
-    {},
-    { onEvent, signal, path: '/check/complete' },
-  )
+  try {
+    await _fetchSse(
+      `${BASE_URL}/sessions/${sessionId}/check/complete`,
+      {},
+      { onEvent, signal, path: '/check/complete' },
+    )
+  } finally {
+    invalidateGetCache(`/sessions/${sessionId}`)
+  }
+}
+
+// #340 Stop button: end the check early; streams the same follow-up
+// vocabulary as streamCheckComplete.
+export async function streamCheckStop({ sessionId, onEvent, signal }) {
+  try {
+    await _fetchSse(
+      `${BASE_URL}/sessions/${sessionId}/check/stop`,
+      {},
+      { onEvent, signal, path: '/check/stop' },
+    )
+  } finally {
+    invalidateGetCache(`/sessions/${sessionId}`)
+  }
 }

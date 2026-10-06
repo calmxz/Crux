@@ -24,9 +24,9 @@ from sqlalchemy.orm import sessionmaker
 
 from config import settings
 from db.database import _normalized_url
-from db.models import Document, Session as SessionModel, User
+from db.models import Document, User
+from db.models import Session as SessionModel
 from services import pgvector_store
-
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 

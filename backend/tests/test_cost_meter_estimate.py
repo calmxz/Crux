@@ -6,7 +6,7 @@ These tests must FAIL before the implementation is added to cost_meter.py.
 from decimal import Decimal
 
 from config import settings
-from services.cost_meter import estimate_cancelled_cost, MODEL_RATES
+from services.cost_meter import MODEL_RATES, estimate_cancelled_cost
 
 
 def test_model_rates_has_default_model():
@@ -121,9 +121,10 @@ def test_embedding_cost_unknown_model_returns_zero(monkeypatch):
 
 
 def test_meter_embedding_response_writes_ledger_and_log(db_session, monkeypatch):
-    from services import cost_meter
-    from db.models import LlmCallLog
     from sqlalchemy import select
+
+    from db.models import LlmCallLog
+    from services import cost_meter
 
     def _mk_user(db, uid):
         from db.models import User

@@ -127,4 +127,43 @@ describe('useTheme', () => {
     init()
     expect(addListener).toHaveBeenCalled()
   })
+
+  // F-20: init() has no removal path today, so it must not attach a second
+  // matchMedia listener if called again (e.g. a second component mount).
+  it('calling init() twice only adds one listener', async () => {
+    const mq = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
+
+    window.matchMedia = vi.fn(() => mq)
+    const { useTheme } = await import('@/composables/useTheme.js')
+    const { init } = useTheme()
+    init()
+    init()
+    expect(window.matchMedia).toHaveBeenCalledTimes(1)
+    expect(mq.addEventListener).toHaveBeenCalledTimes(1)
+  })
+
+  // F-20: dispose() removes the exact listener init() added (module-scope
+  // handler, not a fresh closure) and clears mediaQuery so init() can re-arm.
+  it('dispose() removes the listener added by init() and allows re-init', async () => {
+    const mq = {
+      matches: false,
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
+    }
+
+    window.matchMedia = vi.fn(() => mq)
+    const { useTheme } = await import('@/composables/useTheme.js')
+    const { init, dispose } = useTheme()
+    init()
+    dispose()
+    expect(mq.removeEventListener.mock.calls[0][1]).toBe(mq.addEventListener.mock.calls[0][1])
+
+    init()
+    expect(window.matchMedia).toHaveBeenCalledTimes(2)
+    expect(mq.addEventListener).toHaveBeenCalledTimes(2)
+  })
 })

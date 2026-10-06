@@ -1,5 +1,5 @@
 <template>
-  <section class="sprof" data-testid="session-profile">
+  <section class="sprof profile-page" data-testid="session-profile">
     <BackButton label="Back to session" :fallback="`/session/${id}`" />
 
     <header class="head">
@@ -35,7 +35,7 @@
 
     <template v-else-if="data">
       <p v-if="conflict" class="conflict" data-testid="sprof-conflict" role="status">
-        Profile changed elsewhere — reloaded with the latest.
+        Profile changed elsewhere, so your change wasn't saved. Reloaded with the latest.
       </p>
       <p v-if="writeError" class="error" data-testid="sprof-write-error" role="alert">
         {{ writeError }}
@@ -51,6 +51,7 @@
               type="button"
               class="level-opt"
               :class="{ active: data.profile.knowledge_level === lvl }"
+              :disabled="writing"
               @click="setLevel(lvl)"
             >
               <svg
@@ -104,6 +105,7 @@
                 type="button"
                 class="level-opt"
                 :class="{ active: lvl === l }"
+                :disabled="writing"
                 @click="setSubtopicLevel(name, l)"
               >
                 <svg
@@ -124,6 +126,7 @@
               class="icon-btn hit-44"
               data-testid="subtopic-remove"
               :aria-label="`Remove ${name}`"
+              :disabled="writing"
               @click="removeSubtopic(name)"
             >
               <svg
@@ -176,6 +179,7 @@
                 class="icon-btn hit-44"
                 data-testid="chip-remove"
                 :aria-label="`Remove ${it.name}`"
+                :disabled="writing"
                 @click="removeItem(sec.key, it.name)"
               >
                 <svg
@@ -206,6 +210,7 @@
               :data-testid="sec.submitTestid"
               class="text-btn"
               :aria-label="sec.submitLabel"
+              :disabled="writing"
               @click="addItem(sec)"
             >
               Add
@@ -230,7 +235,10 @@
             :key="ev.id"
             :class="['event-row', ev.correct ? 'evt-ok' : 'evt-bad']"
           >
-            <span class="event-mark" :aria-label="ev.correct ? 'correct' : 'missed'">
+            <span class="event-mark">
+              <!-- D-07: the mark is a <span>, which takes no accessible name
+                   from aria-label; the word is written out for SRs instead. -->
+              <span class="sr-only">{{ ev.correct ? 'correct' : 'missed' }}</span>
               <svg
                 class="event-mark-draw"
                 viewBox="0 0 16 16"
@@ -256,8 +264,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, reactive, ref } from 'vue'
+import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useConfirm } from 'primevue/useconfirm'
 
 import BackButton from '../components/BackButton.vue'
 import GapPickerDialog from '../components/GapPickerDialog.vue'
@@ -266,7 +275,8 @@ import { deleteProfileItem, getSessionProfile, patchProfile } from '../services/
 import { useSessionStore } from '../stores/session.js'
 import { formatRelative } from '../utils/formatDate.js'
 import { stripAutoPrefix } from '../utils/sessionCard.js'
-import { LEVEL_MARK_PATH, levelStroke } from '../components/chat/levelMark.js'
+import { LEVEL_MARK_PATH, TICK_PATH, levelStroke } from '../components/chat/levelMark.js'
+import '@/assets/profile.css'
 
 const props = defineProps({ id: { type: String, required: true } })
 
@@ -301,7 +311,7 @@ const CUE_SECTIONS = [
     keyPrefix: 'm',
     empty: 'Nothing recorded yet.',
     markClass: 'cue-mark cue-mark--tick',
-    markPath: 'M2 6.5 L4.8 9.2 L10 3.2',
+    markPath: TICK_PATH,
     patchKey: 'add_mastered',
     inputTestid: 'add-mastered',
     placeholder: 'Add a concept',
@@ -312,20 +322,36 @@ const CUE_SECTIONS = [
 ]
 
 const router = useRouter()
+
+const confirm = useConfirm()
+
 const store = useSessionStore()
+
 const data = ref(null)
+
 const loading = ref(false)
+
 const error = ref('')
+
 const conflict = ref(false)
+
 // F-05: write failures get their own ref. Reusing the load-path `error`
 // would swap the whole loaded profile for an error paragraph (the template
 // chain is loading -> error -> data) with no control left to retry.
 const writeError = ref('')
+
+// E-08: true while any profile write is in flight. Every mutating control is
+// disabled for the duration, so a second write can never be issued against the
+// etag the first one is about to replace.
+const writing = ref(false)
+
 const drafts = reactive({ confirmed_gaps: '', mastered_concepts: '' })
+
 const gapPickerOpen = ref(false)
 
 const topicLabel = computed(() => {
   const fromStore = store.sessions.find((s) => s.id === props.id)?.topic
+
   return fromStore || store.currentSession?.topic || 'Session profile'
 })
 
@@ -333,49 +359,181 @@ const gapNames = computed(() => (data.value?.profile?.confirmed_gaps ?? []).map(
 
 const subtopicEntries = computed(() => Object.entries(data.value?.profile?.subtopic_levels ?? {}))
 
+// E-18: the route component is reused across session->session navigation
+// (same idiom as SessionView.vue), so a slow earlier load must not overwrite
+// a newer one once it finally resolves. `loadSeq` marks each call; only the
+// most recent one is allowed to write state.
+let loadSeq = 0
+
+let loadedId = null
+
 async function load() {
+  const seq = ++loadSeq
+  // Stale-sibling-state fix: the route component is reused across
+  // session->session navigation (E-18), so these must not survive into the
+  // newly-loaded session -- a write-error banner, an open-conflict notice, an
+  // unsaved add-item draft, or an open gap picker all belong to the session
+  // being left. Drafts and the picker are reset only when the id actually
+  // changed: load() is also the 412 recovery path, and a half-typed draft
+  // must survive a conflict reload.
+  conflict.value = false
+  writeError.value = ''
+
+  if (loadedId !== props.id) {
+    drafts.confirmed_gaps = ''
+    drafts.mastered_concepts = ''
+    gapPickerOpen.value = false
+  }
+
+  loadedId = props.id
   loading.value = true
   error.value = ''
+
   try {
-    data.value = await getSessionProfile(props.id)
+    const res = await getSessionProfile(props.id)
+
+    if (seq !== loadSeq) return
+    data.value = res
   } catch (e) {
+    if (seq !== loadSeq) return
     error.value = friendlyError(e)
   } finally {
-    loading.value = false
+    if (seq === loadSeq) loading.value = false
   }
 }
 
-async function _applyWrite(fn) {
-  conflict.value = false
-  writeError.value = ''
+// E-08: every mutating call goes through one serial queue. Writes are
+// etag-guarded, so two in flight at once means the second carries a stale etag
+// and loses to a 412. `fn` reads data.value.etag when it runs -- not when it is
+// queued -- so each write sees the etag the previous one produced.
+// Re-entrancy is handled by serialising rather than by dropping: the mutating
+// controls are disabled for the duration, and anything that still gets through
+// (an Enter on the still-enabled text field) runs after the write ahead of it
+// instead of racing it. A queued write is dropped only when the page it was
+// aimed at is gone (#459, below).
+let _writeQueue = Promise.resolve()
+
+let _pendingWrites = 0
+
+// #459: queued writes die with the page they were aimed at. Each write
+// captures both generations when it is queued and checks them when it runs.
+// `_conflictGen` is bumped once a 412 recovery reload has finished, so every
+// write queued before the notice became visible (including one queued during
+// the reload) is dropped instead of clearing the notice. `_sessionGen` is
+// bumped on an id change, so nothing queued on session A is sent to B.
+let _conflictGen = 0
+
+let _sessionGen = 0
+
+// Resolves to 'saved' | 'conflict' | 'failed' | 'dropped' | 'stale'.
+function _applyWrite(fn) {
+  const ticket = { conflictGen: _conflictGen, sessionGen: _sessionGen }
+  _pendingWrites += 1
+  writing.value = true
+  const run = _writeQueue.then(() => _doWrite(fn, ticket))
+  _writeQueue = run.catch(() => {})
+
+  return run
+}
+
+async function _doWrite(fn, ticket) {
+  // A write queued on session A must not paint its result, its error, or its
+  // conflict notice onto session B, nor touch B's `writing` state.
+  const isStale = () => ticket.sessionGen !== _sessionGen
+
   try {
+    if (isStale()) return 'stale'
+
+    if (ticket.conflictGen !== _conflictGen) return 'dropped'
+    conflict.value = false
+    writeError.value = ''
     const res = await fn()
+
+    if (isStale()) return 'stale'
     // One source of truth for the etag: keeping a separate ref alongside
     // data.etag let the spread re-seed the stale value on the next write.
     data.value = { ...data.value, profile: res.profile, etag: res.etag }
+
+    return 'saved'
   } catch (e) {
-    if (e?.status === 412) {
-      conflict.value = true
-      await load()
-    } else {
+    if (isStale()) return 'stale'
+
+    if (e?.status !== 412) {
       writeError.value = friendlyError(e)
+
+      return 'failed'
+    }
+
+    // load() resets conflict at its top (stale-sibling-state fix), so the
+    // flag must be set after the recovery reload finishes, not before --
+    // otherwise load() would immediately wipe the notice it is meant to
+    // introduce.
+    await load()
+
+    if (isStale()) return 'stale'
+    _conflictGen += 1
+    conflict.value = true
+
+    return 'conflict'
+  } finally {
+    // A stale write's count was already zeroed by _dropQueuedWrites.
+    if (!isStale()) {
+      _pendingWrites -= 1
+
+      if (_pendingWrites === 0) writing.value = false
     }
   }
 }
 
-function addItem(sec) {
+// Session change: _doWrite skips the `_pendingWrites` decrement for stale
+// writes, so the counter is reset here instead.
+function _dropQueuedWrites() {
+  _sessionGen += 1
+  _writeQueue = Promise.resolve()
+  _pendingWrites = 0
+  writing.value = false
+}
+
+async function addItem(sec) {
   const v = drafts[sec.key].trim()
+
   if (!v) return
   drafts[sec.key] = ''
-  return _applyWrite(() => patchProfile(props.id, { [sec.patchKey]: v }, data.value.etag))
+
+  const outcome = await _applyWrite(() =>
+    patchProfile(props.id, { [sec.patchKey]: v }, data.value.etag),
+  )
+
+  // #459: a failed add puts its text back unless the learner has typed since.
+  // A stale write never restores: drafts now belong to another session.
+  const lost = outcome === 'conflict' || outcome === 'failed' || outcome === 'dropped'
+
+  if (lost && drafts[sec.key] === '') drafts[sec.key] = v
 }
 
 function setLevel(level) {
   return _applyWrite(() => patchProfile(props.id, { knowledge_level: level }, data.value.etag))
 }
 
+// E-08: removing a concept is destructive and unlabelled by anything else on
+// the page, so it asks first. Same dialog contract as the file-delete confirm.
+function confirmRemove(name, accept) {
+  confirm.require({
+    message: `Remove "${name}" from this profile?`,
+    header: 'Remove concept',
+    // No glyph icon font in this world -- the dialog carries no mark.
+    rejectLabel: 'Cancel',
+    acceptLabel: 'Remove',
+    rejectClass: 'p-button-text p-button-secondary',
+    acceptClass: 'p-button-danger confirm-delete-strong',
+    accept,
+  })
+}
+
 function removeItem(listName, item) {
-  return _applyWrite(() => deleteProfileItem(props.id, listName, item, data.value.etag))
+  confirmRemove(item, () =>
+    _applyWrite(() => deleteProfileItem(props.id, listName, item, data.value.etag)),
+  )
 }
 
 function setSubtopicLevel(name, level) {
@@ -385,7 +543,9 @@ function setSubtopicLevel(name, level) {
 }
 
 function removeSubtopic(name) {
-  return _applyWrite(() => deleteProfileItem(props.id, 'subtopic_levels', name, data.value.etag))
+  confirmRemove(name, () =>
+    _applyWrite(() => deleteProfileItem(props.id, 'subtopic_levels', name, data.value.etag)),
+  )
 }
 
 function startReview() {
@@ -398,13 +558,23 @@ function goReview(gap) {
 }
 
 onMounted(load)
+
+watch(
+  () => props.id,
+  () => {
+    _dropQueuedWrites()
+    load()
+  },
+)
 </script>
 
 <style scoped>
 /* The session profile is a stack of full-width cards: what the tutor knows
    about this session, editable in place. The four coloured dividers (Level,
    Focus, Gaps, Mastered) carry the profile's law-bound colours; the rest
-   are plain white cards on the desk. */
+   are plain white cards on the desk. The dividers, cue marks, .sec/.sec-title,
+   .cue-none, .text-btn and the skeleton rule come from assets/profile.css
+   (shared with AggregateProfileView); only what differs is here. */
 .sprof {
   max-width: 72rem;
   margin: 0 auto;
@@ -460,80 +630,7 @@ onMounted(load)
 }
 
 .sec {
-  display: flex;
-  flex-direction: column;
   align-items: flex-start;
-  gap: 0.5rem;
-  padding: 1.25rem 1.5rem;
-  background: var(--card);
-  border: 1px solid var(--card-edge);
-  border-radius: var(--radius-card);
-  box-shadow: 0 1px 0 var(--card-drop);
-}
-
-.sec-title {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  font-weight: 700;
-  line-height: var(--lh-body);
-  color: var(--ink);
-}
-
-/* The four full-width dividers: a coloured tab (law: red only Focus, amber
-   only Gaps, green only Mastered; Level stays neutral) joined to a white
-   card body, same grammar as the Settings rail + sheet. */
-.divider {
-  display: flex;
-  flex-direction: column;
-  width: 100%;
-}
-
-.divider-tab {
-  align-self: flex-start;
-  margin: 0;
-  padding: 0.375rem 1rem;
-  border-radius: var(--radius-card) var(--radius-card) 0 0;
-  color: var(--tab-ink);
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  font-weight: 700;
-  line-height: var(--lh-body);
-}
-
-.divider-tab--focus {
-  background: var(--tab-focus);
-}
-
-.divider-tab--gaps {
-  background: var(--tab-gaps);
-}
-
-.divider-tab--mastered {
-  background: var(--tab-mastered);
-}
-
-.divider-tab--level {
-  background: var(--tab-level);
-}
-
-.divider-body {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 0.5rem;
-  width: 100%;
-  padding: 1.25rem 1.5rem;
-  background: var(--card);
-  border: 1px solid var(--card-edge);
-  border-radius: 0 var(--radius-card) var(--radius-card) var(--radius-card);
-  box-shadow: 0 1px 0 var(--card-drop);
-}
-
-.cue-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
 }
 
 .chip,
@@ -563,35 +660,8 @@ onMounted(load)
 }
 
 .cue-mark {
-  flex: 0 0 auto;
   align-self: flex-start;
   margin-top: 0.35rem;
-  fill: none;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  stroke-width: 1.5;
-}
-
-.cue-mark--focus {
-  stroke: var(--ink-marker);
-  stroke-width: 2;
-}
-
-.cue-mark--gap {
-  stroke: var(--pencil);
-}
-
-.cue-mark--tick {
-  /* Mastered tick is green everywhere (tab law); the word stays blue. */
-  stroke: var(--tab-mastered);
-}
-
-.cue-none {
-  margin: 0;
-  font-family: var(--font-sans);
-  font-size: var(--fs-body);
-  line-height: var(--lh-body);
-  color: var(--pencil);
 }
 
 .chip-badge {
@@ -601,30 +671,8 @@ onMounted(load)
   color: var(--pencil);
 }
 
-/* Controls: blue text, or a drawn stroke in an icon button. Nothing stamped. */
-.text-btn {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--ink-learner);
-  font-family: var(--font-sans);
-  font-size: var(--fs-caption);
-  font-weight: 700;
-  line-height: var(--lh-body);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  cursor: pointer;
-}
-
-.text-btn:hover:not(:disabled) {
-  color: var(--color-accent-hover);
-}
-
-.text-btn:focus-visible {
-  outline: 2px solid var(--color-accent-ring);
-  outline-offset: 2px;
-}
-
+/* Controls: blue text (.text-btn, from assets/profile.css), or a drawn stroke
+   in an icon button. Nothing stamped. */
 .icon-btn {
   display: inline-flex;
   align-items: center;
@@ -644,6 +692,23 @@ onMounted(load)
 .icon-btn:focus-visible {
   outline: 2px solid var(--color-accent-ring);
   outline-offset: 2px;
+}
+
+/* Disabled while a write is in flight: the control drops to pencil and stops
+   inviting a second click. */
+.text-btn:disabled,
+.icon-btn:disabled,
+.level-opt:disabled {
+  color: var(--pencil);
+  cursor: default;
+}
+
+.text-btn:disabled {
+  text-decoration: none;
+}
+
+.level-opt:disabled:hover {
+  text-decoration: none;
 }
 
 .icon-mark {
@@ -856,20 +921,7 @@ onMounted(load)
   color: var(--ink);
 }
 
-/* Skeleton: pencil-weight rules on the pitch, no shimmer. */
 .skel {
-  display: flex;
-  flex-direction: column;
   padding-top: 1.75rem;
-}
-
-.skel-block {
-  display: block;
-  height: 1.75rem;
-  border-bottom: 1px solid var(--rule-strong);
-}
-
-.skel-short {
-  width: 55%;
 }
 </style>

@@ -4,7 +4,7 @@ import { computed, ref, watch } from 'vue'
 import { usePanel } from '@/composables/usePanel.js'
 import { NARROW_QUERY, useMediaQuery } from '@/composables/useMediaQuery.js'
 import { entryNames } from '@/utils/conceptEntry.js'
-import { LEVEL_MARK_PATH, levelStroke as levelStrokeFor } from './levelMark.js'
+import { LEVEL_MARK_PATH, TICK_PATH, levelStroke as levelStrokeFor } from './levelMark.js'
 
 const props = defineProps({
   // TopicProfile as served by the API: knowledge_level, subtopic_levels,
@@ -20,12 +20,17 @@ const props = defineProps({
 const emit = defineEmits(['landed'])
 
 const level = computed(() => props.profile?.knowledge_level ?? null)
+
 const levelLabel = computed(() => level.value || 'level not set')
+
 const levelStroke = computed(() => levelStrokeFor(level.value))
 
 const focus = computed(() => props.profile?.focus_target_gap || '')
+
 const gaps = computed(() => entryNames(props.profile?.confirmed_gaps).filter(Boolean))
+
 const mastered = computed(() => entryNames(props.profile?.mastered_concepts).filter(Boolean))
+
 // The focus cue has its own section; listing it twice would read as two gaps.
 const openGaps = computed(() => gaps.value.filter((g) => g !== focus.value))
 
@@ -37,6 +42,7 @@ const gapsCount = computed(() =>
 
 const subtopics = computed(() => {
   const map = props.profile?.subtopic_levels ?? {}
+
   return Object.keys(map).map((name) => ({
     name,
     level: map[name],
@@ -54,21 +60,27 @@ const allNames = computed(() => [
 ])
 
 const seen = ref(new Set())
+
 const fresh = ref(new Set())
+
 let seededFor = null
 
 watch(
   [() => props.sessionId, () => props.profile, allNames],
   ([sid, profile, names]) => {
     if (!profile) return
+
     if (sid !== seededFor) {
       seededFor = sid
       seen.value = new Set(names)
       fresh.value = new Set()
+
       return
     }
+
     const added = names.filter((n) => !seen.value.has(n))
     seen.value = new Set(names)
+
     if (!added.length) return
     fresh.value = new Set(added)
     emit('landed', added)
@@ -272,7 +284,7 @@ const isCollapsed = computed(() => panelCollapsed.value && !isNarrow.value)
                   aria-hidden="true"
                   focusable="false"
                 >
-                  <path d="M2 6.5 L4.8 9.2 L10 3.2" />
+                  <path :d="TICK_PATH" />
                 </svg>
                 <span class="cue-word">{{ m }}</span>
               </li>
@@ -694,13 +706,11 @@ const isCollapsed = computed(() => panelCollapsed.value && !isNarrow.value)
     display: none;
   }
 
-  /* R2: the strip stays put while the sheet under it scrolls, so the disclosure
-     control is always reachable without hunting for it. */
+  /* The strip stays put while the page scrolls under it; SessionView makes
+     its .sheet-cue grid cell sticky, since this element's own containing
+     block is only as tall as the strip. */
   .cue-strip {
     display: grid;
-    position: sticky;
-    top: 0;
-    z-index: 1;
     background: var(--desk);
     padding: 0.35rem clamp(1rem, 3vw, 1.5rem) 0;
   }

@@ -96,7 +96,8 @@ def _seed_session(focus_gap: str) -> tuple[str, str]:
     """Insert a User + Session with focus_target_gap pre-seeded. Returns ids."""
     from contracts import TopicProfile
     from db.database import SessionLocal, create_tables
-    from db.models import Session as SessionModel, User
+    from db.models import Session as SessionModel
+    from db.models import User
 
     create_tables()
 

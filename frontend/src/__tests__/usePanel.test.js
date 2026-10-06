@@ -3,6 +3,7 @@ import { defineComponent, h } from 'vue'
 import { mount } from '@vue/test-utils'
 
 const LS_KEY = 'crux.panel.expanded'
+
 const BREAKPOINT = 1280
 
 function setViewport(width) {
@@ -21,9 +22,11 @@ function mountHarness(usePanel, ctx) {
   const Host = defineComponent({
     setup() {
       Object.assign(ctx, usePanel())
+
       return () => h('div')
     },
   })
+
   return mount(Host)
 }
 

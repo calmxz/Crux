@@ -56,7 +56,7 @@ def test_cap_never_evicts_focused_gap(db_session):
 def test_prompt_renders_newest_with_older_count():
     profile = TopicProfile(confirmed_gaps=_entries(prompts.PROMPT_LIST_MAX + 7, "gap"))
     out = prompts.build_dynamic_context({"profile": profile})
-    line = next(l for l in out.splitlines() if l.startswith("CURRENT TOPIC PROFILE:"))
+    line = next(ln for ln in out.splitlines() if ln.startswith("CURRENT TOPIC PROFILE:"))
     rendered = json.loads(line[len("CURRENT TOPIC PROFILE: "):])
     assert len(rendered["confirmed_gaps"]) == prompts.PROMPT_LIST_MAX
     assert rendered["confirmed_gaps_older_count"] == 7

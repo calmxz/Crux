@@ -10,16 +10,17 @@ import math
 
 import litellm
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
+from starlette.concurrency import run_in_threadpool
 
 from agent.types import ToolContext
 from config import settings
 from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
+from db.models import Session as SessionModel
 from lib import llm_retry
 from services import cost_meter, documents_service, pgvector_store
-
 
 log = logging.getLogger(__name__)
 
@@ -108,10 +109,12 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
     return ToolResult(ok=True, status="ok", data={"chunks": chunks})
 
 
-def _session_centroid(db: Session, session_id: str) -> list[float] | None:
-    """Mean embedding over the session's chunks; None off-Postgres or empty."""
-    if db.get_bind().dialect.name != "postgresql":
-        return None
+def _is_postgres(db: Session) -> bool:
+    return db.get_bind().dialect.name == "postgresql"
+
+
+def _compute_centroid(db: Session, session_id: str) -> list[float] | None:
+    """avg() over every chunk embedding of the session. Postgres-only."""
     centroid = db.execute(
         select(
             func.avg(ChunkEmbedding.embedding, type_=Vector(settings.embedding_dim))
@@ -122,8 +125,42 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     return list(centroid)
 
 
+def _session_centroid(db: Session, session_id: str) -> list[float] | None:
+    """Mean embedding over the session's chunks; None off-Postgres or empty.
+
+    F-05: the avg() aggregation scans every chunk row of the session on every
+    OPTIONAL turn. Materialise it on sessions.chunk_centroid and recompute
+    only after ingestion or a document delete nulls it.
+
+    The dialect guard stays the first statement so sqlite issues no statement
+    at all here (test_chat_prepare_perf counts statements on sqlite).
+
+    The write-back flushes but never commits: this runs inside _prepare_turn's
+    transaction, which is designed to roll back and re-record embedding spend
+    on a fresh transaction (B-08). A rolled-back write-back just means the
+    next turn recomputes.
+    """
+    if not _is_postgres(db):
+        return None
+    stored = db.execute(
+        select(SessionModel.chunk_centroid).where(SessionModel.id == session_id)
+    ).scalar()
+    if stored is not None:
+        return list(stored)
+    centroid = _compute_centroid(db, session_id)
+    if centroid is None:
+        return None
+    db.execute(
+        update(SessionModel)
+        .where(SessionModel.id == session_id)
+        .values(chunk_centroid=centroid)
+    )
+    db.flush()
+    return centroid
+
+
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
-    dot = sum(x * y for x, y in zip(a, b))
+    dot = sum(x * y for x, y in zip(a, b, strict=True))
     norm_a = math.sqrt(sum(x * x for x in a))
     norm_b = math.sqrt(sum(y * y for y in b))
     if norm_a == 0.0 or norm_b == 0.0:
@@ -209,7 +246,9 @@ async def semantic_fallback_required(
     try:
         if not documents_service.has_ready_document(db, session_id):
             return False, None
-        centroid = _session_centroid(db, session_id)
+        # F-05: sync DB work on an async handler's event loop; the centroid
+        # read (and the one-off recompute) go to the threadpool.
+        centroid = await run_in_threadpool(_session_centroid, db, session_id)
         if centroid is None:
             return False, None
         resp, query_vec = await _aembed_query(query)

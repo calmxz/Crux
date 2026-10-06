@@ -2,15 +2,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
 import {
-  uploadPdf,
   uploadDocument,
-  getUploadStatus,
   validateFile,
   ACCEPT_ATTR,
   MAX_UPLOAD_BYTES,
   deleteDocument,
 } from '@/services/uploadApi.js'
 import { ApiError, setUnauthorizedHandler } from '@/services/apiClient.js'
+import { costBus } from '@/services/costBus.js'
 
 function fakeFile(name, size) {
   return { name, size }
@@ -58,13 +57,15 @@ describe('uploadApi', () => {
     vi.restoreAllMocks()
   })
 
-  function ok(body) {
+  function ok(body, headers = {}) {
     return Promise.resolve({
       ok: true,
       status: 200,
+      headers: new Headers(headers),
       text: () => Promise.resolve(JSON.stringify(body)),
     })
   }
+
   function fail(status, body) {
     return Promise.resolve({
       ok: false,
@@ -73,10 +74,10 @@ describe('uploadApi', () => {
     })
   }
 
-  it('uploadPdf posts FormData with session_id and file (no user_id)', async () => {
+  it('uploadDocument posts FormData with session_id and file (no user_id)', async () => {
     fetchMock.mockReturnValueOnce(ok({ document_id: 'd1' }))
     const file = new File(['x'], 'a.pdf', { type: 'application/pdf' })
-    const out = await uploadPdf({ sessionId: 's1', file })
+    const out = await uploadDocument({ sessionId: 's1', file })
     expect(out.document_id).toBe('d1')
     const init = fetchMock.mock.calls[0][1]
     expect(init.method).toBe('POST')
@@ -86,41 +87,36 @@ describe('uploadApi', () => {
     expect(init.body.get('session_id')).toBe('s1')
   })
 
-  it('uploadPdf throws ApiError(0) on network failure', async () => {
+  it('uploadDocument throws ApiError(0) on network failure', async () => {
     fetchMock.mockRejectedValueOnce(new Error('offline'))
-    const err = await uploadPdf({ sessionId: 's', file: new File([''], 'a.pdf') }).catch((e) => e)
+    const file = new File([''], 'a.pdf')
+    const err = await uploadDocument({ sessionId: 's', file }).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(0)
   })
 
-  it('uploadPdf throws ApiError with parsed body on non-ok', async () => {
+  it('uploadDocument throws ApiError with parsed body on non-ok', async () => {
     fetchMock.mockReturnValueOnce(fail(413, { detail: 'too big' }))
-    const err = await uploadPdf({ sessionId: 's', file: new File([''], 'a.pdf') }).catch((e) => e)
+    const file = new File([''], 'a.pdf')
+    const err = await uploadDocument({ sessionId: 's', file }).catch((e) => e)
     expect(err).toBeInstanceOf(ApiError)
     expect(err.status).toBe(413)
     expect(err.body.detail).toBe('too big')
   })
 
-  it('uploadPdf returns null body for empty response', async () => {
+  it('uploadDocument returns null body for empty response', async () => {
     fetchMock.mockReturnValueOnce(
       Promise.resolve({ ok: true, status: 204, text: () => Promise.resolve('') }),
     )
-    const out = await uploadPdf({ sessionId: 's', file: new File([''], 'a.pdf') })
+    const out = await uploadDocument({ sessionId: 's', file: new File([''], 'a.pdf') })
     expect(out).toBeNull()
   })
 
-  it('uploadPdf returns raw text in body when not JSON', async () => {
+  it('uploadDocument returns raw text in body when not JSON', async () => {
     fetchMock.mockReturnValueOnce(fail(500, 'plain text'))
-    const err = await uploadPdf({ sessionId: 's', file: new File([''], 'a.pdf') }).catch((e) => e)
+    const file = new File([''], 'a.pdf')
+    const err = await uploadDocument({ sessionId: 's', file }).catch((e) => e)
     expect(err.body).toBe('plain text')
-  })
-
-  it('getUploadStatus hits /upload/:id with no user_id query', async () => {
-    fetchMock.mockReturnValueOnce(ok({ status: 'ready' }))
-    const out = await getUploadStatus('d1')
-    expect(out.status).toBe('ready')
-    expect(fetchMock.mock.calls[0][0]).toContain('/upload/d1')
-    expect(fetchMock.mock.calls[0][0]).not.toContain('user_id=')
   })
 
   it('issues DELETE to /documents/{id}', async () => {
@@ -141,7 +137,7 @@ describe('uploadApi', () => {
   })
 
   // F-12: uploadDocument gets the same timeout + 401 refresh-retry discipline
-  // as the main request() path (F-06/F-09), which uploadPdf's raw fetch lacked.
+  // as the main request() path (F-06/F-09).
   it('passes an abort timeout signal to fetch', async () => {
     fetchMock.mockReturnValueOnce(ok({}))
     await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
@@ -161,5 +157,62 @@ describe('uploadApi', () => {
     ).rejects.toMatchObject({ status: 401 })
     expect(globalThis.__supabaseAuthStub.signOut).toHaveBeenCalled()
     expect(unauthorizedHandler).toHaveBeenCalledTimes(1)
+  })
+
+  // F-18 review finding: the multipart POST is a raw fetch, so it must drop the
+  // session tree from the short GET cache itself (ingestion_status lives on
+  // the session body).
+  it('uploadDocument invalidates the cached session GET whether it succeeds or fails', async () => {
+    const { apiGet, _resetApiCache } = await import('@/services/apiClient.js')
+    _resetApiCache()
+
+    const json = (body, status = 200) =>
+      new Response(JSON.stringify(body), {
+        status,
+        headers: { 'content-type': 'application/json' },
+      })
+
+    fetchMock.mockResolvedValueOnce(json({ n: 1 }))
+    await apiGet('/sessions/s1')
+    fetchMock.mockResolvedValueOnce(json({ document_id: 'd1' }))
+    await uploadDocument({ sessionId: 's1', file: new File([''], 'a.pdf') })
+    fetchMock.mockResolvedValueOnce(json({ n: 2 }))
+    await expect(apiGet('/sessions/s1')).resolves.toEqual({ n: 2 })
+
+    fetchMock.mockRejectedValueOnce(new Error('offline'))
+    await expect(
+      uploadDocument({ sessionId: 's1', file: new File([''], 'a.pdf') }),
+    ).rejects.toBeInstanceOf(ApiError)
+    fetchMock.mockResolvedValueOnce(json({ n: 3 }))
+    await expect(apiGet('/sessions/s1')).resolves.toEqual({ n: 3 })
+  })
+
+  describe('cost warning (#398)', () => {
+    let listener
+    beforeEach(() => {
+      listener = vi.fn()
+      costBus.addEventListener('cost-warning', listener)
+    })
+    afterEach(() => {
+      costBus.removeEventListener('cost-warning', listener)
+    })
+
+    it('dispatches cost-warning when the upload response carries x-cost-warning', async () => {
+      fetchMock.mockReturnValueOnce(
+        ok({ document_id: 'd1' }, { 'x-cost-warning': 'level=urgent; used=95; soft_cap=100' }),
+      )
+      await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
+      expect(listener).toHaveBeenCalledTimes(1)
+      expect(listener.mock.calls[0][0].detail).toEqual({
+        header: 'level=urgent; used=95; soft_cap=100',
+        path: '/upload',
+      })
+    })
+
+    it('does not dispatch when the header is absent', async () => {
+      fetchMock.mockReturnValueOnce(ok({ document_id: 'd1' }))
+      await uploadDocument({ sessionId: 's1', file: new File(['x'], 'a.pdf') })
+      expect(listener).not.toHaveBeenCalled()
+    })
   })
 })

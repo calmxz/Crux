@@ -1,12 +1,14 @@
 """TDD: services.documents_service aggregate status + ready gate."""
 
+import json
+
 import pytest
 
 from config import settings
 from contracts import TopicProfile
-from db.models import Document, Session as SessionModel, User
+from db.models import ChunkEmbedding, Document, User
+from db.models import Session as SessionModel
 from services import documents_service
-
 
 SID = "sess_docs"
 UID = "u_docs"
@@ -192,7 +194,7 @@ def test_delete_document_removes_row_chunks_and_file(db_session, monkeypatch, tm
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: calls.append(document_id) or 3,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
 
     doc = _seed_doc(db_session)
     disk = tmp_path / f"{doc.id}_{doc.filename}"
@@ -210,7 +212,7 @@ def test_delete_document_missing_raises_not_found(db_session, monkeypatch, tmp_p
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     with pytest.raises(documents_service.DocumentNotFound):
         documents_service.delete_document(db_session, document_id=999, user_id="u1")
 
@@ -220,7 +222,7 @@ def test_delete_document_other_user_raises_not_found(db_session, monkeypatch, tm
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     doc = _seed_doc(db_session, user_id="owner", session_id="s_owner")
     with pytest.raises(documents_service.DocumentNotFound):
         documents_service.delete_document(db_session, document_id=doc.id, user_id="intruder")
@@ -233,7 +235,7 @@ def test_delete_document_tolerates_missing_file(db_session, monkeypatch, tmp_pat
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
     doc = _seed_doc(db_session)
     # No file on disk.
     documents_service.delete_document(db_session, document_id=doc.id, user_id="u1")
@@ -248,7 +250,7 @@ def test_delete_document_filename_traversal_is_contained(db_session, monkeypatch
     )
     uploads = tmp_path / "uploads"
     uploads.mkdir()
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(uploads))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(uploads))
 
     # A file one level above the uploads dir that a traversal filename would target.
     outside = tmp_path / "secret.txt"
@@ -268,7 +270,7 @@ def test_delete_document_tolerates_unlink_oserror(db_session, monkeypatch, tmp_p
         "services.documents_service.pgvector_store.delete_document_chunks",
         lambda db, document_id: 0,
     )
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
 
     doc = _seed_doc(db_session)
     disk = tmp_path / f"{doc.id}_{doc.filename}"
@@ -318,3 +320,110 @@ def test_status_from_counts_treats_processing_as_in_flight(
         documents_service.status_from_counts(total, pending, ready, processing)
         == expected
     )
+
+
+def test_delete_document_invalidates_session_chunk_centroid(db_session, monkeypatch, tmp_path):
+    """F-05: removing a document changes the session's mean embedding, so the
+    materialised centroid must be dropped in the same transaction."""
+    monkeypatch.setattr(
+        "services.documents_service.pgvector_store.delete_document_chunks",
+        lambda db, document_id: 0,
+    )
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
+
+    doc = _seed_doc(db_session)
+    sess = db_session.get(SessionModel, doc.session_id)
+    sess.chunk_centroid = [0.4] * settings.embedding_dim
+    db_session.commit()
+
+    documents_service.delete_document(db_session, document_id=doc.id, user_id="u1")
+
+    db_session.expire_all()
+    assert db_session.get(SessionModel, "s1").chunk_centroid is None
+
+
+def _add_doc_with_text(db, session_id, filename, texts, status="ready"):
+    doc = Document(session_id=session_id, filename=filename, status=status)
+    db.add(doc)
+    db.flush()
+    for i, text in enumerate(texts):
+        db.add(
+            ChunkEmbedding(
+                session_id=session_id,
+                document_id=doc.id,
+                chunk_index=i,
+                page=1,
+                chunk_text=text,
+                embedding=[0.0] * settings.embedding_dim,
+            )
+        )
+    db.commit()
+    db.refresh(doc)
+    return doc
+
+
+def _kw_index(db, session_id):
+    db.expire_all()
+    return json.loads(db.get(SessionModel, session_id).kw_index_json or "[]")
+
+
+def test_delete_document_rebuilds_keyword_index_from_survivors(
+    db_session, monkeypatch, tmp_path
+):
+    """#430: a deleted file's stems must leave the session keyword index, or
+    chat's lexical gate keeps forcing retrieval for a file that is gone."""
+    from lib import keyword_index
+
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
+    db_session.add(User(id="u1"))
+    db_session.flush()
+    db_session.add(SessionModel(id="s1", user_id="u1", topic="t", topic_profile_json="{}"))
+    db_session.commit()
+    bio_doc = _add_doc_with_text(
+        db_session, "s1", "bio.pdf", ["photosynthesis chlorophyll", "mitochondria"]
+    )
+    net_doc = _add_doc_with_text(db_session, "s1", "net.pdf", ["router packets"])
+    # A non-ready document's chunks are not part of the index.
+    _add_doc_with_text(db_session, "s1", "wip.pdf", ["volcano"], status="pending")
+    sess = db_session.get(SessionModel, "s1")
+    sess.kw_index_json = json.dumps(
+        sorted(keyword_index.build_from_text("photosynthesis chlorophyll mitochondria router packets"))
+    )
+    db_session.commit()
+
+    documents_service.delete_document(db_session, bio_doc.id, "u1")
+    assert _kw_index(db_session, "s1") == sorted(keyword_index.build_from_text("router packets"))
+
+    documents_service.delete_document(db_session, net_doc.id, "u1")
+    assert _kw_index(db_session, "s1") == []
+
+
+def test_delete_document_locks_session_before_touching_chunks(
+    db_session, monkeypatch, seeded_doc_with_chunks
+):
+    """#430: the session row lock is taken before chunks are deleted or read,
+    so a concurrently finishing ingestion's merge unions onto the rebuilt set."""
+    calls = []
+    real_lock = documents_service.profile_service.lock_session_row
+    real_delete = documents_service.pgvector_store.delete_document_chunks
+
+    def spy_lock(db, session_id):
+        calls.append("lock")
+        return real_lock(db, session_id)
+
+    def spy_delete(db, document_id):
+        calls.append("delete_chunks")
+        return real_delete(db, document_id)
+
+    monkeypatch.setattr(documents_service.profile_service, "lock_session_row", spy_lock)
+    real_read = documents_service.pgvector_store.ready_chunk_texts
+
+    def spy_read(db, session_id):
+        calls.append("read_chunks")
+        return real_read(db, session_id)
+
+    monkeypatch.setattr(documents_service.pgvector_store, "delete_document_chunks", spy_delete)
+    monkeypatch.setattr(documents_service.pgvector_store, "ready_chunk_texts", spy_read)
+
+    documents_service.delete_document(db_session, seeded_doc_with_chunks.id, USER_ID)
+    assert calls == ["lock", "delete_chunks", "read_chunks"]

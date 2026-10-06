@@ -20,6 +20,7 @@ describe('SessionEndedBanner', () => {
     const w = mount(SessionEndedBanner, {
       props: { endedAt: '2026-07-30T03:45:00Z', hasGaps: true },
     })
+
     await w.get('[data-testid="session-resume"]').trigger('click')
     await w.get('[data-testid="session-resume-gaps"]').trigger('click')
     expect(w.emitted('resume')).toHaveLength(1)

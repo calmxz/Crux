@@ -3,8 +3,8 @@
 import pytest
 
 from contracts import TopicProfile
-from db.models import Document, Session as SessionModel, User
-
+from db.models import Document, User
+from db.models import Session as SessionModel
 
 OWNER = "owner1"
 SESSION_ID = "sess_del"
@@ -40,7 +40,7 @@ def stub_chunk_delete(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def stub_filesystem(monkeypatch, tmp_path):
-    monkeypatch.setattr("services.documents_service.settings.uploads_path", str(tmp_path))
+    monkeypatch.setattr("services.object_store.settings.uploads_path", str(tmp_path))
 
 
 def test_delete_returns_204_and_removes_row(client, seeded, db_session):

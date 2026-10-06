@@ -1,7 +1,8 @@
 from datetime import datetime, timezone
 from decimal import Decimal
 
-from db.models import DailyCostLedger, LlmCallLog, Session as SessionModel, User
+from db.models import DailyCostLedger, LlmCallLog, User
+from db.models import Session as SessionModel
 from services.usage_service import usage_summary
 
 NOW = datetime(2026, 7, 10, 8, 0, 0, tzinfo=timezone.utc)  # today = 2026-07-10
@@ -116,3 +117,29 @@ def test_usage_service_has_no_tier_literals():
     src = inspect.getsource(sys.modules[usage_summary.__module__])
     for literal in ("2.7", "2.70", "2.0", "2.00", "3.0", "3.00", "0.9"):
         assert literal not in src, f"tier literal {literal} duplicated in usage_service"
+
+
+def test_resets_at_is_next_utc_midnight(db_session):
+    _seed_user(db_session)
+    resp = usage_summary(db_session, "test-user", now=NOW)
+    assert resp.resets_at == datetime(2026, 7, 11, 0, 0, 0, tzinfo=timezone.utc)
+
+
+def test_resets_at_agrees_with_429_payload_helper(db_session):
+    from services.cost_meter import midnight_utc_iso
+
+    _seed_user(db_session)
+    resp = usage_summary(db_session, "test-user", now=NOW)
+    assert resp.resets_at == datetime.fromisoformat(midnight_utc_iso(now=NOW))
+
+
+def test_next_midnight_normalizes_non_utc_clock():
+    from datetime import timedelta
+
+    from services.cost_meter import next_midnight_utc
+
+    manila = timezone(timedelta(hours=8))
+    # 2026-07-11 07:00 +08:00 is still 2026-07-10 23:00 UTC.
+    got = next_midnight_utc(datetime(2026, 7, 11, 7, 0, tzinfo=manila))
+    assert got == datetime(2026, 7, 11, 0, 0, tzinfo=timezone.utc)
+    assert got.utcoffset() == timedelta(0)

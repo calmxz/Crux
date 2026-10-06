@@ -22,10 +22,10 @@ import pytest
 from agent import tutor
 from agent.types import ToolContext
 from config import settings
-from contracts import TopicProfile, ToolResult
-from db.models import ChatMessage, Session as SessionModel, User
+from contracts import ToolResult, TopicProfile
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services.cost_meter import CapStatus
-
 
 SESSION_ID = "sess_1"
 USER_ID = "u1"

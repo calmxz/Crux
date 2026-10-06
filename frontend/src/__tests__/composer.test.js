@@ -139,4 +139,57 @@ describe('Composer', () => {
       'Message the tutor',
     )
   })
+
+  // D-09: the counter changes on every keystroke, so it must not be a live
+  // region. The cap is a static description instead, and only the last 10%
+  // before the cap is announced.
+  describe('character-limit announcement', () => {
+    const live = (w) => w.get('[data-testid="composer-limit-live"]')
+
+    it('keeps the visible counter out of the live region', () => {
+      const wrapper = mountComposer({ modelValue: 'hello' })
+      const count = wrapper.get('.composer-count')
+      expect(count.attributes('aria-live')).toBeUndefined()
+      expect(count.attributes('role')).toBeUndefined()
+      expect(live(wrapper).attributes('aria-live')).toBe('polite')
+    })
+
+    it('describes the cap on the textarea', () => {
+      const wrapper = mountComposer()
+
+      const describedby = wrapper
+        .get('[data-testid="session-input"]')
+        .attributes('aria-describedby')
+
+      expect(describedby).toContain('composer-char-limit')
+      expect(wrapper.get('#composer-char-limit').text()).toContain('4,000 characters')
+    })
+
+    it('merges the parent description with the cap hint', () => {
+      const wrapper = mountComposer({ describedby: 'cap-banner' })
+      expect(wrapper.get('[data-testid="session-input"]').attributes('aria-describedby')).toBe(
+        'cap-banner composer-char-limit',
+      )
+    })
+
+    it('is silent below 90% of the cap', () => {
+      const wrapper = mountComposer({ modelValue: 'a'.repeat(3599) })
+      expect(live(wrapper).text()).toBe('')
+    })
+
+    it('announces the remaining count from 90% of the cap', () => {
+      const wrapper = mountComposer({ modelValue: 'a'.repeat(3600) })
+      expect(live(wrapper).text()).toBe('400 characters left')
+    })
+
+    it('announces the singular at one character left', () => {
+      const wrapper = mountComposer({ modelValue: 'a'.repeat(3999) })
+      expect(live(wrapper).text()).toBe('1 character left')
+    })
+
+    it('says so outright at the cap', () => {
+      const wrapper = mountComposer({ modelValue: 'a'.repeat(4000) })
+      expect(live(wrapper).text()).toBe('Character limit reached')
+    })
+  })
 })

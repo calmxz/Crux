@@ -7,11 +7,11 @@ import pytest
 from sqlalchemy import select
 
 from agent.stream_events import StreamEvent
-from contracts import AskCheckQuestionsArgs, TopicProfile
 from agent.types import ToolContext
-from db.models import ChatMessage, Session as SessionModel, User
-from services import check_question_service, profile_service
-
+from contracts import AskCheckQuestionsArgs, TopicProfile
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
+from services import check_question_service, pending_check_store, profile_service
 
 USER_ID = "u_done_1"
 
@@ -32,6 +32,7 @@ def _resolved_batch(db, sid):
     ctx = ToolContext(db=db, session_id=sid, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=sid, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))
@@ -69,6 +70,7 @@ def resolved_diagnostic_batch_session(db_session):
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
                       diagnostic_required=True)
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=row.id, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))
@@ -119,6 +121,7 @@ def test_complete_409_when_not_done(client, db_session, seeded_session, monkeypa
     ctx = ToolContext(db=db_session, session_id=sid, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=sid, gap="g",
         items=[{"question": "q", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))
@@ -162,6 +165,7 @@ def _resolved_batch_miss(db, sid):
     ctx = ToolContext(db=db, session_id=sid, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=sid, gap="atp",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "a."}]))
@@ -235,13 +239,13 @@ def test_complete_check_claims_batch_under_row_lock(client, db_session, seeded_s
 
     monkeypatch.setattr(profile_service, "lock_session_row", lock_spy)
 
-    real_get = check_question_service.get_pending_check
+    real_get = pending_check_store.get_pending_check
 
     def get_spy(db, session_id):
         events.append("get")
         return real_get(db, session_id)
 
-    monkeypatch.setattr(check_question_service, "get_pending_check", get_spy)
+    monkeypatch.setattr(pending_check_store, "get_pending_check", get_spy)
 
     resp = client.post(f"/api/sessions/{sid}/check/complete", json={"user_id": USER_ID})
     assert resp.status_code == 200

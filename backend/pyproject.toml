@@ -12,7 +12,7 @@ dependencies = [
     "sqlalchemy>=2.0.52,<3.0",
     "pydantic>=2.13.5,<3.0",
     "pydantic-settings>=2.15.0",
-    "litellm>=1.98.0,<2.0",
+    "litellm>=1.100.1,<2.0",
     # litellm.completion() imports litellm.proxy.* -> orjson whenever `tools` is
     # passed, but only declares orjson under its [proxy] extra. Every tutor turn
     # passes tools, so without this the live chat path dies with
@@ -20,16 +20,16 @@ dependencies = [
     "orjson>=3.12.0,<4.0",
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.18,<1.0",
-    "pypdf>=6.16.2,<7.0",
+    "pypdf>=6.18.1,<7.0",
     "python-pptx>=1.0.2",
     "tiktoken>=0.14.0,<1.0",
     "snowballstemmer>=3.1.0,<4.0",
-    "psycopg[binary]>=3.3.4,<4.0",
+    "psycopg[binary]>=3.3.5,<4.0",
     "pgvector>=0.5.0,<1.0",
     "alembic>=1.19.1,<2.0",
     "pyjwt[crypto]>=2.13.0,<3.0",
     "httpx>=0.28.1,<1.0",
-    "boto3>=1.43.83,<2.0",
+    "boto3>=1.43.93,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -38,9 +38,10 @@ dev = [
     "pytest-asyncio>=0.24",
     "httpx>=0.28.1",
     "pytest-cov>=7.1.0",
-    "datamodel-code-generator>=0.74.0,<0.75",
+    "datamodel-code-generator>=0.80.0,<0.81",
     "openapi-spec-validator>=0.9.0",
     "pyyaml>=6.0.3",
+    "ruff>=0.14,<1.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -53,3 +54,17 @@ addopts = "--cov=services --cov=lib --cov=worker --cov=routes --cov=agent --cov=
 
 [tool.coverage.run]
 omit = ["tests/*", "scripts/*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+extend-exclude = ["contracts/models.py"]
+
+[tool.ruff.lint]
+select = ["E", "F", "B", "I"]
+ignore = ["B008", "E501"]
+
+[tool.ruff.lint.per-file-ignores]
+"db/alembic/env.py" = ["E402"]
+"db/alembic/versions/*.py" = ["E402"]
+"tests/*" = ["E402"]

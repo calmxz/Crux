@@ -12,6 +12,7 @@ missing `sub` claim.
 
 from __future__ import annotations
 
+import threading
 import time
 
 import jwt
@@ -27,6 +28,10 @@ from services import auth as auth_module
 from services.auth import accepted_terms_from_request, current_user_id
 
 TEST_SUPABASE_URL = "https://test-project.supabase.co"
+
+# Captured before the autouse patch_jwks_client fixture replaces the module
+# attribute, so the F-19 concurrency test can exercise the real implementation.
+_REAL_GET_JWKS_CLIENT = auth_module._get_jwks_client
 
 
 @pytest.fixture(scope="module")
@@ -151,6 +156,61 @@ def test_current_user_id_stash_reaches_accepted_terms_from_request_false(consent
     r = consent_client.get("/consent", headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 200
     assert r.json() == {"user_id": "user-123", "accepted_terms": False}
+
+
+def test_jwks_client_built_once_under_concurrent_refresh(monkeypatch):
+    """F-19: when the cache is stale every concurrent request sees the stale
+    read and, unguarded, builds its own PyJWKClient -- N JWKS fetches and N
+    throwaway caches per refresh. Double-checked locking builds exactly one,
+    and the constructor pins the cache settings instead of taking PyJWT's
+    300 s default lifespan."""
+    ctor_calls: list[dict] = []
+    ctor_lock = threading.Lock()
+
+    class _CountingJWKClient:
+        def __init__(self, uri, **kwargs):
+            with ctor_lock:
+                ctor_calls.append({"uri": uri, **kwargs})
+            # Widen the race window so an unlocked implementation loses.
+            time.sleep(0.01)
+
+    monkeypatch.setattr(auth_module, "PyJWKClient", _CountingJWKClient)
+    auth_module._JWKS_CACHE["client"] = None
+    auth_module._JWKS_CACHE["fetched_at"] = 0.0
+
+    thread_count = 20
+    barrier = threading.Barrier(thread_count)
+    results: list[object] = []
+    errors: list[Exception] = []
+
+    def worker() -> None:
+        try:
+            barrier.wait()
+            results.append(_REAL_GET_JWKS_CLIENT())
+        except Exception as e:
+            # Re-surfaced via the `assert not errors` below; a bare raise here
+            # would die in the worker thread and leave the barrier deadlocked.
+            errors.append(e)
+
+    try:
+        threads = [threading.Thread(target=worker) for _ in range(thread_count)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert not errors, errors
+        assert len(ctor_calls) == 1, ctor_calls
+        assert ctor_calls[0]["uri"] == auth_module.settings.supabase_jwks_url
+        assert ctor_calls[0]["cache_jwk_set"] is True
+        assert ctor_calls[0]["lifespan"] == 3600
+        assert auth_module._JWKS_TTL_SECONDS == 3600
+        # Every caller got the one cached instance.
+        assert len({id(r) for r in results}) == 1
+        assert len(results) == thread_count
+    finally:
+        auth_module._JWKS_CACHE["client"] = None
+        auth_module._JWKS_CACHE["fetched_at"] = 0.0
 
 
 def test_missing_authorization_header_returns_401(client):

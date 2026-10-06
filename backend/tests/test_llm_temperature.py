@@ -11,7 +11,8 @@ import pytest
 from agent.types import ToolContext
 from config import settings
 from contracts import TopicProfile
-from db.models import ChatMessage, Session as SessionModel, User
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services import summary_service
 from services.cost_meter import CapStatus
 

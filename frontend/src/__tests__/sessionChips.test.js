@@ -3,6 +3,7 @@ import { mount } from '@vue/test-utils'
 import SessionChips from '@/components/SessionChips.vue'
 
 const FOCUS = { type: 'focus', label: 'ATP yield' }
+
 const MASTERED = { type: 'mastered', label: '3 mastered', count: 3 }
 
 describe('SessionChips', () => {
@@ -28,6 +29,7 @@ describe('SessionChips', () => {
     const w = mount(SessionChips, { props: { chips: [FOCUS, MASTERED] } })
     const glyphs = w.findAll('.chip-glyph')
     expect(glyphs.length).toBe(2)
+
     for (const g of glyphs) expect(g.attributes('aria-hidden')).toBe('true')
   })
 

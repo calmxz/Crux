@@ -196,10 +196,13 @@ class Item(BaseModel):
 
 class AskCheckQuestionsArgs(BaseModel):
     """
-    Register an ordered batch of 1..5 multiple-choice check-questions and end
-    the turn. The card renders from this payload; any lead-in prose is the
-    model's own text in the same turn.
-    Per-item correct_index must be < len(options); that cross-field rule is
+    Register one SET (an ordered batch of 1..5 multiple-choice
+    check-questions) and end the turn. A check is set_total sets, posed one
+    set per turn. The card renders from this payload; any lead-in prose is
+    the model's own text in the same turn.
+    Per-item correct_index must be < len(options), set_index must be
+    <= set_total, and a later set must continue the current check
+    (same set_total, set_index = previous + 1); those cross-field rules are
     enforced in check_question_service, not here.
 
     """
@@ -213,12 +216,47 @@ class AskCheckQuestionsArgs(BaseModel):
     """
     gap: constr(max_length=200)
     """
-    The single confirmed gap every item probes. Use the exact name from confirmed_gaps so grading updates the right profile entry.
+    The single confirmed gap every item in this set probes. Use the exact name from confirmed_gaps so grading updates the right profile entry. Each set carries its own gap.
+    """
+    set_index: conint(ge=1, le=3)
+    """
+    1-based position of this set within the check. set_index=1 starts a new check; each later set must be the previous set_index + 1.
+    """
+    set_total: conint(ge=1, le=3)
+    """
+    Number of sets in this check, declared on set 1 and never changed. Mid-lesson checks default to 1.
     """
     items: list[Item] = Field(..., max_length=5, min_length=1)
     """
-    Ordered batch of questions, all on gap. One batch per turn.
+    Ordered questions for this set, all on gap. One set per turn.
     """
+
+
+class TopicSuggestionItem(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    label: constr(min_length=1, max_length=80)
+    """
+    Short noun phrase naming the subtopic or adjacent topic.
+    """
+    hint: constr(max_length=80) | None = None
+    """
+    Optional one-line note shown beside the label.
+    """
+
+
+class TopicSuggestions(BaseModel):
+    """
+    A suggest_topics card as persisted on its assistant message.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    mode: Literal["broad", "specific"]
+    topic: str
+    items: list[TopicSuggestionItem]
 
 
 class Item1(BaseModel):
@@ -249,6 +287,14 @@ class PendingCheck(BaseModel):
     gap: str
     current_index: int
     total: int
+    set_index: int | None = None
+    """
+    1-based set position within the check; null for pre-set batches.
+    """
+    set_total: int | None = None
+    """
+    Sets in the check; null for pre-set batches.
+    """
     items: list[Item1]
 
 
@@ -328,7 +374,7 @@ class ChatRequest(BaseModel):
         extra="forbid",
     )
     session_id: constr(max_length=64)
-    message: constr(max_length=4000)
+    message: constr(min_length=1, max_length=4000)
     review_gaps: bool | None = False
     review_gap: constr(max_length=200) | None = None
     diagnostic_accepted: bool | None = False
@@ -338,7 +384,7 @@ class SessionCreateRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    topic: constr(max_length=200)
+    topic: constr(min_length=1, max_length=200)
     seed_mode: Literal["fresh", "resume"]
     prior_session_id: constr(max_length=64) | None = None
     declared_level: Literal["beginner", "intermediate", "advanced"] | None = None
@@ -348,7 +394,7 @@ class SessionUpdateRequest(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    topic: constr(max_length=200) | None = None
+    topic: constr(min_length=1, max_length=200) | None = None
     pinned: bool | None = None
 
 
@@ -410,6 +456,10 @@ class Message(BaseModel):
     citations: list[Citation] | None = Field([], validate_default=True)
     tool_calls: list[ToolCallRecord] | None = Field([], validate_default=True)
     check_batch: PendingCheck | None = None
+    topic_suggestions: TopicSuggestions | None = None
+    """
+    The topic card this assistant turn offered (#354), else null.
+    """
     status: str | None = None
     """
     Persistence status for assistant turns: complete, cancelled, error, or partial (streamed text kept after a mid-turn abort). Null for rows persisted before this field existed.
@@ -572,7 +622,9 @@ class MeResponse(BaseModel):
         extra="forbid",
     )
     display_name: constr(max_length=120) | None = None
-    feedback_pref: constr(max_length=40) | None = None
+    feedback_pref: Literal["hints", "direct_answers"]
+    check_ins: Literal["often", "sometimes", "only_when_asked"]
+    reply_length: Literal["brief", "balanced", "thorough"]
     onboarding_complete: bool
 
 
@@ -581,8 +633,77 @@ class MePatchRequest(BaseModel):
         extra="forbid",
     )
     display_name: constr(max_length=120) | None = None
-    feedback_pref: constr(max_length=40) | None = None
+    feedback_pref: Literal["hints", "direct_answers"] | None = None
+    check_ins: Literal["often", "sometimes", "only_when_asked"] | None = None
+    reply_length: Literal["brief", "balanced", "thorough"] | None = None
     onboarding_complete: bool | None = None
+
+
+class ExportAccount(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    user_id: str
+    created_at: datetime
+    display_name: str | None = None
+    feedback_pref: Literal["hints", "direct_answers"]
+    check_ins: Literal["often", "sometimes", "only_when_asked"]
+    reply_length: Literal["brief", "balanced", "thorough"]
+    onboarding_complete: bool
+    accepted_terms_at: datetime | None = None
+    terms_version: str | None = None
+
+
+class ExportMessage(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: int
+    role: str
+    content: str
+    created_at: datetime
+    status: str | None = None
+    citations: list[Citation] | None = Field([], validate_default=True)
+
+
+class ExportCheckAnswer(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: int
+    gap_tested: str
+    question: str
+    correct: bool
+    created_at: datetime
+    options: list[str] | None = []
+    selected_index: int | None = None
+    correct_index: int | None = None
+    purpose: str | None = None
+
+
+class ExportDocument(BaseModel):
+    """
+    Upload metadata only; the file itself is not in the export.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: int
+    filename: str
+    status: str | None = None
+    error: str | None = None
+    page_count: int | None = None
+    created_at: datetime
+
+
+class ExportUsageDay(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    date_utc: date
+    messages: conint(ge=0)
+    cost_usd: confloat(ge=0.0)
 
 
 class ProfileResponse(BaseModel):
@@ -730,7 +851,8 @@ class UsageSummaryResponse(BaseModel):
     Spend transparency for the current user. daily covers the last 14 UTC
     days, oldest first, zero-filled for missing ledger rows. Cap values
     mirror the runtime cost meter; the urgent tier is derived (0.9 x
-    hard), never a duplicated literal.
+    hard), never a duplicated literal. resets_at is the next UTC midnight,
+    the same instant the daily cap and rate limit 429 payloads report.
 
     """
 
@@ -743,6 +865,7 @@ class UsageSummaryResponse(BaseModel):
     urgent_cap_usd: float
     hard_cap_usd: float
     top_sessions: list[SessionSpend] = Field(..., max_length=3)
+    resets_at: datetime
 
 
 class CodedErrorDetail(BaseModel):
@@ -757,6 +880,49 @@ class ErrorResponse(BaseModel):
         extra="forbid",
     )
     detail: str | CodedErrorDetail
+
+
+class SuggestTopicsArgs(BaseModel):
+    """
+    Offer the learner a topic card under this reply, once per session,
+    after their level becomes known (#354). Ends the turn. broad: items are
+    3-5 subtopics of the session topic. specific: items are 2-4 adjacent
+    topics; the card itself adds the "Keep going on <topic>" line. The
+    per-mode item counts are enforced in topic_suggest_service, not here.
+
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    session_id: constr(max_length=64)
+    """
+    Ignored; the server injects the authoritative session id.
+    """
+    mode: Literal["broad", "specific"]
+    """
+    broad when the topic spans several subtopics; specific when it is already one narrow concept.
+    """
+    topic: constr(min_length=1, max_length=200)
+    """
+    The session topic as a short noun phrase.
+    """
+    items: list[TopicSuggestionItem] = Field(..., max_length=5, min_length=2)
+
+
+class ExportSession(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    id: str
+    topic: str
+    created_at: datetime
+    ended_at: datetime | None = None
+    pinned: bool
+    topic_profile: TopicProfile
+    messages: list[ExportMessage]
+    check_answers: list[ExportCheckAnswer]
+    documents: list[ExportDocument]
 
 
 class AggregateProfileResponse(BaseModel):
@@ -781,3 +947,21 @@ class AggregateProfileResponse(BaseModel):
     recent_topics: list[RecentSessionSummary]
     concept_accuracy: list[ConceptAccuracy]
     weekly_mastery: list[WeeklyMasteryPoint]
+
+
+class DataExport(BaseModel):
+    """
+    Everything the server holds for one learner, oldest first.
+    """
+
+    model_config = ConfigDict(
+        extra="forbid",
+    )
+    format_version: int
+    """
+    Bumped when a field is removed or changes meaning.
+    """
+    exported_at: datetime
+    account: ExportAccount | None
+    sessions: list[ExportSession]
+    usage: list[ExportUsageDay]

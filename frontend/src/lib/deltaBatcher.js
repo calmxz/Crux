@@ -9,6 +9,7 @@ export function createDeltaBatcher(apply, raf = globalThis.requestAnimationFrame
 
   function flush() {
     scheduled = false
+
     if (!pending) return
     const text = pending
     pending = ''
@@ -19,9 +20,12 @@ export function createDeltaBatcher(apply, raf = globalThis.requestAnimationFrame
     push(text) {
       if (typeof raf !== 'function') {
         apply(text)
+
         return
       }
+
       pending += text
+
       if (!scheduled) {
         scheduled = true
         raf(flush)

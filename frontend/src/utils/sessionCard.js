@@ -12,32 +12,46 @@ export function cardMeta(session) {
   const noun = count === 1 ? 'message' : 'messages'
   const ts = session.last_activity_at || session.created_at
   const left = `${count} ${noun}`
+
   return ts ? `${left} · last active ${formatRelative(ts)}` : left
 }
 
 const DISPLAY_MATH_RE = /\$\$[\s\S]*?\$\$/g
+
 const INLINE_MATH_RE = /\$[^$\n]+?\$/g
+
 const SHORT_PREVIEW = 12
 
 // Line-start block markers. Run before the inline passes so a bullet's "* "
 // is never mistaken for an emphasis opener.
 const MD_HEADING_RE = /^[ \t]*#{1,6}[ \t]+/gm
+
 const MD_QUOTE_RE = /^[ \t]*>[ \t]?/gm
+
 const MD_BULLET_RE = /^[ \t]*[-*+][ \t]+/gm
+
 const MD_ORDERED_RE = /^[ \t]*\d+\.[ \t]+/gm
+
 // Images before links, or "![alt](url)" would leave a stray "!".
 const MD_IMAGE_RE = /!\[([^\]]*)\]\([^)]*\)/g
+
 const MD_LINK_RE = /\[([^\]]*)\]\([^)]*\)/g
+
 const MD_CODE_RE = /`([^`\n]+)`/g
+
 const MD_STRIKE_RE = /~~([^~\n]+?)~~/g
+
 // Double markers before single ones, or "**x**" would only lose one pair.
 // The underscore forms require a word boundary on both sides so "snake_case"
 // survives untouched.
 const MD_BOLD_STAR_RE = /\*\*([^*\n]+?)\*\*/g
+
 const MD_BOLD_UNDER_RE = /(^|[^\w])__([^_\n]+?)__(?=[^\w]|$)/g
+
 // The single-marker forms also require the marker to hug its text, so prose
 // arithmetic ("5 * 3 and 2 * 4") keeps its asterisks.
 const MD_ITALIC_STAR_RE = /\*(\S(?:[^*\n]*?\S)?)\*/g
+
 const MD_ITALIC_UNDER_RE = /(^|[^\w])_(\S(?:[^_\n]*?\S)?)_(?=[^\w]|$)/g
 
 // Strips LaTeX source (display and inline math) down to a placeholder and then
@@ -71,9 +85,12 @@ export function cardStory(session) {
   if (session.ended_at) {
     return stripAutoPrefix(session.last_session_summary) || 'Completed'
   }
+
   const preview = cleanPreview(session.last_message_preview)
   const summary = stripAutoPrefix(session.last_session_summary)
+
   if (preview.length < SHORT_PREVIEW && summary) return summary
+
   return preview
 }
 
@@ -87,15 +104,20 @@ function capitalize(s) {
 export function cardChips(session) {
   const chips = []
   const progress = session.progress
+
   if (progress && progress.focus_target_gap) {
     chips.push({ type: 'focus', label: progress.focus_target_gap })
   }
+
   if (progress && progress.level) {
     chips.push({ type: 'level', label: capitalize(progress.level), level: progress.level })
   }
+
   const mastered = (progress && progress.mastered_count) || 0
+
   if (mastered > 0) {
     chips.push({ type: 'mastered', label: `${mastered} mastered`, count: mastered })
   }
+
   return chips
 }

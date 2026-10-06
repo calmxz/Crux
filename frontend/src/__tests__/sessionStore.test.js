@@ -19,7 +19,7 @@ import * as sessionsApi from '@/services/sessionsApi.js'
 import { getSessionLibrary } from '@/services/sessionsApi.js'
 import * as streamSvc from '@/services/chatStreamService.js'
 import { ERR_DAILY_CAP_REACHED, ERR_DAILY_COST_CAP_REACHED } from '@/lib/errorCodes.js'
-import { StreamAbortedError } from '@/lib/errors.js'
+import { SESSION_ENDED_COPY, StreamAbortedError } from '@/lib/errors.js'
 
 class ApiErrorLike extends Error {
   constructor(status, body) {
@@ -370,22 +370,29 @@ describe('session store', () => {
     sessionsApi.getSessionLibrary.mockResolvedValueOnce(page)
     const s = useSessionStore()
     const out = await s.fetchLibrary({ status: 'all', limit: 20, offset: 0 })
-    expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith({
-      status: 'all',
-      limit: 20,
-      offset: 0,
-    })
+    // E-06: silent, because the library page owns its own failure copy and
+    // retry control. A toast on top of that would say the same thing twice.
+    expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
+      {
+        status: 'all',
+        limit: 20,
+        offset: 0,
+      },
+      { silent: true },
+    )
     expect(out).toEqual(page)
     expect(s.libraryLoading).toBe(false)
-    expect(s.libraryError).toBeNull()
   })
 
-  it('fetchLibrary records error and rethrows', async () => {
+  // E-06: the store no longer holds a libraryError ref -- it was rendered
+  // nowhere. The failure reaches the page by rethrow only.
+  it('fetchLibrary rethrows without recording any store error', async () => {
     sessionsApi.getSessionLibrary.mockRejectedValueOnce(new Error('boom'))
     const s = useSessionStore()
     await expect(s.fetchLibrary({})).rejects.toThrow('boom')
-    expect(s.libraryError).toBeTruthy()
     expect(s.libraryLoading).toBe(false)
+    expect(s.error).toBeNull()
+    expect('libraryError' in s).toBe(false)
   })
 
   // F-07: renameSession/setPinned are background sidebar actions -- a failure
@@ -581,6 +588,99 @@ describe('session store — streaming', () => {
     expect(s.messages.at(-1)).toMatchObject({ status: 'partial', content: 'draft' })
   })
 
+  // F-16: an unbounded transcript grows for the life of the page. The cap is
+  // enforced on live append only, and the eviction must leave the
+  // load-earlier cursor (oldest retained SERVER id) intact.
+  describe('F-16 retained-history cap', () => {
+    const server = (n) => ({
+      role: n % 2 ? 'user' : 'assistant',
+      content: `m${n}`,
+      message_id: `m${n}`,
+      citations: [],
+      tool_calls: [],
+    })
+
+    it('evicts from the top and flags hasMoreMessages once past 200', () => {
+      const s = useSessionStore()
+      s.messages = Array.from({ length: 200 }, (_, i) => server(i + 1))
+      s.hasMoreMessages = false
+      s.streamingMessage = { role: 'assistant', content: 'new', tool_calls: [], citations: [] }
+      s.streamState = 'streaming'
+      s.finalizeMessage('m201')
+      expect(s.messages).toHaveLength(200)
+      expect(s.messages[0].message_id).toBe('m2')
+      expect(s.messages.at(-1)).toMatchObject({ message_id: 'm201', content: 'new' })
+      expect(s.hasMoreMessages).toBe(true)
+    })
+
+    it('does not evict at exactly 200', () => {
+      const s = useSessionStore()
+      s.messages = Array.from({ length: 199 }, (_, i) => server(i + 1))
+      s.hasMoreMessages = false
+      s.streamingMessage = { role: 'assistant', content: 'new', tool_calls: [], citations: [] }
+      s.finalizeMessage('m200')
+      expect(s.messages).toHaveLength(200)
+      expect(s.messages[0].message_id).toBe('m1')
+      expect(s.hasMoreMessages).toBe(false)
+    })
+
+    it('trims extra off the top so the oldest retained message carries a server id', () => {
+      const s = useSessionStore()
+      const seeded = Array.from({ length: 200 }, (_, i) => server(i + 1))
+      // A live-appended user bubble (no server id yet) sitting where the
+      // plain 200-wide window would start.
+      delete seeded[1].message_id
+      s.messages = seeded
+      s.streamingMessage = { role: 'assistant', content: 'new', tool_calls: [], citations: [] }
+      s.finalizeMessage('m201')
+      expect(s.messages).toHaveLength(199)
+      expect(s.messages[0].message_id).toBe('m3')
+      expect(s.hasMoreMessages).toBe(true)
+    })
+
+    it('pages back from the oldest retained id after an eviction, and the prepend is exempt', async () => {
+      const s = useSessionStore()
+      s.messages = Array.from({ length: 200 }, (_, i) => server(i + 1))
+      s.streamingMessage = { role: 'assistant', content: 'new', tool_calls: [], citations: [] }
+      s.finalizeMessage('m201')
+      expect(s.messages[0].message_id).toBe('m2')
+      s.currentSessionId = 's1'
+
+      sessionsApi.getSessionMessages.mockResolvedValueOnce({
+        items: Array.from({ length: 50 }, (_, i) => ({
+          id: `old${i}`,
+          role: 'user',
+          content: 'old',
+          citations: [],
+          created_at: '2026-01-01',
+        })),
+        has_more: true,
+      })
+      await s.loadEarlierMessages()
+      // The cursor is the oldest RETAINED server id, so the page the server
+      // returns is exactly the turns that were evicted -- no gap, no dupes.
+      expect(sessionsApi.getSessionMessages).toHaveBeenCalledWith('s1', { before: 'm2' })
+      // The manual prepend is deliberately not capped: the user just asked
+      // for that history.
+      expect(s.messages).toHaveLength(250)
+      expect(s.messages[0].message_id).toBe('old0')
+    })
+
+    it('uses the oldest retained SERVER id, not messages[0], as the cursor', async () => {
+      const s = useSessionStore()
+      s.currentSessionId = 's1'
+      s.hasMoreMessages = true
+      s.messages = [
+        { role: 'assistant', content: 'retained partial', status: 'error' },
+        { role: 'user', content: 'local', message_id: 'pending' },
+        server(7),
+      ]
+      sessionsApi.getSessionMessages.mockResolvedValueOnce({ items: [], has_more: false })
+      await s.loadEarlierMessages()
+      expect(sessionsApi.getSessionMessages).toHaveBeenCalledWith('s1', { before: 'm7' })
+    })
+  })
+
   it('handleAbortError pushes streamed text as status=partial for max_iters_reached', () => {
     const s = useSessionStore()
     s.streamingMessage = { role: 'assistant', content: 'draft', tool_calls: [], citations: [] }
@@ -611,13 +711,71 @@ describe('session store — streaming', () => {
   it('sendMessageStreaming wires through streamChat and dispatches events', async () => {
     const s = useSessionStore()
     s.currentSessionId = 's1'
+
     const spy = vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
       onEvent({ event: 'assistant_delta', data: { text: 'Hi' } })
       onEvent({ event: 'done', data: { message_id: 'm1' } })
     })
+
     await s.sendMessageStreaming({ text: 'q' })
     expect(spy).toHaveBeenCalled()
     expect(s.messages.at(-1)).toMatchObject({ message_id: 'm1' })
+  })
+
+  // #354: live stream and reload converge on the same message field.
+  const TOPIC_CARD = {
+    mode: 'broad',
+    topic: 'Thermodynamics',
+    items: [{ label: 'Entropy', hint: null }],
+  }
+
+  it('carries a topic_suggestions event onto the finalized message', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'Energy moves.' } })
+      onEvent({ event: 'topic_suggestions', data: TOPIC_CARD })
+      onEvent({ event: 'done', data: { message_id: 'm1' } })
+    })
+    await s.sendMessageStreaming({ text: 'I am a beginner' })
+    expect(s.messages.at(-1)).toMatchObject({
+      role: 'assistant',
+      message_id: 'm1',
+      topic_suggestions: TOPIC_CARD,
+    })
+  })
+
+  it('carries a topic_suggestions event from the check follow-up stream', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    s.handleCheckQuestion({ gap: 'g', total: 1, items: [{ question: 'Q', options: ['a'] }] })
+    vi.spyOn(streamSvc, 'streamCheckComplete').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'You are intermediate.' } })
+      onEvent({ event: 'topic_suggestions', data: TOPIC_CARD })
+      onEvent({ event: 'done', data: { message_id: 'm2' } })
+    })
+    await s.completeCheck()
+    expect(s.messages.at(-1)).toMatchObject({ message_id: 'm2', topic_suggestions: TOPIC_CARD })
+  })
+
+  it('maps topic_suggestions from session detail on reload', async () => {
+    sessionsApi.getSession.mockResolvedValueOnce({
+      id: 's1',
+      messages: [
+        {
+          id: 'm1',
+          role: 'assistant',
+          content: 'Energy moves.',
+          created_at: '2026-01-01',
+          topic_suggestions: TOPIC_CARD,
+        },
+        { id: 'm2', role: 'user', content: 'hi', created_at: '2026-01-02' },
+      ],
+    })
+    const s = useSessionStore()
+    await s.loadSession('s1')
+    expect(s.messages[0].topic_suggestions).toEqual(TOPIC_CARD)
+    expect(s.messages[1].topic_suggestions).toBeNull()
   })
 
   it('forwards reviewGaps to streamChat as review_gaps', async () => {
@@ -756,6 +914,62 @@ describe('session store — streaming', () => {
     expect(s.messages.filter((m) => m.role === 'user' && m.content === 'hi')).toHaveLength(0)
   })
 
+  // F-21: the optimistic row carried no id at all, so MessageList keyed it on
+  // its array index - two sends in a row shared a key until the server ids
+  // landed, and the failure pop matched "the last row with no message_id".
+  describe('optimistic user row client_id (F-21)', () => {
+    it('gives every optimistic user row a distinct client_id and no message_id', async () => {
+      const s = useSessionStore()
+      s.currentSessionId = 's1'
+      vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
+        onEvent({ event: 'done', data: { message_id: 'a1' } })
+      })
+      await s.sendMessageStreaming({ text: 'one' })
+      await s.sendMessageStreaming({ text: 'two' })
+      const users = s.messages.filter((m) => m.role === 'user')
+      expect(users).toHaveLength(2)
+      expect(users[0].client_id).toBeTruthy()
+      expect(users[1].client_id).toBeTruthy()
+      expect(users[0].client_id).not.toBe(users[1].client_id)
+      // The cursor guard (_hasServerId) reads message_id, so a client value
+      // must never be written there.
+      expect(users[0].message_id).toBeUndefined()
+      expect(users[1].message_id).toBeUndefined()
+    })
+
+    // The discriminating case: the old "last user row with no message_id" rule
+    // pops whatever happens to be last, which is not necessarily this send's
+    // row once anything else has landed behind it.
+    it('pops this send row, not the last id-less row', async () => {
+      const s = useSessionStore()
+      s.currentSessionId = 's1'
+      vi.spyOn(streamSvc, 'streamChat').mockImplementationOnce(async () => {
+        s.messages.push({ role: 'user', content: 'other' })
+        throw new ApiErrorLike(422, { detail: 'too long' })
+      })
+      await s.sendMessageStreaming({ text: 'dropped' }).catch(() => {})
+      expect(s.messages.filter((m) => m.role === 'user').map((m) => m.content)).toEqual(['other'])
+    })
+
+    it('pops the failed row by client_id and leaves earlier rows alone', async () => {
+      const s = useSessionStore()
+      s.currentSessionId = 's1'
+      vi.spyOn(streamSvc, 'streamChat').mockImplementationOnce(async ({ onEvent }) => {
+        onEvent({ event: 'done', data: { message_id: 'a1' } })
+      })
+      await s.sendMessageStreaming({ text: 'kept' })
+      const keptId = s.messages.find((m) => m.role === 'user').client_id
+      vi.spyOn(streamSvc, 'streamChat').mockRejectedValueOnce(
+        new ApiErrorLike(422, { detail: 'too long' }),
+      )
+      await s.sendMessageStreaming({ text: 'dropped' }).catch(() => {})
+      const users = s.messages.filter((m) => m.role === 'user')
+      expect(users).toHaveLength(1)
+      expect(users[0].content).toBe('kept')
+      expect(users[0].client_id).toBe(keptId)
+    })
+  })
+
   it('maps a session_ended 409 to a friendly error and marks the session ended', async () => {
     const s = useSessionStore()
     s.currentSessionId = 's1'
@@ -772,6 +986,18 @@ describe('session store — streaming', () => {
     expect(s.error).toMatch(/ended/i)
     expect(s.streamState).toBe('idle')
     expect(s.currentSession.ended_at).not.toBeNull()
+  })
+
+  // #460: the one place a session_ended 409 flips the page to ended.
+  it('markSessionEnded sets the copy, stamps ended_at and clears pendingCheck', () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    s.currentSession = { id: 's1', ended_at: null }
+    s.handleCheckQuestion({ gap: 'g', items: [{ question: 'Q', options: ['a', 'b'] }] })
+    s.markSessionEnded()
+    expect(s.error).toBe(SESSION_ENDED_COPY)
+    expect(s.currentSession.ended_at).toBeTruthy()
+    expect(s.pendingCheck).toBeNull()
   })
 
   // I-10 follow-up: a session_ended 409 is a pre-stream failure and must
@@ -866,6 +1092,85 @@ describe('session store — streaming', () => {
     // F-14 follow-up: the streamed text must survive onto the transcript,
     // not just clear the cap banner state.
     expect(s.messages.at(-1)).toMatchObject({ status: 'partial', content: 'partial' })
+    // E-04: CapBanners already renders this failure, so the generic error
+    // banner must stay quiet rather than say the same thing twice.
+    expect(s.error).toBeNull()
+  })
+
+  // E-04: the non-cap arm of the same handler. Both stream loops route their
+  // SSE `error` event through it, so a bare code can no longer reach the
+  // banner verbatim (it used to render `data.message || data.code`).
+  it('sendMessageStreaming renders coded copy for a non-cap SSE error event', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'half a thought' } })
+      onEvent({ event: 'error', data: { code: 'tool_failed' } })
+    })
+    await s.sendMessageStreaming({ text: 'x' })
+    expect(s.error).toMatch(/could not finish that step/i)
+    expect(s.error).not.toMatch(/tool_failed/)
+    expect(s.dailyCapInfo).toBeNull()
+    expect(s.costCapInfo).toBeNull()
+    expect(s.streamState).toBe('idle')
+    expect(s.streamingMessage).toBeNull()
+    // Not a PARTIAL_ABORT_CODE, so the retained text lands on 'error'.
+    expect(s.messages.at(-1)).toMatchObject({ status: 'error', content: 'half a thought' })
+  })
+
+  // E-04: the check-complete loop shares the same handler; asserting it here
+  // is what stops the two `case 'error'` blocks from drifting apart again.
+  it('completeCheck renders coded copy for a non-cap SSE error event', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    s.pendingCheck = { gap: 'g', total: 1, currentIndex: 1, viewIndex: 0, items: [] }
+    vi.spyOn(streamSvc, 'streamCheckComplete').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'half a thought' } })
+      onEvent({ event: 'error', data: { code: 'tool_failed' } })
+    })
+    await s.completeCheck()
+    expect(s.error).toMatch(/could not finish that step/i)
+    expect(s.streamState).toBe('idle')
+    expect(s.messages.at(-1)).toMatchObject({ status: 'error', content: 'half a thought' })
+  })
+
+  // E-03: a transport failure mid-stream used to discard text the learner had
+  // already watched stream, while the same text survived an SSE-reported
+  // failure. Both now go through _settleWithError.
+  it('sendMessageStreaming retains the streamed partial on a transport failure', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'half a thought' } })
+      throw Object.assign(new Error('boom'), { status: 500 })
+    })
+    await expect(s.sendMessageStreaming({ text: 'q' })).rejects.toMatchObject({ status: 500 })
+    expect(s.messages.at(-1)).toMatchObject({ status: 'error', content: 'half a thought' })
+    expect(s.error).toBeTruthy()
+    expect(s.streamingMessage).toBeNull()
+    expect(s.streamState).toBe('idle')
+  })
+
+  it('sendMessageStreaming retains the streamed partial on a status-0 network drop', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(async ({ onEvent }) => {
+      onEvent({ event: 'assistant_delta', data: { text: 'half a thought' } })
+      throw new ApiErrorLike(0, { detail: 'network error' })
+    })
+    await expect(s.sendMessageStreaming({ text: 'q' })).rejects.toMatchObject({ status: 0 })
+    expect(s.messages.at(-1)).toMatchObject({ status: 'error', content: 'half a thought' })
+    expect(s.error).toMatch(/can't reach the server/i)
+  })
+
+  it('sendMessageStreaming appends nothing when the transport dies before any delta', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(async () => {
+      throw new ApiErrorLike(0, { detail: 'network error' })
+    })
+    await expect(s.sendMessageStreaming({ text: 'q' })).rejects.toMatchObject({ status: 0 })
+    expect(s.messages.some((m) => m.role === 'assistant')).toBe(false)
   })
 
   it('resets stream state when the stream ends without a terminal event', async () => {
@@ -963,6 +1268,30 @@ describe('session store — streaming', () => {
     expect(s.streamState).toBe('idle')
   })
 
+  // Dup-key fix: the local AbortError path appends a row with the literal
+  // message_id 'pending'. MessageList falls back to client_id when
+  // message_id is 'pending', so this row must carry one (two Stop clicks in
+  // one session would otherwise produce duplicate keys).
+  it('the local-cancel path (AbortError) appends a row with a client_id (dup-key fix)', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(
+      ({ signal }) =>
+        new Promise((_res, rej) => {
+          signal.addEventListener('abort', () =>
+            rej(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+          )
+        }),
+    )
+    const p = s.sendMessageStreaming({ text: 'q' })
+    s.stopStream()
+    await p
+    const row = s.messages.find((m) => m.role === 'assistant')
+    expect(row).toBeDefined()
+    expect(row.message_id).toBe('pending')
+    expect(row.client_id).toMatch(/^c-/)
+  })
+
   it('abandonStream aborts silently without persisting a cancelled bubble (F-01)', async () => {
     const s = useSessionStore()
     s.currentSessionId = 's1'
@@ -979,6 +1308,33 @@ describe('session store — streaming', () => {
     await p
     expect(s.messages.some((m) => m.role === 'assistant')).toBe(false)
     expect(s.messages.some((m) => m.status === 'cancelled')).toBe(false)
+    expect(s.error).toBeNull()
+    expect(s.streamState).toBe('idle')
+    expect(s.streamingMessage).toBeNull()
+  })
+
+  // #414 fix 2: sign-out runs reset(), which must abort the live stream (else
+  // the server keeps generating and billing the turn) and leave the reset
+  // store untouched when the aborted stream settles.
+  it('reset() mid-send aborts the stream and writes nothing after', async () => {
+    const s = useSessionStore()
+    s.currentSessionId = 's1'
+    let signal
+    vi.spyOn(streamSvc, 'streamChat').mockImplementation(
+      (opts) =>
+        new Promise((_res, rej) => {
+          signal = opts.signal
+          opts.onEvent({ event: 'assistant_delta', data: { text: 'partial' } })
+          signal.addEventListener('abort', () =>
+            rej(Object.assign(new Error('aborted'), { name: 'AbortError' })),
+          )
+        }),
+    )
+    const p = s.sendMessageStreaming({ text: 'q' })
+    s.reset()
+    expect(signal.aborted).toBe(true)
+    await p
+    expect(s.messages).toEqual([])
     expect(s.error).toBeNull()
     expect(s.streamState).toBe('idle')
     expect(s.streamingMessage).toBeNull()
@@ -1006,6 +1362,120 @@ describe('session store — streaming', () => {
     s.abortController = { abort }
     await s.loadSession('s1')
     expect(abort).not.toHaveBeenCalled()
+  })
+})
+
+// #414 fix 3: a request still in flight at sign-out must not write the
+// previous account's data into the reset store (F-02 class).
+describe('session store - late results after reset()', () => {
+  function deferred() {
+    let resolve, reject
+
+    const promise = new Promise((res, rej) => {
+      resolve = res
+      reject = rej
+    })
+
+    return { promise, resolve, reject }
+  }
+
+  const page = (items, total) => ({ items, total, limit: 40, offset: 0 })
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+  })
+
+  it('listSessions: a stale list writes nothing and never touches the next call', async () => {
+    const s = useSessionStore()
+    const oldActive = deferred()
+    const oldEnded = deferred()
+    getSessionLibrary.mockReturnValueOnce(oldActive.promise).mockReturnValueOnce(oldEnded.promise)
+    const stale = s.listSessions()
+    s.reset()
+
+    const newActive = deferred()
+    const newEnded = deferred()
+    getSessionLibrary.mockReturnValueOnce(newActive.promise).mockReturnValueOnce(newEnded.promise)
+    const fresh = s.listSessions()
+    // A fresh request, not a join onto the old account's promise.
+    expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+    expect(s.loading).toBe(true)
+
+    oldActive.resolve(page([{ id: 'old-a' }], 5))
+    oldEnded.resolve(page([{ id: 'old-e' }], 6))
+    await stale
+    expect(s.sessions).toEqual([])
+    expect(s.activeTotal).toBe(0)
+    expect(s.endedTotal).toBe(0)
+    // The stale finally left the new call's spinner and in-flight entry alone.
+    expect(s.loading).toBe(true)
+    getSessionLibrary.mockClear()
+    const joined = s.listSessions()
+    expect(getSessionLibrary).not.toHaveBeenCalled()
+
+    newActive.resolve(page([{ id: 'new-a' }], 1))
+    newEnded.resolve(page([], 0))
+    await fresh
+    await joined
+    expect(s.sessions.map((r) => r.id)).toEqual(['new-a'])
+    expect(s.activeTotal).toBe(1)
+    expect(s.loading).toBe(false)
+  })
+
+  it('loadSession: a stale detail writes nothing', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.getSession.mockReturnValueOnce(d.promise)
+    const stale = s.loadSession('s1')
+    s.reset()
+    d.resolve({
+      id: 's1',
+      messages: [{ id: 'm1', role: 'user', content: 'hi' }],
+      pending_check: { gap: 'g', total: 1, current_index: 0, items: [{ question: 'Q' }] },
+    })
+    await stale
+    expect(s.currentSession).toBeNull()
+    expect(s.currentSessionId).toBeNull()
+    expect(s.messages).toEqual([])
+    expect(s.pendingCheck).toBeNull()
+    expect(s.loading).toBe(false)
+    expect(s.detailLoading).toBe(false)
+  })
+
+  it('loadSession: a same-id load after reset issues a fresh request', async () => {
+    const s = useSessionStore()
+    sessionsApi.getSession.mockReturnValueOnce(deferred().promise)
+    s.loadSession('s1')
+    s.reset()
+    sessionsApi.getSession.mockResolvedValueOnce({ id: 's1', messages: [] })
+    await s.loadSession('s1')
+    expect(sessionsApi.getSession).toHaveBeenCalledTimes(2)
+    expect(s.currentSessionId).toBe('s1')
+  })
+
+  it('createSession: a stale create writes nothing', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.createSession.mockReturnValueOnce(d.promise)
+    const stale = s.createSession({ topic: 't' })
+    s.reset()
+    d.resolve({ id: 'new' })
+    expect(await stale).toEqual({ id: 'new' })
+    expect(s.activeTotal).toBe(0)
+    expect(s.currentSessionId).toBeNull()
+    expect(s.currentSession).toBeNull()
+  })
+
+  it('a stale failure rethrows without writing error', async () => {
+    const s = useSessionStore()
+    const d = deferred()
+    sessionsApi.endSession.mockReturnValueOnce(d.promise)
+    const stale = s.endSession('s1')
+    s.reset()
+    d.reject(new ApiErrorLike(500, {}))
+    await expect(stale).rejects.toBeInstanceOf(ApiErrorLike)
+    expect(s.error).toBeNull()
   })
 })
 

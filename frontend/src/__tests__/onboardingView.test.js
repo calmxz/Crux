@@ -4,8 +4,10 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import OnboardingView from '@/views/OnboardingView.vue'
 import { useUserStore } from '@/stores/user.js'
+import { useAuthStore } from '@/stores/auth.js'
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({ useRouter: () => ({ push }) }))
 
 // F-46: completeOnboarding writes through to PATCH /me via the real
@@ -88,6 +90,20 @@ describe('OnboardingView', () => {
     expect(wrapper.find('[data-testid="onboarding-error"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="onboarding-submit"]').attributes('disabled')).toBeUndefined()
     expect(push).not.toHaveBeenCalled()
+  })
+
+  // E-09: onboarding used to be a dead end for a learner who cannot or does
+  // not want to complete it (e.g. hydrate failed and force-routed them here
+  // with no local snapshot). Same sign-out as Sidebar.vue's onSignOut: call
+  // authStore.signOut(), then push to /login.
+  it('sign-out button calls authStore.signOut and routes to login (E-09)', async () => {
+    const auth = useAuthStore()
+    const signOutSpy = vi.spyOn(auth, 'signOut').mockResolvedValue()
+    const wrapper = mount(OnboardingView, { global: { stubs } })
+    await wrapper.get('[data-testid="onboarding-signout"]').trigger('click')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(signOutSpy).toHaveBeenCalled()
+    expect(push).toHaveBeenCalledWith('/login')
   })
 
   it('ignores double submit while in flight', async () => {

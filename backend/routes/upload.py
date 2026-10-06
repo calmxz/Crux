@@ -1,3 +1,5 @@
+import hashlib
+import io
 import logging
 import re
 from pathlib import Path
@@ -13,16 +15,20 @@ from fastapi import (
     UploadFile,
     status,
 )
+from pptx import Presentation
+from pypdf import PdfReader
+from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from config import settings
 from contracts import UploadResponse, UploadStatus
 from db.database import get_db
-from db.models import Document, Session as SessionModel
-from lib.error_codes import CHUNK_LIMIT_EXCEEDED, DAILY_CAP_REACHED
+from db.models import Document
+from db.models import Session as SessionModel
+from lib.error_codes import CHUNK_LIMIT_EXCEEDED, DAILY_CAP_REACHED, PAGE_LIMIT_EXCEEDED
 from services import cost_meter, object_store, rate_limit, velocity_limit
 from services.auth import current_user_id
-
 
 router = APIRouter(prefix="/api")
 
@@ -44,6 +50,43 @@ _MAGIC_BYTES = {
 log = logging.getLogger(__name__)
 
 READ_CHUNK = 1024 * 1024  # 1 MiB
+
+
+
+def _page_count(ext: str, data: bytes) -> int | None:
+    """Pages in a PDF / slides in a PPTX, or None when it cannot be determined.
+
+    Uses the same libraries as services.ingestion_service._extract_pages /
+    _extract_slides. Unparseable files return None and are let through:
+    ingestion already reports extraction failures on the document row, and a
+    parser disagreement must not turn into a confusing 413.
+    """
+    try:
+        if ext == ".pdf":
+            return len(PdfReader(io.BytesIO(data), strict=False).pages)
+        if ext == ".pptx":
+            return len(Presentation(io.BytesIO(data)).slides)
+    except Exception:
+        log.info("page-count probe failed for %s upload; skipping the gate", ext)
+    return None
+
+
+def _find_existing_document(db: Session, session_id: str, sha: str) -> Document | None:
+    """C-08: the live row (if any) holding these exact bytes for this session.
+
+    Mirrors the partial unique index `uq_documents_session_sha`: failed rows
+    are excluded so a retry after a failed ingest always creates a fresh row.
+    """
+    return db.execute(
+        select(Document)
+        .where(
+            Document.session_id == session_id,
+            Document.content_sha256 == sha,
+            Document.status != "failed",
+        )
+        .order_by(Document.id)
+        .limit(1)
+    ).scalar_one_or_none()
 
 
 def _read_bounded(fh, max_bytes: int) -> bytes:
@@ -104,35 +147,11 @@ def upload_file(
     if sess is None or sess.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
 
-    # B-01: cost caps gate before the rate-limit slot is consumed, mirroring
-    # the chat turn's guard order (routes/chat.py:141-153) - a capped account
-    # must not be able to burn a daily upload slot on a rejected request.
-    try:
-        cost_meter.assert_within_caps(db, user_id)
-    except cost_meter.CostCapExceeded as e:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "code": e.code,
-                "resets_at": cost_meter.midnight_utc_iso(),
-            },
-        ) from e
-
-    # B-07: rate limit only after extension + ownership pass, mirroring
-    # _prepare_turn's guard order - a rejected upload must not consume a
-    # daily slot. Ownership-before-increment also guarantees the users row
-    # exists for the usage_counters FK (owning a session implies it).
-    allowed, used = rate_limit.check_and_increment(db, user_id)
-    if not allowed:
-        raise HTTPException(
-            status_code=429,
-            detail={
-                "code": DAILY_CAP_REACHED,
-                "cap": settings.daily_cap,
-                "used": used,
-                "resets_at": rate_limit.midnight_utc_iso(),
-            },
-        )
+    # C-07: an ended session is read-only (same detail shape as routes/chat.py
+    # and the sessions routes). Placed immediately after the ownership check so
+    # it costs neither a cost-cap evaluation nor a daily rate-limit slot.
+    if sess.ended_at is not None:
+        raise HTTPException(status_code=409, detail={"code": "session_ended"})
 
     raw_name = Path(file.filename or "upload.pdf").name
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", raw_name)
@@ -141,6 +160,23 @@ def upload_file(
 
     data = _read_bounded(file.file, MAX_UPLOAD_BYTES)
 
+    # C-08: the dedupe lookup runs before the cost gate and the rate limiter so
+    # a re-upload of bytes we already hold burns neither. It is a pure SELECT:
+    # nothing is committed on this path.
+    sha = hashlib.sha256(data).hexdigest()
+    existing = _find_existing_document(db, session_id, sha)
+    if existing is not None:
+        warn = cost_meter.cost_warning_header(db, user_id)
+        if warn:
+            response.headers["X-Cost-Warning"] = warn
+        return UploadResponse(
+            document_id=existing.id,
+            session_id=session_id,
+            filename=existing.filename,
+            status=existing.status,
+        )
+
+    # #430: free content checks, before the cost gate and the slot (see B-07).
     if ext in _PLAINTEXT_EXTENSIONS:
         estimated_chunks = len(data) / _CHARS_PER_TOKEN / _CHUNK_STRIDE_TOKENS
         if estimated_chunks > settings.max_chunks:
@@ -163,14 +199,81 @@ def upload_file(
             },
         )
 
+    # F-03: structural page gate. The plaintext estimate above has no
+    # equivalent for containers, so a 3000-page PDF would only be caught
+    # after a worker had already loaded and tokenised the whole document.
+    page_count = _page_count(ext, data)
+    if page_count is not None and page_count > settings.max_pages:
+        raise HTTPException(
+            status_code=413,
+            detail={
+                "code": PAGE_LIMIT_EXCEEDED,
+                "max_pages": settings.max_pages,
+                "page_count": page_count,
+            },
+        )
+
+    # B-01: cost caps gate before the rate-limit slot is consumed, mirroring
+    # the chat turn's guard order (routes/chat.py:141-153) - a capped account
+    # must not be able to burn a daily upload slot on a rejected request.
+    try:
+        cost_meter.assert_within_caps(db, user_id)
+    except cost_meter.CostCapExceeded as e:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": e.code,
+                "resets_at": cost_meter.midnight_utc_iso(),
+            },
+        ) from e
+
+    # B-07: rate limit only after the extension, ownership and content checks
+    # pass - a rejected upload must not consume a daily slot. Order, and the
+    # unrefunded 507 slot: docs/decisions.md 2026-09-30 B5. Owning a session
+    # also guarantees the users row exists for the usage_counters FK.
+    allowed, used = rate_limit.check_and_increment(db, user_id)
+    if not allowed:
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "code": DAILY_CAP_REACHED,
+                "cap": settings.daily_cap,
+                "used": used,
+                "resets_at": cost_meter.midnight_utc_iso(),
+            },
+        )
+
     # The pending row must not be committed (and therefore claimable by the
     # worker's poll loop, which runs every 2s) before the blob write
     # completes. flush() assigns the PK for the storage key without opening
     # the row up to a concurrent claim; only commit once the blob write has
     # actually succeeded.
-    doc = Document(session_id=session_id, filename=safe_name, status="pending")
+    doc = Document(
+        session_id=session_id,
+        filename=safe_name,
+        status="pending",
+        content_sha256=sha,
+    )
     db.add(doc)
-    db.flush()
+    try:
+        db.flush()
+    except IntegrityError:
+        # C-08 race: a concurrent request for the same bytes committed its row
+        # between our lookup and this flush. Adopt the winner instead of 500ing.
+        db.rollback()
+        winner = _find_existing_document(db, session_id, sha)
+        if winner is None:
+            raise
+        log.info("upload deduped after insert race", extra={"doc_id": winner.id})
+        warn = cost_meter.cost_warning_header(db, user_id)
+        if warn:
+            response.headers["X-Cost-Warning"] = warn
+        return UploadResponse(
+            document_id=winner.id,
+            session_id=session_id,
+            filename=winner.filename,
+            status=winner.status,
+        )
 
     # F-29: a failed blob write must not strand a permanent "pending" row.
     # Mark the row failed (visible in the UI banner) and report 507.
@@ -180,7 +283,7 @@ def upload_file(
     try:
         store = object_store.get_store()
         store.put(object_store.key_for(doc.id, doc.filename), data)
-    except Exception:
+    except Exception as e:
         log.error(
             "upload storage write failed",
             extra={"doc_id": doc.id},
@@ -205,7 +308,7 @@ def upload_file(
         raise HTTPException(
             status_code=507,
             detail={"code": "STORAGE_WRITE_FAILED"},
-        )
+        ) from e
 
     db.commit()
     db.refresh(doc)

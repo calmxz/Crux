@@ -6,7 +6,8 @@ import pytest
 from sqlalchemy.exc import IntegrityError
 
 from contracts import TopicProfile
-from db.models import Session as SessionModel, User
+from db.models import Session as SessionModel
+from db.models import User
 
 
 def _create(client, topic, uid="dupe-user"):

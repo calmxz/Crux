@@ -76,14 +76,18 @@ import { computed, ref } from 'vue'
 import InputText from 'primevue/inputtext'
 
 import AuthCover from '../components/auth/AuthCover.vue'
+import { authErrorCopy } from '../lib/authErrors.js'
 import { useAuthStore } from '../stores/auth.js'
 import { isValidEmail } from '../utils/validation.js'
 
 const auth = useAuthStore()
 
 const email = ref('')
+
 const submitting = ref(false)
+
 const error = ref('')
+
 const sent = ref(false)
 
 const canSubmit = computed(() => isValidEmail(email.value.trim()))
@@ -92,6 +96,7 @@ async function submit() {
   if (!canSubmit.value) return
   error.value = ''
   submitting.value = true
+
   try {
     await auth.requestPasswordReset(email.value.trim())
     sent.value = true
@@ -99,7 +104,8 @@ async function submit() {
     // Supabase AuthErrors carry an HTTP status, so friendlyError() would swap
     // their specific copy (rate-limit wording, for instance) for a generic
     // status message. Surface the SDK message instead.
-    error.value = e?.message || 'Could not send reset link. Try again.'
+    // E-13: code-keyed copy, never SDK prose (see lib/authErrors.js).
+    error.value = authErrorCopy(e, 'Could not send reset link. Try again.')
   } finally {
     submitting.value = false
   }

@@ -14,6 +14,7 @@ describe('mapCapError', () => {
       used: 50,
       resets_at: '2026-07-08T00:00:00+00:00',
     })
+
     expect(r.kind).toBe('daily')
     expect(r.info).toEqual({ cap: 50, used: 50, resets_at: '2026-07-08T00:00:00+00:00' })
   })
@@ -26,6 +27,7 @@ describe('mapCapError', () => {
       hard_cap_usd: '3.0',
       resets_at: '2026-07-08T00:00:00+00:00',
     })
+
     expect(r.kind).toBe('cost')
     expect(r.info).toEqual({
       used_usd: '3.0100',
@@ -43,6 +45,7 @@ describe('mapCapError', () => {
       soft_cap_usd: '2.0',
       hard_cap_usd: '3.0',
     })
+
     expect(r.kind).toBe('cost')
     expect(r.info.resets_at).toBeNull()
   })
@@ -52,6 +55,7 @@ describe('mapCapError', () => {
       code: ERR_GLOBAL_COST_CAP_REACHED,
       resets_at: '2026-07-08T00:00:00+00:00',
     })
+
     expect(r.kind).toBe('cost')
     expect(r.info).toEqual({
       used_usd: null,

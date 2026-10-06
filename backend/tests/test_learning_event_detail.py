@@ -10,7 +10,8 @@ import pytest
 
 from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import LearningEvent, Session as SessionModel, User
+from db.models import LearningEvent, User
+from db.models import Session as SessionModel
 from services import check_question_service, learning_event_service
 
 USER_ID = "u_detail_1"
@@ -49,6 +50,7 @@ def open_batch_session(db_session):
     db_session.commit()
     ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0)
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=row.id, gap="atp",
         items=[{"question": "Q1?", "options": ["Prophase", "Metaphase", "Telophase"],
                 "correct_index": 0, "explanation": "e1"},
@@ -72,6 +74,7 @@ def diagnostic_batch_session(db_session):
     ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0,
                       diagnostic_required=True)
     check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=row.id, gap="warmup",
         items=[{"question": "Q1?", "options": ["a", "b"],
                 "correct_index": 0, "explanation": "e1"}]))

@@ -15,7 +15,8 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from contracts import SessionProgress
-from db.models import ChatMessage, Session as SessionModel
+from db.models import ChatMessage
+from db.models import Session as SessionModel
 
 # Preview window tuning (moved verbatim from routes/sessions.py).
 PREVIEW_CANDIDATES = 5

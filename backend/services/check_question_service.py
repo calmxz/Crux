@@ -3,7 +3,9 @@
 A pending_check lives on the Session row as JSON:
     {
         "gap": str,
-        "current_index": int,          # next unanswered item
+        "set_index": int,              # 1-based set within the check (#340)
+        "set_total": int,              # sets in the check, fixed on set 1
+        "current_index": int,          # first unresolved item, len(items) when done
         "asked_at_turn": iso8601,
         "items": [
             {"question": str, "options": [str], "correct_index": int,
@@ -17,7 +19,15 @@ Anti-cheat: public_view() reveals correct_index / explanation / selected_index /
 correct ONLY for items whose status != "pending". Pending items leak only
 question + options.
 
-State machine is linear: answer()/skip() require index == current_index.
+Items resolve in any order (#348): answer()/skip() take any still-pending
+index, and current_index tracks the first unresolved item.
+
+A CHECK is 1..3 sets, one set (batch) per turn. The pending_check above is the
+open set only; the check-level pointer that survives between sets lives in
+pending_check_store (get/set_current_check). register() enforces the set
+order against it, close_set() clears it after the final set, and
+stop_open_check() / abandon_open_batch() clear it when the learner stops or
+the session ends.
 """
 
 from __future__ import annotations
@@ -30,17 +40,24 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from contracts import AskCheckQuestionsArgs, ToolResult
-from db.models import ChatMessage, LearningEvent, Session as SessionModel
+from db.models import ChatMessage, LearningEvent
+from db.models import Session as SessionModel
 
 # Low-level pending_check state accessors live in a leaf module so
 # learning_event_service can use them without importing this module (which
 # would create a cyclic import). Only the ones this module calls internally
 # are imported; callers wanting parse_asked_at / get_pending_check_from_row
 # import them from services.pending_check_store directly.
+from services import diagnostic_service
 from services.pending_check_store import (
     _save,
     clear_pending_check,
+    diagnostic_tally,
+    get_current_check,
     get_pending_check,
+    is_done,
+    is_final_set,
+    set_current_check,
 )
 
 log = logging.getLogger(__name__)
@@ -74,6 +91,9 @@ def public_view(pc: dict | None) -> dict | None:
         "gap": pc["gap"],
         "current_index": pc.get("current_index", 0),
         "total": len(items),
+        # None for batches registered before sets existed.
+        "set_index": pc.get("set_index"),
+        "set_total": pc.get("set_total"),
         "items": items,
     }
 
@@ -114,18 +134,37 @@ def write_check_batch(db: Session, pc: dict | None, commit: bool = True) -> None
         db.commit()
 
 
-def is_done(pc: dict | None) -> bool:
-    if not pc:
-        return False
-    return pc.get("current_index", 0) >= len(pc.get("items", []))
+_SUPPRESSED = "address the check results before quizzing again"
+
+
+def _set_order_error(args: AskCheckQuestionsArgs, cc: dict | None) -> str | None:
+    """Why a set_index > 1 call does not continue the current check, or None.
+
+    Only a check whose last registered set is short of its set_total can be
+    continued; close_set() drops the pointer once the final set closes."""
+    if cc is None or cc.get("last_set_index", 0) >= cc.get("set_total", 0):
+        return (
+            f"set_index {args.set_index} has no check in progress to continue; "
+            "start a new check with set_index=1"
+        )
+    if args.set_total != cc["set_total"]:
+        return (
+            f"set_total {args.set_total} does not match the current check's "
+            f"set_total {cc['set_total']}"
+        )
+    expected = cc["last_set_index"] + 1
+    if args.set_index != expected:
+        return f"set_index {args.set_index} out of order: expected {expected}"
+    return None
 
 
 def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> ToolResult:
-    if getattr(ctx, "suppress_check", False):
-        return ToolResult(
-            ok=False, status="failed",
-            error="address the check results before quizzing again",
-        )
+    # suppress_check marks the /check/complete follow-up turn. The only quiz
+    # it may pose is the NEXT set of the current check (#340); that case is
+    # validated against the pointer under the row lock below.
+    suppressed = getattr(ctx, "suppress_check", False)
+    if suppressed and args.set_index == 1:
+        return ToolResult(ok=False, status="failed", error=_SUPPRESSED)
     if args.session_id != ctx.session_id:
         return ToolResult(
             ok=False, status="failed",
@@ -145,6 +184,11 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
                     f"for {len(it.options)} options"
                 ),
             )
+    if args.set_index > args.set_total:
+        return ToolResult(
+            ok=False, status="failed",
+            error=f"set_index {args.set_index} exceeds set_total {args.set_total}",
+        )
 
     from services import profile_service  # local import avoids circular
 
@@ -159,13 +203,30 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
             error="a check-question batch is already open; resolve it first",
         )
 
-    # F-59: purpose is the turn's prepared decision, not a re-read of live
-    # knowledge_level (which races with grading and misclassifies review
-    # quizzes posed while level is None).
-    purpose = "diagnostic" if ctx.diagnostic_required else "check"
+    if args.set_index == 1:
+        # F-59: purpose is the turn's prepared decision, not a re-read of live
+        # knowledge_level (which races with grading and misclassifies review
+        # quizzes posed while level is None).
+        purpose = "diagnostic" if ctx.diagnostic_required else "check"
+        # Set 1 always starts a fresh check; any stale pointer is replaced.
+        cc = {
+            "set_total": args.set_total, "last_set_index": 1, "gaps": [args.gap],
+            "purpose": purpose,
+        }
+    else:
+        cc = get_current_check(db, ctx.session_id)
+        err = _set_order_error(args, cc)
+        if cc is None or err is not None:
+            return ToolResult(ok=False, status="failed", error=err)
+        # Later sets inherit set 1's purpose: a diagnostic stays a diagnostic
+        # whatever the follow-up turn's own ctx says.
+        purpose = cc.get("purpose", "check")
+        cc = {**cc, "last_set_index": args.set_index, "gaps": [*cc.get("gaps", []), args.gap]}
 
     pc = {
         "gap": args.gap,
+        "set_index": args.set_index,
+        "set_total": args.set_total,
         "purpose": purpose,
         "current_index": 0,
         "asked_at_turn": ctx.turn_started_at.isoformat(),
@@ -183,12 +244,15 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
             for it in args.items
         ],
     }
+    set_current_check(db, ctx.session_id, cc, commit=False)
     _save(db, ctx.session_id, pc)
     return ToolResult(
         ok=True, status="ok",
         data={
             "gap": args.gap,
             "total": len(args.items),
+            "set_index": args.set_index,
+            "set_total": args.set_total,
             "items": [{"question": it.question, "options": list(it.options)} for it in args.items],
         },
     )
@@ -201,25 +265,41 @@ def _progress(pc: dict) -> dict:
     return {"current_index": ci, "total": total, "has_next": not done, "done": done}
 
 
+def _pending_item(pc: dict, index: int) -> dict:
+    """The still-pending item at `index`, else CheckStateError (#348: any
+    pending item may be resolved, in any order)."""
+    items = pc["items"]
+    if not (0 <= index < len(items)):
+        raise CheckStateError(f"index {index} out of range for {len(items)} items")
+    if items[index].get("status", "pending") != "pending":
+        raise CheckStateError(f"item {index} already resolved")
+    return items[index]
+
+
+def _advance(pc: dict) -> None:
+    """Point current_index at the first unresolved item, or len(items) once
+    every item is resolved (is_done keys off that)."""
+    items = pc["items"]
+    pc["current_index"] = next(
+        (n for n, it in enumerate(items) if it.get("status", "pending") == "pending"),
+        len(items),
+    )
+
+
 def answer(db: Session, session_id: str, index: int, selected_index: int) -> dict:
-    """Grade item `index` (must equal current_index), record the LearningEvent
-    + profile effect, mark the item answered, advance current_index, persist -
-    all in ONE commit. Does NOT clear the batch."""
+    """Grade pending item `index`, record the LearningEvent + profile effect,
+    mark the item answered, move current_index to the first unresolved item,
+    persist - all in ONE commit. Does NOT clear the batch."""
     from services import learning_event_service, profile_service  # local import avoids circular
 
     # F-24: serialize concurrent submits on the session row; the loser then
-    # sees the advanced current_index and raises CheckStateError -> 409.
+    # sees the item already resolved and raises CheckStateError -> 409.
     profile_service.lock_session_row(db, session_id)
 
     pc = get_pending_check(db, session_id)
     if pc is None:
         raise CheckStateError("no open check-question batch")
-    ci = pc["current_index"]
-    if index != ci:
-        raise CheckStateError(f"out-of-order answer: index={index} current_index={ci}")
-    if ci >= len(pc["items"]):
-        raise CheckStateError("batch already resolved")
-    item = pc["items"][ci]
+    item = _pending_item(pc, index)
     if not (0 <= selected_index < len(item["options"])):
         raise CheckStateError("selected_index out of range")
 
@@ -237,7 +317,7 @@ def answer(db: Session, session_id: str, index: int, selected_index: int) -> dic
     item["status"] = "answered"
     item["selected_index"] = selected_index
     item["correct"] = correct
-    pc["current_index"] = ci + 1
+    _advance(pc)
     _save(db, session_id, pc, commit=False)
     db.commit()
 
@@ -254,19 +334,15 @@ def skip(db: Session, session_id: str, index: int) -> dict:
     from services import profile_service  # local import avoids circular
 
     # F-24: serialize concurrent submits on the session row; the loser then
-    # sees the advanced current_index and raises CheckStateError -> 409.
+    # sees the item already resolved and raises CheckStateError -> 409.
     profile_service.lock_session_row(db, session_id)
 
     pc = get_pending_check(db, session_id)
     if pc is None:
         raise CheckStateError("no open check-question batch")
-    ci = pc["current_index"]
-    if index != ci:
-        raise CheckStateError(f"out-of-order skip: index={index} current_index={ci}")
-    if ci >= len(pc["items"]):
-        raise CheckStateError("batch already resolved")
-    pc["items"][ci]["status"] = "skipped"
-    pc["current_index"] = ci + 1
+    item = _pending_item(pc, index)
+    item["status"] = "skipped"
+    _advance(pc)
     _save(db, session_id, pc)
     return _progress(pc)
 
@@ -274,8 +350,11 @@ def skip(db: Session, session_id: str, index: int) -> dict:
 def abandon_open_batch(db: Session, session_id: str, commit: bool = True) -> bool:
     """Clear any lingering pending check batch: mark still-pending items
     "skipped", freeze the batch onto its message for honest history, and clear
-    the pending pointer. Side-effect free -- logs no learning events and does
-    not mutate the profile. Returns True when a batch was cleared.
+    the pending pointer. Logs no learning events and applies no mastery
+    effects; the one profile write is grading an in-progress diagnostic
+    check from its answered items, so a learner who ends the session between
+    diagnostic sets keeps the level they earned. Returns True when a batch
+    was cleared.
 
     Called on session end so a later review-gaps resume can pose a fresh check
     instead of hitting the "a batch is already open" guard. That guard blocks on
@@ -283,27 +362,116 @@ def abandon_open_batch(db: Session, session_id: str, commit: bool = True) -> boo
     just as a half-answered one does -- both must be cleared here, hence no
     is_done() short-circuit.
 
-    commit=False defers both writes to the caller's single commit (F-33).
+    Also drops the current-check pointer (#340), so a set-2+ call cannot
+    continue a check from an ended session.
+
+    commit=False defers all writes to the caller's single commit (F-33).
     """
     pc = get_pending_check(db, session_id)
+    if pc is not None:
+        _skip_remaining(pc)
+        _save(db, session_id, pc, commit=False)
+    diagnostic_service.grade_if_diagnostic(db, session_id, force=True, commit=False)
+    set_current_check(db, session_id, None, commit=commit)
     if pc is None:
         return False
-    for item in pc.get("items", []):
-        if item.get("status") == "pending":
-            item["status"] = "skipped"
-    pc["current_index"] = len(pc.get("items", []))
     write_check_batch(db, pc, commit=commit)
     clear_pending_check(db, session_id, commit=commit)
     return True
 
 
-def build_results_summary(pc: dict) -> str:
+def _skip_remaining(pc: dict) -> None:
+    for item in pc.get("items", []):
+        if item.get("status") == "pending":
+            item["status"] = "skipped"
+    pc["current_index"] = len(pc.get("items", []))
+
+
+def close_set(db: Session, session_id: str, pc: dict) -> dict | None:
+    """Close a resolved set in one commit: freeze it onto its asking message,
+    clear the pending batch, record the quiz cooldown, and drop the
+    current-check pointer once the final set has closed. Returns the cooldown.
+    A non-final diagnostic set's score is folded into the pointer so the level
+    can be graded over the whole check.
+
+    Callers hold the session row lock and have already graded a diagnostic
+    (diagnostic_service.grade_if_diagnostic reads the still-pending batch)."""
+    cooldown = build_quiz_cooldown(pc)
+    write_check_batch(db, pc, commit=False)
+    clear_pending_check(db, session_id, commit=False)
+    set_quiz_cooldown(db, session_id, cooldown, commit=False)
+    if is_final_set(pc):
+        set_current_check(db, session_id, None, commit=False)
+    else:
+        cc = get_current_check(db, session_id)
+        if cc is not None and cc.get("purpose") == "diagnostic":
+            cc["diag"] = diagnostic_tally(pc, cc.get("diag"))
+            set_current_check(db, session_id, cc, commit=False)
+    db.commit()
+    return cooldown
+
+
+def stop_open_check(db: Session, session_id: str) -> str | None:
+    """The learner ended the check early with the Stop button (#340 "early
+    stop = skip"; POST /check/stop). Chat messages never stop a check. Grade the open set's remaining items as skipped, with
+    Skip-button semantics (results summary, cooldown), close it, and end the
+    check. Returns the [check results] text for the follow-up turn, or None
+    when no check is in progress or the open set is fully answered (that set
+    is /check/complete's to close).
+
+    Between sets (no open batch, pointer still short of set_total) there is
+    nothing to grade; the summary only records where the learner stopped so
+    the untested gaps are not mistaken for tested ones. Either way a
+    diagnostic check is graded from whatever was answered."""
+    from services import profile_service  # local import avoids circular
+
+    profile_service.lock_session_row(db, session_id)
+    pc = get_pending_check(db, session_id)
+    if pc is None:
+        cc = get_current_check(db, session_id)
+        if cc is None:
+            db.commit()  # release the row lock
+            return None
+        diagnostic_service.grade_if_diagnostic(db, session_id, force=True, commit=False)
+        set_current_check(db, session_id, None)
+        return (
+            f"[check results] learner stopped at set {cc['last_set_index']} "
+            f"of {cc['set_total']}."
+        )
+
+    if is_done(pc):
+        # Every item is answered and /check/complete owns closing the set;
+        # closing it here would 409 the frontend's complete call.
+        db.commit()  # release the row lock
+        return None
+    _skip_remaining(pc)
+    _save(db, session_id, pc, commit=False)
+    summary = build_results_summary(pc, stopped=True)
+    diagnostic_service.grade_if_diagnostic(db, session_id, force=True, commit=False)
+    # A stop ends the check even when this set was not the final one;
+    # close_set only drops the pointer after the final set.
+    set_current_check(db, session_id, None, commit=False)
+    close_set(db, session_id, pc)
+    return summary
+
+
+def build_results_summary(pc: dict, stopped: bool = False) -> str:
     """Server-built summary injected as a synthetic user turn for the follow-up.
-    Reflects post-answer profile state (demotions already applied per-answer)."""
+    Reflects post-answer profile state (demotions already applied per-answer).
+
+    The header names the set ("Set N of M.") or, when the learner stopped the
+    check, "learner stopped at set N of M." Pre-#340 batches get neither."""
     items = pc.get("items", [])
     graded = [it for it in items if it["status"] == "answered"]
     n_correct = sum(1 for it in graded if it.get("correct"))
-    lines = [f"[check results] gap={pc['gap']}: {n_correct}/{len(graded)} correct."]
+    header = f"[check results] gap={pc['gap']}: {n_correct}/{len(graded)} correct."
+    set_index, set_total = pc.get("set_index"), pc.get("set_total")
+    if set_index and set_total:
+        if stopped:
+            header += f" learner stopped at set {set_index} of {set_total}."
+        else:
+            header += f" Set {set_index} of {set_total}."
+    lines = [header]
     for n, it in enumerate(items):
         if it["status"] == "skipped":
             lines.append(f"  Q{n + 1} skipped.")
@@ -441,6 +609,8 @@ def reconstruct_check_batch(db: Session, msg: ChatMessage, events: list | None =
         "gap": gap,
         "current_index": len(items),
         "total": len(items),
+        "set_index": args.get("set_index"),
+        "set_total": args.get("set_total"),
         "items": items,
     }
 

@@ -4,8 +4,9 @@
 **Companion to:** `.github/workflows/ci.yml`. The 2026-05-23 security review it was written against is archived in git history (see `docs/decisions.md`).
 **Phase introduced:** Phase 6 (`phase/6-ci-security-tests`, 2026-05-23).
 
-Every job below blocks PR merge once branch protection is enabled on `dev`
-(staging) and `main` (prod). See "Manual post-merge" at the end of this file.
+Every job below blocks PR merge: branch protection is live on `dev` (staging)
+and `main` (prod). See "Branch protection — current state" at the end of this
+file.
 
 ---
 
@@ -63,62 +64,33 @@ refactor reintroducing the finding will fail CI deterministically.
 
 ---
 
-## Manual post-merge (user configures via GitHub web UI)
-
-Branch protection and signed commits are documented here but **not executed by
-the Phase 6 PR** — both require admin scope on the repo and (for signed
-commits) a configured signing key on the user's machine.
+## Branch protection — current state (verified 2026-09-23 via `gh api`)
 
 Branch model:
 - `dev` = staging (PRs land here first)
-- `main` = production (only fast-forward from `dev` after staging verification)
+- `main` = production (promoted from `dev` after staging verification)
 
-### Branch protection — apply to BOTH `dev` and `main`
+| Setting | `dev` | `main` |
+|---|---|---|
+| Required checks | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)` | same plus `Analyze (python)` |
+| Required approving reviews | 1 (solo maintainer merges with `--admin`) | none |
+| Include administrators (enforce_admins) | OFF | OFF |
+| Require signed commits | OFF | ON |
+| Force pushes / deletions | blocked | blocked |
 
-Settings → Branches → Add branch protection rule. Create one rule per branch
-(`dev` and `main`) with the same status checks. Staging must enforce the same
-gates as prod; otherwise broken commits sneak into `dev` and get promoted to
-`main` later under a false-pass assumption.
+Deviations from the Phase 6 plan, recorded in `docs/decisions.md` (2026-09-23):
+`dev` requires one review instead of zero, `enforce_admins` is off on both,
+`Playwright (chromium)` is not a required check, and `Analyze (python)` is
+required on `main` only.
 
-Required status checks (must match exact job names from `ci.yml` and
-`codeql.yml`):
-- `Backend (pytest)`
-- `Frontend (Vitest + lint)`
-- `Security (SAST + deps + secrets + images)`
-- `Analyze (python)`
-- `Analyze (javascript-typescript)`
+CodeQL: the `Analyze (*)` checks come from `.github/workflows/codeql.yml`
+(advanced setup). GitHub's code-scanning *default setup* is `not-configured`.
+GitHub does not allow both; enabling default setup would require removing
+`codeql.yml` first.
 
-Other settings (both branches):
-- Require branches to be up to date before merging: ON
-- Include administrators (enforce_admins): ON
-- Required approving reviews: 0 (solo-maintainer phase; revisit at v2)
-- Restrict who can push: OFF
-
-### Signed commits — `main` only
-
-Settings → Branches → `main` rule → Require signed commits: ON.
-
-Skip on `dev` — staging churns fast and per-commit signing adds friction with
-no security gain (staging is not the deploy artifact).
-
-Prereq on local machine: `git config --global commit.gpgsign true` and a GPG
-or SSH signing key registered with GitHub (Settings → SSH and GPG keys).
-
-### Equivalent gh CLI (if web UI unavailable)
+Verify or reapply:
 
 ```bash
-# Repeat for both branches: dev, main
-gh api -X PUT repos/:owner/:repo/branches/<branch>/protection \
-  -f required_status_checks.strict=true \
-  -f required_status_checks.contexts[]='Backend (pytest)' \
-  -f required_status_checks.contexts[]='Frontend (Vitest + lint)' \
-  -f required_status_checks.contexts[]='Security (SAST + deps + secrets + images)' \
-  -f required_status_checks.contexts[]='Analyze (python)' \
-  -f required_status_checks.contexts[]='Analyze (javascript-typescript)' \
-  -f enforce_admins=true \
-  -f required_pull_request_reviews.required_approving_review_count=0 \
-  -f restrictions=null
-
-# Signed commits on main only
-gh api -X POST repos/:owner/:repo/branches/main/protection/required_signatures
+gh api repos/calmxz/Crux/branches/dev/protection --jq '.required_status_checks.contexts'
+gh api repos/calmxz/Crux/branches/main/protection/required_signatures --jq '.enabled'
 ```

@@ -28,11 +28,17 @@
 
     <template v-else>
       <div class="sheet-header">
+        <!-- D-21: SessionHeader's own h1 is gated on a resolved topic, so the
+             page had no h1 at all while the detail fetch was in flight. This
+             fills that window only -- the two are mutually exclusive on the
+             same predicate, so the page never carries two h1s. The 404 branch
+             is excluded structurally: it is the v-if arm above. -->
+        <h1 v-if="!headerTopic" class="sr-only">Session</h1>
         <SessionHeader
-          :topic="headerTopic"
-          :session-id="props.id"
-          :started-at="startedAt"
+          :session="headerSession"
           :level="profileLevel"
+          :ref-status="headerRefStatus"
+          :streaming="store.streamState !== 'idle'"
         />
       </div>
 
@@ -40,7 +46,6 @@
            the panel is placed in column 2 by the grid. -->
       <div class="sheet-notes">
         <div
-          ref="messagesEl"
           class="messages"
           :class="{ 'is-empty': !store.messages.length }"
           data-testid="session-messages"
@@ -75,22 +80,41 @@
                 :landed="cuesLanded"
               />
 
-              <!-- R2: under 900px the check card scrolls with the transcript.
-                   Pinned in the foot it took a fixed ~420px out of a 844px
-                   viewport and starved .messages down to ~190px (0px with the
-                   cue expanded). The foot copy below is the >=900px form; the
-                   two are v-if/v-else on isNarrow, so exactly one instance of
-                   CheckQuestion exists at any width and an open batch can
-                   never double-render. -->
+              <!-- #346: the check batch and the level picker scroll with the
+                   page at every width. Pinned in the foot they took a fixed
+                   slab of the viewport (R2: ~420px of a 844px screen), and the
+                   foot is sticky now, so only the composer rides there. -->
               <CheckQuestion
-                v-if="isNarrow && store.pendingCheck"
-                class="check-inline"
+                v-if="store.pendingCheck"
+                class="transcript-card"
                 :check="store.pendingCheck"
                 :busy="store.streamState !== 'idle'"
+                :answering="store.checkAnswering"
                 @answer="onAnswerCheck"
                 @skip="onSkipCheck"
+                @back="store.prevCheck"
                 @next="store.nextCheck"
                 @done="onDoneCheck"
+                @stop="onStopCheck"
+              />
+
+              <DiagnosticConsentCard
+                v-if="showDiagnosticCard"
+                class="transcript-card"
+                :busy="store.streamState !== 'idle' || !canSend || diagLevelBusy"
+                :error="diagError"
+                @quiz="onDiagQuiz"
+                @level="onDiagLevel"
+                @dismiss="dismissDiag()"
+              />
+
+              <TopicSuggestCard
+                v-if="topicCard"
+                class="transcript-card"
+                :card="topicCard"
+                :busy="store.streamState !== 'idle' || !canSend"
+                @pick="onTopicPick"
+                @dismiss="dismissTopicCard()"
               />
             </template>
           </div>
@@ -98,25 +122,6 @@
 
         <div class="notes-foot">
           <div class="notes-measure">
-            <CheckQuestion
-              v-if="!isNarrow && store.pendingCheck && !store.detailLoading"
-              :check="store.pendingCheck"
-              :busy="store.streamState !== 'idle'"
-              @answer="onAnswerCheck"
-              @skip="onSkipCheck"
-              @next="store.nextCheck"
-              @done="onDoneCheck"
-            />
-
-            <DiagnosticConsentCard
-              v-if="showDiagnosticCard"
-              :busy="store.streamState !== 'idle' || !canSend || diagLevelBusy"
-              :error="diagError"
-              @quiz="onDiagQuiz"
-              @level="onDiagLevel"
-              @dismiss="dismissDiag()"
-            />
-
             <!-- One status slot: persistent state (caps, send error) stays
                  mounted because the composer's aria-describedby points at it;
                  the transient captions below it land one at a time. -->
@@ -149,7 +154,12 @@
                 </router-link>
               </div>
 
-              <ReferenceStatusBanner ref="referenceBannerRef" :session-id="props.id" />
+              <ReferenceStatusBanner
+                :status="refStatus"
+                :documents="refDocuments"
+                :failed="refFailed"
+                @refresh="refreshReferences"
+              />
 
               <UploadStatus v-if="topCaption === 'upload'" :upload="uploadStatus" />
 
@@ -174,11 +184,9 @@
               :sending="sending"
               :stream-state="store.streamState"
               :describedby="capDescribedby"
-              :locked="store.checkLocked"
               @send="send"
               @stop="store.stopStream"
               @attach="onAttachFile"
-              @skip="onSkipCheck"
             />
 
             <SessionEndedBanner
@@ -251,16 +259,18 @@ import MessageList from '../components/chat/MessageList.vue'
 import MessageListSkeleton from '../components/chat/MessageListSkeleton.vue'
 import SessionHeader from '../components/chat/SessionHeader.vue'
 import SessionEndedBanner from '../components/SessionEndedBanner.vue'
+import TopicSuggestCard from '../components/TopicSuggestCard.vue'
 import ReferenceStatusBanner from '../components/chat/ReferenceStatusBanner.vue'
 import UploadStatus from '../components/chat/UploadStatus.vue'
-import { friendlyError, StreamAbortedError } from '../lib/errors.js'
+import { friendlyError, isSessionEndedError, StreamAbortedError } from '../lib/errors.js'
 import { useSessionStore } from '../stores/session.js'
+import { REDUCED_MOTION_QUERY, useMediaQuery } from '../composables/useMediaQuery.js'
 import { usePanel } from '../composables/usePanel.js'
 import { useToast } from '../composables/useToast.js'
 import { costBus } from '../services/costBus.js'
 import { getSessionProfile, patchProfile } from '../services/profileApi.js'
-import { getUploadStatus, uploadDocument, validateFile } from '../services/uploadApi.js'
-import { NARROW_QUERY, useMediaQuery } from '../composables/useMediaQuery.js'
+import { uploadDocument, validateFile } from '../services/uploadApi.js'
+import { useReferencePoll } from '../composables/useReferencePoll.js'
 import { entryNames } from '../utils/conceptEntry.js'
 import { formatResetTime } from '../utils/formatDate.js'
 import {
@@ -275,40 +285,69 @@ import { costCapToastMessage, dailyCapToastMessage } from '../lib/capToast.js'
 const props = defineProps({ id: { type: String, required: true } })
 
 const route = useRoute()
+
 const router = useRouter()
+
 const store = useSessionStore()
+
 // Drives the panel column width only (see --panel-col in <style>); CueColumn
 // owns its own collapsed rendering and the toggle button.
 const { collapsed: panelCollapsed } = usePanel()
 
 const draft = ref('')
+
 const lastSentText = ref('')
+
 const summaryDialog = ref(false)
+
 const summaryText = ref('')
+
 const summaryKind = ref('summary')
+
 const notFound = ref(false)
+
 const resuming = ref(false)
+
 const gapPickerOpen = ref(false)
+
 const sending = ref(false)
-const messagesEl = ref(null)
+
 const composerRef = ref(null)
+
 const uploading = ref(false)
+
 const uploadStatus = ref(null)
-// Same generation-counter idiom as ReferenceStatusBanner: /session/:id reuses
+
+// Same generation-counter idiom as useReferencePoll: /session/:id reuses
 // this component instance across sidebar switches, so an in-flight upload poll
 // from the previous session must not write uploadStatus/uploading after the id
 // changes. Bumped by the props.id watcher; every write after an await checks it.
 let uploadGen = 0
+
 const lastError = ref(null)
-const referenceBannerRef = ref(null)
+
+// F-12 / E-07: one poller for this session, shared by the reference banner and
+// the upload chip. Destructured at top level so the template auto-unwraps the
+// refs (a nested `refPoll.documents` would hand the child the ComputedRef).
+// It follows props.id itself and settles any watcher on a session switch.
+const {
+  documents: refDocuments,
+  status: refStatus,
+  failed: refFailed,
+  refresh: refreshReferences,
+  watch: watchReference,
+} = useReferencePoll(() => props.id)
 
 // Diagnostic consent card (spec 2026-07-25-diagnostic-consent-design.md).
 // diagProfile holds the latest GET /profile/:id payload ({ profile, etag });
 // null means not loaded or load failed - the card simply does not render,
 // the tutor's conversational offer is the fallback.
 const diagProfile = ref(null)
+
 const diagDismissed = ref(false)
+
 const diagError = ref('')
+
 // A conversational decline ("no thanks, just teach me") never writes a level,
 // so knowledge_level stays null and the card would render for the rest of the
 // session. Two completed tutor turns with the level still null are treated as
@@ -325,6 +364,7 @@ function dismissDiag() {
   // storage unavailable (private mode/quota) - in-memory dismissal still holds
   storageSet(sessionStorageThunk, diagDismissKey(props.id), '1')
 }
+
 // F5: guards onDiagLevel's async body against a rapid second click firing a
 // second PATCH with the same (soon-to-be-stale) etag. Folded into the card's
 // busy binding so the buttons visually disable too.
@@ -343,9 +383,62 @@ const showDiagnosticCard = computed(() =>
   ),
 )
 
+// #354 topic card: offered once per session, under the tutor's first reply at
+// the learner's level. It lives only while that reply is the latest message:
+// a tap (or anything the learner writes) appends a learner turn and closes it.
+// A dismissal persists per session, like the level picker's.
+const topicDismissed = ref(false)
+
+function topicDismissKey(id) {
+  return `crux:topic-dismissed:${id}`
+}
+
+function dismissTopicCard() {
+  topicDismissed.value = true
+  storageSet(sessionStorageThunk, topicDismissKey(props.id), '1')
+}
+
+const topicCard = computed(() => {
+  const last = store.messages.at(-1)
+
+  if (last?.role !== 'assistant' || !last.topic_suggestions) return null
+
+  if (
+    topicDismissed.value ||
+    store.streamingMessage ||
+    store.pendingCheck ||
+    showDiagnosticCard.value ||
+    isEnded.value ||
+    resuming.value ||
+    notFound.value ||
+    store.detailLoading
+  )
+    return null
+
+  return last.topic_suggestions
+})
+
+async function onTopicPick(text) {
+  if (!canSend.value) return
+  lastError.value = null
+  sending.value = true
+
+  try {
+    await store.sendMessageStreaming({ text })
+  } catch (e) {
+    // The store already surfaced an aborted stream (ended banner / login).
+    if (e instanceof StreamAbortedError) return
+    lastSentText.value = text
+    lastError.value = e
+  } finally {
+    sending.value = false
+  }
+}
+
 async function loadDiagProfile(id) {
   try {
     const data = await getSessionProfile(id)
+
     if (id !== props.id) return // stale response from a previous session
     diagProfile.value = data
   } catch {
@@ -359,7 +452,8 @@ async function loadDiagProfile(id) {
 // stopping), so the edges we care about are idle -> non-idle (start) and
 // non-idle -> idle (finish), not every individual hop.
 const streamAnnouncement = ref('')
-// Both things this view does on a stream-state edge, in one watcher.
+
+// Everything this view does on a stream-state edge, in one watcher.
 //
 // F2: the agent may have conversationally recorded a declared level
 // (update_topic_profile) during the turn -- that only becomes visible to us
@@ -376,17 +470,25 @@ watch(
   (next, prev) => {
     if (prev === 'idle' && next !== 'idle') {
       streamAnnouncement.value = 'Tutor is replying.'
+      // A new tutor turn spends the previous turn's tick, whatever started it.
+      cuesLanded.value = false
+
       return
     }
+
     if (prev === 'idle' || next !== 'idle') return
     streamAnnouncement.value = 'Reply finished.'
+
     const stillUnset =
       diagProfile.value &&
       diagProfile.value.profile?.knowledge_level == null &&
       !diagDismissed.value
+
     loadDiagProfile(props.id)
+
     if (!stillUnset) return
     diagNullTurns += 1
+
     if (diagNullTurns >= 2) dismissDiag()
   },
 )
@@ -406,31 +508,42 @@ const current = computed(() =>
 
 // Falls back to not-ended until the target detail resolves.
 const isEnded = computed(() => Boolean(current.value?.ended_at))
+
 // The one profile the frontend holds. The store's copy is only written on
 // loadSession, so the per-turn GET /profile/:id refetch (diagProfile) is the
 // fresher of the two and wins when present; both are already discriminated on
 // props.id, so a switch never paints the previous session's cues.
 const liveProfile = computed(() => {
   if (diagProfile.value?.profile) return diagProfile.value.profile
+
   return current.value?.topic_profile ?? null
 })
+
 const profileLevel = computed(() => liveProfile.value?.knowledge_level || '')
+
 const startedAt = computed(() => current.value?.created_at || '')
+
 const endedSummary = computed(() => stripAutoPrefix(liveProfile.value?.last_session_summary))
+
 // While a check batch is open, the cue it tests carries the red underline.
 const testingGap = computed(() => store.pendingCheck?.gap || '')
+
 // The full gap list drives the picker (single gap skips it, >1 gap opens it).
 const confirmedGaps = computed(() => entryNames(current.value?.topic_profile?.confirmed_gaps))
+
 // Gates the "Review my gaps" CTA — only meaningful once we're showing the
 // ended banner for this session.
 const hasGaps = computed(() => confirmedGaps.value.length > 0)
+
 const canEnd = computed(() => Boolean(current.value) && !isEnded.value)
+
 const canSend = computed(() => canEnd.value && !store.dailyCapReached && !store.costCapReached)
 
 // Cue-lands: CueColumn diffs the live profile and tells us when new cues were
 // written; the gutter of the latest tutor turn then carries the blue tick
-// until the learner writes again.
+// until the next tutor turn starts (the stream-state watcher clears it).
 const cuesLanded = ref(false)
+
 function onCuesLanded() {
   cuesLanded.value = true
 }
@@ -439,7 +552,9 @@ function onCuesLanded() {
 // follow-up notice (it is the newer, more specific event).
 const topCaption = computed(() => {
   if (uploadStatus.value) return 'upload'
+
   if (store.followupNotice) return 'followup'
+
   return null
 })
 
@@ -449,9 +564,43 @@ const topCaption = computed(() => {
 // row. View-local only — store.currentSession is never stubbed, which is what
 // keeps this clear of the PR #72 switch-reload bug class.
 const knownRow = computed(() => store.sessions.find((s) => s.id === props.id) || null)
+
 const headerTopic = computed(() => {
   if (current.value) return current.value.topic || ''
+
   return knownRow.value?.topic || ''
+})
+
+// Ticket 10: the action bar takes one session object. Built from the same
+// optimistic sources as headerTopic so the D-21 h1 gating is unchanged;
+// ended_at reads `current` only, so End/Resume flips on the same predicate as
+// isEnded and the composer. `pinned` falls back to the list row (setPinned
+// patches both copies optimistically).
+const headerSession = computed(() => {
+  if (!current.value && !knownRow.value) return null
+
+  return {
+    id: props.id,
+    topic: headerTopic.value,
+    created_at: startedAt.value,
+    pinned: Boolean(current.value?.pinned ?? knownRow.value?.pinned),
+    ended_at: current.value?.ended_at ?? null,
+  }
+})
+
+// The reference-file dot in the action bar reads the same session-wide
+// aggregate the status banner reads (refStatus from useReferencePoll, which
+// mirrors backend documents_service.aggregate_status: (pending or processing)
+// > ready > failed > null). Re-deriving a rank from the raw document list here
+// used a different priority (any non-terminal doc beat a failure), so a
+// session with one ready and one failed file showed a green banner alongside
+// a red dot -- two different verdicts for the same ingestion state. The
+// aggregate's 'pending' maps onto the header's own 'processing' vocabulary;
+// 'ready'/'failed'/null pass through unchanged.
+const headerRefStatus = computed(() => {
+  const s = refStatus.value
+
+  return s === 'pending' ? 'processing' : s || null
 })
 
 // When the composer is disabled because a daily/cost cap was hit, point its
@@ -459,12 +608,16 @@ const headerTopic = computed(() => {
 // input is blocked. null when not cap-disabled (renders no attribute).
 const capDescribedby = computed(() => {
   const ids = []
+
   if (store.dailyCapReached) ids.push('cap-banner-daily')
+
   if (store.costCapReached) ids.push('cap-banner-cost')
+
   return ids.length ? ids.join(' ') : null
 })
 
 const { showError, showWarn } = useToast()
+
 watch(
   () => store.dailyCapReached,
   (now) => {
@@ -474,6 +627,7 @@ watch(
     showError(message, { summary, life: 8000 })
   },
 )
+
 watch(
   () => store.costCapReached,
   (now) => {
@@ -491,17 +645,23 @@ watch(
 // warning), while neither level repeats. Never read by the template, so plain
 // per-instance flags (setup scope, i.e. one pair per mount) rather than refs.
 let softCapShown = false
+
 let urgentCapShown = false
+
 function resolveCostWarningLevel(detail) {
   let level = detail?.level
+
   if (!level && typeof detail?.header === 'string') {
     const match = detail.header.match(/level=(\w+)/)
     level = match ? match[1] : null
   }
+
   return level === 'urgent' ? 'urgent' : 'soft'
 }
+
 function onCostWarning(event) {
   const level = resolveCostWarningLevel(event?.detail)
+
   if (level === 'urgent') {
     if (urgentCapShown) return
     urgentCapShown = true
@@ -509,8 +669,10 @@ function onCostWarning(event) {
       summary: 'Cost limit near',
       life: 8000,
     })
+
     return
   }
+
   if (softCapShown) return
   softCapShown = true
   showWarn('You’re approaching the daily cost limit for this session.', {
@@ -518,22 +680,21 @@ function onCostWarning(event) {
     life: 6000,
   })
 }
+
 onMounted(() => costBus.addEventListener('cost-warning', onCostWarning))
+
 onUnmounted(() => costBus.removeEventListener('cost-warning', onCostWarning))
 
-// R2: the check card's placement is width-dependent (see the template comment).
-// Driven by matchMedia rather than a CSS-only swap because the card has to move
-// between two different containers — the .messages scroller and the foot — which
-// CSS cannot do. NARROW_QUERY is kept in sync with the 899px breakpoint in
-// <style> below.
-const isNarrow = useMediaQuery(NARROW_QUERY)
+// #346: the document is the scroller. A body class drives the route-scoped
+// flex-height cascade (see <style>) so a short transcript still puts the
+// composer at the foot of the viewport. Removed unconditionally on leave.
+onMounted(() => document.body.classList.add('session-page'))
 
-// App-shell lock: while in a session, the document itself must not scroll —
-// only the .messages box does. A body class drives the route-scoped overflow
-// lock and flex-height cascade (see <style>). Removed unconditionally on leave
-// so other routes regain normal document scroll.
-onMounted(() => document.body.classList.add('chat-locked'))
-onUnmounted(() => document.body.classList.remove('chat-locked'))
+onUnmounted(() => document.body.classList.remove('session-page'))
+
+// There is no router scrollBehavior, so a long session scrolled to its foot
+// would hand the next route a scrolled-down document.
+onUnmounted(() => window.scrollTo(0, 0))
 
 // F-01: leaving the session view must not leave a stream running (and
 // billing) in the background, nor let it deliver into a later session.
@@ -545,16 +706,87 @@ onUnmounted(() => store.abandonStream())
 const awaitingResponse = computed(() => {
   if (!sending.value) return false
   const last = store.messages[store.messages.length - 1]
+
   return !last || last.role === 'user'
 })
 
-function scrollToBottom() {
-  // App-shell: the .messages box is the sole scroller, so drive it directly.
-  nextTick(() => {
-    const el = messagesEl.value
-    if (el) el.scrollTop = el.scrollHeight
-  })
+// #346: the page scrolls, so every scroll read and write goes to the document.
+function docScrollHeight() {
+  return (document.scrollingElement || document.documentElement).scrollHeight
 }
+
+function scrollToBottom() {
+  nextTick(() => window.scrollTo(0, docScrollHeight()))
+}
+
+// #347: follow the stream. Autoscroll is on until the learner scrolls up and
+// back on once they return to the bottom. Cancel keys on scroll *direction*,
+// not on "not at the bottom": content growth and an in-flight smooth scroll
+// both leave the view short of the bottom without the learner doing anything,
+// and neither ever moves scrollY up. Any upward move short of the exact bottom
+// cancels (a small nudge counts); a shrink that clamps the view to the bottom
+// does not. Re-arming takes FOLLOW_SLACK_PX so sub-pixel rounding still
+// counts as "back at the bottom". Never read by the template, so plain lets.
+const FOLLOW_SLACK_PX = 40
+
+let following = true
+
+let lastScrollY = 0
+
+const reducedMotion = useMediaQuery(REDUCED_MOTION_QUERY)
+
+function distanceFromBottom() {
+  return docScrollHeight() - window.scrollY - window.innerHeight
+}
+
+function onWindowScroll() {
+  const distance = distanceFromBottom()
+
+  if (window.scrollY < lastScrollY && distance > 1) following = false
+  else if (distance <= FOLLOW_SLACK_PX) following = true
+  lastScrollY = window.scrollY
+}
+
+// The scroll event lags the gesture by a frame, long enough for a token to
+// land and a programmatic scroll to swallow the learner's first flick. A wheel
+// turned upward is intent itself, so cancel on it directly.
+function onWindowWheel(event) {
+  if (event.deltaY < 0 && window.scrollY > 0) following = false
+}
+
+onMounted(() => {
+  window.addEventListener('scroll', onWindowScroll, { passive: true })
+  window.addEventListener('wheel', onWindowWheel, { passive: true })
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', onWindowScroll)
+  window.removeEventListener('wheel', onWindowWheel)
+})
+
+function followStream() {
+  if (!following) return
+  nextTick(() =>
+    window.scrollTo({
+      top: docScrollHeight(),
+      behavior: reducedMotion.value ? 'instant' : 'smooth',
+    }),
+  )
+}
+
+// content grows in place (streamingMessage.content += text), so messages.length
+// never moves while a reply streams -- watch the parts that add height. A tool
+// call settling from running to done relabels its chip, which can wrap.
+watch(
+  () => {
+    const s = store.streamingMessage
+
+    return s && [s.content.length, s.tool_calls.map((t) => t.state).join(), s.citations.length]
+  },
+  (streamSize) => {
+    if (streamSize) followStream()
+  },
+)
 
 // True from the moment a "load earlier" click starts until its scroll-offset
 // restore lands. The autoscroll watcher below fires when store.messages.length
@@ -566,14 +798,14 @@ function scrollToBottom() {
 let prepending = false
 
 async function onLoadEarlier() {
-  const el = messagesEl.value
-  const prevHeight = el ? el.scrollHeight : 0
-  const prevTop = el ? el.scrollTop : 0
+  const prevHeight = docScrollHeight()
+  const prevTop = window.scrollY
   prepending = true
+
   try {
     await store.loadEarlierMessages()
     await nextTick()
-    if (el) el.scrollTop = prevTop + (el.scrollHeight - prevHeight)
+    window.scrollTo(0, prevTop + (docScrollHeight() - prevHeight))
   } finally {
     prepending = false
   }
@@ -581,17 +813,23 @@ async function onLoadEarlier() {
 
 watch([() => store.messages.length, awaitingResponse], () => {
   if (prepending) return
-  scrollToBottom()
+
+  // A learner who just sent expects to see the reply, wherever they were; a
+  // reply landing while they read history above must not yank them down.
+  if (awaitingResponse.value || store.messages.at(-1)?.role === 'user') following = true
+
+  if (following) scrollToBottom()
 })
 
-// R2: at narrow widths the card lives at the end of the scroller, so a newly
-// opened batch would otherwise land below the fold. Shallow watch — the store
-// assigns a fresh object per batch, so this fires once per batch, not per
-// answered item.
+// The check batch and the level picker sit at the end of the transcript, so a
+// newly opened one would otherwise land below the fold. Shallow watch -- the
+// store assigns a fresh pendingCheck per batch, so this fires once per batch,
+// not per answered item.
 watch(
-  () => store.pendingCheck,
-  (now) => {
-    if (now && isNarrow.value) scrollToBottom()
+  [() => store.pendingCheck, showDiagnosticCard, topicCard],
+  ([check, diag, topic], [prevCheck, prevDiag, prevTopic]) => {
+    if ((check && check !== prevCheck) || (diag && !prevDiag) || (topic && !prevTopic))
+      scrollToBottom()
   },
 )
 
@@ -603,13 +841,17 @@ async function loadCurrent(id) {
   // loadSession entry. loadCurrent only runs on mount + id-change, so a same-
   // session send-error stays retryable.
   lastError.value = null
+  following = true
+  lastScrollY = window.scrollY
   cuesLanded.value = false
   diagProfile.value = null
   diagNullTurns = 0
   diagDismissed.value = storageGet(sessionStorageThunk, diagDismissKey(id)) === '1'
+  topicDismissed.value = storageGet(sessionStorageThunk, topicDismissKey(id)) === '1'
   diagError.value = ''
   diagLevelBusy.value = false
   loadDiagProfile(id) // deliberately not awaited: card is best-effort
+
   try {
     await store.loadSession(id)
   } catch (e) {
@@ -617,12 +859,15 @@ async function loadCurrent(id) {
     // 404 from the session we left must not flash its not-found over the one now
     // on screen. Same discriminator the success-path computeds use (id===props.id).
     if (id !== props.id) return
+
     if (e?.status === 404) {
       notFound.value = true
       store.setError(null)
     }
   }
+
   if (!isEnded.value && !notFound.value) focusComposer()
+
   // Covers fresh navigation (new id, e.g. from ProfileView's "Review gaps"
   // button, or the level-at-start picker's "Quiz me" chip) where the query
   // is already present before the session loads. handleQuizQuery runs first
@@ -666,6 +911,7 @@ watch(
   () => route.query.review_gap,
   (gap) => {
     if (!gap) return
+
     if (!current.value) return
     handleReviewGapQuery()
   },
@@ -676,6 +922,7 @@ watch(
   () => route.query.quiz,
   (quiz) => {
     if (!quiz) return
+
     if (!current.value) return
     handleQuizQuery()
   },
@@ -694,13 +941,13 @@ const canRetry = computed(() => Boolean(lastSentText.value) && !sending.value &&
 
 async function send() {
   const text = draft.value
+
   if (!text.trim()) return
   draft.value = ''
   lastSentText.value = text
   lastError.value = null
-  // The learner is writing again: the previous turn's landed tick is spent.
-  cuesLanded.value = false
   sending.value = true
+
   try {
     await store.sendMessageStreaming({ text })
     lastSentText.value = ''
@@ -716,6 +963,7 @@ async function send() {
         // the in-memory restore below is still the best we can do.
         storageSet(sessionStorageThunk, `crux:draft:${props.id}`, text)
       }
+
       draft.value = text
     } else {
       draft.value = text
@@ -732,6 +980,7 @@ async function retryLastMessage() {
   // silently discard that edit. lastSentText is only the fallback for the case
   // where the composer was cleared.
   if (!draft.value.trim() && lastSentText.value) draft.value = lastSentText.value
+
   if (!draft.value.trim()) return
   await send()
 }
@@ -741,6 +990,7 @@ async function retryLastMessage() {
 function restoreStashedDraft(id) {
   const key = `crux:draft:${id}`
   const stashed = storageGet(sessionStorageThunk, key)
+
   if (stashed !== null) {
     draft.value = stashed
     storageRemove(sessionStorageThunk, key)
@@ -751,6 +1001,7 @@ async function onDiagQuiz() {
   if (!canSend.value) return
   const id = props.id
   diagError.value = ''
+
   try {
     await store.sendMessageStreaming({ text: 'Quiz me to gauge my level' })
   } catch {
@@ -768,6 +1019,7 @@ async function onDiagQuiz() {
 // send failure is not surfaced on the card.
 async function sendLevelDeclaration(level) {
   if (!canSend.value) return
+
   try {
     await store.sendMessageStreaming({ text: `I'd say my level is ${level}.` })
   } catch {
@@ -785,11 +1037,14 @@ async function onDiagLevel(level) {
   // resolves late.
   const id = props.id
   const etag = diagProfile.value?.etag
+
   if (!etag) return
   diagLevelBusy.value = true
   diagError.value = ''
+
   try {
     const res = await patchProfile(id, { knowledge_level: level }, etag)
+
     if (id !== props.id) return // stale response from a previous session
     diagProfile.value = { profile: res.profile, etag: res.etag }
     await sendLevelDeclaration(level)
@@ -800,7 +1055,9 @@ async function onDiagLevel(level) {
       // has its own stale-response guard, so this is safe even if the
       // session has since switched.
       await loadDiagProfile(id)
+
       if (id !== props.id) return // stale response from a previous session
+
       if (diagProfile.value == null) {
         // The refetch itself failed (loadDiagProfile sets it to null on
         // error) -- distinct from "refetch succeeded, level still null".
@@ -810,8 +1067,10 @@ async function onDiagLevel(level) {
         // false alarm, not a real conflicting write. Retry once with the
         // fresh etag so the original click is not silently swallowed.
         const freshEtag = diagProfile.value.etag
+
         try {
           const retryRes = await patchProfile(id, { knowledge_level: level }, freshEtag)
+
           if (id !== props.id) return // stale response from a previous session
           diagProfile.value = { profile: retryRes.profile, etag: retryRes.etag }
           await sendLevelDeclaration(level)
@@ -829,7 +1088,8 @@ async function onDiagLevel(level) {
   }
 }
 
-// End is triggered from the sidebar row context menu (S2). When the store
+// End is triggered from the sidebar row context menu (S2) or the session action
+// bar (ticket 10); both call useSessionActions.confirmEnd. When the store
 // commits the End and the ended session matches this view's id, surface the
 // closing summary modal here. Watching pendingSummary keeps the trigger
 // location decoupled from the dialog owner.
@@ -848,22 +1108,39 @@ watch(
 async function onAttachFile(file) {
   // Client-side pre-check for instant feedback; backend re-validates (type + 25 MB).
   const v = validateFile(file)
+
   if (!v.ok) {
     uploadStatus.value = { kind: 'failed', text: v.reason }
+
     return
   }
+
   uploading.value = true
   uploadStatus.value = { kind: 'pending', text: `Uploading ${file.name}...` }
   const gen = uploadGen
+
   try {
     const resp = await uploadDocument({ sessionId: props.id, file })
+
     if (gen !== uploadGen) return
-    referenceBannerRef.value?.refresh?.()
-    await pollUploadStatus(resp.document_id, file.name, gen)
+    // The shared poller both drives the banner (so the new doc appears) and
+    // resolves once this document reaches a terminal state, replacing the old
+    // fixed-1s / 90-attempt pollUploadStatus loop.
+    const outcome = await watchReference(resp.document_id, file.name)
+
     if (gen !== uploadGen) return
-    referenceBannerRef.value?.refresh?.()
+    applyUploadOutcome(outcome, file.name)
   } catch (e) {
     if (gen !== uploadGen) return
+
+    // #460: the ended banner says it once; no "Upload failed" chip on top.
+    if (isSessionEndedError(e)) {
+      store.markSessionEnded()
+      uploadStatus.value = null
+
+      return
+    }
+
     // I-09: the 415 (and friends) carry an actionable server message -
     // prefer it over the generic friendlyError copy.
     const serverMsg = e?.body?.detail?.message
@@ -878,43 +1155,49 @@ async function onAttachFile(file) {
   }
 }
 
-async function pollUploadStatus(documentId, filename, gen) {
-  for (let i = 0; i < 90; i += 1) {
-    let s
-    try {
-      s = await getUploadStatus(documentId)
-    } catch (e) {
-      if (gen !== uploadGen) return
-      uploadStatus.value = {
-        kind: 'failed',
-        text: `Upload status unavailable: ${friendlyError(e)}`,
-      }
-      return
-    }
-    if (gen !== uploadGen) return
-    if (s.status === 'ready') {
-      uploadStatus.value = { kind: 'ready', text: `${filename} is ready. Ask a question about it.` }
-      return
-    }
-    if (s.status === 'failed') {
-      uploadStatus.value = {
-        kind: 'failed',
-        text: `Upload failed: ${s.error || 'ingestion error'}`,
-      }
-      return
-    }
-    await new Promise((r) => setTimeout(r, 1000))
-    if (gen !== uploadGen) return
+// Maps a useReferencePoll watch outcome onto the chip. Copy is unchanged from
+// the old pollUploadStatus; only the attempt ceiling became a ~90s wall-clock
+// ceiling (timedOut), because attempt counts mean nothing under backoff.
+function applyUploadOutcome(outcome, filename) {
+  // Session switched or the poller stopped: the id watcher already cleared the
+  // chip, so writing anything here would paint a stale session's status.
+  if (!outcome || outcome.cancelled) return
+
+  if (outcome.status === 'ready') {
+    uploadStatus.value = { kind: 'ready', text: `${filename} is ready. Ask a question about it.` }
+
+    return
   }
-  uploadStatus.value = {
-    kind: 'pending',
-    text: `${filename} is still processing. You can keep asking while it finishes.`,
+
+  if (outcome.status === 'failed') {
+    uploadStatus.value = {
+      kind: 'failed',
+      text: `Upload failed: ${outcome.error || 'ingestion error'}`,
+    }
+
+    return
   }
+
+  if (outcome.unavailable) {
+    uploadStatus.value = {
+      kind: 'failed',
+      text: `Upload status unavailable: ${friendlyError(outcome.error)}`,
+    }
+
+    return
+  }
+
+  // E-15: still pending at the wall-clock ceiling. The chip is a report on one
+  // upload attempt and nothing clears it, so a "still processing" caption sat
+  // there for the rest of the session on top of ReferenceStatusBanner, which
+  // already owns steady-state ingestion status. Hand it over: clear the chip.
+  uploadStatus.value = null
 }
 
 async function resume() {
   if (!store.currentSession) return
   resuming.value = true
+
   try {
     await store.reopenSession(store.currentSession.id)
   } catch {
@@ -926,10 +1209,13 @@ async function resume() {
 
 async function resumeReviewGaps() {
   if (!store.currentSession) return
+
   if (confirmedGaps.value.length > 1) {
     gapPickerOpen.value = true
+
     return
   }
+
   await sendReviewSeed(confirmedGaps.value[0])
 }
 
@@ -941,6 +1227,7 @@ async function sendReviewSeed(gap) {
   // before calling in, but this covers both null and stale defensively.
   if (!current.value) return
   resuming.value = true
+
   try {
     if (isEnded.value) await store.reopenSession(current.value.id)
     await store.sendMessageStreaming({
@@ -957,6 +1244,7 @@ async function sendReviewSeed(gap) {
 
 async function handleReviewGapQuery() {
   const gap = route.query.review_gap
+
   if (!gap) return
   router.replace({ query: { ...route.query, review_gap: undefined } })
   await sendReviewSeed(String(gap))
@@ -979,8 +1267,11 @@ async function handleQuizQuery() {
   // fires unprompted on a later remount/reload once review_gap is gone.
   const yieldToReviewGap = !!route.query.review_gap
   router.replace({ query: { ...route.query, quiz: undefined } })
+
   if (yieldToReviewGap) return
+
   if (!current.value) return
+
   try {
     await store.sendMessageStreaming({
       text: 'Quiz me so you can pitch this at the right level.',
@@ -991,11 +1282,17 @@ async function handleQuizQuery() {
   }
 }
 
+// #460: a session_ended rejection already put the store's copy on the error
+// line; adding lastError would show it twice and offer a Retry.
+function onCheckActionError(e) {
+  if (!(e instanceof StreamAbortedError && e.reason === 'session_ended')) lastError.value = e
+}
+
 async function onAnswerCheck(index) {
   try {
     await store.answerCheck(index)
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
@@ -1003,7 +1300,17 @@ async function onSkipCheck() {
   try {
     await store.skipCheck()
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
+  }
+}
+
+// #340: same settle path as Done -- the stream-state watcher refetches the
+// profile (a stopped diagnostic may just have set knowledge_level).
+async function onStopCheck() {
+  try {
+    await store.stopCheck()
+  } catch (e) {
+    onCheckActionError(e)
   }
 }
 
@@ -1016,7 +1323,7 @@ async function onDoneCheck() {
     // stays gone. No second fetch here.
     await store.completeCheck()
   } catch (e) {
-    lastError.value = e
+    onCheckActionError(e)
   }
 }
 
@@ -1027,41 +1334,44 @@ function goHome() {
 </script>
 
 <style scoped>
-/* App-shell: while in a session the document is locked to the viewport and the
-   .messages box is the only scroller. The body.chat-locked class (toggled on
-   mount/unmount) drives the overflow lock and the flex-height cascade — every
-   ancestor down to the scroller needs min-height: 0 so it can shrink instead of
-   overflowing. Scoped to this route; other routes keep normal document scroll. */
-:global(body.chat-locked) {
-  overflow: hidden;
-}
-:global(body.chat-locked #app) {
-  height: 100vh;
-  height: 100dvh;
-}
-:global(body.chat-locked .page) {
-  min-height: 0;
-}
-/* The sheet owns its own edges: no page padding, no measure cap. */
-:global(body.chat-locked .page-inner) {
+/* #346: the document is the scroller. The body.session-page class (toggled on
+   mount/unmount) only drives a flex-height cascade so the sheet is at least a
+   viewport tall: a short transcript still puts the composer at the foot of the
+   screen, a long one grows the page. The composer is pinned by the sticky
+   .notes-foot, not by locking the page. */
+:global(body.session-page .page) {
   display: flex;
   flex-direction: column;
-  height: 100%;
-  min-height: 0;
+}
+/* The sheet owns its own edges: no page padding, no measure cap. width: 100%
+   because the shared margin: 0 auto would shrink-wrap a flex item. */
+:global(body.session-page .page-inner) {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  width: 100%;
   padding: 0;
 }
 
 /* The desk: thread on the left, profile panel on the right, one header across.
    --panel-col is the panel's width; the collapsed value is the vertical tab
-   strip (CueColumn renders it, usePanel owns the state). */
+   strip (CueColumn renders it, usePanel owns the state). --sticky-top is where
+   sticky chrome parks: under the shell's mobile top strip below 1280px (the
+   useSidebar breakpoint), at the viewport edge above it. */
 .session.is-sheet {
   --panel-col: 17rem;
+  --sticky-top: 0px;
   display: grid;
   grid-template-columns: minmax(0, 1fr) var(--panel-col);
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto 1fr;
   flex: 1;
-  min-height: 0;
   width: 100%;
+}
+
+@media (max-width: 1279px) {
+  .session.is-sheet {
+    --sticky-top: var(--sidebar-mobile-strip-height, 3rem);
+  }
 }
 
 .session.is-sheet.panel-collapsed {
@@ -1078,53 +1388,47 @@ function goHome() {
   grid-column: 2;
   grid-row: 2;
   display: flex;
-  min-height: 0;
+  align-items: flex-start;
   min-width: 0;
+}
+
+/* The profile panel stays in view while the page scrolls under it. Capped at
+   the lesser of its row and the visible viewport, so it fills a short page
+   without growing it and its own .cue-body scroll keeps long profiles
+   reachable on a tall one. Narrow widths pin the whole strip cell instead. */
+@media (min-width: 900px) {
+  .sheet-cue :deep(.cue) {
+    position: sticky;
+    top: var(--sticky-top);
+    height: min(100%, calc(100dvh - var(--sticky-top)));
+  }
 }
 
 .sheet-notes {
   grid-column: 1;
   grid-row: 2;
   display: grid;
-  grid-template-rows: minmax(0, 1fr) auto;
-  min-height: 0;
+  grid-template-rows: 1fr auto;
   min-width: 0;
 }
 
 .messages {
-  /* Sole scroller in the app-shell. min-height: 0 lets it shrink within the
-     grid row instead of forcing the page to overflow. The cards are laid on the
-     desk: no ruled ground, the ground is what the turns sit on. */
-  /* position: relative makes the scroller the containing block for everything
-     inside it. Without it an absolutely positioned descendant with no offsets
-     (the check card's sr-only live region) resolves against the page, escapes
-     this box's overflow entirely, and is laid out at its static position deep
-     in the unscrolled transcript -- which grew document.scrollHeight to 1132px
-     on a 844px viewport and broke the "composer at the foot" promise. */
+  /* The cards are laid on the desk: no ruled ground, the ground is what the
+     turns sit on. The 1fr row stretches it so the foot sits at the bottom of
+     the viewport on a short transcript. */
+  /* position: relative makes the transcript the containing block for
+     everything inside it. Without it an absolutely positioned descendant with
+     no offsets (the check card's sr-only live region) resolves against the page
+     and is laid out at its static position, adding phantom height to the
+     document (1132px on a 844px viewport, 2026-09-16). */
   position: relative;
-  min-height: 0;
-  overflow-y: auto;
   background: var(--desk);
   padding: 1rem clamp(1rem, 3vw, 2rem);
-  scrollbar-width: thin;
-  scrollbar-color: var(--rule-strong) transparent;
 }
 
-.messages::-webkit-scrollbar {
-  width: 8px;
-}
-.messages::-webkit-scrollbar-button {
-  display: none;
-  height: 0;
-  width: 0;
-}
-.messages::-webkit-scrollbar-track {
-  background: transparent;
-}
-.messages::-webkit-scrollbar-thumb {
-  background: var(--rule-strong);
-  border: 2px solid transparent;
-  background-clip: padding-box;
+/* Cards opened in the transcript keep the spacing of the turns above them. */
+.transcript-card {
+  margin-top: 0.75rem;
 }
 
 /* The measure: a 72ch text column plus the card's own padding, centered in the
@@ -1136,10 +1440,16 @@ function goHome() {
   margin: 0 auto;
 }
 
-/* No top rule: the composer is a card on the desk, not a footer band. */
+/* No top rule: the composer is a card on the desk, not a footer band. Sticky
+   pins it to the bottom of the viewport while the page scrolls; the desk
+   ground keeps the transcript from showing through behind it. */
 .notes-foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 1;
   padding: 0 clamp(1rem, 3vw, 2rem) 1rem;
   min-width: 0;
+  background: var(--desk);
 }
 
 .notes-foot .notes-measure {
@@ -1322,47 +1632,35 @@ function goHome() {
 }
 
 /* Under 900px the profile panel becomes a strip under the header: one column,
-   so --panel-col is unused at this width. Kept in sync with the NARROW_QUERY
-   matchMedia switch in <script> -- the check card has to move between two
-   different containers, which CSS alone cannot do. */
+   so --panel-col is unused at this width. */
 @media (max-width: 899px) {
   .session.is-sheet {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto 1fr;
     /* clip, never hidden: hidden would make the grid a scroll container and
        change what the sticky strip and foot stick to. clip swallows the
-       sheet's dim overlay (which runs a viewport's worth past the strip) and
-       backstops anything else that tries to grow the page past the fold. */
+       sheet's dim overlay (which runs a viewport's worth past the strip) so
+       opening the profile never grows the page. */
     overflow: clip;
   }
 
-  /* R2: no scroller and no 50vh cap here — the expanded profile is bounded by
-     .cue-body's own 40vh cap in CueColumn, so the strip can never grow far
-     enough to push the notes column (and the composer with it) off-screen. */
+  /* The strip stays put while the page scrolls under it, so the disclosure
+     control is always reachable. Sticky lives on this grid cell, not on the
+     strip inside CueColumn: the cell's containing block is the whole sheet,
+     the strip's would only be the strip-tall panel. The expanded profile is
+     bounded by .cue-body's own 40vh cap in CueColumn. */
   .sheet-cue {
     grid-column: 1;
     grid-row: 2;
     display: block;
-    min-height: 0;
+    position: sticky;
+    top: var(--sticky-top);
+    z-index: 2;
   }
 
   .sheet-notes {
     grid-column: 1;
     grid-row: 3;
-  }
-
-  /* R2: the foot now carries only the status slot and the composer, so it is
-     short enough to stay in view. Sticky pins it to the bottom of the notes
-     column as a backstop if a status caption ever makes the column overflow. */
-  .notes-foot {
-    position: sticky;
-    bottom: 0;
-    background: var(--desk);
-  }
-
-  /* The inline card keeps the same spacing as the cards above it. */
-  .check-inline {
-    margin-bottom: 0.75rem;
   }
 }
 

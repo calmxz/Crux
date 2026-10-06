@@ -3,9 +3,8 @@
 Revision ID: 0014_llm_call_log
 Revises: 0013_learning_event_detail
 """
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 revision = "0014_llm_call_log"
 down_revision = "0013_learning_event_detail"

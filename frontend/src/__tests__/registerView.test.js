@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import RegisterView from '@/views/RegisterView.vue'
+import { AUTH_CODE_COPY } from '@/lib/authErrors.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const stubs = {
@@ -43,9 +44,11 @@ describe('RegisterView', () => {
 
   it('submit calls register and shows the check-inbox state', async () => {
     const auth = useAuthStore()
+
     const spy = vi
       .spyOn(auth, 'register')
       .mockResolvedValue({ user: { id: 'u-new' }, session: null })
+
     const wrapper = mountView()
     await wrapper.get('[data-testid="register-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="register-password"]').setValue('hunter2pw')
@@ -69,7 +72,13 @@ describe('RegisterView', () => {
 
   it('shows an error banner when register throws', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'register').mockRejectedValue(new Error('User already registered'))
+    // E-13: our copy for the SDK code, never the SDK's prose.
+    vi.spyOn(auth, 'register').mockRejectedValue(
+      Object.assign(new Error('User already registered'), {
+        code: 'user_already_exists',
+        status: 422,
+      }),
+    )
     const wrapper = mountView()
     await wrapper.get('[data-testid="register-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="register-password"]').setValue('hunter2pw')
@@ -78,9 +87,9 @@ describe('RegisterView', () => {
     await wrapper.get('[data-testid="register-form"]').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('[data-testid="register-error"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="register-error"]').text()).toContain(
-      'User already registered',
-    )
+    const text = wrapper.get('[data-testid="register-error"]').text()
+    expect(text).toBe(AUTH_CODE_COPY.user_already_exists)
+    expect(text).not.toContain('User already registered')
   })
 
   it('announces the error to screen readers', async () => {

@@ -3,6 +3,7 @@ import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 import ForgotPasswordView from '@/views/ForgotPasswordView.vue'
+import { AUTH_CODE_COPY } from '@/lib/authErrors.js'
 import { useAuthStore } from '@/stores/auth.js'
 
 const stubs = {
@@ -48,13 +49,24 @@ describe('ForgotPasswordView', () => {
 
   it('shows an error banner when the request throws', async () => {
     const auth = useAuthStore()
-    vi.spyOn(auth, 'requestPasswordReset').mockRejectedValue(new Error('rate limit'))
+    // E-13: our copy for the SDK code, never the SDK's prose.
+    vi.spyOn(auth, 'requestPasswordReset').mockRejectedValue(
+      Object.assign(
+        new Error('For security purposes, you can only request this after 46 seconds'),
+        {
+          code: 'over_email_send_rate_limit',
+          status: 429,
+        },
+      ),
+    )
     const wrapper = mountView()
     await wrapper.get('[data-testid="forgot-email"]').setValue('me@example.com')
     await wrapper.get('[data-testid="forgot-form"]').trigger('submit.prevent')
     await flushPromises()
     expect(wrapper.find('[data-testid="forgot-error"]').exists()).toBe(true)
-    expect(wrapper.get('[data-testid="forgot-error"]').text()).toContain('rate limit')
+    const text = wrapper.get('[data-testid="forgot-error"]').text()
+    expect(text).toBe(AUTH_CODE_COPY.over_email_send_rate_limit)
+    expect(text).not.toContain('46 seconds')
   })
 
   it('announces the error to screen readers', async () => {

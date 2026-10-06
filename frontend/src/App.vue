@@ -13,14 +13,19 @@ import SidebarMobileTopStrip from './components/sidebar/SidebarMobileTopStrip.vu
 import RouteProgressBar from './components/RouteProgressBar.vue'
 
 const { showError } = useToast()
+
 const route = useRoute()
+
 const { isDesktop, mode, closeDrawer, openDrawer, toggleDesktop } = useSidebar()
+
 const { toggleDesktop: togglePanel } = usePanel()
 
 const showShell = computed(() => route.meta?.sidebar !== false)
+
 // Sheet routes are the page itself: they run edge to edge so the desk ground
 // reaches the full width of the shell.
 const isSheet = computed(() => route.meta?.sheet === true)
+
 const { drawerOpen } = useSidebar()
 
 // Drives the shell's sidebar column width (see .shell CSS below). The column
@@ -30,7 +35,9 @@ const { drawerOpen } = useSidebar()
 // applied and the column keeps its default "auto" (collapses to zero).
 const shellSidebarClass = computed(() => {
   if (mode.value === 'expanded') return 'shell--sb-expanded'
+
   if (mode.value === 'collapsed') return 'shell--sb-collapsed'
+
   return null
 })
 
@@ -45,9 +52,11 @@ watch(
 // scroll the page underneath the backdrop.
 watch(drawerOpen, (open) => {
   if (typeof document === 'undefined') return
+
   if (open) document.body.classList.add('sb-scroll-lock')
   else document.body.classList.remove('sb-scroll-lock')
 })
+
 onBeforeUnmount(() => {
   if (typeof document !== 'undefined') {
     document.body.classList.remove('sb-scroll-lock')
@@ -60,10 +69,13 @@ onBeforeUnmount(() => {
 // codes, stack fragments) never lands in the toast.
 const onApiError = (e) => {
   const err = e.detail
+
   if (!err || err.status === 429 || err.status === 404) return
   showError(friendlyError(err))
 }
+
 onMounted(() => errorBus.addEventListener('api-error', onApiError))
+
 onBeforeUnmount(() => errorBus.removeEventListener('api-error', onApiError))
 
 // Shell shortcuts: Ctrl+B folds the sidebar, Ctrl+. folds the profile panel.
@@ -73,29 +85,37 @@ const EDITABLE_TAGS = ['INPUT', 'TEXTAREA', 'SELECT']
 
 function isEditableTarget(target) {
   if (!target || typeof target !== 'object') return false
+
   if (EDITABLE_TAGS.includes(target.tagName)) return true
+
   return target.isContentEditable === true
 }
 
 function overlayOpen() {
   if (typeof document === 'undefined') return false
+
   return Boolean(document.querySelector('.p-overlay-mask, .p-dialog, .p-popover'))
 }
 
 function onShellKeydown(e) {
   // Ctrl only: Ctrl+Shift+B is the browser's own bookmarks-bar toggle.
   if (!e.ctrlKey || e.shiftKey || e.altKey || e.metaKey) return
+
   if (isEditableTarget(e.target)) return
+
   if (overlayOpen()) return
 
   const key = typeof e.key === 'string' ? e.key.toLowerCase() : ''
+
   if (key === 'b') {
     if (isDesktop.value) toggleDesktop()
     else if (drawerOpen.value) closeDrawer()
     else openDrawer()
     e.preventDefault()
+
     return
   }
+
   if (key === '.' || e.code === 'Period') {
     togglePanel()
     e.preventDefault()
@@ -105,6 +125,7 @@ function onShellKeydown(e) {
 onMounted(() => {
   if (typeof window !== 'undefined') window.addEventListener('keydown', onShellKeydown)
 })
+
 onBeforeUnmount(() => {
   if (typeof window !== 'undefined') window.removeEventListener('keydown', onShellKeydown)
 })
@@ -128,11 +149,18 @@ onBeforeUnmount(() => {
       </main>
     </div>
   </div>
-  <RouterView v-else v-slot="{ Component }">
-    <transition name="fade">
-      <component :is="Component" />
-    </transition>
-  </RouterView>
+  <!-- D-15: chrome-less routes (login, legal, 404, onboarding) get the same
+       focus target as the shell so the router's afterEach has something stable
+       to move focus to. The id lives on this wrapper rather than on each view
+       root: afterEach runs before Vue swaps the rendered view, so a per-view id
+       would resolve to the outgoing root and lose focus when it unmounts. -->
+  <div v-else id="main-content" tabindex="-1">
+    <RouterView v-slot="{ Component }">
+      <transition name="fade">
+        <component :is="Component" />
+      </transition>
+    </RouterView>
+  </div>
   <Toast position="top-right" />
   <ConfirmDialog />
 </template>

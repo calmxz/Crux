@@ -18,6 +18,7 @@ async function mountView() {
   const router = makeRouter()
   await router.push('/nope-404')
   await router.isReady()
+
   return mount(NotFoundView, { global: { plugins: [router] } })
 }
 

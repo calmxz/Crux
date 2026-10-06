@@ -11,7 +11,6 @@ Output format is a stable, parseable marker the e2e suite asserts against:
 import hashlib
 import re
 
-
 _SUMMARY_LINE = re.compile(r"^LAST_SESSION_SUMMARY:(.*)$", re.MULTILINE)
 
 

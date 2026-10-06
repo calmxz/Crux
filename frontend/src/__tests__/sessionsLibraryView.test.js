@@ -1,9 +1,10 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { reactive } from 'vue'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 
 const push = vi.fn()
+
 // Reactive so watch(() => route.query...) inside the component actually
 // re-fires when a test mutates a property post-mount (simulating a
 // same-route query navigation). replace() mimics real router behavior by
@@ -18,13 +19,16 @@ const push = vi.fn()
 // inflating the call count nondeterministically. A fresh object per test
 // means only the current test's component instance is subscribed to it.
 let mockRouteQuery = reactive({})
+
 const replace = vi.fn((to) => {
   if (to?.query) {
     for (const k of Object.keys(mockRouteQuery)) delete mockRouteQuery[k]
     Object.assign(mockRouteQuery, to.query)
   }
+
   return Promise.resolve()
 })
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push, replace }),
   useRoute: () => ({ query: mockRouteQuery }),
@@ -45,6 +49,7 @@ const stubs = {
 function page(items, over = {}) {
   return { items, total: items.length, limit: 20, offset: 0, ...over }
 }
+
 function item(id, over = {}) {
   return {
     id,
@@ -93,6 +98,13 @@ describe('SessionsLibraryView', () => {
     vi.stubGlobal('IntersectionObserver', MockIntersectionObserver)
   })
 
+  // A test that fails before its own vi.useRealTimers() used to leak fake
+  // timers into every later test in this file, turning one assertion failure
+  // into a cascade of unrelated timeouts. Reset unconditionally.
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
   it('renders rich cards from the library page', async () => {
     sessionsApi.getSessionLibrary.mockResolvedValue(page([item('a'), item('b')]))
     const wrapper = mount(SessionsLibraryView, { global: { stubs } })
@@ -134,13 +146,33 @@ describe('SessionsLibraryView', () => {
     expect(wrapper.get('[data-testid="library-error"]').exists()).toBe(true)
   })
 
+  it('E-06: a first-load failure offers Retry, which refetches from offset 0', async () => {
+    sessionsApi.getSessionLibrary
+      .mockRejectedValueOnce(new Error('nope'))
+      .mockResolvedValueOnce(page([item('a')]))
+    const wrapper = mount(SessionsLibraryView, { global: { stubs } })
+    await flushPromises()
+    expect(wrapper.get('[data-testid="library-error"]').exists()).toBe(true)
+    await wrapper.get('[data-testid="library-error-retry"]').trigger('click')
+    await flushPromises()
+    expect(sessionsApi.getSessionLibrary).toHaveBeenCalledTimes(2)
+    expect(sessionsApi.getSessionLibrary).toHaveBeenLastCalledWith(
+      expect.objectContaining({ offset: 0 }),
+      { silent: true },
+    )
+    expect(wrapper.find('[data-testid="library-error"]').exists()).toBe(false)
+    expect(wrapper.findAll('[data-testid^="library-card-"]')).toHaveLength(1)
+  })
+
   it('the card links to the session route', async () => {
     sessionsApi.getSessionLibrary.mockResolvedValue(page([item('a')]))
     const wrapper = mount(SessionsLibraryView, { global: { stubs } })
     await flushPromises()
+
     const link = wrapper
       .findAllComponents(stubs.RouterLink)
       .find((c) => c.props('to')?.params?.id === 'a')
+
     expect(link).toBeTruthy()
     expect(link.props('to')).toEqual({ name: 'session', params: { id: 'a' } })
   })
@@ -199,6 +231,7 @@ describe('SessionsLibraryView', () => {
     await flushPromises()
     expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
       expect.objectContaining({ status: 'ended', offset: 0 }),
+      { silent: true },
     )
     // No-double-fetch guard: setStatus also syncs the URL (router.replace),
     // which in a real router reactively updates route.query and could
@@ -248,6 +281,7 @@ describe('SessionsLibraryView', () => {
     await flushPromises()
     expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
       expect.objectContaining({ sort: 'topic' }),
+      { silent: true },
     )
   })
 
@@ -263,6 +297,7 @@ describe('SessionsLibraryView', () => {
     await flushPromises()
     expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
       expect.objectContaining({ q: 'gly', offset: 0 }),
+      { silent: true },
     )
     vi.useRealTimers()
   })
@@ -385,12 +420,14 @@ describe('SessionsLibraryView', () => {
     const { useSessionStore } = await import('@/stores/session.js')
     const store = useSessionStore()
     let resolve
+
     const continueTopicSpy = vi.spyOn(store, 'continueTopic').mockImplementation(
       () =>
         new Promise((r) => {
           resolve = r
         }),
     )
+
     sessionsApi.getSessionLibrary.mockResolvedValue(
       page([item('z', { ended_at: '2026-06-02T00:00:00Z' })]),
     )
@@ -414,11 +451,14 @@ describe('SessionsLibraryView', () => {
     const wrapper = mount(SessionsLibraryView, { global: { stubs } })
     await flushPromises()
     const rejections = []
+
     const onUnhandled = (e) => {
       rejections.push(e)
       e.preventDefault()
     }
+
     window.addEventListener('unhandledrejection', onUnhandled)
+
     try {
       await wrapper.get('[data-testid="library-continue-z"]').trigger('click')
       await flushPromises()
@@ -426,6 +466,7 @@ describe('SessionsLibraryView', () => {
     } finally {
       window.removeEventListener('unhandledrejection', onUnhandled)
     }
+
     expect(rejections).toHaveLength(0)
     expect(push).not.toHaveBeenCalled()
     // The button is usable again for a retry.
@@ -496,6 +537,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ offset: 20 }),
+        { silent: true },
       )
       expect(wrapper.findAll('[data-testid^="library-card-"]')).toHaveLength(40)
       expect(wrapper.find('[data-testid="library-card-s1"]').exists()).toBe(true)
@@ -558,6 +600,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'ended', offset: 0 }),
+        { silent: true },
       )
       expect(wrapper.findAll('[data-testid^="library-card-"]')).toHaveLength(1)
       expect(wrapper.find('[data-testid="library-card-s1"]').exists()).toBe(false)
@@ -585,6 +628,7 @@ describe('SessionsLibraryView', () => {
       await flushPromises()
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ offset: 1 }),
+        { silent: true },
       )
       expect(wrapper.find('[data-testid="library-retry"]').exists()).toBe(false)
     })
@@ -656,11 +700,25 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'ended', q: 'gly', offset: 0 }),
+        { silent: true },
       )
       expect(wrapper.get('[data-testid="library-filter-ended"]').attributes('aria-pressed')).toBe(
         'true',
       )
       expect(wrapper.get('[data-testid="library-search"]').element.value).toBe('gly')
+    })
+
+    it('clamps a bookmarked q to the backend cap of 200 chars', async () => {
+      Object.assign(mockRouteQuery, { q: 'x'.repeat(250) })
+      sessionsApi.getSessionLibrary.mockResolvedValue(page([item('a')]))
+      const wrapper = mount(SessionsLibraryView, { global: { stubs } })
+      await flushPromises()
+
+      expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
+        expect.objectContaining({ q: 'x'.repeat(200) }),
+        { silent: true },
+      )
+      expect(wrapper.get('[data-testid="library-search"]').element.value).toHaveLength(200)
     })
 
     it('ignores an invalid status query value', async () => {
@@ -671,6 +729,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'all' }),
+        { silent: true },
       )
     })
   })
@@ -705,6 +764,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'ended', offset: 0 }),
+        { silent: true },
       )
       expect(wrapper.findAll('[data-testid^="library-card-"]')).toHaveLength(1)
       expect(wrapper.find('[data-testid="library-card-s1"]').exists()).toBe(false)
@@ -725,6 +785,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ q: 'gly', offset: 0 }),
+        { silent: true },
       )
       expect(wrapper.get('[data-testid="library-search"]').element.value).toBe('gly')
     })
@@ -744,6 +805,7 @@ describe('SessionsLibraryView', () => {
 
       expect(sessionsApi.getSessionLibrary).toHaveBeenCalledWith(
         expect.objectContaining({ status: 'all', offset: 0 }),
+        { silent: true },
       )
       expect(wrapper.get('[data-testid="library-filter-all"]').attributes('aria-pressed')).toBe(
         'true',

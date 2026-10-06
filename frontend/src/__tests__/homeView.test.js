@@ -6,12 +6,14 @@ import HomeView from '@/views/HomeView.vue'
 import { useSessionStore } from '@/stores/session.js'
 
 const push = vi.fn()
+
 vi.mock('vue-router', () => ({
   useRouter: () => ({ push }),
   RouterLink: { props: ['to'], template: '<a :href="to"><slot /></a>' },
 }))
 
 const apiEndSession = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', () => ({
   endSession: (...args) => apiEndSession(...args),
 }))
@@ -26,6 +28,7 @@ const stubs = {
 
 function makeSession(id, topic, ended = false, createdOffset = 0) {
   const created = new Date(Date.now() + createdOffset).toISOString()
+
   return {
     id,
     topic,
@@ -87,6 +90,36 @@ describe('HomeView', () => {
     store.sessions = []
     const wrapper = mountView()
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
+  })
+
+  // E-01: a boot-time list failure with zero sessions used to hide the start
+  // form entirely (v-if/v-else on store.error), leaving the learner with no
+  // way to start a session. The form must stay mounted regardless.
+  it('does not hide the start form when store.error is set and there are no sessions (E-01)', () => {
+    const store = useSessionStore()
+    store.error = 'boom'
+    store.sessions = []
+    const wrapper = mountView()
+    expect(wrapper.find('[data-testid="home-quick-topic"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="home-quick-go"]').exists()).toBe(true)
+  })
+
+  // E-01: a failed createSession used to throw out of an unawaited handler
+  // (unhandled rejection) and leave the learner stuck with no feedback. The
+  // form must stay mounted and the failure must surface inline.
+  it('keeps the start form mounted and shows an inline error when create fails (E-01)', async () => {
+    const store = useSessionStore()
+    vi.spyOn(store, 'listSessions').mockResolvedValue([])
+    vi.spyOn(store, 'lookupTopic').mockResolvedValue({ active_match: null, ended_match: null })
+    vi.spyOn(store, 'createSession').mockRejectedValue(new Error('boom'))
+    const wrapper = mountView()
+    await flushPromises()
+    await wrapper.get('[data-testid="home-quick-topic"]').setValue('Recursion')
+    await wrapper.get('[data-testid="home-quick-go"]').trigger('click')
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-quick-topic"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="home-quick-go"]').exists()).toBe(true)
+    expect(wrapper.get('[data-testid="home-error"]').text()).toBe('boom')
   })
 
   it('shows a single New lesson card, no Build a subject', async () => {
@@ -170,11 +203,13 @@ describe('HomeView', () => {
     const store = useSessionStore()
     vi.spyOn(store, 'listSessions').mockResolvedValue([])
     let resolveLookup
+
     const lookupSpy = vi.spyOn(store, 'lookupTopic').mockReturnValue(
       new Promise((resolve) => {
         resolveLookup = resolve
       }),
     )
+
     vi.spyOn(store, 'createSession').mockResolvedValue({ id: 'sess1' })
     const wrapper = mountView()
     await flushPromises()

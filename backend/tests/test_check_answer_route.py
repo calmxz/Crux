@@ -5,11 +5,11 @@ from datetime import datetime, timezone
 
 import pytest
 
-from contracts import AskCheckQuestionsArgs, TopicProfile
 from agent.types import ToolContext
-from db.models import ChatMessage, Session as SessionModel, User
+from contracts import AskCheckQuestionsArgs, TopicProfile
+from db.models import ChatMessage, User
+from db.models import Session as SessionModel
 from services import check_question_service, profile_service
-
 
 USER_ID = "u_ans_1"
 
@@ -33,6 +33,7 @@ def _open_batch(db, session_id):
     ctx = ToolContext(db=db, session_id=session_id, user_id=USER_ID,
                       turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
     check_question_service.register(db, ctx, AskCheckQuestionsArgs(
+        set_index=1, set_total=1,
         session_id=session_id, gap="atp",
         items=[
             {"question": "Q1?", "options": ["2 ATP", "36 ATP"],
@@ -69,9 +70,22 @@ def test_answer_last_item_done(client, db_session, seeded_session):
     assert r.json()["done"] is True
 
 
-def test_answer_out_of_order_is_409(client, db_session, seeded_session):
+def test_answer_later_item_first(client, db_session, seeded_session):
+    # #348: free navigation, any pending item may be answered first.
     sid = seeded_session.id
     _open_batch(db_session, sid)
+    r = client.post(f"/api/sessions/{sid}/check/answer",
+                    json={"index": 1, "selected_index": 0, "user_id": USER_ID})
+    assert r.status_code == 200
+    assert r.json()["current_index"] == 0
+    assert r.json()["done"] is False
+
+
+def test_answer_resolved_item_is_409(client, db_session, seeded_session):
+    sid = seeded_session.id
+    _open_batch(db_session, sid)
+    client.post(f"/api/sessions/{sid}/check/answer",
+                json={"index": 1, "selected_index": 0, "user_id": USER_ID})
     r = client.post(f"/api/sessions/{sid}/check/answer",
                     json={"index": 1, "selected_index": 0, "user_id": USER_ID})
     assert r.status_code == 409

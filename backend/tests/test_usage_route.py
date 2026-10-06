@@ -23,6 +23,10 @@ def test_usage_summary_shape(client, db_session):
     assert body["urgent_cap_usd"] == 2.7
     assert body["hard_cap_usd"] == 3.0
     assert body["top_sessions"] == []
+    resets_at = datetime.fromisoformat(body["resets_at"])
+    assert resets_at.tzinfo is not None
+    assert (resets_at.hour, resets_at.minute, resets_at.second) == (0, 0, 0)
+    assert resets_at > datetime.now(timezone.utc)
 
 
 def test_usage_summary_rejects_invalid_token(client, db_session):

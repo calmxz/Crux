@@ -1,6 +1,12 @@
 <template>
-  <div v-if="status" class="ref-status" :class="`is-${status}`" data-testid="reference-status">
+  <div
+    v-if="status || failed"
+    class="ref-status"
+    :class="[status ? `is-${status}` : null, { 'is-unavailable': failed }]"
+    data-testid="reference-status"
+  >
     <button
+      v-if="status"
       type="button"
       class="ref-header"
       data-testid="ref-toggle"
@@ -77,6 +83,15 @@
       </svg>
     </button>
 
+    <!-- F-12: a poll threw. The last-known list above (if any) stays rendered so
+         per-file delete stays reachable; this row owns the outage and its retry. -->
+    <div v-if="failed" class="ref-unavailable" data-testid="ref-unavailable">
+      <span class="ref-text" role="status" aria-live="polite">References unavailable.</span>
+      <button type="button" class="ref-retry" data-testid="ref-retry" @click="emit('refresh')">
+        Retry
+      </button>
+    </div>
+
     <ul v-if="expanded" class="ref-file-list" data-testid="ref-file-list">
       <li v-for="doc in documents" :key="doc.id" class="ref-file-row">
         <span class="ref-file-name">{{ doc.filename }}</span>
@@ -115,65 +130,54 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, ref } from 'vue'
 import { useConfirm } from 'primevue/useconfirm'
 
-import { getSessionIngestion, deleteDocument } from '../../services/uploadApi.js'
+import { deleteDocument } from '../../services/uploadApi.js'
 import { useToast } from '../../composables/useToast.js'
 
+// F-12 / E-07: this component used to own a fixed-2s poller of its own, running
+// alongside SessionView's fixed-1s upload poller against the same fact. Both
+// now read one useReferencePoll instance owned by SessionView, so the banner is
+// presentational plus the delete flow. `refresh` asks the owner to re-poll.
 const props = defineProps({
-  sessionId: { type: String, required: true },
+  // 'pending' | 'ready' | 'failed' | null
+  status: { type: String, default: null },
+  documents: { type: Array, default: () => [] },
+  failed: { type: Boolean, default: false },
 })
 
-const status = ref(null) // 'pending' | 'ready' | 'failed' | null
-const documents = ref([])
+const emit = defineEmits(['refresh'])
+
 const expanded = ref(false)
 
-let timer = null
-let stopped = false
-// Bumped on every refresh()/sessionId change so an in-flight poll() whose await
-// resolves late cannot clobber a newer session's status (or write post-unmount).
-let generation = 0
+const readyCount = computed(() => props.documents.filter((d) => d.status === 'ready').length)
 
-const readyCount = computed(() => documents.value.filter((d) => d.status === 'ready').length)
-const failedCount = computed(() => documents.value.filter((d) => d.status === 'failed').length)
-const total = computed(() => documents.value.length)
+const failedCount = computed(() => props.documents.filter((d) => d.status === 'failed').length)
+
+// #430: only in-flight files are being indexed; ready ones already are.
+const indexingCount = computed(
+  () => props.documents.filter((d) => d.status === 'pending' || d.status === 'processing').length,
+)
 
 const message = computed(() => {
-  if (status.value === 'pending') {
-    return `Indexing ${total.value} reference${total.value === 1 ? '' : 's'}... you can start chatting now.`
+  if (props.status === 'pending') {
+    return `Indexing ${indexingCount.value} reference${indexingCount.value === 1 ? '' : 's'}... you can start chatting now.`
   }
-  if (status.value === 'failed') {
+
+  if (props.status === 'failed') {
     return `${failedCount.value} reference${failedCount.value === 1 ? '' : 's'} could not be indexed.`
   }
-  if (status.value === 'ready') {
+
+  if (props.status === 'ready') {
     return `${readyCount.value} reference${readyCount.value === 1 ? '' : 's'} ready.`
   }
+
   return ''
 })
 
-async function poll(gen) {
-  if (stopped || gen !== generation) return
-  try {
-    const res = await getSessionIngestion(props.sessionId)
-    if (stopped || gen !== generation) return
-    status.value = res?.status ?? null
-    documents.value = res?.documents ?? []
-  } catch {
-    // Transient; keep the last known state and retry on the next tick.
-  }
-  if (!stopped && gen === generation && status.value === 'pending') {
-    timer = setTimeout(() => poll(gen), 2000)
-  }
-}
-
-function refresh() {
-  generation += 1
-  if (timer) clearTimeout(timer)
-  poll(generation)
-}
-
 const confirm = useConfirm()
+
 const { showSuccess, showError } = useToast()
 
 function confirmDelete(doc) {
@@ -191,23 +195,14 @@ function confirmDelete(doc) {
       try {
         await deleteDocument(doc.id)
         showSuccess(`${doc.filename} removed.`)
-        refresh()
+        emit('refresh')
       } catch {
         showError(`Could not delete ${doc.filename}. Please try again.`)
-        refresh()
+        emit('refresh')
       }
     },
   })
 }
-
-watch(() => props.sessionId, refresh)
-onMounted(() => poll(generation))
-onUnmounted(() => {
-  stopped = true
-  if (timer) clearTimeout(timer)
-})
-
-defineExpose({ refresh })
 </script>
 
 <style scoped>
@@ -236,6 +231,40 @@ defineExpose({ refresh })
 .ref-status.is-failed {
   border-top-color: var(--tab-focus);
   color: var(--ink-marker-text);
+}
+
+/* A transient outage, not a rejected document: same warning tab edge, but the
+   ink stays neutral so a stale ready/pending count above it still reads. */
+.ref-status.is-unavailable {
+  border-top-color: var(--tab-focus);
+}
+
+.ref-unavailable {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  line-height: 1.75rem;
+}
+
+/* Only when a last-known status line sits above it, so the outage row reads as
+   a second line rather than a floating sentence. */
+.ref-header + .ref-unavailable {
+  border-top: 1px solid var(--card-edge);
+}
+
+.ref-retry {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  color: var(--ink-learner);
+  font: inherit;
+  text-decoration: underline;
+}
+
+.ref-retry:focus-visible {
+  outline: 2px solid var(--color-accent-ring);
+  outline-offset: 2px;
 }
 
 .ref-header {

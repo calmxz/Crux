@@ -6,8 +6,8 @@ import pytest
 
 from config import settings
 from contracts import TopicProfile
-from db.models import Session as SessionModel, User
-
+from db.models import Session as SessionModel
+from db.models import User
 
 SESSION_ID = "s_debug_timing"
 USER_ID = "u_debug_timing"

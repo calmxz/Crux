@@ -18,10 +18,10 @@ import pytest
 
 from config import settings
 from contracts import TopicProfile
-from db.models import DailyCostLedger, Session as SessionModel, User
+from db.models import DailyCostLedger, User
+from db.models import Session as SessionModel
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
 from services import cost_meter
-
 
 USER_ID = "u_cost"
 SESSION_ID = "s_cost"
@@ -196,10 +196,11 @@ async def test_tutor_records_cost_per_call(
 ):
     """run_streaming's billed acompletion call must accumulate its cost to
     the per-user daily ledger (real record_cost, real ledger row)."""
-    from agent import tutor
-    from agent.types import ToolContext
     from datetime import datetime, timezone
     from unittest.mock import AsyncMock
+
+    from agent import tutor
+    from agent.types import ToolContext
 
     # Disable stub so the real loop runs.
     monkeypatch.setattr(settings, "llm_stub", False)
@@ -265,11 +266,12 @@ async def test_tutor_short_circuits_on_mid_turn_hard_cap(
     """If `record_cost` pushes spend past `llm_hard_cap_usd` mid-loop, the
     next iteration must bail with a daily_cost_cap_reached error event
     before issuing another acompletion."""
+    from datetime import datetime, timezone
+    from unittest.mock import AsyncMock
+
     from agent import tutor
     from agent.types import ToolContext
     from contracts import ToolResult
-    from datetime import datetime, timezone
-    from unittest.mock import AsyncMock
 
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")

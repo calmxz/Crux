@@ -12,9 +12,11 @@ function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (name === '__tests__') continue
     const p = join(dir, name)
+
     if (statSync(p).isDirectory()) walk(p, out)
     else if (name.endsWith('.css') || name.endsWith('.vue')) out.push(p)
   }
+
   return out
 }
 
@@ -32,6 +34,7 @@ describe('reduced motion is an alternative, not a blanket kill (WCAG 2.3.3)', ()
     const offenders = files
       .filter((f) => /animation-duration:\s*0\.01ms/.test(f.src))
       .map((f) => f.path)
+
     expect(offenders).toEqual([])
   })
 
@@ -39,15 +42,18 @@ describe('reduced motion is an alternative, not a blanket kill (WCAG 2.3.3)', ()
     const offenders = files
       .filter((f) => /transition-duration:\s*0\.01ms/.test(f.src))
       .map((f) => f.path)
+
     expect(offenders).toEqual([])
   })
 
   it('every @keyframes owner declares its own reduced-motion alternative', () => {
     const owners = files.filter((f) => f.src.includes('@keyframes'))
     expect(owners.length).toBeGreaterThan(10)
+
     const missing = owners
       .filter((f) => !f.src.includes('prefers-reduced-motion'))
       .map((f) => f.path)
+
     expect(missing).toEqual([])
   })
 })

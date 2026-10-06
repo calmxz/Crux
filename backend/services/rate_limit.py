@@ -12,14 +12,6 @@ def _today_utc() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
 
-def midnight_utc_iso() -> str:
-    from datetime import timedelta
-
-    now = datetime.now(timezone.utc)
-    tomorrow = (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
-    return tomorrow.isoformat()
-
-
 def check_and_increment(db: Session, user_id: str) -> tuple[bool, int]:
     """Return (allowed, current_used_count_after_call).
 

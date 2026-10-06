@@ -40,6 +40,7 @@ def test_cors_disallows_credentials():
 
 def test_accepted_terms_from_request_reads_user_metadata():
     from types import SimpleNamespace
+
     from services import auth as auth_service
 
     req = SimpleNamespace(state=SimpleNamespace(

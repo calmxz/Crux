@@ -10,9 +10,9 @@ import pytest
 from agent.types import ToolContext
 from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
-from db.models import ChatMessage, LlmCallLog, Session as SessionModel, User
+from db.models import ChatMessage, LlmCallLog, User
+from db.models import Session as SessionModel
 from services import check_question_service, cost_meter, profile_service, summary_service
-
 
 USER_ID = "u1"
 SESSION_ID = "s1"
@@ -298,6 +298,7 @@ def _open_batch(db, session_id, user_id=USER_ID, n=2):
     return check_question_service.register(
         db, ctx,
         AskCheckQuestionsArgs(
+            set_index=1, set_total=1,
             session_id=session_id,
             gap="g",
             items=[

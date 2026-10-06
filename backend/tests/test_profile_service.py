@@ -7,10 +7,10 @@ import pytest
 
 from agent.types import ToolContext
 from contracts import ConceptEntry, TopicProfile, UpdateTopicProfileArgs
-from db.models import LearningEvent, Session as SessionModel, User
+from db.models import LearningEvent, User
+from db.models import Session as SessionModel
 from services import profile_service
 from services.profile_service import concept_names
-
 
 SESSION_ID = "sess_1"
 USER_ID = "u1"
@@ -424,6 +424,117 @@ def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
     assert profile == TopicProfile()
 
 
+def _seed_one_bad_entry(db_session):
+    """#436 probe seed: one mastered entry carries a retired evidence_type."""
+    row = db_session.get(SessionModel, SESSION_ID)
+    row.topic_profile_json = json.dumps(
+        {
+            "knowledge_level": "intermediate",
+            "mastered_concepts": [
+                {"name": "joins", "evidence_type": "declared"},
+                {"name": "views", "evidence_type": "inferred"},
+            ],
+            "confirmed_gaps": [{"name": "indexes"}],
+            "last_session_summary": "covered joins",
+        }
+    )
+    db_session.commit()
+
+
+def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session):
+    _seed_one_bad_entry(db_session)
+
+    profile = profile_service.load_profile(db_session, SESSION_ID)
+    assert profile.knowledge_level == "intermediate"
+    assert concept_names(profile.mastered_concepts) == ["joins"]
+    assert concept_names(profile.confirmed_gaps) == ["indexes"]
+    assert profile.last_session_summary == "covered joins"
+
+
+def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session):
+    _seed_one_bad_entry(db_session)
+
+    profile_service.apply_user_patch(db_session, SESSION_ID, add_gap="subqueries")
+
+    stored = json.loads(db_session.get(SessionModel, SESSION_ID).topic_profile_json)
+    assert stored["knowledge_level"] == "intermediate"
+    assert [e["name"] for e in stored["mastered_concepts"]] == ["joins"]
+    assert [e["name"] for e in stored["confirmed_gaps"]] == ["indexes", "subqueries"]
+    assert stored["last_session_summary"] == "covered joins"
+
+
+def test_invalid_level_is_dropped_lists_are_kept():
+    p = _parse_profile(
+        '{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}'
+    )
+    assert p.knowledge_level is None
+    assert concept_names(p.mastered_concepts) == ["joins"]
+
+
+def test_bad_subtopic_level_dropped_others_kept():
+    p = _parse_profile('{"subtopic_levels": {"a": "beginner", "b": "wizard"}}')
+    assert p.subtopic_levels == {"a": "beginner"}
+
+
+def test_salvage_drops_bad_elements_and_unlistable_fields():
+    p = _parse_profile(
+        json.dumps(
+            {
+                "confirmed_gaps": [{"name": "a", "stale": 1}, "b"],
+                "mastered_concepts": "not a list",
+                "retired_field": True,
+            }
+        )
+    )
+    assert concept_names(p.confirmed_gaps) == ["b"]
+    assert p.mastered_concepts == []
+
+
+@pytest.mark.parametrize(
+    ("focus", "expected"),
+    [("Views", None), ("indexes", "indexes"), ("unlisted", "unlisted")],
+    ids=["on-dropped-gap", "on-kept-gap", "outside-gaps"],
+)
+def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected):
+    """F-22: dropping the focused gap would leave focus dangling. A focus
+    outside confirmed_gaps is legal on its own and survives."""
+    p = _parse_profile(
+        json.dumps(
+            {
+                "confirmed_gaps": [
+                    {"name": "indexes"},
+                    {"name": "views", "evidence_type": "inferred"},
+                ],
+                "focus_target_gap": focus,
+            }
+        )
+    )
+    assert concept_names(p.confirmed_gaps) == ["indexes"]
+    assert p.focus_target_gap == expected
+
+
+def test_salvage_warning_carries_no_learner_text(caplog):
+    with caplog.at_level("WARNING", logger="services.profile_service"):
+        _parse_profile(
+            json.dumps(
+                {
+                    "knowledge_level": "expert",
+                    "mastered_concepts": [
+                        {"name": "secret-concept", "evidence_type": "inferred"}
+                    ],
+                    "confirmed_gaps": [{"name": "secret-gap", "x": 1}],
+                    "focus_target_gap": 7,
+                    "last_session_summary": "secret summary",
+                    "subtopic_levels": {"secret-sub": "wizard"},
+                }
+            )
+        )
+    text = caplog.text
+    assert "salvaged" in text
+    for secret in ("secret-concept", "secret-gap", "secret summary", "secret-sub"):
+        assert secret not in text
+
+
 def test_save_profile_commit_false_defers_write(session_row, db_session):
     """commit=False leaves the write in the open transaction so a caller can
     batch it into one atomic commit (used by record_from_answer to close the
@@ -549,6 +660,7 @@ def test_lock_session_row_emits_for_update_on_postgres():
     # SQLite ignores FOR UPDATE, so prove intent at the SQL layer instead.
     from sqlalchemy import select
     from sqlalchemy.dialects import postgresql
+
     from db.models import Session as SessionModel
     stmt = select(SessionModel).where(SessionModel.id == "x").with_for_update()
     assert "FOR UPDATE" in str(stmt.compile(dialect=postgresql.dialect()))
@@ -974,3 +1086,35 @@ def test_agent_gap_add_removes_concept_from_mastered(db_session, session_row, ct
     mastered = [e.name for e in (profile.mastered_concepts or [])]
     assert "chain rule" in gaps
     assert "chain rule" not in mastered
+
+
+def test_focus_clear_log_redacts_gap_name(session_row, ctx, db_session, caplog):
+    """G-05: the focus_clear INFO line must not carry the raw gap string
+    (learner free text is PII-adjacent). A sha256 prefix plus length keeps the
+    line correlatable without leaking content."""
+    import hashlib
+    import logging
+
+    gap = "photosynthesis light reactions"
+    _set_focus(db_session, ctx, gap)
+    caplog.clear()
+    with caplog.at_level(logging.INFO, logger="services.profile_service"):
+        result = profile_service.apply_patch(
+            db_session,
+            ctx,
+            _patch(
+                focus_target_gap=None,
+                focus_clear_reason="user_redirected",
+                evidence_type="inferred",
+            ),
+        )
+    assert result.ok is True
+
+    records = [r for r in caplog.records if r.name == "services.profile_service"]
+    messages = [r.getMessage() for r in records]
+    assert not any(gap in m for m in messages), messages
+    digest = hashlib.sha256(gap.encode()).hexdigest()[:8]
+    line = next(m for m in messages if "focus_clear session=" in m)
+    assert f"gap_sha={digest}" in line
+    assert f"gap_len={len(gap)}" in line
+    assert "reason=user_redirected" in line

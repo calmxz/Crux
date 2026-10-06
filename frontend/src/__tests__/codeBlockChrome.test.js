@@ -42,6 +42,7 @@ describe('code-block copy button (F-03)', () => {
       value: { writeText },
       configurable: true,
     })
+
     return mount(MarkdownContent, {
       props: { text: '```python\nprint("hi")\n```' },
     })

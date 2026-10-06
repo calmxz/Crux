@@ -105,6 +105,56 @@ def test_record_cost_is_an_atomic_increment(db_session):
     assert total == Decimal("1.2500")
 
 
+def test_reserve_cost_returns_pre_increment_total(db_session):
+    # B-05: the gate reads the PRE-increment total so the caller is judged on
+    # the spend that existed before its own reservation.
+    _mk_user(db_session, "ures")
+    cost_meter.record_cost(db_session, "ures", Decimal("0.10"))
+    pre = cost_meter.reserve_cost(db_session, "ures", Decimal("0.02"))
+    assert pre == Decimal("0.1000")
+    assert cost_meter.current_spend(db_session, "ures") == Decimal("0.1200")
+
+
+def test_reserve_cost_creates_row_when_absent(db_session):
+    _mk_user(db_session, "ures2")
+    pre = cost_meter.reserve_cost(db_session, "ures2", Decimal("0.02"))
+    assert pre == Decimal("0.0000")
+    assert cost_meter.current_spend(db_session, "ures2") == Decimal("0.0200")
+
+
+def test_adjust_cost_allows_negative_delta(db_session):
+    _mk_user(db_session, "uadj")
+    cost_meter.reserve_cost(db_session, "uadj", Decimal("0.02"))
+    total = cost_meter.adjust_cost(db_session, "uadj", Decimal("-0.02"))
+    assert total == Decimal("0.0000")
+    assert cost_meter.current_spend(db_session, "uadj") == Decimal("0.0000")
+
+
+def test_adjust_cost_zero_is_a_no_op(db_session):
+    _mk_user(db_session, "uadj0")
+    cost_meter.record_cost(db_session, "uadj0", Decimal("0.25"))
+    assert cost_meter.adjust_cost(db_session, "uadj0", Decimal("0")) == Decimal("0.2500")
+    assert cost_meter.current_spend(db_session, "uadj0") == Decimal("0.2500")
+
+
+def test_sequential_reserves_serialize_at_the_cap(db_session, monkeypatch):
+    # B-05: two turns that would each pass a plain read gate at
+    # hard_cap - 0.01 must NOT both be admitted: the second reserve's
+    # pre-increment total already carries the first's reservation.
+    from config import settings
+
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
+    _mk_user(db_session, "ucap")
+    cost_meter.record_cost(db_session, "ucap", Decimal("2.99"))
+
+    first = cost_meter.reserve_cost(db_session, "ucap", Decimal("0.02"))
+    assert cost_meter.check_cap_from_spend(first).allowed is True
+
+    second = cost_meter.reserve_cost(db_session, "ucap", Decimal("0.02"))
+    assert second == Decimal("3.0100")
+    assert cost_meter.check_cap_from_spend(second).allowed is False
+
+
 def test_record_cost_returns_running_total_and_quantizes(db_session):
     _mk_user(db_session, "uq")
     assert cost_meter.record_cost(db_session, "uq", 0.00006) == Decimal("0.0001")

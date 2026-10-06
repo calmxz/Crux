@@ -1,5 +1,9 @@
 """Profile patch service. Spec §3.4 v1 simplified rules.
 
+Scope: the per-session topic profile only. The cross-session rollup behind
+/api/profile/aggregate lives in `services/profile_insights.py` (G-14), which
+imports from here. This module must never import that one.
+
 Rules:
 - Declared / tested mastery -> directly to mastered_concepts.
 - Inferred mastery -> ignored (no-op, ok=True).
@@ -14,34 +18,29 @@ Rules:
 import hashlib
 import json
 import logging
-from datetime import date, datetime, timedelta, timezone
-from typing import Literal
+from collections.abc import Callable
+from datetime import datetime, timezone
+from typing import Any, Literal
 
 from pydantic import ValidationError
-from sqlalchemy import func, or_, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from agent.types import ToolContext
 from config import settings
 from contracts import (
-    AggregateConceptCount,
-    AggregateProfileResponse,
-    ConceptAccuracy,
     ConceptEntry,
-    KnowledgeLevelDistribution,
-    RecentSessionSummary,
     ToolResult,
     TopicProfile,
     UpdateTopicProfileArgs,
-    WeeklyMasteryPoint,
 )
-from db.models import LearningEvent, Session as SessionModel
-from services.session_enrichment import aware_utc, compute_enrichment
-
+from db.models import LearningEvent
+from db.models import Session as SessionModel
 
 log = logging.getLogger(__name__)
 
 MAX_SUBTOPICS = 20
+_CONCEPT_LIST_KEYS = ("mastered_concepts", "confirmed_gaps")
 
 
 def canon(name: str) -> str:
@@ -98,7 +97,7 @@ def _upgrade_concept_lists(data: dict) -> dict:
     """Element-level legacy upgrade: bare-string concepts become ConceptEntry
     dicts. Permanent, not a transition shim: seed_from_prior copies raw JSON
     forward on resume, so pre-slice-8 blobs can arrive indefinitely."""
-    for key in ("mastered_concepts", "confirmed_gaps"):
+    for key in _CONCEPT_LIST_KEYS:
         items = data.get(key)
         if isinstance(items, list):
             data[key] = [
@@ -108,6 +107,72 @@ def _upgrade_concept_lists(data: dict) -> dict:
                 for it in items
             ]
     return data
+
+
+def _validates(validate: Callable[[Any], object], value: Any) -> bool:
+    try:
+        validate(value)
+    except ValidationError:
+        return False
+    return True
+
+
+def _drop_focus_on_dropped_gap(
+    known: dict, kept: dict, dropped: dict[str, int]
+) -> None:
+    """F-22: a focus naming a gap entry that salvage dropped would dangle.
+    A focus outside confirmed_gaps is otherwise legal (apply_patch sets it
+    freely), so only a focus on a dropped entry is cleared."""
+    focus = kept.get("focus_target_gap")
+    gaps = known.get("confirmed_gaps")
+    if not focus or "confirmed_gaps" not in dropped or not isinstance(gaps, list):
+        return
+    surviving = {canon(g["name"]) for g in kept["confirmed_gaps"]}
+    lost = {
+        canon(g["name"])
+        for g in gaps
+        if isinstance(g, dict) and isinstance(g.get("name"), str)
+    } - surviving
+    if canon(focus) in lost:
+        del kept["focus_target_gap"]
+        dropped["focus_target_gap"] = 1
+
+
+def _salvage_profile(known: dict) -> tuple[TopicProfile, dict[str, int]]:
+    """#436: keep every field, list element and subtopic entry that validates
+    on its own; drop the rest. All-or-nothing here would blank the profile on
+    read, and the next load -> mutate -> save of any writer would persist the
+    blank. Returns the profile and a per-field count of dropped values (an
+    unsalvageable field counts as 1)."""
+    kept: dict = {}
+    dropped: dict[str, int] = {}
+    for key, value in known.items():
+        if key in _CONCEPT_LIST_KEYS and isinstance(value, list):
+            kept[key] = [
+                v for v in value if _validates(ConceptEntry.model_validate, v)
+            ]
+            lost = len(value) - len(kept[key])
+        elif key == "subtopic_levels" and isinstance(value, dict):
+            kept[key] = {
+                k: v
+                for k, v in value.items()
+                if _validates(TopicProfile.model_validate, {key: {k: v}})
+            }
+            lost = len(value) - len(kept[key])
+        elif _validates(TopicProfile.model_validate, {key: value}):
+            kept[key] = value
+            lost = 0
+        else:
+            lost = 1
+        if lost:
+            dropped[key] = lost
+    _drop_focus_on_dropped_gap(known, kept, dropped)
+    try:
+        return TopicProfile.model_validate(kept), dropped
+    except ValidationError:
+        # Unreachable while TopicProfile has no cross-field validators; keeps
+        # the never-raises contract if one is ever added.
+        return TopicProfile(), {k: 1 for k in known}
 
 
 def _parse_profile(raw: str | None) -> TopicProfile:
@@ -120,7 +185,8 @@ def _parse_profile(raw: str | None) -> TopicProfile:
     forward (sessions.py / seed_from_prior); a retired field left in an old row
     would otherwise raise ValidationError and 500 every read of that session
     (and the whole /profile aggregate). So: try strict parse, then drop unknown
-    keys and re-validate, then fall back to an empty profile. Never raises.
+    keys and re-validate, then salvage field by field (_salvage_profile). Only
+    a non-dict or non-JSON blob gives an empty profile. Never raises.
     Also upgrades legacy bare-string concept-list elements to ConceptEntry
     dicts before validation (see _upgrade_concept_lists).
     """
@@ -140,13 +206,20 @@ def _parse_profile(raw: str | None) -> TopicProfile:
         log.debug("topic_profile strict validation failed; retrying on known fields")
     known = {k: v for k, v in data.items() if k in TopicProfile.model_fields}
     dropped = sorted(set(data) - set(known))
+    salvaged: dict[str, int] = {}
     try:
         profile = TopicProfile.model_validate(known)
     except ValidationError:
-        log.warning("topic_profile failed strict reparse; using empty profile")
-        return TopicProfile()
-    if dropped:
-        log.warning("dropped legacy topic_profile fields on load: %s", dropped)
+        profile, salvaged = _salvage_profile(known)
+    if dropped or salvaged:
+        # Field names and counts only: concept, gap and summary text is
+        # learner free text (G-05).
+        log.warning(
+            "repaired topic_profile on load; dropped legacy fields %s, "
+            "salvaged invalid values per field %s",
+            dropped,
+            salvaged,
+        )
     return profile
 
 
@@ -200,8 +273,15 @@ def lock_session_row(db: Session, session_id: str) -> SessionModel:
     read-modify-write spans on Postgres (blind whole-blob writes were losing
     concurrent updates). No-op on SQLite (single-writer). The lock releases at
     the transaction's commit/rollback -- callers must commit promptly and must
-    NEVER hold it across an LLM await. Raises ValueError when missing."""
-    row = db.get(SessionModel, session_id, with_for_update=True)
+    NEVER hold it across an LLM await. Raises ValueError when missing.
+
+    #417: the returned row is fresh as of the lock (populate_existing), not
+    the identity-map copy. Flushes first so the refresh keeps the caller's
+    own pending edits (sessions run autoflush=False)."""
+    db.flush()
+    row = db.get(
+        SessionModel, session_id, with_for_update=True, populate_existing=True
+    )
     if row is None:
         raise ValueError(f"session not found: {session_id}")
     return row
@@ -465,10 +545,14 @@ def apply_patch(
                     f"check answer recorded for '{prior_focus}' in this session"
                 ),
             )
+        # G-05: gap strings are learner free text and can carry personal
+        # detail, so the audit line logs a sha256 prefix plus length instead
+        # of the raw name. Still correlatable across turns, no PII at rest.
         log.info(
-            "focus_clear session=%s gap=%s reason=%s",
+            "focus_clear session=%s gap_sha=%s gap_len=%d reason=%s",
             ctx.session_id,
-            prior_focus,
+            hashlib.sha256(prior_focus.encode()).hexdigest()[:8],
+            len(prior_focus),
             args.focus_clear_reason,
         )
         profile.focus_target_gap = None
@@ -497,199 +581,3 @@ def apply_patch(
             data={"notes": ignored_notes},
         )
     return ToolResult(ok=True, status="ok")
-
-
-def _monday(d: date) -> date:
-    return d - timedelta(days=d.weekday())
-
-
-def _learning_insights(
-    db: Session, session_ids: list[str], now: datetime
-) -> tuple[list[ConceptAccuracy], list[WeeklyMasteryPoint]]:
-    """Per-concept accuracy + weekly mastery buckets from learning_events.
-    Diagnostic probes excluded (NULL purpose kept). Pure SQL + Python."""
-    this_monday = _monday(now.date())
-    weeks = [this_monday - timedelta(weeks=i) for i in range(11, -1, -1)]
-    week_counts: dict[date, int] = {w: 0 for w in weeks}
-
-    if not session_ids:
-        return [], [
-            WeeklyMasteryPoint(week_start=w, count=0) for w in weeks
-        ]
-
-    rows = db.execute(
-        select(LearningEvent)
-        .where(LearningEvent.session_id.in_(session_ids))
-        .where(
-            or_(
-                LearningEvent.purpose.is_(None),
-                LearningEvent.purpose != "diagnostic",
-            )
-        )
-        .order_by(LearningEvent.created_at.asc(), LearningEvent.id.asc())
-    ).scalars().all()
-
-    per: dict[str, dict] = {}
-    first_correct: dict[str, datetime] = {}
-    for ev in rows:
-        entry = per.setdefault(
-            ev.gap_tested,
-            {"correct": 0, "total": 0, "results": [], "first_session": ev.session_id},
-        )
-        entry["total"] += 1
-        entry["results"].append(ev.correct)
-        if ev.correct:
-            entry["correct"] += 1
-            first_correct.setdefault(ev.gap_tested, aware_utc(ev.created_at))
-
-    for ts in first_correct.values():
-        w = _monday(ts.date())
-        if w in week_counts:
-            week_counts[w] += 1
-
-    concept_accuracy = sorted(
-        (
-            ConceptAccuracy(
-                concept=name,
-                correct_count=v["correct"],
-                total_count=v["total"],
-                accuracy=round(v["correct"] / v["total"], 4),
-                last_results=v["results"][-5:],
-                first_seen_session_id=v["first_session"],
-            )
-            for name, v in per.items()
-        ),
-        key=lambda x: (x.accuracy, x.concept),
-    )
-    weekly = [WeeklyMasteryPoint(week_start=w, count=week_counts[w]) for w in weeks]
-    return concept_accuracy, weekly
-
-
-def aggregate_for_user(
-    db: Session, user_id: str, now: datetime | None = None
-) -> AggregateProfileResponse:
-    """Cross-session aggregate. Pure SQL + Python, no LLM calls."""
-    sessions: list[SessionModel] = db.execute(
-        select(SessionModel)
-        .where(SessionModel.user_id == user_id)
-        .order_by(SessionModel.created_at.asc())
-    ).scalars().all()
-
-    total = len(sessions)
-    active = sum(1 for s in sessions if s.ended_at is None)
-    ended = total - active
-
-    mastered_counts: dict[str, dict] = {}
-    gap_counts: dict[str, dict] = {}
-    level_dist = {"beginner": 0, "intermediate": 0, "advanced": 0, "unknown": 0}
-    last_active_at = None
-
-    for s in sessions:
-        profile = _parse_profile(s.topic_profile_json)
-
-        level_key = profile.knowledge_level or "unknown"
-        level_dist[level_key] = level_dist.get(level_key, 0) + 1
-
-        for concept in profile.mastered_concepts or []:
-            entry = mastered_counts.setdefault(
-                concept.name, {"count": 0, "first_seen_session_id": s.id}
-            )
-            entry["count"] += 1
-
-        for gap in profile.confirmed_gaps or []:
-            entry = gap_counts.setdefault(
-                gap.name, {"count": 0, "first_seen_session_id": s.id}
-            )
-            entry["count"] += 1
-
-        candidate = s.ended_at or s.created_at
-        if candidate is not None and (
-            last_active_at is None or candidate > last_active_at
-        ):
-            last_active_at = candidate
-
-    def _to_sorted_list(d: dict[str, dict]) -> list[AggregateConceptCount]:
-        return sorted(
-            (
-                AggregateConceptCount(
-                    concept=name,
-                    count=v["count"],
-                    first_seen_session_id=v["first_seen_session_id"],
-                )
-                for name, v in d.items()
-            ),
-            key=lambda x: (-x.count, x.concept),
-        )
-
-    session_ids = [s.id for s in sessions]
-
-    # Issue #288: a concept must never surface as both mastered and a confirmed
-    # gap. Most-recent-event-wins: the newest LearningEvent for the concept
-    # across this user's sessions decides. Correct -> mastered only, incorrect
-    # -> gap only. No event (or nothing decisive) -> gap only, the conservative
-    # reading. One query covers every conflicting concept.
-    conflicts = set(mastered_counts) & set(gap_counts)
-    if conflicts and session_ids:
-        rows = db.execute(
-            select(LearningEvent.gap_tested, LearningEvent.correct)
-            .where(
-                LearningEvent.session_id.in_(session_ids),
-                LearningEvent.gap_tested.in_(conflicts),
-            )
-            .order_by(LearningEvent.created_at.desc(), LearningEvent.id.desc())
-        ).all()
-        newest: dict[str, bool] = {}
-        for name, correct in rows:
-            if name not in newest:
-                newest[name] = bool(correct)
-    else:
-        newest = {}
-    for name in conflicts:
-        if newest.get(name) is True:
-            gap_counts.pop(name, None)
-        else:
-            mastered_counts.pop(name, None)
-
-    concept_accuracy, weekly_mastery = _learning_insights(
-        db, session_ids, now or datetime.now(timezone.utc)
-    )
-    if session_ids:
-        total_events = db.execute(
-            select(func.count(LearningEvent.id)).where(
-                LearningEvent.session_id.in_(session_ids)
-            )
-        ).scalar_one()
-    else:
-        total_events = 0
-
-    # `sessions` already ordered by created_at asc; last 5 reversed = newest first.
-    recent = list(reversed(sessions[-5:]))
-    recent_enr = compute_enrichment(db, recent)
-    recent_topics = [
-        RecentSessionSummary(
-            id=s.id,
-            topic=s.topic or "",
-            created_at=s.created_at,
-            ended_at=s.ended_at,
-            last_session_summary=recent_enr[s.id].last_session_summary,
-            message_count=recent_enr[s.id].message_count,
-            last_activity_at=recent_enr[s.id].last_activity_at,
-            last_message_preview=recent_enr[s.id].last_message_preview,
-            progress=recent_enr[s.id].progress,
-        )
-        for s in recent
-    ]
-
-    return AggregateProfileResponse(
-        total_sessions=total,
-        active_sessions=active,
-        ended_sessions=ended,
-        total_learning_events=int(total_events or 0),
-        last_active_at=last_active_at,
-        combined_mastered_concepts=_to_sorted_list(mastered_counts),
-        combined_confirmed_gaps=_to_sorted_list(gap_counts),
-        knowledge_level_distribution=KnowledgeLevelDistribution(**level_dist),
-        recent_topics=recent_topics,
-        concept_accuracy=concept_accuracy,
-        weekly_mastery=weekly_mastery,
-    )

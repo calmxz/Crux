@@ -7,7 +7,8 @@ from sqlalchemy import select
 
 from agent import tutor
 from agent.types import ToolContext
-from db.models import ChatMessage, Session as SessionModel
+from db.models import ChatMessage
+from db.models import Session as SessionModel
 
 
 def _mk_session(db):
@@ -58,7 +59,7 @@ class _FakeStream:
         try:
             return next(self._i)
         except StopIteration:
-            raise StopAsyncIteration
+            raise StopAsyncIteration from None
 
 
 def test_max_iters_persists_partial(db_session, monkeypatch):

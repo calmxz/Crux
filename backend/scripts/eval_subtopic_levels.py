@@ -46,7 +46,8 @@ from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
 from db.database import Base  # noqa: E402
-from db.models import Session as SessionModel, User  # noqa: E402
+from db.models import Session as SessionModel  # noqa: E402
+from db.models import User  # noqa: E402
 from services import profile_service  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"

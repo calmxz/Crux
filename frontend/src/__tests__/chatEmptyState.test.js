@@ -39,6 +39,7 @@ describe('ChatEmptyState', () => {
     it('emitted payload matches the pill text for each pill', async () => {
       const wrapper = mount(ChatEmptyState)
       const pills = wrapper.findAll('[data-testid^="quick-prompt-"]')
+
       for (let i = 0; i < pills.length; i++) {
         const text = pills[i].text()
         await pills[i].trigger('click')
