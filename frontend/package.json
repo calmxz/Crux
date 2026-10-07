@@ -34,7 +34,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@oxlint/plugins": "1.81.0",
+    "@oxlint/plugins": "1.86.0",
     "@playwright/test": "^1.62.1",
     "@types/markdown-it": "^14.1.2",
     "@vitejs/plugin-vue": "^6.0.8",
@@ -43,7 +43,7 @@
     "@vue/test-utils": "^2.5.0",
     "eslint": "^10.8.0",
     "eslint-config-prettier": "^10.1.8",
-    "eslint-plugin-oxlint": "^1.83.0",
+    "eslint-plugin-oxlint": "^1.86.0",
     "eslint-plugin-vue": "~10.11.0",
     "globals": "^17.12.0",
     "jsdom": "^29.0.2",
