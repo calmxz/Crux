@@ -9,6 +9,9 @@ _Version 2026-07-03 · Effective 2026-07-03_
   them to.
 - **Study data** — your topics, mastered concepts, knowledge gaps, learning
   events, and chat messages, stored in our database (Supabase Postgres).
+- **Usage analytics** — page views (the page path with session IDs removed,
+  referrer, browser, operating system, device type, and country), collected
+  without cookies by Vercel Web Analytics to understand how the site is used.
 
 ## How we use it
 
