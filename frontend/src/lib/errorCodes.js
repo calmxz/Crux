@@ -31,6 +31,10 @@ export const ERR_BODY_TOO_LARGE = 'body_too_large'
 // was ended (possibly in another tab) before this action reached the server.
 export const ERR_SESSION_ENDED = 'session_ended'
 
+// 409 from backend/routes/sessions.py (create, reopen, rename); the envelope
+// also carries the open session's session_id.
+export const ERR_DUPLICATE_TOPIC = 'duplicate_topic'
+
 // G-04: coarse tool-dispatch failure. Arrives as `tool_call_done.error`, not
 // as an SSE `error` event code.
 export const ERR_TOOL_FAILED = 'tool_failed'

@@ -37,7 +37,7 @@ INVALID_FILENAME = "INVALID_FILENAME"
 CONTENT_TYPE_MISMATCH = "CONTENT_TYPE_MISMATCH"
 STORAGE_WRITE_FAILED = "STORAGE_WRITE_FAILED"
 
-# lib/error_handlers.py.
+# Unhandled or rejected-input errors (lib/error_handlers.py).
 INTERNAL_ERROR = "internal_error"
 INVALID_VALUE = "invalid_value"
 
