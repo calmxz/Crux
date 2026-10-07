@@ -12,6 +12,7 @@ import {
   StreamAbortedError,
 } from '../lib/errors.js'
 import { mapCapError } from '../lib/capErrors.js'
+import { ERR_DUPLICATE_TOPIC } from '../lib/errorCodes.js'
 import { createDeltaBatcher } from '../lib/deltaBatcher.js'
 
 function toUiMessage(m) {
@@ -556,7 +557,7 @@ export const useSessionStore = defineStore('session', () => {
 
       // I-05: the contract hands over the conflicting session id - surface
       // it as an affordance instead of the generic dead end.
-      if (e?.status === 409 && e?.body?.detail?.code === 'duplicate_topic') {
+      if (e?.status === 409 && e?.body?.detail?.code === ERR_DUPLICATE_TOPIC) {
         duplicateReopen.value = { sessionId: e.body.detail.session_id }
         error.value = 'An active session with this topic already exists.'
         throw e

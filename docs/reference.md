@@ -123,6 +123,15 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   level, plus one more for `_`-prefixed helpers; skips `include_in_schema=False`
   routes; never expects 500. Add a new `raise` and add the response block in the
   same commit. It also fails when the yaml documents a path+method with no route.
+- Error codes (#464): every `code` the backend sends is listed in the
+  `x-error-codes` block of `docs/api/openapi.yaml` and defined once in
+  `backend/lib/error_codes.py`. `backend/tests/test_error_codes.py` fails if the
+  two differ, or if backend code outside the registry spells a code as a string
+  literal (an `ast` guard: a literal under a `"code"` key or `code=` keyword, or
+  any literal equal to a registered value). A new code goes into the spec block
+  and the registry in the same commit. `frontend/src/lib/errorCodes.js` holds
+  only the codes the frontend handles; `errorCodes.test.js` fails if one is not
+  in the spec block.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).

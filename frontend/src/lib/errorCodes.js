@@ -1,5 +1,6 @@
-// Backend error-code strings carried inside HTTPException `detail.code`.
-// Kept in sync with backend/lib/error_codes.py.
+// Backend error codes the frontend handles: a subset of the `x-error-codes`
+// block in docs/api/openapi.yaml (the full list). errorCodes.test.js fails if
+// a value here is not listed there.
 export const ERR_DAILY_CAP_REACHED = 'daily_cap_reached'
 
 export const ERR_DAILY_COST_CAP_REACHED = 'daily_cost_cap_reached'
@@ -30,6 +31,17 @@ export const ERR_BODY_TOO_LARGE = 'body_too_large'
 // was ended (possibly in another tab) before this action reached the server.
 export const ERR_SESSION_ENDED = 'session_ended'
 
-// G-04: coarse tool-dispatch failure. Can also arrive as an SSE `error` event
-// code mid-turn, so it needs user-facing copy as well as a constant.
+// 409 from backend/routes/sessions.py (create, reopen, rename); the envelope
+// also carries the open session's session_id.
+export const ERR_DUPLICATE_TOPIC = 'duplicate_topic'
+
+// G-04: coarse tool-dispatch failure. Arrives as `tool_call_done.error`, not
+// as an SSE `error` event code.
 export const ERR_TOOL_FAILED = 'tool_failed'
+
+// SSE `error` event: the LLM call failed mid-turn; the partial reply is kept.
+export const ERR_LLM_FAILED = 'llm_failed'
+
+// SSE `error` event: the tutor ran out of tool-loop iterations; the partial
+// reply is kept. Retrying the same question tends to hit the same limit.
+export const ERR_MAX_ITERS_REACHED = 'max_iters_reached'

@@ -17,7 +17,7 @@ actually read.
 
 import json
 
-_BODY_TOO_LARGE_CODE = "body_too_large"
+from lib.error_codes import BODY_TOO_LARGE
 
 
 class _BodyTooLarge(Exception):
@@ -104,7 +104,7 @@ class BodySizeLimitMiddleware:
         payload = json.dumps(
             {
                 "detail": {
-                    "code": _BODY_TOO_LARGE_CODE,
+                    "code": BODY_TOO_LARGE,
                     "max_bytes": self.max_bytes,
                 }
             }

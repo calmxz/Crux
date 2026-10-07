@@ -23,7 +23,13 @@ from db.models import ChatMessage, Document, User
 from db.models import Session as SessionModel
 from lib import keyword_index
 from lib.citations import chunks_to_citations
-from lib.error_codes import DAILY_CAP_REACHED, DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
+from lib.error_codes import (
+    DAILY_CAP_REACHED,
+    DAILY_COST_CAP_REACHED,
+    EMPTY_MESSAGE,
+    GLOBAL_COST_CAP_REACHED,
+    SESSION_ENDED,
+)
 from services import (
     check_question_service,
     cost_meter,
@@ -237,7 +243,7 @@ def _prepare_turn_guards(
         raise HTTPException(status_code=404, detail="session not found")
     session = row[0]
     if session.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     ingestion_status = documents_service.status_from_counts(
         row.doc_total, row.doc_pending, row.doc_ready, row.doc_processing
     )
@@ -470,7 +476,7 @@ async def _prepare_turn(
     # effect (no cost reservation, no rate-limit slot, no persisted message).
     # The stored message itself is never stripped.
     if not req.message.strip():
-        raise HTTPException(status_code=422, detail={"code": "empty_message"})
+        raise HTTPException(status_code=422, detail={"code": EMPTY_MESSAGE})
 
     session, ingestion_status, learner_prefs = await run_in_threadpool(
         _prepare_turn_guards, req, user_id, db, accepted_terms
