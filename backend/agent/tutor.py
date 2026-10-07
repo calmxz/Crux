@@ -21,6 +21,7 @@ from config import settings
 from contracts import Citation, ToolCallRecord, ToolResult
 from db.models import ChatMessage
 from lib.citations import chunks_to_citations
+from lib.error_codes import DAILY_COST_CAP_REACHED, LLM_FAILED, MAX_ITERS_REACHED
 from services import check_question_service, cost_meter, topic_suggest_service
 
 log = logging.getLogger(__name__)
@@ -199,7 +200,7 @@ async def run_streaming(
                 yield StreamEvent(
                     "error",
                     {
-                        "code": "daily_cost_cap_reached",
+                        "code": DAILY_COST_CAP_REACHED,
                         "used_usd": str(cap.used),
                         "soft_cap_usd": str(cap.soft_cap),
                         "hard_cap_usd": str(cap.hard_cap),
@@ -532,7 +533,7 @@ async def run_streaming(
         _persist_partial_on_abort(
             ctx, accumulated_text, tool_calls_record, citations, asked_check
         )
-        yield StreamEvent("error", {"code": "max_iters_reached"})
+        yield StreamEvent("error", {"code": MAX_ITERS_REACHED})
         return
 
     except asyncio.CancelledError:
@@ -644,7 +645,7 @@ async def run_streaming(
         yield StreamEvent(
             "error",
             {
-                "code": "llm_failed",
+                "code": LLM_FAILED,
                 "message": "The tutor could not finish responding. Please try again.",
             },
         )

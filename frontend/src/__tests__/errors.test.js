@@ -88,6 +88,18 @@ describe('sseErrorCopy', () => {
     }
   })
 
+  it('gives max_iters_reached its own copy instead of the generic line', () => {
+    expect(sseErrorCopy({ code: 'max_iters_reached' })).toBe(
+      "The tutor couldn't finish that one. Try asking a narrower question.",
+    )
+  })
+
+  it('owns the llm_failed copy, so it needs no backend message', () => {
+    expect(sseErrorCopy({ code: 'llm_failed' })).toBe(
+      'The tutor could not finish responding. Please try again.',
+    )
+  })
+
   it('falls back to the backend message for an unknown code', () => {
     expect(sseErrorCopy({ code: 'brand_new', message: 'something specific' })).toBe(
       'something specific',

@@ -2139,7 +2139,8 @@ components:
     # check_conflict, 429 caps, 413/400/415/507 upload) send detail as an
     # object with a machine-readable `code` plus code-specific extras
     # (e.g. session_id, soft_cap_usd, resets_at). Plain FastAPI/validation
-    # errors still send a bare string.
+    # errors still send a bare string. Every code is listed in x-error-codes
+    # at the end of this file; `code` stays a free string on purpose (#464).
     CodedErrorDetail:
       type: object
       additionalProperties: true
@@ -2283,3 +2284,88 @@ x-sse-events:
       required: [reason]
       properties:
         reason: { type: string, enum: [daily_cap] }
+
+# ---------------------------------------------------------------------------
+# Error-code list (vendor extension - not processed by codegen)
+# Every `code` the backend sends: in `detail.code` of an HTTP error
+# (CodedErrorDetail), in an SSE `error` event, or (tool_failed only) in
+# `tool_call_done.error`. backend/lib/error_codes.py must hold exactly these
+# keys and frontend/src/lib/errorCodes.js a subset; tests enforce both.
+# Keys: status = HTTP status, sse = true when sent as an SSE `error` event,
+# via = any other carrier, when = one line on when it is sent.
+# Spellings are API: the UPPERCASE upload codes stay as they are.
+# ---------------------------------------------------------------------------
+x-error-codes:
+  daily_cap_reached:
+    status: 429
+    when: The per-user daily chat or upload count limit is used up.
+  daily_cost_cap_reached:
+    status: 429
+    sse: true
+    when: The per-user daily LLM spend hit its hard cap, before a turn or upload (429) or mid-turn (SSE).
+  global_cost_cap_reached:
+    status: 429
+    when: The service-wide daily LLM spend ceiling is reached.
+  chunk_limit_exceeded:
+    status: 413
+    when: An upload would produce more chunks than the per-document limit.
+  page_limit_exceeded:
+    status: 413
+    when: A PDF or PPTX upload has more pages than the limit.
+  too_many_requests:
+    status: 429
+    when: The per-user burst (velocity) limiter rejected the request.
+  tool_failed:
+    via: tool_call_done.error
+    when: A tool dispatch failed; the real exception stays in the server log.
+  session_ended:
+    status: 409
+    when: The session was ended (possibly in another tab) before the action reached the server.
+  empty_message:
+    status: 422
+    when: A chat message is blank after trimming.
+  empty_topic:
+    status: 422
+    when: A session create or rename topic is blank after trimming.
+  body_too_large:
+    status: 413
+    when: A non-multipart request body is over the size limit; carries max_bytes.
+  duplicate_topic:
+    status: 409
+    when: Another open session already has this topic; carries session_id.
+  check_conflict:
+    status: 409
+    when: A check answer or skip does not fit the open check's state; carries message.
+  no_resolved_batch:
+    status: 409
+    when: Check complete found no fully answered check set to close (or a concurrent call already claimed it).
+  no_open_check:
+    status: 409
+    when: Check stop found no check in progress (or a concurrent call already stopped it).
+  FILE_TOO_LARGE:
+    status: 413
+    when: An upload is over the byte limit; carries max_bytes.
+  UNSUPPORTED_FILE_TYPE:
+    status: 400
+    when: An upload's extension is not PDF, PPTX, TXT or MD.
+  INVALID_FILENAME:
+    status: 400
+    when: An upload's filename is empty or a path component after sanitising.
+  CONTENT_TYPE_MISMATCH:
+    status: 415
+    when: An upload's content does not match its extension.
+  STORAGE_WRITE_FAILED:
+    status: 507
+    when: An accepted upload could not be written to storage.
+  internal_error:
+    status: 500
+    when: An unhandled server error; carries request_id and a fixed message.
+  invalid_value:
+    status: 422
+    when: A ValueError escaped a route; carries request_id.
+  max_iters_reached:
+    sse: true
+    when: The tutor used every tool-loop iteration without a final answer; the partial reply is kept.
+  llm_failed:
+    sse: true
+    when: The LLM call failed mid-turn; the partial reply is kept.
