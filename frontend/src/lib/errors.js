@@ -10,6 +10,8 @@ import {
   ERR_BODY_TOO_LARGE,
   ERR_SESSION_ENDED,
   ERR_TOOL_FAILED,
+  ERR_LLM_FAILED,
+  ERR_MAX_ITERS_REACHED,
 } from './errorCodes.js'
 
 const DAILY_LIMIT_COPY = "You've hit the daily limit. Try again tomorrow."
@@ -39,6 +41,8 @@ const CODE_COPY = {
   [ERR_BODY_TOO_LARGE]: 'That is too much text to send at once. Shorten it and try again.',
   [ERR_SESSION_ENDED]: SESSION_ENDED_COPY,
   [ERR_TOOL_FAILED]: 'The tutor could not finish that step. Try again.',
+  [ERR_LLM_FAILED]: 'The tutor could not finish responding. Please try again.',
+  [ERR_MAX_ITERS_REACHED]: "The tutor couldn't finish that one. Try asking a narrower question.",
 }
 
 // Copy for an SSE `error` event payload ({ code, message }). Code-first so the

@@ -37,13 +37,12 @@ import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+from lib.error_codes import INTERNAL_ERROR, INVALID_VALUE
 from lib.request_id import request_id_var
 
 log = logging.getLogger(__name__)
 
-INTERNAL_ERROR_CODE = "internal_error"
 INTERNAL_ERROR_MESSAGE = "Something went wrong."
-INVALID_VALUE_CODE = "invalid_value"
 
 
 def _internal_error_body(request_id: str) -> bytes:
@@ -53,7 +52,7 @@ def _internal_error_body(request_id: str) -> bytes:
     return json.dumps(
         {
             "detail": {
-                "code": INTERNAL_ERROR_CODE,
+                "code": INTERNAL_ERROR,
                 "message": INTERNAL_ERROR_MESSAGE,
                 "request_id": request_id,
             }
@@ -140,7 +139,7 @@ async def value_error_handler(request: Request, exc: Exception) -> JSONResponse:
         status_code=422,
         content={
             "detail": {
-                "code": INVALID_VALUE_CODE,
+                "code": INVALID_VALUE,
                 "message": str(exc),
                 "request_id": request_id,
             }

@@ -44,6 +44,14 @@ from contracts import (
 from db.database import get_db
 from db.models import ChatMessage
 from db.models import Session as SessionModel
+from lib.error_codes import (
+    CHECK_CONFLICT,
+    DUPLICATE_TOPIC,
+    EMPTY_TOPIC,
+    NO_OPEN_CHECK,
+    NO_RESOLVED_BATCH,
+    SESSION_ENDED,
+)
 from services import (
     check_question_service,
     cost_meter,
@@ -142,7 +150,7 @@ async def create_session(
     # (ensure_user, duplicate-topic lookup, prior claim-end, rate limit).
     topic = req.topic.strip()
     if not topic:
-        raise HTTPException(status_code=422, detail={"code": "empty_topic"})
+        raise HTTPException(status_code=422, detail={"code": EMPTY_TOPIC})
     req.topic = topic
 
     if req.seed_mode == "resume" and req.prior_session_id is None:
@@ -201,7 +209,7 @@ def _create_session_claim(
     if existing is not None:
         raise HTTPException(
             status_code=409,
-            detail={"code": "duplicate_topic", "session_id": existing},
+            detail={"code": DUPLICATE_TOPIC, "session_id": existing},
         )
 
     if req.seed_mode != "resume":
@@ -245,7 +253,7 @@ def _create_session_finish(
         existing = _active_session_on_topic(db, user_id, req.topic)
         raise HTTPException(
             status_code=409,
-            detail={"code": "duplicate_topic", "session_id": existing},
+            detail={"code": DUPLICATE_TOPIC, "session_id": existing},
         ) from e
     db.refresh(new_session)
     return _to_response(db, new_session)
@@ -635,7 +643,7 @@ def reopen_session(
         if existing is not None:
             raise HTTPException(
                 status_code=409,
-                detail={"code": "duplicate_topic", "session_id": existing},
+                detail={"code": DUPLICATE_TOPIC, "session_id": existing},
             )
         row.ended_at = None
         try:
@@ -647,7 +655,7 @@ def reopen_session(
             )
             raise HTTPException(
                 status_code=409,
-                detail={"code": "duplicate_topic", "session_id": existing},
+                detail={"code": DUPLICATE_TOPIC, "session_id": existing},
             ) from e
         db.refresh(row)
     return _to_response(db, row)
@@ -686,7 +694,7 @@ def update_session(
         # the row lookup and any mutation.
         topic = req.topic.strip()
         if not topic:
-            raise HTTPException(status_code=422, detail={"code": "empty_topic"})
+            raise HTTPException(status_code=422, detail={"code": EMPTY_TOPIC})
         req.topic = topic
     row = db.get(SessionModel, session_id)
     if row is None or row.user_id != user_id:
@@ -704,7 +712,7 @@ def update_session(
             if existing is not None:
                 raise HTTPException(
                     status_code=409,
-                    detail={"code": "duplicate_topic", "session_id": existing},
+                    detail={"code": DUPLICATE_TOPIC, "session_id": existing},
                 )
         row.topic = req.topic.strip()
     if req.pinned is not None:
@@ -723,7 +731,7 @@ def update_session(
         )
         raise HTTPException(
             status_code=409,
-            detail={"code": "duplicate_topic", "session_id": existing},
+            detail={"code": DUPLICATE_TOPIC, "session_id": existing},
         ) from e
     db.refresh(row)
     return _to_response(db, row)
@@ -740,12 +748,12 @@ def skip_check(
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     try:
         prog = check_question_service.skip(db, session_id, req.index)
     except check_question_service.CheckStateError as e:
         raise HTTPException(
-            status_code=409, detail={"code": "check_conflict", "message": str(e)}
+            status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
         ) from e
     check_question_service.write_check_batch(
         db, check_question_service.get_pending_check(db, session_id)
@@ -768,12 +776,12 @@ def answer_check(
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     try:
         result = check_question_service.answer(db, session_id, req.index, req.selected_index)
     except check_question_service.CheckStateError as e:
         raise HTTPException(
-            status_code=409, detail={"code": "check_conflict", "message": str(e)}
+            status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
         ) from e
     check_question_service.write_check_batch(
         db, check_question_service.get_pending_check(db, session_id)
@@ -808,7 +816,7 @@ def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
 
     # B-02: claim the batch under the session row lock, so two concurrent
     # /check/complete calls cannot both pass the is_done guard and both fire
@@ -818,7 +826,7 @@ def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     profile_service.lock_session_row(db, session_id)
     pc = pending_check_store.get_pending_check(db, session_id)
     if pc is None or not pending_check_store.is_done(pc):
-        raise HTTPException(status_code=409, detail={"code": "no_resolved_batch"})
+        raise HTTPException(status_code=409, detail={"code": NO_RESOLVED_BATCH})
 
     summary = check_question_service.build_results_summary(pc)
     # F-24 crash-window backstop: if the per-item grade call never ran (crash
@@ -845,10 +853,10 @@ def _stop_check_prepare(session_id: str, user_id: str, db: Session):
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     summary = check_question_service.stop_open_check(db, session_id)
     if summary is None:
-        raise HTTPException(status_code=409, detail={"code": "no_open_check"})
+        raise HTTPException(status_code=409, detail={"code": NO_OPEN_CHECK})
     cooldown = check_question_service.get_quiz_cooldown(db, session_id)
     return _followup_context(db, row, session_id, user_id, summary, cooldown)
 

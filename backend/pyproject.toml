@@ -9,10 +9,10 @@ requires-python = ">=3.12"
 dependencies = [
     "fastapi>=0.141.1,<0.141.2",  # MAL-2026-4750: 0.136.3 flagged malicious by pip-audit (amazon-inspector)
     "uvicorn[standard]>=0.52.4,<1.0",
-    "sqlalchemy>=2.0.52,<3.0",
+    "sqlalchemy>=2.1.1,<3.0",
     "pydantic>=2.13.5,<3.0",
     "pydantic-settings>=2.15.0",
-    "litellm>=1.100.1,<2.0",
+    "litellm>=1.103.1,<2.0",
     # litellm.completion() imports litellm.proxy.* -> orjson whenever `tools` is
     # passed, but only declares orjson under its [proxy] extra. Every tutor turn
     # passes tools, so without this the live chat path dies with
@@ -20,7 +20,7 @@ dependencies = [
     "orjson>=3.12.0,<4.0",
     "python-dotenv>=1.2.3",
     "python-multipart>=0.0.18,<1.0",
-    "pypdf>=6.18.1,<7.0",
+    "pypdf>=6.19.0,<7.0",
     "python-pptx>=1.0.2",
     "tiktoken>=0.14.0,<1.0",
     "snowballstemmer>=3.1.0,<4.0",
@@ -29,7 +29,7 @@ dependencies = [
     "alembic>=1.19.1,<2.0",
     "pyjwt[crypto]>=2.13.0,<3.0",
     "httpx>=0.28.1,<1.0",
-    "boto3>=1.43.93,<2.0",
+    "boto3>=1.43.105,<2.0",
 ]
 
 [project.optional-dependencies]
@@ -41,7 +41,7 @@ dev = [
     "datamodel-code-generator>=0.80.0,<0.81",
     "openapi-spec-validator>=0.9.0",
     "pyyaml>=6.0.3",
-    "ruff>=0.14,<1.0",
+    "ruff>=0.16.9,<1.0",
 ]
 
 [tool.setuptools.packages.find]

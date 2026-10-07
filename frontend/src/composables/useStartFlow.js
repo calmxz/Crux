@@ -1,5 +1,7 @@
 import { ref } from 'vue'
 
+import { ERR_DUPLICATE_TOPIC } from '@/lib/errorCodes.js'
+
 // State machine for the start pages: lookup -> intercept | create.
 // Lookup is an enhancement: any failure falls through to direct create.
 // No level picker up front -- the in-chat knowledge diagnostic asks after the
@@ -86,7 +88,7 @@ export function useStartFlow({ store, router, beforeNavigate }) {
       if (beforeNavigate) await beforeNavigate(created)
       router.push({ name: 'session', params: { id: created.id } })
     } catch (e) {
-      if (e?.status === 409 && e?.body?.detail?.code === 'duplicate_topic') {
+      if (e?.status === 409 && e?.body?.detail?.code === ERR_DUPLICATE_TOPIC) {
         // Race backstop: a session appeared between lookup and create.
         interceptMatch.value = { session_id: e.body.detail.session_id, title: topic.value }
         interceptKind.value = 'active'

@@ -26,7 +26,17 @@ from contracts import UploadResponse, UploadStatus
 from db.database import get_db
 from db.models import Document
 from db.models import Session as SessionModel
-from lib.error_codes import CHUNK_LIMIT_EXCEEDED, DAILY_CAP_REACHED, PAGE_LIMIT_EXCEEDED
+from lib.error_codes import (
+    CHUNK_LIMIT_EXCEEDED,
+    CONTENT_TYPE_MISMATCH,
+    DAILY_CAP_REACHED,
+    FILE_TOO_LARGE,
+    INVALID_FILENAME,
+    PAGE_LIMIT_EXCEEDED,
+    SESSION_ENDED,
+    STORAGE_WRITE_FAILED,
+    UNSUPPORTED_FILE_TYPE,
+)
 from services import cost_meter, object_store, rate_limit, velocity_limit
 from services.auth import current_user_id
 
@@ -102,7 +112,7 @@ def _read_bounded(fh, max_bytes: int) -> bytes:
         if len(data) > max_bytes:
             raise HTTPException(
                 status_code=413,
-                detail={"code": "FILE_TOO_LARGE", "max_bytes": max_bytes},
+                detail={"code": FILE_TOO_LARGE, "max_bytes": max_bytes},
             )
 
 
@@ -126,7 +136,7 @@ def upload_file(
             if int(content_length) > MAX_UPLOAD_BYTES:
                 raise HTTPException(
                     status_code=413,
-                    detail={"code": "FILE_TOO_LARGE", "max_bytes": MAX_UPLOAD_BYTES},
+                    detail={"code": FILE_TOO_LARGE, "max_bytes": MAX_UPLOAD_BYTES},
                 )
         except ValueError:
             # Malformed header - not a size signal. The real guard is the
@@ -138,7 +148,7 @@ def upload_file(
         raise HTTPException(
             status_code=400,
             detail={
-                "code": "UNSUPPORTED_FILE_TYPE",
+                "code": UNSUPPORTED_FILE_TYPE,
                 "message": "file type not supported; use PDF, PPTX, TXT, or MD",
             },
         )
@@ -151,12 +161,12 @@ def upload_file(
     # and the sessions routes). Placed immediately after the ownership check so
     # it costs neither a cost-cap evaluation nor a daily rate-limit slot.
     if sess.ended_at is not None:
-        raise HTTPException(status_code=409, detail={"code": "session_ended"})
+        raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
 
     raw_name = Path(file.filename or "upload.pdf").name
     safe_name = re.sub(r"[^A-Za-z0-9._-]", "_", raw_name)
     if not safe_name or safe_name in {".", ".."}:
-        raise HTTPException(status_code=400, detail={"code": "INVALID_FILENAME"})
+        raise HTTPException(status_code=400, detail={"code": INVALID_FILENAME})
 
     data = _read_bounded(file.file, MAX_UPLOAD_BYTES)
 
@@ -194,7 +204,7 @@ def upload_file(
         raise HTTPException(
             status_code=415,
             detail={
-                "code": "CONTENT_TYPE_MISMATCH",
+                "code": CONTENT_TYPE_MISMATCH,
                 "message": "file content does not match its extension",
             },
         )
@@ -307,7 +317,7 @@ def upload_file(
             log.error("could not mark upload row failed", extra={"doc_id": doc.id})
         raise HTTPException(
             status_code=507,
-            detail={"code": "STORAGE_WRITE_FAILED"},
+            detail={"code": STORAGE_WRITE_FAILED},
         ) from e
 
     db.commit()
