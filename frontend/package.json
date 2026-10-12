@@ -35,7 +35,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@oxlint/plugins": "1.86.0",
+    "@oxlint/plugins": "1.87.0",
     "@playwright/test": "^1.62.1",
     "@types/markdown-it": "^14.1.2",
     "@vitejs/plugin-vue": "^6.0.8",
@@ -50,7 +50,7 @@
     "jsdom": "^29.0.2",
     "npm-run-all2": "^9.0.3",
     "oxlint": "^1.81.0",
-    "prettier": "3.9.6",
+    "prettier": "3.9.10",
     "vite": "^8.3.1",
     "vite-plugin-vue-devtools": "^8.2.1",
     "vitest": "^5.0.2",
