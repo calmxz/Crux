@@ -95,7 +95,9 @@ class FakeLitellm:
     """Scriptable stand-in for the litellm calls the app makes.
 
     `responses` feeds acompletion in order; `costs` feeds completion_cost in
-    order (one entry per priced call, chat or embedding).
+    order (one entry per priced call, chat or embedding). An unscripted call
+    is recorded in `unexpected` as well as raised: production code catches
+    the AssertionError and falls back, so the fixture checks the record.
     """
 
     def __init__(self, monkeypatch):
@@ -103,6 +105,7 @@ class FakeLitellm:
         self.costs: list[float] = []
         self.acompletion_calls: list[dict] = []
         self.embedding_calls: list[list[str]] = []
+        self.unexpected: list[str] = []
         monkeypatch.setattr(litellm, "acompletion", self.acompletion)
         monkeypatch.setattr(litellm, "completion_cost", self.completion_cost)
         monkeypatch.setattr(litellm, "stream_chunk_builder", self.stream_chunk_builder)
@@ -113,11 +116,13 @@ class FakeLitellm:
     async def acompletion(self, **kwargs):
         self.acompletion_calls.append(kwargs)
         if not self.responses:
+            self.unexpected.append("acompletion")
             raise AssertionError("unexpected litellm.acompletion call")
         return self.responses.pop(0)
 
     def completion_cost(self, completion_response=None, **kwargs):
         if not self.costs:
+            self.unexpected.append("completion_cost")
             raise AssertionError("unexpected litellm.completion_cost call")
         return self.costs.pop(0)
 
@@ -154,11 +159,25 @@ def _real_llm_settings(monkeypatch):
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
     monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)
+    monkeypatch.setattr(settings, "llm_turn_reserve_usd", 0.02)
+    # The estimate constants above assume these rates; pin them so a pricing
+    # update to MODEL_RATES does not read as a behaviour change.
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        MODEL,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
 
 
 @pytest.fixture
 def fake_llm(monkeypatch):
-    return FakeLitellm(monkeypatch)
+    fake = FakeLitellm(monkeypatch)
+    yield fake
+    # Every scripted response and price was consumed, and nothing unscripted
+    # was called (even if production code swallowed the tripwire).
+    assert fake.unexpected == []
+    assert fake.responses == []
+    assert fake.costs == []
 
 
 @pytest.fixture
@@ -277,8 +296,10 @@ async def test_cancel_during_iteration_two(db_session, seeded, fake_llm):
                 reached.set()
 
     task = asyncio.create_task(consume())
-    await asyncio.wait_for(reached.wait(), timeout=5)
-    task.cancel()
+    try:
+        await asyncio.wait_for(reached.wait(), timeout=5)
+    finally:
+        task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
 
@@ -443,6 +464,14 @@ def _seed_messages(db, n: int) -> None:
     db.commit()
 
 
+@pytest.fixture
+def ledger_down(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("ledger down")
+
+    monkeypatch.setattr(cost_meter, "record_cost", boom)
+
+
 async def test_generate_and_persist_meters_summary(db_session, seeded, fake_llm):
     _seed_messages(db_session, 2)
     fake_llm.responses = [_completion("Covered joins; foreign keys remain a gap.")]
@@ -459,16 +488,11 @@ async def test_generate_and_persist_meters_summary(db_session, seeded, fake_llm)
 
 
 async def test_generate_and_persist_record_cost_failure_falls_back(
-    db_session, seeded, fake_llm, monkeypatch
+    db_session, seeded, fake_llm, ledger_down
 ):
     _seed_messages(db_session, 2)
     fake_llm.responses = [_completion("Covered joins.")]
     fake_llm.costs = [0.002]
-
-    def boom(*args, **kwargs):
-        raise RuntimeError("ledger down")
-
-    monkeypatch.setattr(cost_meter, "record_cost", boom)
 
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
@@ -476,6 +500,8 @@ async def test_generate_and_persist_record_cost_failure_falls_back(
     # #411 changes this: today a failed ledger write throws the paid summary
     # away for the mechanical one. After #411 settlement never raises and the
     # LLM summary is kept.
+    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
+    assert fake_llm.costs == []
     assert summary.startswith("[auto] ")
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
@@ -498,21 +524,18 @@ async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded,
 
 
 async def test_update_rolling_summary_record_cost_failure_returns_none(
-    db_session, seeded, fake_llm, monkeypatch
+    db_session, seeded, fake_llm, ledger_down
 ):
     _seed_messages(db_session, 31)
     fake_llm.responses = [_completion("Earlier the learner practised joins.")]
     fake_llm.costs = [0.002]
 
-    def boom(*args, **kwargs):
-        raise RuntimeError("ledger down")
-
-    monkeypatch.setattr(cost_meter, "record_cost", boom)
-
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
     # #411 changes this: today a failed ledger write discards the paid
     # rolling summary. After #411 settlement never raises and it is kept.
+    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
+    assert fake_llm.costs == []
     assert result is None
     session = db_session.get(SessionModel, SESSION_ID)
     assert session.rolling_summary is None

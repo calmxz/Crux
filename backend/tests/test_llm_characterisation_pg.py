@@ -113,7 +113,7 @@ def seeded(engine):
 
 
 @pytest.fixture
-def app_on_postgres(seeded, monkeypatch):
+def app_on_postgres(seeded):
     Session, uid, _sid = seeded
 
     def override_get_db():
@@ -156,12 +156,24 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
     def fake_token_counter(model=None, messages=None, text=None, **kwargs):
         return PROMPT_TOKENS if messages is not None else OUTPUT_TOKENS
 
+    # Recorded, not just raised: the tutor's cost block catches exceptions
+    # and would fall back to the same token-math estimate.
+    completion_cost_calls: list[dict] = []
+
     def no_completion_cost(**kwargs):
+        completion_cost_calls.append(kwargs)
         raise AssertionError("a cancelled iteration is never priced by completion_cost")
 
     monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
     monkeypatch.setattr(litellm, "token_counter", fake_token_counter)
     monkeypatch.setattr(litellm, "completion_cost", no_completion_cost)
+    # CANCEL_ESTIMATE assumes these rates; a pricing update is not a
+    # behaviour change.
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        MODEL,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
 
     # The response's BackgroundTask opens SessionLocal() on the default URL.
     async def no_rolling_summary(db, session_id):
@@ -229,6 +241,7 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
     assert status == [200]
     assert sent_events == ["assistant_delta", "assistant_delta"]
     assert len(acompletion_calls) == 1
+    assert completion_cost_calls == []
 
     with Session() as db:
         msg = db.execute(
