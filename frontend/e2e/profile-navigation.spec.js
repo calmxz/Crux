@@ -20,6 +20,9 @@ test.describe('profile navigation', () => {
     await page.getByTestId('sidebar-profile').first().click()
     await expect(page).toHaveURL(/\/profile$/)
     await expect(page.getByTestId('aggregate-profile')).toBeVisible()
+    await expect(page.getByTestId('aprof-lede')).toContainText(
+      'What the tutor knows about you, topic by topic.',
+    )
 
     // Empty state on first run.
     await expect(page.getByTestId('aprof-empty')).toBeVisible()
