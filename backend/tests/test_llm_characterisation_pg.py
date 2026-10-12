@@ -51,10 +51,11 @@ pytestmark = pytest.mark.skipif(
 )
 
 MODEL = "gemini/gemini-3.5-flash-lite"
-# token_counter fake: (1000 prompt tokens * $0.30 + 400 output tokens * $2.50)
-# per 1M, i.e. the token-math estimate for the one cancelled iteration.
+# token_counter fake: 1000 tokens per prompt, 200 per streamed word. The
+# cancelled iteration streamed "one two " (2 words), so its token-math
+# estimate is (1000 * $0.30 + 400 * $2.50) per 1M.
 PROMPT_TOKENS = 1000
-OUTPUT_TOKENS = 400
+TOKENS_PER_WORD = 200
 CANCEL_ESTIMATE = Decimal("0.0013")
 EVENTS_BEFORE_DISCONNECT = 2
 
@@ -114,7 +115,9 @@ def seeded(engine):
 
 @pytest.fixture
 def app_on_postgres(seeded):
-    Session, uid, _sid = seeded
+    """The real app on a Postgres session, authenticated as the seeded user.
+    Yields the seeded (Session, uid, sid)."""
+    Session, uid, _ = seeded
 
     def override_get_db():
         db = Session()
@@ -127,16 +130,16 @@ def app_on_postgres(seeded):
     app.dependency_overrides[current_user_id] = lambda: uid
     velocity_limit.reset()
     try:
-        yield
+        yield seeded
     finally:
         app.dependency_overrides.clear()
         velocity_limit.reset()
 
 
 async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
-    seeded, app_on_postgres, monkeypatch
+    app_on_postgres, monkeypatch
 ):
-    Session, uid, sid = seeded
+    Session, uid, sid = app_on_postgres
 
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
@@ -154,7 +157,22 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         return _litellm_stream(_text_chunk("one "), _text_chunk("two "), block=parked)
 
     def fake_token_counter(model=None, messages=None, text=None, **kwargs):
-        return PROMPT_TOKENS if messages is not None else OUTPUT_TOKENS
+        if messages is not None:
+            return PROMPT_TOKENS
+        return TOKENS_PER_WORD * len((text or "").split())
+
+    # No embedding happens on this turn (no ready document). Faked so an
+    # unexpected one is recorded instead of reaching the real provider and
+    # being swallowed by the best-effort retrieval gate.
+    embedding_calls: list[str] = []
+
+    def fake_embedding(**kwargs):
+        embedding_calls.append("embedding")
+        raise AssertionError("unexpected litellm.embedding call")
+
+    async def fake_aembedding(**kwargs):
+        embedding_calls.append("aembedding")
+        raise AssertionError("unexpected litellm.aembedding call")
 
     # Recorded, not just raised: the tutor's cost block catches exceptions
     # and would fall back to the same token-math estimate.
@@ -167,6 +185,8 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
     monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
     monkeypatch.setattr(litellm, "token_counter", fake_token_counter)
     monkeypatch.setattr(litellm, "completion_cost", no_completion_cost)
+    monkeypatch.setattr(litellm, "embedding", fake_embedding)
+    monkeypatch.setattr(litellm, "aembedding", fake_aembedding)
     # CANCEL_ESTIMATE assumes these rates; a pricing update is not a
     # behaviour change.
     monkeypatch.setitem(
@@ -241,7 +261,10 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
     assert status == [200]
     assert sent_events == ["assistant_delta", "assistant_delta"]
     assert len(acompletion_calls) == 1
+    call = acompletion_calls[0]
+    assert (call["model"], call["stream"], call["tool_choice"]) == (MODEL, True, "auto")
     assert completion_cost_calls == []
+    assert embedding_calls == []
 
     with Session() as db:
         msg = db.execute(
@@ -257,6 +280,10 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         assert releases == [uid]
         assert cost_meter.current_spend(db, uid) == CANCEL_ESTIMATE
         rows = db.execute(
-            select(LlmCallLog.purpose, LlmCallLog.cost_usd).where(LlmCallLog.user_id == uid)
+            select(
+                LlmCallLog.purpose, LlmCallLog.model, LlmCallLog.session_id, LlmCallLog.cost_usd
+            ).where(LlmCallLog.user_id == uid)
         ).all()
-        assert [(p, Decimal(str(c))) for p, c in rows] == [("chat", CANCEL_ESTIMATE)]
+        assert [(p, m, s, Decimal(str(c))) for p, m, s, c in rows] == [
+            ("chat", MODEL, sid, CANCEL_ESTIMATE)
+        ]
