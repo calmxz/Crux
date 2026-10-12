@@ -7,16 +7,13 @@ right payloads.
 """
 
 import pytest
-import yaml
 from jsonschema import Draft202012Validator
 from jsonschema.exceptions import SchemaError
 
-from tests.sse_contract import SPEC_PATH, SseContractError, sse_event_schemas, validate_event
+from tests.sse_contract import SseContractError, sse_event_schemas, validate_event
 
 
 def test_openapi_has_x_sse_events():
-    doc = yaml.safe_load(SPEC_PATH.read_text())
-    assert "x-sse-events" in doc
     expected = {
         "tool_call_start",
         "tool_call_done",
@@ -30,12 +27,11 @@ def test_openapi_has_x_sse_events():
         "topic_suggestions",
         "followup_skipped",
     }
-    assert set(doc["x-sse-events"].keys()) == expected
+    assert set(sse_event_schemas().keys()) == expected
 
 
 def test_each_event_has_data_schema():
-    doc = yaml.safe_load(SPEC_PATH.read_text())
-    for name, ev in doc["x-sse-events"].items():
+    for name, ev in sse_event_schemas().items():
         assert "data" in ev, f"{name} missing data schema"
         assert isinstance(ev["data"], dict)
 
@@ -55,7 +51,7 @@ def test_cancelled_allows_null_message_id():
     )
 
 
-def test_done_rejects_total_cost_usd():
+def test_done_no_longer_lists_total_cost_usd():
     with pytest.raises(SseContractError, match="total_cost_usd"):
         validate_event("done", {"message_id": "m", "total_cost_usd": "0.1"})
 

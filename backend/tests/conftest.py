@@ -106,10 +106,15 @@ def _validate_stream_events(request, monkeypatch):
 
 
 def _is_whole_suite_run(config) -> bool:
-    # args_source is TESTPATHS only when no path was given on the command
-    # line (config.args is never empty: pyproject sets testpaths).
+    # No path was given on the command line: args_source is TESTPATHS from
+    # backend/, INVOCATION_DIR from backend/tests/. (config.args is never
+    # empty: pyproject sets testpaths.)
+    no_paths = config.args_source == pytest.Config.ArgsSource.TESTPATHS or (
+        config.args_source == pytest.Config.ArgsSource.INVOCATION_DIR
+        and os.path.normcase(str(config.invocation_params.dir)) + os.sep == _TESTS_DIR
+    )
     return (
-        config.args_source == pytest.Config.ArgsSource.TESTPATHS
+        no_paths
         and not config.getoption("keyword")
         and not config.getoption("markexpr")
         and not config.getoption("lf", False)
