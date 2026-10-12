@@ -6,45 +6,30 @@ Validates model-derived schema via in-memory SQLite — no live DB required.
 import uuid  # used for session_id generation
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.pool import StaticPool
-
-import db.models  # noqa: F401 — ensures all models are registered with Base.metadata
-from db.database import Base
 
 
-def _make_engine():
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    return engine
-
-
-def _columns() -> dict:
-    engine = _make_engine()
-    insp = inspect(engine)
+def _columns(db_session) -> dict:
+    insp = inspect(db_session.get_bind())
     return {c["name"]: c for c in insp.get_columns("chat_messages")}
 
 
-def test_message_has_status_column():
-    cols = _columns()
+def test_message_has_status_column(db_session):
+    cols = _columns(db_session)
     assert "status" in cols, "chat_messages.status column is missing"
     assert cols["status"]["nullable"] is False, "status must be NOT NULL"
 
 
-def test_message_has_cancelled_at_column():
-    cols = _columns()
+def test_message_has_cancelled_at_column(db_session):
+    cols = _columns(db_session)
     assert "cancelled_at" in cols, "chat_messages.cancelled_at column is missing"
     assert cols["cancelled_at"]["nullable"] is True, "cancelled_at must be nullable"
 
 
-def test_status_server_default_is_complete():
+def test_status_server_default_is_complete(db_session):
     """Inserting a row without an explicit status must default to 'complete'."""
-    engine = _make_engine()
+    engine = db_session.get_bind()
     session_id = str(uuid.uuid4())
     with engine.connect() as conn:
         conn.execute(
@@ -70,9 +55,9 @@ def test_status_server_default_is_complete():
     assert row[0] == "complete", f"Expected server_default 'complete', got {row[0]!r}"
 
 
-def test_status_check_constraint_rejects_invalid():
+def test_status_check_constraint_rejects_invalid(db_session):
     """Inserting a row with status='bogus' must raise IntegrityError."""
-    engine = _make_engine()
+    engine = db_session.get_bind()
     session_id = str(uuid.uuid4())
     with pytest.raises(IntegrityError):
         with engine.connect() as conn:

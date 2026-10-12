@@ -79,6 +79,32 @@ def _make_stream(*chunks):
     return _gen()
 
 
+def _parked_stream():
+    """Return (stream, mid_stream): a stream that yields one content chunk and
+    then parks, plus an Event set once the consumer has taken that chunk and
+    asked for more -- the mid-flight state a cancel test must hit."""
+    mid_stream = asyncio.Event()
+
+    async def _gen():
+        yield _content_chunk("partial ")
+        mid_stream.set()
+        await asyncio.sleep(10)
+
+    return _gen(), mid_stream
+
+
+async def _cancel_mid_stream(task, mid_stream):
+    """Cancel `task` once the stream is parked. If it never gets there, reap
+    the task first so it cannot outlive the test (and db_session) and fail."""
+    try:
+        await asyncio.wait_for(mid_stream.wait(), timeout=5)
+    except TimeoutError:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        raise AssertionError("stream never reached its parked chunk") from None
+    task.cancel()
+
+
 def _ctx(db_session, session_id="s1"):
     return ToolContext(
         db=db_session,
@@ -304,13 +330,11 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
 
     from agent import tutor
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
     monkeypatch.setattr(
         "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[_slow_stream()]),
+        AsyncMock(side_effect=[slow_stream]),
     )
 
     ctx = _ctx(db_session, session_id="s2")
@@ -322,8 +346,7 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 
@@ -440,13 +463,11 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
     estimate_spy = MagicMock(return_value=Decimal("0.01"))
     monkeypatch.setattr("agent.tutor.cost_meter.estimate_cancelled_cost", estimate_spy)
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
     monkeypatch.setattr(
         "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[_slow_stream()]),
+        AsyncMock(side_effect=[slow_stream]),
     )
 
     ctx = _ctx(db_session, session_id="s_cancel_tokens")
@@ -458,8 +479,7 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 
@@ -952,11 +972,9 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
         ),
     )
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
-    turns = [turn1, turn2, _slow_stream()]
+    turns = [turn1, turn2, slow_stream]
 
     async def _fake_acompletion(*args, **kwargs):
         return turns.pop(0)
@@ -999,8 +1017,7 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 

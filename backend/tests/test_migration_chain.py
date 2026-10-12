@@ -4,11 +4,9 @@ import importlib.util
 from pathlib import Path
 
 import pytest
-from sqlalchemy import create_engine, inspect, text
+from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.pool import StaticPool
 
-from db.database import Base
 from db.models import Session as SessionModel
 from db.models import User
 
@@ -91,19 +89,6 @@ def test_chat_messages_sid_id_desc_index_declared_on_model():
     assert "ix_chat_messages_sid_id_desc" in names
 
 
-def _sqlite_engine():
-    """Model-derived schema on in-memory SQLite -- the same shape every test
-    fixture uses, and the only way to exercise the CHECK constraints without a
-    live Postgres (the alembic chain itself is Postgres-only from 0003 on)."""
-    engine = create_engine(
-        "sqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(bind=engine)
-    return engine
-
-
 # C-16: the five tables 0001_phase7_baseline created with a nullable,
 # defaultless created_at. chunk_embeddings and llm_call_log are out of scope.
 CREATED_AT_TABLES = ("users", "sessions", "learning_events", "documents", "chat_messages")
@@ -141,21 +126,25 @@ def test_chat_messages_role_check_declared_on_model():
     assert "chat_messages_role_check" in checks
 
 
+# The created_at and CHECK-constraint tests below run against db_session's engine:
+# model-derived schema on in-memory SQLite, the only way to exercise the
+# constraints without a live Postgres (the alembic chain itself is
+# Postgres-only from 0003 on).
 @pytest.mark.parametrize("table", CREATED_AT_TABLES)
-def test_created_at_is_not_null_with_server_default(table):
+def test_created_at_is_not_null_with_server_default(table, db_session):
     """C-16: a row written outside the ORM must still get a timestamp."""
-    insp = inspect(_sqlite_engine())
+    insp = inspect(db_session.get_bind())
     col = {c["name"]: c for c in insp.get_columns(table)}["created_at"]
     assert col["nullable"] is False, f"{table}.created_at must be NOT NULL"
     assert col["default"] is not None, f"{table}.created_at needs a server default"
 
 
-def test_created_at_filled_when_insert_omits_it():
+def test_created_at_filled_when_insert_omits_it(db_session):
     """The server default, not the ORM default, is what covers a raw INSERT.
     Read the value back as raw SQL: the column is timezone=True but SQLite's
     CURRENT_TIMESTAMP carries no offset, so an ORM round-trip would hand back
     a naive datetime -- a distraction from what this test is proving."""
-    engine = _sqlite_engine()
+    engine = db_session.get_bind()
     with engine.connect() as conn:
         conn.execute(
             text(
@@ -171,8 +160,8 @@ def test_created_at_filled_when_insert_omits_it():
     assert value is not None
 
 
-def test_documents_status_check_rejects_unknown_status():
-    engine = _sqlite_engine()
+def test_documents_status_check_rejects_unknown_status(db_session):
+    engine = db_session.get_bind()
     with pytest.raises(IntegrityError):
         with engine.connect() as conn:
             conn.execute(
@@ -185,9 +174,9 @@ def test_documents_status_check_rejects_unknown_status():
 
 
 @pytest.mark.parametrize("status", ["pending", "processing", "ready", "failed"])
-def test_documents_status_check_allows_every_live_value(status):
+def test_documents_status_check_allows_every_live_value(status, db_session):
     """Every value any writer in backend/ can produce must still insert."""
-    engine = _sqlite_engine()
+    engine = db_session.get_bind()
     with engine.connect() as conn:
         conn.execute(
             text(
@@ -199,8 +188,8 @@ def test_documents_status_check_allows_every_live_value(status):
         conn.commit()
 
 
-def test_chat_messages_role_check_rejects_unknown_role():
-    engine = _sqlite_engine()
+def test_chat_messages_role_check_rejects_unknown_role(db_session):
+    engine = db_session.get_bind()
     with pytest.raises(IntegrityError):
         with engine.connect() as conn:
             conn.execute(
@@ -214,8 +203,8 @@ def test_chat_messages_role_check_rejects_unknown_role():
 
 
 @pytest.mark.parametrize("role", ["user", "assistant"])
-def test_chat_messages_role_check_allows_every_live_value(role):
-    engine = _sqlite_engine()
+def test_chat_messages_role_check_allows_every_live_value(role, db_session):
+    engine = db_session.get_bind()
     with engine.connect() as conn:
         conn.execute(
             text(
