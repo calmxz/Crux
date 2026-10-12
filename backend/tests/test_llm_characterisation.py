@@ -149,11 +149,11 @@ class FakeLitellm:
         vec = [0.1] * settings.embedding_dim
         return SimpleNamespace(data=[{"embedding": vec} for _ in inputs], usage=None)
 
-    def embedding(self, model=None, input=None, **kwargs):
+    def embedding(self, model=None, input=(), **kwargs):
         self.embedding_calls.append(list(input))
         return self._embed_response(input)
 
-    async def aembedding(self, model=None, input=None, **kwargs):
+    async def aembedding(self, model=None, input=(), **kwargs):
         self.aembedding_calls.append(list(input))
         return self._embed_response(input)
 
@@ -358,11 +358,13 @@ async def test_cancel_during_iteration_two(db_session, seeded, fake_llm):
         # Let the cancel arm finish with db_session before teardown drops it.
         task.cancel()
         with contextlib.suppress(asyncio.CancelledError):
-            await task
+            await asyncio.gather(task)
         raise
     task.cancel()
+    # gather(), not a bare `await task`: same wait and re-raise, and CodeQL
+    # does not misread it as a statement with no effect.
     with pytest.raises(asyncio.CancelledError):
-        await task
+        await asyncio.gather(task)
 
     assert _types(events) == [
         "assistant_delta",
