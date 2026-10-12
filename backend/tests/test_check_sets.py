@@ -26,27 +26,41 @@ _T0 = datetime(2026, 9, 24, 0, 0, tzinfo=timezone.utc)
 def db(db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()
-    db_session.add(SessionModel(
-        id=SESSION_ID, user_id=USER_ID, topic="biology",
-        topic_profile_json=TopicProfile(knowledge_level="beginner").model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id=SESSION_ID,
+            user_id=USER_ID,
+            topic="biology",
+            topic_profile_json=TopicProfile(knowledge_level="beginner").model_dump_json(),
+        )
+    )
     db_session.commit()
     return db_session
 
 
 def _ctx(db, suppress: bool = False) -> ToolContext:
     return ToolContext(
-        db=db, session_id=SESSION_ID, user_id=USER_ID,
-        turn_started_at=_T0, suppress_check=suppress,
+        db=db,
+        session_id=SESSION_ID,
+        user_id=USER_ID,
+        turn_started_at=_T0,
+        suppress_check=suppress,
     )
 
 
 def _args(set_index: int, set_total: int, gap: str = "atp", n_items: int = 2):
     return AskCheckQuestionsArgs(
-        session_id=SESSION_ID, gap=gap, set_index=set_index, set_total=set_total,
+        session_id=SESSION_ID,
+        gap=gap,
+        set_index=set_index,
+        set_total=set_total,
         items=[
-            {"question": f"{gap} Q{n}?", "options": ["a", "b"],
-             "correct_index": 0, "explanation": "e."}
+            {
+                "question": f"{gap} Q{n}?",
+                "options": ["a", "b"],
+                "correct_index": 0,
+                "explanation": "e.",
+            }
             for n in range(n_items)
         ],
     )
@@ -70,7 +84,9 @@ def _run_set(db, set_index, set_total, gap="atp", suppress=False):
 def test_valid_three_set_sequence(db):
     _run_set(db, 1, 3, gap="glycolysis")
     assert pcs.get_current_check(db, SESSION_ID) == {
-        "set_total": 3, "last_set_index": 1, "gaps": ["glycolysis"],
+        "set_total": 3,
+        "last_set_index": 1,
+        "gaps": ["glycolysis"],
         "purpose": "check",
     }
     _run_set(db, 2, 3, gap="krebs", suppress=True)
@@ -113,7 +129,9 @@ def test_set_one_starts_a_fresh_check_over_a_stale_pointer(db):
     res = cq.register(db, _ctx(db), _args(1, 2, gap="new"))
     assert res.ok
     assert pcs.get_current_check(db, SESSION_ID) == {
-        "set_total": 2, "last_set_index": 1, "gaps": ["new"],
+        "set_total": 2,
+        "last_set_index": 1,
+        "gaps": ["new"],
         "purpose": "check",
     }
 
@@ -160,7 +178,9 @@ def test_public_view_exposes_set_position(db):
 def test_reconstruct_check_batch_reads_set_position_from_tool_args(db):
     args = _args(2, 3).model_dump()
     msg = ChatMessage(
-        session_id=SESSION_ID, role="assistant", content="Set two:",
+        session_id=SESSION_ID,
+        role="assistant",
+        content="Set two:",
         tool_calls_json=json.dumps([{"name": "ask_check_questions", "args": args}]),
     )
     db.add(msg)
@@ -177,9 +197,7 @@ def test_stop_mid_check_grades_remaining_as_skipped_and_reports(db):
     summary = cq.stop_open_check(db, SESSION_ID)
 
     lines = summary.splitlines()
-    assert lines[0] == (
-        "[check results] gap=krebs: 1/1 correct. learner stopped at set 2 of 3."
-    )
+    assert lines[0] == ("[check results] gap=krebs: 1/1 correct. learner stopped at set 2 of 3.")
     assert "  Q2 skipped." in lines and "  Q3 skipped." in lines
     assert cq.get_pending_check(db, SESSION_ID) is None
     assert pcs.get_current_check(db, SESSION_ID) is None

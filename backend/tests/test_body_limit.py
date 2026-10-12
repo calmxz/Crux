@@ -55,9 +55,7 @@ def seeded_session(db_session):
 # --- through the app -------------------------------------------------------
 
 
-def test_oversized_json_body_is_rejected_before_the_route_runs(
-    client, db_session, seeded_session
-):
+def test_oversized_json_body_is_rejected_before_the_route_runs(client, db_session, seeded_session):
     body = _json_body_of_size(MAX + 1)
     resp = client.post(
         "/api/chat/stream",
@@ -68,9 +66,7 @@ def test_oversized_json_body_is_rejected_before_the_route_runs(
         },
     )
     assert resp.status_code == 413
-    assert resp.json() == {
-        "detail": {"code": "body_too_large", "max_bytes": MAX}
-    }
+    assert resp.json() == {"detail": {"code": "body_too_large", "max_bytes": MAX}}
     # The handler never ran, so it persisted nothing.
     assert db_session.query(ChatMessage).count() == 0
 
@@ -119,9 +115,11 @@ def test_multipart_upload_is_exempt_from_this_gate(client, seeded_session):
         files={"file": ("ref.txt", blob, "text/plain")},
         headers={"Authorization": f"Bearer test-{USER_ID}"},
     )
-    detail = resp.json().get("detail") if resp.headers.get(
-        "content-type", ""
-    ).startswith("application/json") else None
+    detail = (
+        resp.json().get("detail")
+        if resp.headers.get("content-type", "").startswith("application/json")
+        else None
+    )
     if isinstance(detail, dict):
         assert detail.get("code") != "body_too_large"
 
@@ -173,9 +171,7 @@ def _scope(headers=None, method="POST"):
         "type": "http",
         "method": method,
         "path": "/api/chat/stream",
-        "headers": headers if headers is not None else [
-            (b"content-type", b"application/json")
-        ],
+        "headers": headers if headers is not None else [(b"content-type", b"application/json")],
     }
 
 
@@ -201,12 +197,8 @@ async def test_chunked_body_without_content_length_is_rejected_on_crossing():
     starts = [m for m in sent if m["type"] == "http.response.start"]
     assert len(starts) == 1
     assert starts[0]["status"] == 413
-    payload = b"".join(
-        m.get("body", b"") for m in sent if m["type"] == "http.response.body"
-    )
-    assert json.loads(payload) == {
-        "detail": {"code": "body_too_large", "max_bytes": MAX}
-    }
+    payload = b"".join(m.get("body", b"") for m in sent if m["type"] == "http.response.body")
+    assert json.loads(payload) == {"detail": {"code": "body_too_large", "max_bytes": MAX}}
     # The app was entered (it had to start reading), but nothing it sent
     # afterwards may reach the client -- exactly one response.start.
     assert entered == [True]

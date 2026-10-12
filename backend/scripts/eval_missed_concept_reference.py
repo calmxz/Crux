@@ -237,7 +237,7 @@ def _write_report(report_path: Path, block: str) -> None:
         existing = (
             "# D1 AC3 - missed-concept-reference reliability\n\n"
             "Per the CLAUDE.md reliability checkpoints: gate threshold is >=85% across"
-            " replicates. Scenario: user asks \"can you explain that again?\""
+            ' replicates. Scenario: user asks "can you explain that again?"'
             " right after a missed quiz item; PASS requires the tutor's reply"
             " to reference the missed concept (chosen/correct answer or"
             " question stem). Below 85% triggers prompt iteration; if still"

@@ -127,9 +127,15 @@ def test_aggregate_knowledge_level_distribution(client, db_session):
     db_session.flush()
     # Distinct topics: uq_sessions_active_topic forbids two simultaneously-active
     # same-topic sessions per user, and topic content is irrelevant to this test.
-    _mk_session(db_session, "k1", topic="k1-topic", profile=TopicProfile(knowledge_level="beginner"))
-    _mk_session(db_session, "k2", topic="k2-topic", profile=TopicProfile(knowledge_level="beginner"))
-    _mk_session(db_session, "k3", topic="k3-topic", profile=TopicProfile(knowledge_level="advanced"))
+    _mk_session(
+        db_session, "k1", topic="k1-topic", profile=TopicProfile(knowledge_level="beginner")
+    )
+    _mk_session(
+        db_session, "k2", topic="k2-topic", profile=TopicProfile(knowledge_level="beginner")
+    )
+    _mk_session(
+        db_session, "k3", topic="k3-topic", profile=TopicProfile(knowledge_level="advanced")
+    )
     _mk_session(db_session, "k4", topic="k4-topic", profile=TopicProfile())  # unknown
     db_session.commit()
 
@@ -273,17 +279,31 @@ def _count_queries(db):
 
 def test_recent_topics_carry_enriched_fields(client, db_session):
     base = datetime(2026, 6, 1, tzinfo=timezone.utc)
-    prof = {"focus_target_gap": "ATP yield",
-            "mastered_concepts": ["a", "b", "c"], "confirmed_gaps": []}
+    prof = {
+        "focus_target_gap": "ATP yield",
+        "mastered_concepts": ["a", "b", "c"],
+        "confirmed_gaps": [],
+    }
     db_session.add(User(id=USER_ID))
     db_session.flush()
-    db_session.add(SessionModel(id="s_rich", user_id=USER_ID, topic="Glycolysis",
-                                created_at=base, topic_profile_json=json.dumps(prof)))
-    db_session.add(ChatMessage(session_id="s_rich", role="user", content="hi",
-                               created_at=base))
-    db_session.add(ChatMessage(session_id="s_rich", role="assistant",
-                               content="glycolysis nets 2 ATP per glucose",
-                               created_at=base + timedelta(minutes=1)))
+    db_session.add(
+        SessionModel(
+            id="s_rich",
+            user_id=USER_ID,
+            topic="Glycolysis",
+            created_at=base,
+            topic_profile_json=json.dumps(prof),
+        )
+    )
+    db_session.add(ChatMessage(session_id="s_rich", role="user", content="hi", created_at=base))
+    db_session.add(
+        ChatMessage(
+            session_id="s_rich",
+            role="assistant",
+            content="glycolysis nets 2 ATP per glucose",
+            created_at=base + timedelta(minutes=1),
+        )
+    )
     db_session.commit()
 
     r = client.get("/api/profile/aggregate", params={"user_id": USER_ID})
@@ -302,10 +322,12 @@ def test_recent_topics_enrichment_is_set_based(client, db_session):
     db_session.flush()
     for n in range(8):  # more than the 5-row recent window
         sid = f"s{n}"
-        db_session.add(SessionModel(id=sid, user_id=USER_ID, topic=f"t{n}",
-                                    created_at=base, topic_profile_json="{}"))
-        db_session.add(ChatMessage(session_id=sid, role="user", content="x",
-                                   created_at=base))
+        db_session.add(
+            SessionModel(
+                id=sid, user_id=USER_ID, topic=f"t{n}", created_at=base, topic_profile_json="{}"
+            )
+        )
+        db_session.add(ChatMessage(session_id=sid, role="user", content="x", created_at=base))
     db_session.commit()
 
     with _count_queries(db_session) as q:
@@ -376,9 +398,7 @@ def test_last_results_capped_at_five_oldest_to_newest(client, db_session):
     # 7 events: F F F T T T F -> last 5 = F T T T F
     pattern = [False, False, False, True, True, True, False]
     for i, ok in enumerate(pattern):
-        _seed_event_for_insights(
-            db_session, "s1", "mitosis", ok, T0 + timedelta(minutes=i)
-        )
+        _seed_event_for_insights(db_session, "s1", "mitosis", ok, T0 + timedelta(minutes=i))
     body = client.get("/api/profile/aggregate").json()
     entry = body["concept_accuracy"][0]
     assert entry["last_results"] == [False, True, True, True, False]
@@ -483,9 +503,7 @@ def _conflict_body(client):
 def test_conflict_newest_event_incorrect_keeps_gap_only(client, db_session):
     _seed_conflict_sessions(db_session)
     _seed_event_for_insights(db_session, "conf_a", "osmosis", True, T0)
-    _seed_event_for_insights(
-        db_session, "conf_b", "osmosis", False, T0 + timedelta(hours=1)
-    )
+    _seed_event_for_insights(db_session, "conf_b", "osmosis", False, T0 + timedelta(hours=1))
 
     mastered, gaps = _conflict_body(client)
     assert "osmosis" in gaps
@@ -495,9 +513,7 @@ def test_conflict_newest_event_incorrect_keeps_gap_only(client, db_session):
 def test_conflict_newest_event_correct_keeps_mastered_only(client, db_session):
     _seed_conflict_sessions(db_session)
     _seed_event_for_insights(db_session, "conf_a", "osmosis", False, T0)
-    _seed_event_for_insights(
-        db_session, "conf_b", "osmosis", True, T0 + timedelta(hours=1)
-    )
+    _seed_event_for_insights(db_session, "conf_b", "osmosis", True, T0 + timedelta(hours=1))
 
     mastered, gaps = _conflict_body(client)
     assert "osmosis" in mastered
@@ -512,13 +528,9 @@ def test_conflict_with_no_events_keeps_gap_only(client, db_session):
     assert "osmosis" not in mastered
 
 
-def test_conflict_resolution_leaves_non_conflicting_concepts_untouched(
-    client, db_session
-):
+def test_conflict_resolution_leaves_non_conflicting_concepts_untouched(client, db_session):
     _seed_conflict_sessions(db_session)
-    _seed_event_for_insights(
-        db_session, "conf_b", "osmosis", False, T0 + timedelta(hours=1)
-    )
+    _seed_event_for_insights(db_session, "conf_b", "osmosis", False, T0 + timedelta(hours=1))
 
     mastered, gaps = _conflict_body(client)
     assert mastered["mitosis"]["count"] == 2
@@ -564,11 +576,7 @@ def capture_statements(db):
 
 
 def _mk_raw(db, sid, *, user_id, topic, profile_json, created_at, ended_at=None):
-    db.add(
-        SessionModel(
-            id=sid, user_id=user_id, topic=topic, topic_profile_json=profile_json
-        )
-    )
+    db.add(SessionModel(id=sid, user_id=user_id, topic=topic, topic_profile_json=profile_json))
     db.flush()
     row = db.get(SessionModel, sid)
     row.created_at = created_at
@@ -579,7 +587,11 @@ def _seed_pin_fixture(db):
     db.add(User(id=PIN_USER))
     db.flush()
     _mk_raw(
-        db, "p1", user_id=PIN_USER, topic="sql", created_at=AGG_T0,
+        db,
+        "p1",
+        user_id=PIN_USER,
+        topic="sql",
+        created_at=AGG_T0,
         profile_json=TopicProfile(
             knowledge_level="beginner",
             mastered_concepts=[{"name": "joins"}, {"name": "select"}],
@@ -587,7 +599,10 @@ def _seed_pin_fixture(db):
         ).model_dump_json(),
     )
     _mk_raw(
-        db, "p2", user_id=PIN_USER, topic="sql-2",
+        db,
+        "p2",
+        user_id=PIN_USER,
+        topic="sql-2",
         created_at=AGG_T0 + timedelta(days=1),
         ended_at=AGG_T0 + timedelta(days=2),
         profile_json=TopicProfile(
@@ -598,12 +613,19 @@ def _seed_pin_fixture(db):
     )
     # malformed blob -> tolerant parser yields an empty profile ("unknown" level)
     _mk_raw(
-        db, "p3", user_id=PIN_USER, topic="broken",
-        created_at=AGG_T0 + timedelta(days=3), profile_json="{not json",
+        db,
+        "p3",
+        user_id=PIN_USER,
+        topic="broken",
+        created_at=AGG_T0 + timedelta(days=3),
+        profile_json="{not json",
     )
     # legacy bare-string concept-list elements
     _mk_raw(
-        db, "p4", user_id=PIN_USER, topic="legacy",
+        db,
+        "p4",
+        user_id=PIN_USER,
+        topic="legacy",
         created_at=AGG_T0 + timedelta(days=4),
         profile_json=json.dumps(
             {
@@ -615,13 +637,19 @@ def _seed_pin_fixture(db):
     )
     db.add(
         LearningEvent(
-            session_id="p1", gap_tested="ctes", question="q", correct=True,
+            session_id="p1",
+            gap_tested="ctes",
+            question="q",
+            correct=True,
             created_at=AGG_T0 + timedelta(days=5),
         )
     )
     db.add(
         LearningEvent(
-            session_id="p1", gap_tested="joins", question="q", correct=False,
+            session_id="p1",
+            gap_tested="joins",
+            question="q",
+            correct=False,
             created_at=AGG_T0 + timedelta(days=5),
         )
     )
@@ -646,55 +674,86 @@ AGGREGATE_PIN = {
     ],
     "concept_accuracy": [
         {
-            "accuracy": 0.0, "concept": "joins", "correct_count": 0,
-            "first_seen_session_id": "p1", "last_results": [False],
+            "accuracy": 0.0,
+            "concept": "joins",
+            "correct_count": 0,
+            "first_seen_session_id": "p1",
+            "last_results": [False],
             "total_count": 1,
         },
         {
-            "accuracy": 1.0, "concept": "ctes", "correct_count": 1,
-            "first_seen_session_id": "p1", "last_results": [True],
+            "accuracy": 1.0,
+            "concept": "ctes",
+            "correct_count": 1,
+            "first_seen_session_id": "p1",
+            "last_results": [True],
             "total_count": 1,
         },
     ],
     "knowledge_level_distribution": {
-        "advanced": 1, "beginner": 1, "intermediate": 1, "unknown": 1,
+        "advanced": 1,
+        "beginner": 1,
+        "intermediate": 1,
+        "unknown": 1,
     },
     "recent_topics": [
         {
-            "created_at": "2026-05-05T00:00:00", "ended_at": None, "id": "p4",
-            "last_activity_at": None, "last_message_preview": None,
-            "last_session_summary": None, "message_count": 0,
+            "created_at": "2026-05-05T00:00:00",
+            "ended_at": None,
+            "id": "p4",
+            "last_activity_at": None,
+            "last_message_preview": None,
+            "last_session_summary": None,
+            "message_count": 0,
             "progress": {
-                "focus_target_gap": None, "level": "advanced", "mastered_count": 1,
+                "focus_target_gap": None,
+                "level": "advanced",
+                "mastered_count": 1,
             },
             "topic": "legacy",
         },
         {
-            "created_at": "2026-05-04T00:00:00", "ended_at": None, "id": "p3",
-            "last_activity_at": None, "last_message_preview": None,
-            "last_session_summary": None, "message_count": 0,
+            "created_at": "2026-05-04T00:00:00",
+            "ended_at": None,
+            "id": "p3",
+            "last_activity_at": None,
+            "last_message_preview": None,
+            "last_session_summary": None,
+            "message_count": 0,
             "progress": {
-                "focus_target_gap": None, "level": None, "mastered_count": 0,
+                "focus_target_gap": None,
+                "level": None,
+                "mastered_count": 0,
             },
             "topic": "broken",
         },
         {
             "created_at": "2026-05-02T00:00:00",
-            "ended_at": "2026-05-03T00:00:00", "id": "p2",
-            "last_activity_at": None, "last_message_preview": None,
-            "last_session_summary": None, "message_count": 0,
+            "ended_at": "2026-05-03T00:00:00",
+            "id": "p2",
+            "last_activity_at": None,
+            "last_message_preview": None,
+            "last_session_summary": None,
+            "message_count": 0,
             "progress": {
-                "focus_target_gap": None, "level": "intermediate",
+                "focus_target_gap": None,
+                "level": "intermediate",
                 "mastered_count": 1,
             },
             "topic": "sql-2",
         },
         {
-            "created_at": "2026-05-01T00:00:00", "ended_at": None, "id": "p1",
-            "last_activity_at": None, "last_message_preview": None,
-            "last_session_summary": None, "message_count": 0,
+            "created_at": "2026-05-01T00:00:00",
+            "ended_at": None,
+            "id": "p1",
+            "last_activity_at": None,
+            "last_message_preview": None,
+            "last_session_summary": None,
+            "message_count": 0,
             "progress": {
-                "focus_target_gap": None, "level": "beginner", "mastered_count": 2,
+                "focus_target_gap": None,
+                "level": "beginner",
+                "mastered_count": 2,
             },
             "topic": "sql",
         },
@@ -753,7 +812,10 @@ def test_aggregate_statement_count_does_not_grow_with_sessions(db_session):
 
     for i in range(50):
         _mk_raw(
-            db_session, f"bulk{i}", user_id=PIN_USER, topic=f"t{i}",
+            db_session,
+            f"bulk{i}",
+            user_id=PIN_USER,
+            topic=f"t{i}",
             created_at=AGG_T0 - timedelta(days=i + 1),
             profile_json=TopicProfile(
                 knowledge_level="beginner",

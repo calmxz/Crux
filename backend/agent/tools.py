@@ -102,7 +102,7 @@ TOOLS = [
                 " session, on the first reply after the learner's level becomes"
                 " known (see TOPIC_SUGGEST). mode=broad: items are 3-5"
                 " subtopics of the topic. mode=specific: items are 2-4 adjacent"
-                " topics; the card adds the \"Keep going on <topic>\" line"
+                ' topics; the card adds the "Keep going on <topic>" line'
                 " itself. Write your reply first; a call with no reply text"
                 " fails. Calling it ends the turn. Fails when TOPIC_SUGGEST is"
                 " OFF or the level is still unknown."
@@ -125,9 +125,7 @@ def dispatch(name: str, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
                 ctx.db, ctx, UpdateTopicProfileArgs.model_validate(args)
             )
         if name == "retrieve_chunks":
-            return retrieval_service.retrieve(
-                ctx.db, ctx, RetrieveChunksArgs.model_validate(args)
-            )
+            return retrieval_service.retrieve(ctx.db, ctx, RetrieveChunksArgs.model_validate(args))
         if name == "ask_check_questions":
             return check_question_service.register(
                 ctx.db, ctx, AskCheckQuestionsArgs.model_validate(args)

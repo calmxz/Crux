@@ -46,6 +46,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Format check (ruff)
+        run: ruff format --check .
+
       - name: Validate OpenAPI spec
         working-directory: .
         run: python -m openapi_spec_validator docs/api/openapi.yaml

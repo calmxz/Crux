@@ -81,14 +81,20 @@ def record_from_answer(
             # canon-equal dangling focus. Reversible: a later wrong retest
             # demotes and re-adds the gap below.
             profile_service.add_exclusive(
-                profile, "mastered_concepts", gap,
-                evidence_type="tested", stamp=stamp,
+                profile,
+                "mastered_concepts",
+                gap,
+                evidence_type="tested",
+                stamp=stamp,
             )
         else:
             # Demotion + confirmed-gap evidence via the same choke point.
             profile_service.add_exclusive(
-                profile, "confirmed_gaps", gap,
-                evidence_type="tested", stamp=stamp,
+                profile,
+                "confirmed_gaps",
+                gap,
+                evidence_type="tested",
+                stamp=stamp,
             )
         profile_service.save_profile(db, session_id, profile, commit=False)
 
@@ -115,4 +121,6 @@ def gap_accuracy(db: Session, session_id: str) -> dict[str, dict]:
         .where(LearningEvent.session_id == session_id)
         .group_by(LearningEvent.gap_tested)
     ).all()
-    return {r.gap_tested: {"attempts": int(r.attempts), "correct": int(r.correct or 0)} for r in rows}
+    return {
+        r.gap_tested: {"attempts": int(r.attempts), "correct": int(r.correct or 0)} for r in rows
+    }

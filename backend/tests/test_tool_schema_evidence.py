@@ -11,15 +11,10 @@ from agent.tools import TOOLS
 
 
 def _update_profile_fn():
-    return next(
-        t["function"] for t in TOOLS if t["function"]["name"] == "update_topic_profile"
-    )
+    return next(t["function"] for t in TOOLS if t["function"]["name"] == "update_topic_profile")
 
 
 def test_schema_description_states_level_needs_evidence():
     params = _update_profile_fn()["parameters"]
     desc = params.get("description") or ""
-    assert (
-        "required whenever `knowledge_level` or `add_mastered_concept` is present"
-        in desc
-    ), desc
+    assert "required whenever `knowledge_level` or `add_mastered_concept` is present" in desc, desc

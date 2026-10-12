@@ -120,7 +120,8 @@ def test_apply_patch_mastery_add_removes_gap(session_row, ctx, db_session):
     profile_service.save_profile(db_session, SESSION_ID, profile)
 
     result = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         _patch(add_mastered_concept="Chain Rule", evidence_type="declared"),
     )
 
@@ -149,7 +150,8 @@ def test_apply_patch_mastery_add_removes_gap_with_dangling_focus_cleared(
     profile_service.save_profile(db_session, SESSION_ID, profile)
 
     result = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         _patch(
             add_mastered_concept="Chain Rule",
             evidence_type="declared",
@@ -180,7 +182,8 @@ def test_apply_patch_mastery_add_rejects_explicit_focus_resend_of_mastered_gap(
     profile_service.save_profile(db_session, SESSION_ID, profile)
 
     result = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         _patch(
             add_mastered_concept="Chain Rule",
             evidence_type="declared",
@@ -195,9 +198,7 @@ def test_apply_patch_mastery_add_rejects_explicit_focus_resend_of_mastered_gap(
     assert after.focus_target_gap is None
 
 
-def test_apply_patch_mastery_add_allows_unrelated_explicit_focus(
-    session_row, ctx, db_session
-):
+def test_apply_patch_mastery_add_allows_unrelated_explicit_focus(session_row, ctx, db_session):
     """An explicit focus_target_gap unrelated to the mastered concept must
     still be set -- only the resurrection of the just-mastered gap's own
     focus is suppressed."""
@@ -211,7 +212,8 @@ def test_apply_patch_mastery_add_allows_unrelated_explicit_focus(
     profile_service.save_profile(db_session, SESSION_ID, profile)
 
     result = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         _patch(
             add_mastered_concept="Chain Rule",
             evidence_type="declared",
@@ -321,9 +323,14 @@ def test_focus_clear_tested_correct_ok(session_row, ctx, db_session):
     # F-02 (restored): with a correct LearningEvent recorded for the focused
     # gap in this session, the clear is accepted.
     _set_focus(db_session, ctx, "joins")
-    db_session.add(LearningEvent(
-        session_id=SESSION_ID, gap_tested="joins", question="q?", correct=True,
-    ))
+    db_session.add(
+        LearningEvent(
+            session_id=SESSION_ID,
+            gap_tested="joins",
+            question="q?",
+            correct=True,
+        )
+    )
     db_session.commit()
     result = profile_service.apply_patch(
         db_session,
@@ -366,7 +373,7 @@ def test_load_profile_tolerates_legacy_fields(session_row, db_session):
         {
             "knowledge_level": "intermediate",
             "mastered_concepts": ["joins"],
-            "mastered_candidates": ["legacy"],     # retired field
+            "mastered_candidates": ["legacy"],  # retired field
             "interaction_preferences": {"hints": True},  # retired field
         }
     )
@@ -464,9 +471,7 @@ def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_ses
 
 
 def test_invalid_level_is_dropped_lists_are_kept():
-    p = _parse_profile(
-        '{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}'
-    )
+    p = _parse_profile('{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}')
     assert p.knowledge_level is None
     assert concept_names(p.mastered_concepts) == ["joins"]
 
@@ -519,9 +524,7 @@ def test_salvage_warning_carries_no_learner_text(caplog):
             json.dumps(
                 {
                     "knowledge_level": "expert",
-                    "mastered_concepts": [
-                        {"name": "secret-concept", "evidence_type": "inferred"}
-                    ],
+                    "mastered_concepts": [{"name": "secret-concept", "evidence_type": "inferred"}],
                     "confirmed_gaps": [{"name": "secret-gap", "x": 1}],
                     "focus_target_gap": 7,
                     "last_session_summary": "secret summary",
@@ -600,7 +603,8 @@ def test_apply_user_patch_mutual_exclusion_moves_item(db_session, seeded_session
 
 def test_add_mastered_nulls_focus_when_it_was_the_focused_gap(db_session, seeded_session_id):
     profile_service.save_profile(
-        db_session, seeded_session_id,
+        db_session,
+        seeded_session_id,
         TopicProfile(confirmed_gaps=[{"name": "recursion"}], focus_target_gap="recursion"),
     )
     p = profile_service.apply_user_patch(db_session, seeded_session_id, add_mastered="recursion")
@@ -612,7 +616,9 @@ def test_add_mastered_nulls_focus_when_it_was_the_focused_gap(db_session, seeded
 
 def test_remove_profile_item_removes_and_persists(db_session, seeded_session_id):
     profile_service.apply_user_patch(db_session, seeded_session_id, add_mastered="loops")
-    p = profile_service.remove_profile_item(db_session, seeded_session_id, "mastered_concepts", "loops")
+    p = profile_service.remove_profile_item(
+        db_session, seeded_session_id, "mastered_concepts", "loops"
+    )
     assert "loops" not in concept_names(p.mastered_concepts)
     # persisted
     reloaded = profile_service.load_profile(db_session, seeded_session_id)
@@ -621,10 +627,13 @@ def test_remove_profile_item_removes_and_persists(db_session, seeded_session_id)
 
 def test_remove_confirmed_gap_nulls_focus(db_session, seeded_session_id):
     profile_service.save_profile(
-        db_session, seeded_session_id,
+        db_session,
+        seeded_session_id,
         TopicProfile(confirmed_gaps=[{"name": "recursion"}], focus_target_gap="recursion"),
     )
-    p = profile_service.remove_profile_item(db_session, seeded_session_id, "confirmed_gaps", "recursion")
+    p = profile_service.remove_profile_item(
+        db_session, seeded_session_id, "confirmed_gaps", "recursion"
+    )
     assert "recursion" not in concept_names(p.confirmed_gaps)
     assert p.focus_target_gap is None
     # persisted
@@ -635,7 +644,9 @@ def test_remove_confirmed_gap_nulls_focus(db_session, seeded_session_id):
 
 def test_remove_missing_item_raises_keyerror(db_session, seeded_session_id):
     with pytest.raises(KeyError):
-        profile_service.remove_profile_item(db_session, seeded_session_id, "mastered_concepts", "nope")
+        profile_service.remove_profile_item(
+            db_session, seeded_session_id, "mastered_concepts", "nope"
+        )
 
 
 def test_apply_user_patch_missing_session_raises_value_error(db_session):
@@ -662,6 +673,7 @@ def test_lock_session_row_emits_for_update_on_postgres():
     from sqlalchemy.dialects import postgresql
 
     from db.models import Session as SessionModel
+
     stmt = select(SessionModel).where(SessionModel.id == "x").with_for_update()
     assert "FOR UPDATE" in str(stmt.compile(dialect=postgresql.dialect()))
 
@@ -670,7 +682,8 @@ def test_apply_user_patch_takes_the_lock(db_session, session_row, monkeypatch):
     calls = []
     real = profile_service.lock_session_row
     monkeypatch.setattr(
-        profile_service, "lock_session_row",
+        profile_service,
+        "lock_session_row",
         lambda db, sid: calls.append(sid) or real(db, sid),
     )
     profile_service.apply_user_patch(db_session, session_row.id, add_gap="x")
@@ -681,7 +694,8 @@ def test_apply_patch_takes_the_lock(db_session, session_row, ctx, monkeypatch):
     calls = []
     real = profile_service.lock_session_row
     monkeypatch.setattr(
-        profile_service, "lock_session_row",
+        profile_service,
+        "lock_session_row",
         lambda db, sid: calls.append(sid) or real(db, sid),
     )
     profile_service.apply_patch(
@@ -691,8 +705,7 @@ def test_apply_patch_takes_the_lock(db_session, session_row, ctx, monkeypatch):
 
 
 def test_profile_from_row_parses_without_db(db_session):
-    row = SessionModel(user_id="u", topic="t",
-                       topic_profile_json='{"knowledge_level": "beginner"}')
+    row = SessionModel(user_id="u", topic="t", topic_profile_json='{"knowledge_level": "beginner"}')
     profile = profile_service.profile_from_row(row)
     assert profile.knowledge_level == "beginner"
 
@@ -766,7 +779,8 @@ def test_apply_patch_stamps_provenance(session_row, db_session):
         turn_started_at=datetime.now(timezone.utc),
     )
     res = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         UpdateTopicProfileArgs(
             session_id=session_row.id,
             add_mastered_concept="limits",
@@ -789,7 +803,8 @@ def test_apply_patch_stamps_provenance(session_row, db_session):
     # and assert the re-stamp actually advanced last_event_at -- otherwise
     # this test would pass even if upsert_entry never re-stamped on repeat.
     res2 = profile_service.apply_patch(
-        db_session, ctx,
+        db_session,
+        ctx,
         UpdateTopicProfileArgs(
             session_id=session_row.id,
             add_mastered_concept="LIMITS",
@@ -922,10 +937,14 @@ def test_tested_correct_clear_rejected_without_event(db_session, tool_ctx):
 def test_tested_correct_clear_accepted_with_canon_matching_event(db_session, tool_ctx):
     profile = TopicProfile(focus_target_gap="Chain Rule")
     profile_service.save_profile(db_session, tool_ctx.session_id, profile)
-    db_session.add(LearningEvent(
-        session_id=tool_ctx.session_id, gap_tested="  chain rule ",
-        question="q?", correct=True,
-    ))
+    db_session.add(
+        LearningEvent(
+            session_id=tool_ctx.session_id,
+            gap_tested="  chain rule ",
+            question="q?",
+            correct=True,
+        )
+    )
     db_session.commit()
 
     result = profile_service.apply_patch(
@@ -939,10 +958,14 @@ def test_tested_correct_clear_accepted_with_canon_matching_event(db_session, too
 def test_tested_correct_clear_rejected_for_event_on_other_gap(db_session, tool_ctx):
     profile = TopicProfile(focus_target_gap="chain rule")
     profile_service.save_profile(db_session, tool_ctx.session_id, profile)
-    db_session.add(LearningEvent(
-        session_id=tool_ctx.session_id, gap_tested="product rule",
-        question="q?", correct=True,
-    ))
+    db_session.add(
+        LearningEvent(
+            session_id=tool_ctx.session_id,
+            gap_tested="product rule",
+            question="q?",
+            correct=True,
+        )
+    )
     db_session.commit()
 
     result = profile_service.apply_patch(
@@ -960,7 +983,9 @@ def test_non_tested_reasons_clear_without_event(db_session, tool_ctx):
             db_session, tool_ctx, _clear_args(tool_ctx.session_id, reason)
         )
         assert result.ok
-        assert profile_service.load_profile(db_session, tool_ctx.session_id).focus_target_gap is None
+        assert (
+            profile_service.load_profile(db_session, tool_ctx.session_id).focus_target_gap is None
+        )
 
 
 def test_omitted_focus_without_reason_is_not_a_clear(db_session, tool_ctx):
@@ -969,7 +994,8 @@ def test_omitted_focus_without_reason_is_not_a_clear(db_session, tool_ctx):
     profile_service.save_profile(db_session, tool_ctx.session_id, profile)
 
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(session_id=tool_ctx.session_id, add_confirmed_gap="product rule"),
     )
 
@@ -981,7 +1007,8 @@ def test_omitted_focus_without_reason_is_not_a_clear(db_session, tool_ctx):
 
 def test_agent_tested_evidence_downgraded_to_declared(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(
             session_id=tool_ctx.session_id,
             add_mastered_concept="chain rule",
@@ -996,7 +1023,8 @@ def test_agent_tested_evidence_downgraded_to_declared(db_session, tool_ctx):
 
 def test_agent_tested_gap_evidence_downgraded(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(
             session_id=tool_ctx.session_id,
             add_confirmed_gap="chain rule",
@@ -1011,7 +1039,8 @@ def test_agent_tested_gap_evidence_downgraded(db_session, tool_ctx):
 
 def test_knowledge_level_requires_evidence(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(session_id=tool_ctx.session_id, knowledge_level="advanced"),
     )
     assert not result.ok
@@ -1021,7 +1050,8 @@ def test_knowledge_level_requires_evidence(db_session, tool_ctx):
 
 def test_knowledge_level_with_declared_evidence_accepted(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(
             session_id=tool_ctx.session_id,
             knowledge_level="advanced",
@@ -1029,7 +1059,9 @@ def test_knowledge_level_with_declared_evidence_accepted(db_session, tool_ctx):
         ),
     )
     assert result.ok
-    assert profile_service.load_profile(db_session, tool_ctx.session_id).knowledge_level == "advanced"
+    assert (
+        profile_service.load_profile(db_session, tool_ctx.session_id).knowledge_level == "advanced"
+    )
 
 
 def test_empty_patch_fails(db_session, tool_ctx):
@@ -1043,7 +1075,8 @@ def test_empty_patch_fails(db_session, tool_ctx):
 
 def test_inferred_only_patch_returns_ignored(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(
             session_id=tool_ctx.session_id,
             add_mastered_concept="chain rule",
@@ -1059,7 +1092,8 @@ def test_inferred_only_patch_returns_ignored(db_session, tool_ctx):
 
 def test_inferred_mastery_alongside_real_change_is_ok_with_note(db_session, tool_ctx):
     result = profile_service.apply_patch(
-        db_session, tool_ctx,
+        db_session,
+        tool_ctx,
         UpdateTopicProfileArgs(
             session_id=tool_ctx.session_id,
             add_mastered_concept="chain rule",

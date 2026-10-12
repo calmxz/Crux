@@ -2,6 +2,7 @@
 
 Validates model-derived schema via in-memory SQLite — no live DB required.
 """
+
 import uuid  # used for session_id generation
 
 import pytest

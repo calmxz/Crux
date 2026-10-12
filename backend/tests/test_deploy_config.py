@@ -157,7 +157,8 @@ def test_backup_workflow_alerts_on_failure():
     # A timeout-minutes kill marks the job cancelled, not failed, so the
     # alert condition must cover both or the hang case never alerts.
     failure_steps = [
-        s for s in steps
+        s
+        for s in steps
         if "failure()" in str(s.get("if", "")) and "cancelled()" in str(s.get("if", ""))
     ]
     assert failure_steps, "no `if: failure() || cancelled()` alert step in the backup job"

@@ -106,9 +106,7 @@ def get_current_check(db: Session, session_id: str) -> dict | None:
     return get_current_check_from_row(db.get(SessionModel, session_id))
 
 
-def set_current_check(
-    db: Session, session_id: str, cc: dict | None, commit: bool = True
-) -> None:
+def set_current_check(db: Session, session_id: str, cc: dict | None, commit: bool = True) -> None:
     row = db.get(SessionModel, session_id)
     if row is None:
         if cc is None:

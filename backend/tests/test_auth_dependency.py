@@ -77,9 +77,15 @@ def patch_jwks_client(monkeypatch, rsa_keys):
     )
 
 
-def _sign(rsa_keys: dict, *, sub: str = "user-123", aud: str = "authenticated",
-          exp_offset: int = 3600, iss: str | None = None,
-          extra: dict | None = None) -> str:
+def _sign(
+    rsa_keys: dict,
+    *,
+    sub: str = "user-123",
+    aud: str = "authenticated",
+    exp_offset: int = 3600,
+    iss: str | None = None,
+    extra: dict | None = None,
+) -> str:
     now = int(time.time())
     payload = {
         "sub": sub,
@@ -287,9 +293,7 @@ def test_wrong_signature_returns_401(client, rsa_keys):
 
 
 def test_malformed_token_returns_401(client):
-    r = client.get(
-        "/whoami", headers={"Authorization": "Bearer not.a.real.jwt"}
-    )
+    r = client.get("/whoami", headers={"Authorization": "Bearer not.a.real.jwt"})
     assert r.status_code == 401
     assert r.json()["detail"] == "invalid_token"
 
@@ -301,6 +305,7 @@ def test_auth_not_configured_when_jwks_url_missing(monkeypatch, app, rsa_keys):
 
     # Re-import the original function (the autouse fixture patched it; undo here).
     import importlib
+
     fresh = importlib.reload(auth_module)
     monkeypatch.setattr(fresh.settings, "supabase_url", "")
     monkeypatch.setattr(fresh.settings, "supabase_jwks_url_override", "")
@@ -337,7 +342,7 @@ def test_unknown_kid_returns_401_not_500(monkeypatch):
     monkeypatch.setattr(
         auth,
         "_get_jwks_client",
-        lambda: _RaisingJwksClient(pyjwt.PyJWKClientError('Unable to find a signing key')),
+        lambda: _RaisingJwksClient(pyjwt.PyJWKClientError("Unable to find a signing key")),
     )
     with pytest.raises(HTTPException) as exc:
         auth.verify_supabase_jwt("h.p.s")

@@ -95,7 +95,8 @@ def _build_prompt_state(
         # #340: lets the prompt tell "between sets" from "no check".
         "current_check": (
             pending_check_store.get_current_check_from_row(session)
-            if getattr(session, "current_check_json", None) else None
+            if getattr(session, "current_check_json", None)
+            else None
         ),
         "quiz_cooldown": quiz_cooldown,
         "gap_accuracy": gap_accuracy or {},
@@ -108,9 +109,7 @@ def _build_prompt_state(
     if review_gaps:
         gaps = profile_service.concept_names(profile.confirmed_gaps)
         mastered = [
-            c
-            for c in profile_service.concept_names(profile.mastered_concepts)
-            if c not in gaps
+            c for c in profile_service.concept_names(profile.mastered_concepts) if c not in gaps
         ]
         pool = gaps + mastered
         if pool:
@@ -127,9 +126,7 @@ def _build_prompt_state(
             prompt_state["diagnostic_required"] = False
             prompt_state["diagnostic_accepted"] = False
     if prefetched_chunks:
-        prompt_state["prefetched_excerpts"] = [
-            wrap_chunk(ch) for ch in prefetched_chunks
-        ]
+        prompt_state["prefetched_excerpts"] = [wrap_chunk(ch) for ch in prefetched_chunks]
     return prompt_state
 
 
@@ -201,10 +198,7 @@ def _prepare_turn_guards(
         select(
             cost_meter.spend_subquery(user_id),
             exists_subq,
-            *(
-                select(col).where(User.id == user_id).scalar_subquery()
-                for col in pref_cols
-            ),
+            *(select(col).where(User.id == user_id).scalar_subquery() for col in pref_cols),
         )
     ).one()
     learner_prefs = {col.key: value for col, value in zip(pref_cols, pref_values, strict=True)}
@@ -214,9 +208,7 @@ def _prepare_turn_guards(
         raise _cost_cap_error(cost_status)
 
     if settings.global_daily_cost_cap_usd is not None:
-        if cost_meter.global_spend(db) >= Decimal(
-            str(settings.global_daily_cost_cap_usd)
-        ):
+        if cost_meter.global_spend(db) >= Decimal(str(settings.global_daily_cost_cap_usd)):
             raise HTTPException(
                 status_code=429,
                 detail={
@@ -235,7 +227,9 @@ def _prepare_turn_guards(
             SessionModel,
             doc_base.scalar_subquery().label("doc_total"),
             doc_base.where(Document.status == "pending").scalar_subquery().label("doc_pending"),
-            doc_base.where(Document.status == "processing").scalar_subquery().label("doc_processing"),
+            doc_base.where(Document.status == "processing")
+            .scalar_subquery()
+            .label("doc_processing"),
             doc_base.where(Document.status == "ready").scalar_subquery().label("doc_ready"),
         ).where(SessionModel.id == req.session_id)
     ).first()
@@ -303,22 +297,25 @@ def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
     F-11: split out so the caller can run it via run_in_threadpool. Returns
     (messages, profile, gap_accuracy, retrieval_required).
     """
-    history = db.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id == req.session_id)
-        # C-18: id DESC breaks created_at ties, so a batched write (or a coarse
-        # clock) cannot reorder the prompt history or drop the wrong turn.
-        # Matches services/session_enrichment.py and the session library query.
-        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
-        .limit(20)
-    ).scalars().all()
+    history = (
+        db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == req.session_id)
+            # C-18: id DESC breaks created_at ties, so a batched write (or a coarse
+            # clock) cannot reorder the prompt history or drop the wrong turn.
+            # Matches services/session_enrichment.py and the session library query.
+            .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+            .limit(20)
+        )
+        .scalars()
+        .all()
+    )
     history = list(reversed(history))
 
     # P2: cap each history message; the current user message (appended below)
     # and the system prompt are exempt.
     messages = [
-        {"role": m.role, "content": context_budget.truncate_message(m.content)}
-        for m in history
+        {"role": m.role, "content": context_budget.truncate_message(m.content)} for m in history
     ]
     messages.append({"role": "user", "content": req.message})
 
@@ -395,15 +392,22 @@ async def _prepare_turn_after_guards(
         query_vec = None
         if not retrieval_required:
             retrieval_required, query_vec = await retrieval_service.semantic_fallback_required(
-                db, req.session_id, req.message, user_id=user_id,
+                db,
+                req.session_id,
+                req.message,
+                user_id=user_id,
                 cost_holder=embed_cost_holder,
             )
 
         prefetched_chunks = None
         if retrieval_required:
             prefetched_chunks = await retrieval_service.prefetch_for_prompt(
-                db, req.session_id, user_id, req.message,
-                query_vec=query_vec, cost_holder=embed_cost_holder,
+                db,
+                req.session_id,
+                user_id,
+                req.message,
+                query_vec=query_vec,
+                cost_holder=embed_cost_holder,
             )
 
         prompt_state = _build_prompt_state(

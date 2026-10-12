@@ -63,9 +63,11 @@ def seed_session(db_session):
 
 def _make_fake_run_streaming(*events):
     """Return an async generator function that yields the given StreamEvent objects."""
+
     async def fake(messages, system_prompt, ctx):
         for event in events:
             yield event
+
     return fake
 
 
@@ -215,6 +217,7 @@ def test_chat_stream_cancelled_event_terminates_stream(client, monkeypatch):
 
 def test_chat_stream_includes_quiz_readiness(client, db_session, monkeypatch):
     from services import check_question_service
+
     check_question_service.set_quiz_cooldown(
         db_session, SESSION_ID, {"gap": "joins", "last_score": "0/1", "missed": ["q0"]}
     )
@@ -228,7 +231,8 @@ def test_chat_stream_includes_quiz_readiness(client, db_session, monkeypatch):
     monkeypatch.setattr("agent.tutor.run_streaming", fake)
 
     with client.stream(
-        "POST", "/api/chat/stream",
+        "POST",
+        "/api/chat/stream",
         json={"session_id": SESSION_ID, "message": "hello"},
         headers=AUTH_HEADERS,
     ) as resp:
@@ -292,9 +296,7 @@ def test_semantic_fallback_escalates_gate(client, monkeypatch):
         calls["user_id"] = user_id
         return True, None
 
-    monkeypatch.setattr(
-        "routes.chat.retrieval_service.semantic_fallback_required", fake_fallback
-    )
+    monkeypatch.setattr("routes.chat.retrieval_service.semantic_fallback_required", fake_fallback)
 
     captured = {}
     from routes import chat as chat_module
@@ -342,9 +344,7 @@ def test_semantic_fallback_not_called_when_lexical_gate_true(client, db_session,
     def fail_if_called(db, session_id, query):
         raise AssertionError("fallback must not run when lexical gate is True")
 
-    monkeypatch.setattr(
-        "routes.chat.retrieval_service.semantic_fallback_required", fail_if_called
-    )
+    monkeypatch.setattr("routes.chat.retrieval_service.semantic_fallback_required", fail_if_called)
 
     fake = _make_fake_run_streaming(StreamEvent("done", {"message_id": "1"}))
     monkeypatch.setattr("agent.tutor.run_streaming", fake)
@@ -463,7 +463,9 @@ def test_first_turn_creates_user_before_rate_limit_insert(db_session, seeded_ses
         return real(db, uid)
 
     monkeypatch.setattr(rate_limit, "check_and_increment", spy)
-    asyncio.run(_prepare_turn(ChatRequest(session_id=seeded_session.id, message="hi"), new_uid, db_session))
+    asyncio.run(
+        _prepare_turn(ChatRequest(session_id=seeded_session.id, message="hi"), new_uid, db_session)
+    )
     assert db_session.get(User, new_uid) is not None
 
 
@@ -473,9 +475,7 @@ def test_first_turn_creates_user_before_rate_limit_insert(db_session, seeded_ses
 
 
 @pytest.mark.asyncio
-async def test_disconnect_drains_producer_before_releasing_reserve(
-    db_session, monkeypatch
-):
+async def test_disconnect_drains_producer_before_releasing_reserve(db_session, monkeypatch):
     """B-05: on a real client disconnect the ambient anyio cancel scope is
     cancelled level-triggered, so an unshielded `await task` in the finally
     returns immediately (its CancelledError swallowed) while the tutor's
@@ -556,13 +556,9 @@ async def test_disconnect_drains_producer_before_releasing_reserve(
     assert state["release_saw_arm_done"] is True, (
         "_release_reserve ran while the tutor producer was still unwinding"
     )
-    cancelled = (
-        db_session.execute(
-            select(func.count())
-            .select_from(ChatMessage)
-            .where(ChatMessage.status == "cancelled")
-        ).scalar_one()
-    )
+    cancelled = db_session.execute(
+        select(func.count()).select_from(ChatMessage).where(ChatMessage.status == "cancelled")
+    ).scalar_one()
     assert cancelled == 1, "the cancelled assistant message was not persisted"
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000"), (
         "the per-turn reserve was left on the ledger"

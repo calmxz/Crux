@@ -315,9 +315,7 @@ def test_get_single_404_for_wrong_user(client, db_session, seeded_user):
     assert r.status_code == 404
 
 
-def test_get_single_ingestion_status_null_when_no_documents(
-    client, db_session, seeded_user
-):
+def test_get_single_ingestion_status_null_when_no_documents(client, db_session, seeded_user):
     db_session.add(
         SessionModel(
             id="s1",
@@ -571,9 +569,7 @@ def test_end_session_at_rate_cap_returns_mechanical_summary(client, db_session, 
     assert "joins combine tables" in body["summary"]["text"]
 
 
-def test_end_session_consumes_rate_limit_slot(
-    client, db_session, monkeypatch, llm_text
-):
+def test_end_session_consumes_rate_limit_slot(client, db_session, monkeypatch, llm_text):
     async def fake_acompletion(**kwargs):
         return llm_text("a fresh summary")
 
@@ -733,17 +729,26 @@ def seeded_session(db_session, seeded_user):
 
 def _open_batch(db, session_id, user_id=USER_ID, n=2):
     ctx = ToolContext(
-        db=db, session_id=session_id, user_id=user_id,
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
     )
     return check_question_service.register(
-        db, ctx,
+        db,
+        ctx,
         AskCheckQuestionsArgs(
-            set_index=1, set_total=1,
+            set_index=1,
+            set_total=1,
             session_id=session_id,
             gap="g",
             items=[
-                {"question": f"Q{i}?", "options": ["a", "b"], "correct_index": 0, "explanation": "a."}
+                {
+                    "question": f"Q{i}?",
+                    "options": ["a", "b"],
+                    "correct_index": 0,
+                    "explanation": "a.",
+                }
                 for i in range(n)
             ],
         ),
@@ -844,7 +849,9 @@ def test_get_session_caps_messages_to_last_30(client, db_session, seeded_user):
     assert body["messages"][-1]["content"] == "m30"
 
 
-def test_get_session_small_transcript_returns_all_and_has_more_false(client, db_session, seeded_user):
+def test_get_session_small_transcript_returns_all_and_has_more_false(
+    client, db_session, seeded_user
+):
     _seed_session_with_messages(db_session, "s_small", 2)
 
     r = client.get(f"/api/sessions/s_small?user_id={USER_ID}")
@@ -1043,9 +1050,7 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
         # Simulate Starlette's disconnect handling: cancel the scope the
         # response body iterator runs in.
         tg.cancel_scope.cancel()
-    assert arm_done.is_set(), (
-        "the pump returned while the tutor's cancel arm was still unwinding"
-    )
+    assert arm_done.is_set(), "the pump returned while the tutor's cancel arm was still unwinding"
     # get_db teardown stand-in; the assert above is what proves the drain.
     db_session.close()
 

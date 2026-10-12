@@ -12,8 +12,11 @@ T0 = datetime(2026, 7, 1, 12, 0, 0, tzinfo=timezone.utc)
 
 def _ev(concept, correct, at, session_id="s1", topic="biology"):
     return EventRow(
-        concept=concept, correct=correct, created_at=at,
-        session_id=session_id, topic=topic,
+        concept=concept,
+        correct=correct,
+        created_at=at,
+        session_id=session_id,
+        topic=topic,
     )
 
 
@@ -62,9 +65,7 @@ def test_incorrect_resets_streak():
 
 def test_interval_capped_at_max():
     # 8 consecutive corrects -> raw 2^7 = 128 days -> capped at MAX_INTERVAL_DAYS
-    events = [
-        _ev("photosynthesis", True, T0 + timedelta(days=i)) for i in range(8)
-    ]
+    events = [_ev("photosynthesis", True, T0 + timedelta(days=i)) for i in range(8)]
     last = T0 + timedelta(days=7)
     assert compute_schedule(events, now=last + timedelta(days=MAX_INTERVAL_DAYS - 1)) == []
     due = compute_schedule(events, now=last + timedelta(days=MAX_INTERVAL_DAYS))

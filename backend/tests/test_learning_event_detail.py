@@ -4,6 +4,7 @@ record_from_answer gains optional selected_index/correct_index/options/purpose
 params; the batch answer() path in check_question_service is the sole caller
 and must populate them from the same item dict it already grades from.
 """
+
 from datetime import datetime, timezone
 
 import pytest
@@ -28,7 +29,9 @@ def seeded_session_id(db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()
     row = SessionModel(
-        id="s_detail_1", user_id=USER_ID, topic="bio",
+        id="s_detail_1",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile().model_dump_json(),
     )
     db_session.add(row)
@@ -43,19 +46,33 @@ def open_batch_session(db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()
     row = SessionModel(
-        id="s_detail_open", user_id=USER_ID, topic="bio",
+        id="s_detail_open",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile(knowledge_level="intermediate").model_dump_json(),
     )
     db_session.add(row)
     db_session.commit()
     ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0)
-    check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=row.id, gap="atp",
-        items=[{"question": "Q1?", "options": ["Prophase", "Metaphase", "Telophase"],
-                "correct_index": 0, "explanation": "e1"},
-               {"question": "Q2?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "e2"}]))
+    check_question_service.register(
+        db_session,
+        ctx,
+        AskCheckQuestionsArgs(
+            set_index=1,
+            set_total=1,
+            session_id=row.id,
+            gap="atp",
+            items=[
+                {
+                    "question": "Q1?",
+                    "options": ["Prophase", "Metaphase", "Telophase"],
+                    "correct_index": 0,
+                    "explanation": "e1",
+                },
+                {"question": "Q2?", "options": ["a", "b"], "correct_index": 0, "explanation": "e2"},
+            ],
+        ),
+    )
     return row.id, USER_ID
 
 
@@ -66,26 +83,45 @@ def diagnostic_batch_session(db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()
     row = SessionModel(
-        id="s_detail_diag", user_id=USER_ID, topic="bio",
+        id="s_detail_diag",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile().model_dump_json(),
     )
     db_session.add(row)
     db_session.commit()
-    ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0,
-                      diagnostic_required=True)
-    check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=row.id, gap="warmup",
-        items=[{"question": "Q1?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "e1"}]))
+    ctx = ToolContext(
+        db=db_session,
+        session_id=row.id,
+        user_id=USER_ID,
+        turn_started_at=_T0,
+        diagnostic_required=True,
+    )
+    check_question_service.register(
+        db_session,
+        ctx,
+        AskCheckQuestionsArgs(
+            set_index=1,
+            set_total=1,
+            session_id=row.id,
+            gap="warmup",
+            items=[
+                {"question": "Q1?", "options": ["a", "b"], "correct_index": 0, "explanation": "e1"}
+            ],
+        ),
+    )
     return row.id, USER_ID
 
 
 def test_record_from_answer_persists_detail(db, seeded_session_id):
     ev = learning_event_service.record_from_answer(
-        db, seeded_session_id,
-        gap="mitosis", question="Which phase?", correct=False,
-        selected_index=2, correct_index=0,
+        db,
+        seeded_session_id,
+        gap="mitosis",
+        question="Which phase?",
+        correct=False,
+        selected_index=2,
+        correct_index=0,
         options=["Prophase", "Metaphase", "Telophase"],
         purpose="check",
     )
@@ -98,7 +134,11 @@ def test_record_from_answer_persists_detail(db, seeded_session_id):
 
 def test_record_from_answer_detail_defaults_null(db, seeded_session_id):
     ev = learning_event_service.record_from_answer(
-        db, seeded_session_id, gap="g", question="q", correct=True,
+        db,
+        seeded_session_id,
+        gap="g",
+        question="q",
+        correct=True,
     )
     row = db.get(LearningEvent, ev.id)
     assert row.selected_index is None and row.options_json is None

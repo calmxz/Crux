@@ -9,14 +9,8 @@ def _seed_doc(db, status="pending", claimed_at=None, sid="s_w", uid="u_w"):
     if db.get(User, uid) is None:
         db.add(User(id=uid))
         db.flush()
-        db.add(
-            SessionModel(
-                id=sid, user_id=uid, topic="t", topic_profile_json="{}"
-            )
-        )
-    doc = Document(
-        session_id=sid, filename="a.txt", status=status, claimed_at=claimed_at
-    )
+        db.add(SessionModel(id=sid, user_id=uid, topic="t", topic_profile_json="{}"))
+    doc = Document(session_id=sid, filename="a.txt", status=status, claimed_at=claimed_at)
     db.add(doc)
     db.commit()
     return doc
@@ -40,8 +34,7 @@ def test_claim_next_returns_none_when_empty(db_session):
 def test_recover_stuck_resets_old_processing(db_session):
     old = datetime.now(timezone.utc) - timedelta(minutes=45)
     d = _seed_doc(db_session, status="processing", claimed_at=old)
-    fresh = _seed_doc(db_session, status="processing",
-                      claimed_at=datetime.now(timezone.utc))
+    fresh = _seed_doc(db_session, status="processing", claimed_at=datetime.now(timezone.utc))
     n = worker.recover_stuck(db_session)
     assert n == 1
     db_session.expire_all()
@@ -63,9 +56,7 @@ def test_main_loop_recovers_stale_claim_mid_run_without_restart(db_session, monk
         "worker.SessionLocal",
         sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
     )
-    monkeypatch.setattr("worker.time", type("T", (), {
-        "sleep": staticmethod(lambda s: None)
-    }))
+    monkeypatch.setattr("worker.time", type("T", (), {"sleep": staticmethod(lambda s: None)}))
     monkeypatch.setattr("worker.RECOVER_EVERY_ITERATIONS", 2)
 
     call_count = {"n": 0}
@@ -93,9 +84,8 @@ def test_main_loop_processes_then_exits(db_session, monkeypatch):
     d = _seed_doc(db_session)
     processed = []
     monkeypatch.setattr(
-        "worker.ingestion_service", type("M", (), {
-            "run": staticmethod(lambda doc_id: processed.append(doc_id))
-        }),
+        "worker.ingestion_service",
+        type("M", (), {"run": staticmethod(lambda doc_id: processed.append(doc_id))}),
     )
     from sqlalchemy.orm import sessionmaker
 
@@ -104,9 +94,7 @@ def test_main_loop_processes_then_exits(db_session, monkeypatch):
         "worker.SessionLocal",
         sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
     )
-    monkeypatch.setattr("worker.time", type("T", (), {
-        "sleep": staticmethod(lambda s: None)
-    }))
+    monkeypatch.setattr("worker.time", type("T", (), {"sleep": staticmethod(lambda s: None)}))
     worker.main_loop(max_iterations=2)
     assert processed == [d.id]
 

@@ -37,12 +37,16 @@ def get_profile(
         raise HTTPException(status_code=404, detail="session not found")
 
     profile = profile_service.load_profile(db, session_id)
-    rows = db.execute(
-        select(LearningEvent)
-        .where(LearningEvent.session_id == session_id)
-        .order_by(LearningEvent.id.desc())
-        .limit(20)
-    ).scalars().all()
+    rows = (
+        db.execute(
+            select(LearningEvent)
+            .where(LearningEvent.session_id == session_id)
+            .order_by(LearningEvent.id.desc())
+            .limit(20)
+        )
+        .scalars()
+        .all()
+    )
     events = [
         LearningEventResponse(
             id=r.id,
@@ -126,7 +130,9 @@ def _delete_item(db, session_id, user_id, list_name, item, if_match):
     return ProfileMutationResponse(profile=profile, etag=profile_service.profile_etag(profile))
 
 
-@router.delete("/profile/{session_id}/mastered_concepts/{item}", response_model=ProfileMutationResponse)
+@router.delete(
+    "/profile/{session_id}/mastered_concepts/{item}", response_model=ProfileMutationResponse
+)
 def delete_mastered(
     session_id: str,
     item: str,
@@ -137,7 +143,9 @@ def delete_mastered(
     return _delete_item(db, session_id, user_id, "mastered_concepts", item, if_match)
 
 
-@router.delete("/profile/{session_id}/confirmed_gaps/{item}", response_model=ProfileMutationResponse)
+@router.delete(
+    "/profile/{session_id}/confirmed_gaps/{item}", response_model=ProfileMutationResponse
+)
 def delete_gap(
     session_id: str,
     item: str,
@@ -167,6 +175,4 @@ def delete_subtopic_level(
         profile = profile_service.remove_subtopic(db, session_id, item)
     except KeyError:
         raise HTTPException(status_code=404, detail="item not found") from None
-    return ProfileMutationResponse(
-        profile=profile, etag=profile_service.profile_etag(profile)
-    )
+    return ProfileMutationResponse(profile=profile, etag=profile_service.profile_etag(profile))

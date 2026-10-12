@@ -62,7 +62,6 @@ log = logging.getLogger(__name__)
 READ_CHUNK = 1024 * 1024  # 1 MiB
 
 
-
 def _page_count(ext: str, data: bytes) -> int | None:
     """Pages in a PDF / slides in a PPTX, or None when it cannot be determined.
 

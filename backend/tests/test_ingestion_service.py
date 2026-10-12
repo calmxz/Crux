@@ -101,9 +101,7 @@ def mock_embed(monkeypatch):
             input = [input]
         return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
 
-    monkeypatch.setattr(
-        "services.ingestion_service.litellm.embedding", fake_embedding
-    )
+    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
 
 
 def _write_blob_stub(monkeypatch, tmp_path, doc_id, filename, content=b"stub blob bytes"):
@@ -127,13 +125,9 @@ def test_embed_and_store_requests_configured_dimension(db_session, setup_doc, mo
 
     def fake_embedding(model, input, **kw):
         captured["dimensions"] = kw.get("dimensions")
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
-    monkeypatch.setattr(
-        "services.ingestion_service.litellm.embedding", fake_embedding
-    )
+    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
     monkeypatch.setattr(
         "services.ingestion_service.pgvector_store.insert_chunks",
         lambda db, **kw: len(kw["rows"]),
@@ -161,9 +155,7 @@ def test_embed_and_store_retries_once_on_transient_provider_error(
         calls["n"] += 1
         if calls["n"] == 1:
             raise litellm.APIConnectionError(message="blip", llm_provider="gemini", model=model)
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
     stored = []
     monkeypatch.setattr("services.ingestion_service.litellm.embedding", flaky_embedding)
@@ -298,9 +290,7 @@ def test_run_fails_over_chunk_cap_before_embedding(db_session, monkeypatch, tmp_
     monkeypatch.setattr("services.ingestion_service.settings.max_chunks", 1)
 
     # chunk=500 tokens, stride 450 -- 4000 words yields well over 1 chunk.
-    _write_blob_stub(
-        monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 4000
-    )
+    _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 4000)
 
     embed_calls: list[object] = []
 
@@ -370,9 +360,7 @@ def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, t
     def fake_embedding(model, input, **_):
         if isinstance(input, str):
             input = [input]
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
     monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
 
@@ -389,9 +377,7 @@ def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, t
     assert db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() > 0
 
 
-def test_rerun_after_partial_failure_skips_already_paid_chunks(
-    db_session, monkeypatch, tmp_path
-):
+def test_rerun_after_partial_failure_skips_already_paid_chunks(db_session, monkeypatch, tmp_path):
     """F-02 resume contract, exercised through run() (not just the
     _embed_and_store unit tests) with the real _existing_chunk_indexes query:
     a first run that embeds+stores all chunks but then fails at the
@@ -433,9 +419,7 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
 
     def fake_embedding(model, input, **_):
         embed_calls.append(list(input))
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
     monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
     monkeypatch.setattr(
@@ -463,8 +447,7 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
     assert doc.status == "ready"
     assert len(embed_calls) == calls_before_rerun  # no new embedding calls
     assert (
-        db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count()
-        == committed_before
+        db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() == committed_before
     )
 
 
@@ -512,9 +495,7 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
     def fake_embedding(model, input, **_):
         if isinstance(input, str):
             input = [input]
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
     monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
     monkeypatch.setattr(
@@ -538,9 +519,9 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
 def test_extract_plaintext_txt_and_md():
     from services import ingestion_service
 
-    assert ingestion_service._extract(
-        b"Plain text reference content.", "notes.txt"
-    ) == [(None, "Plain text reference content.")]
+    assert ingestion_service._extract(b"Plain text reference content.", "notes.txt") == [
+        (None, "Plain text reference content.")
+    ]
 
     assert ingestion_service._extract(b"# Heading\n\nBody.", "notes.md") == [
         (None, "# Heading\n\nBody.")
@@ -615,9 +596,7 @@ def test_extract_slides_includes_table_cell_text(monkeypatch):
 
     class FakePresentation:
         def __init__(self, _path):
-            self.slides = [
-                FakeSlide([FakeTableShape([["r1c1", "r1c2"], ["r2c1", "r2c2"]])])
-            ]
+            self.slides = [FakeSlide([FakeTableShape([["r1c1", "r1c2"], ["r2c1", "r2c2"]])])]
 
     monkeypatch.setattr("services.ingestion_service.Presentation", FakePresentation)
     pages = ingestion_service._extract(b"stub pptx bytes", "x.pptx")
@@ -709,9 +688,7 @@ def test_embed_and_store_stops_at_cap_between_batches(db_session, monkeypatch):
     )
     chunks = [chunking.Chunk(text="text", page=None, chunk_idx=0)]
     with pytest.raises(cm.CostCapExceeded):
-        ingestion_service._embed_and_store(
-            db_session, doc, chunks, user_id="u_capped"
-        )
+        ingestion_service._embed_and_store(db_session, doc, chunks, user_id="u_capped")
     assert called == []
 
 
@@ -797,7 +774,9 @@ def test_extract_plaintext_from_bytes():
     assert ingestion_service._extract(b"hello world", "notes.txt") == [(None, "hello world")]
 
 
-def test_legacy_bare_filename_fallback(db_session, insert_capture, mock_embed, monkeypatch, tmp_path):
+def test_legacy_bare_filename_fallback(
+    db_session, insert_capture, mock_embed, monkeypatch, tmp_path
+):
     """Pre-F-15 files were stored under the bare filename (no doc-id prefix).
     _load_blob must fall back to that layout so old uploads keep ingesting."""
     from sqlalchemy.orm import sessionmaker
@@ -935,9 +914,7 @@ def _fake_embedding_factory(fail_on_call: int | None = None):
         calls.append(list(input))
         if fail_on_call is not None and len(calls) == fail_on_call:
             raise RuntimeError("embedding api down")
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * 8} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
 
     return stub, calls
 
@@ -947,9 +924,7 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
 ):
     doc = db_session.get(Document, setup_doc)
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 2)
-    chunks = [
-        chunking.Chunk(text=f"c{i}", page=1, chunk_idx=i) for i in range(5)
-    ]
+    chunks = [chunking.Chunk(text=f"c{i}", page=1, chunk_idx=i) for i in range(5)]
     stored_rows = []
 
     def fake_insert(db, *, session_id, document_id, rows):
@@ -957,9 +932,7 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
         stored_rows.extend(fresh)
         return len(fresh)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.pgvector_store.insert_chunks", fake_insert
-    )
+    monkeypatch.setattr("services.ingestion_service.pgvector_store.insert_chunks", fake_insert)
     # Expose the persisted indexes to the skip-set query:
     monkeypatch.setattr(
         "services.ingestion_service._existing_chunk_indexes",
@@ -972,16 +945,12 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
     from services import ingestion_service
 
     with pytest.raises(RuntimeError):
-        ingestion_service._embed_and_store(
-            db_session, doc, chunks, user_id=None
-        )
+        ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
     assert [r[0] for r in stored_rows] == [0, 1]  # batch 1 survived
 
     stub2, calls2 = _fake_embedding_factory()
     monkeypatch.setattr("services.ingestion_service.litellm.embedding", stub2)
-    n = ingestion_service._embed_and_store(
-        db_session, doc, chunks, user_id=None
-    )
+    n = ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
     assert n == 3  # only the unpaid chunks were embedded and stored
     assert sorted(r[0] for r in stored_rows) == [0, 1, 2, 3, 4]
     assert all(len(c) <= 2 for c in calls2)  # still batched
@@ -990,9 +959,7 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
 def test_metering_commits_per_batch(db_session, setup_doc, monkeypatch):
     doc = db_session.get(Document, setup_doc)
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 1)
-    chunks = [
-        chunking.Chunk(text=f"c{i}", page=1, chunk_idx=i) for i in range(2)
-    ]
+    chunks = [chunking.Chunk(text=f"c{i}", page=1, chunk_idx=i) for i in range(2)]
     monkeypatch.setattr(
         "services.ingestion_service.pgvector_store.insert_chunks",
         lambda db, **kw: len(kw["rows"]),
@@ -1009,9 +976,7 @@ def test_metering_commits_per_batch(db_session, setup_doc, monkeypatch):
         ledger_seen_at_call.append(len(metered))
         return stub(**kw)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.litellm.embedding", spying_stub
-    )
+    monkeypatch.setattr("services.ingestion_service.litellm.embedding", spying_stub)
 
     from services import ingestion_service
 
@@ -1048,9 +1013,7 @@ def test_run_holds_no_db_transaction_during_blob_load_and_extract(
     db_session.refresh(doc)
 
     created: list = []
-    real_factory = sessionmaker(
-        autocommit=False, autoflush=False, bind=db_session.get_bind()
-    )
+    real_factory = sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind())
 
     def recording_factory():
         s = real_factory()
@@ -1260,9 +1223,7 @@ def test_partial_ingest_failure_still_invalidates_centroid(
         sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 1)
-    _write_blob_stub(
-        monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 1200
-    )
+    _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 1200)
 
     calls = {"n": 0}
 
@@ -1312,9 +1273,7 @@ def test_extraction_failure_hides_exception_text_but_logs_it(
     assert doc.status == "failed"
     assert doc.error == ingestion_service.ERR_EXTRACTION_FAILED
     assert "secret" not in doc.error
-    assert "/srv/secret/path: boom" in " ".join(
-        r.getMessage() for r in caplog.records
-    )
+    assert "/srv/secret/path: boom" in " ".join(r.getMessage() for r in caplog.records)
 
 
 def test_generic_stage_failure_uses_the_catch_all_message(
@@ -1327,9 +1286,7 @@ def test_generic_stage_failure_uses_the_catch_all_message(
     def boom(db, session_id, stems):
         raise RuntimeError("kw merge exploded")
 
-    monkeypatch.setattr(
-        "services.ingestion_service.keyword_index.merge_into_session", boom
-    )
+    monkeypatch.setattr("services.ingestion_service.keyword_index.merge_into_session", boom)
     from services import ingestion_service
 
     ingestion_service.run(setup_doc)
@@ -1374,8 +1331,5 @@ def test_ingest_error_messages_covers_the_upload_route_string():
     frozenset is the single inventory of everything the frontend can render."""
     from services import ingestion_service
 
-    assert (
-        ingestion_service.ERR_STORAGE_WRITE
-        in ingestion_service.INGEST_ERROR_MESSAGES
-    )
+    assert ingestion_service.ERR_STORAGE_WRITE in ingestion_service.INGEST_ERROR_MESSAGES
     assert len(ingestion_service.INGEST_ERROR_MESSAGES) == 6

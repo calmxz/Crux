@@ -298,11 +298,13 @@ def _normalize_missed(missed) -> list[dict]:
     for entry in missed or []:
         if isinstance(entry, dict):
             q = str(entry.get("question", ""))[:_MISSED_STEM_CAP]
-            out.append({
-                "question": q,
-                "chosen": entry.get("chosen"),
-                "correct": entry.get("correct"),
-            })
+            out.append(
+                {
+                    "question": q,
+                    "chosen": entry.get("chosen"),
+                    "correct": entry.get("correct"),
+                }
+            )
         elif isinstance(entry, str):
             out.append({"question": entry[:_MISSED_STEM_CAP]})
     return out
@@ -335,27 +337,41 @@ def _gap_accuracy_label(profile_dict: dict, gap_accuracy: dict) -> str:
 # prompt; a stored value outside the enum renders as the default, so the raw
 # column text is never echoed (G-03).
 _LEARNER_PREFS = (
-    ("feedback_pref", "feedback style", "hints", {
-        "hints": "nudge the learner toward the answer (a hint or guiding "
-                 "question) before giving it.",
-        "direct_answers": "when the learner asks, explain the answer outright "
-                          "instead of hinting first.",
-    }),
-    ("check_ins", "check-ins", "sometimes", {
-        "often": "pose a check set (ask_check_questions) after most "
-                 "explanations.",
-        "sometimes": "use your judgement on when to pose a check set.",
-        "only_when_asked": "never call ask_check_questions unprompted outside "
-                           "DIAGNOSTIC and REVIEW-GAPS modes; check only when "
-                           "the learner asks. Finishing the sets of a check "
-                           "already under way is not unprompted.",
-    }),
-    ("reply_length", "reply length", "balanced", {
-        "brief": "keep replies short: the key point and little else.",
-        "balanced": "the key point plus the explanation it needs.",
-        "thorough": "fuller replies with more worked detail and examples "
-                    "(this overrides \"Be concise\").",
-    }),
+    (
+        "feedback_pref",
+        "feedback style",
+        "hints",
+        {
+            "hints": "nudge the learner toward the answer (a hint or guiding "
+            "question) before giving it.",
+            "direct_answers": "when the learner asks, explain the answer outright "
+            "instead of hinting first.",
+        },
+    ),
+    (
+        "check_ins",
+        "check-ins",
+        "sometimes",
+        {
+            "often": "pose a check set (ask_check_questions) after most explanations.",
+            "sometimes": "use your judgement on when to pose a check set.",
+            "only_when_asked": "never call ask_check_questions unprompted outside "
+            "DIAGNOSTIC and REVIEW-GAPS modes; check only when "
+            "the learner asks. Finishing the sets of a check "
+            "already under way is not unprompted.",
+        },
+    ),
+    (
+        "reply_length",
+        "reply length",
+        "balanced",
+        {
+            "brief": "keep replies short: the key point and little else.",
+            "balanced": "the key point plus the explanation it needs.",
+            "thorough": "fuller replies with more worked detail and examples "
+            '(this overrides "Be concise").',
+        },
+    ),
 )
 
 
@@ -388,13 +404,9 @@ def build_dynamic_context(state: dict) -> str:
     # seed forward across sessions, so they are fenced as untrusted content
     # (see the UNTRUSTED SUMMARIES rule block). "none" stays a bare sentinel.
     _last = state.get("last_session_summary")
-    last_session_summary = (
-        wrap_untrusted(_SUMMARY_TAG, _last) if _last else "none"
-    )
+    last_session_summary = wrap_untrusted(_SUMMARY_TAG, _last) if _last else "none"
     _rolling = state.get("rolling_summary")
-    rolling_summary = (
-        wrap_untrusted(_SUMMARY_TAG, _rolling) if _rolling else "none"
-    )
+    rolling_summary = wrap_untrusted(_SUMMARY_TAG, _rolling) if _rolling else "none"
     retrieval_label = "REQUIRED" if retrieval_required else "OPTIONAL"
     prefetched = state.get("prefetched_excerpts") or []
     if prefetched:

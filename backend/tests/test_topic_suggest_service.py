@@ -113,10 +113,15 @@ def test_register_accepts_per_mode_bounds(db_session, mode, n):
 def _call(name="suggest_topics", status="ok", args=None):
     return {
         "name": name,
-        "args": args if args is not None else {
+        "args": args
+        if args is not None
+        else {
             "mode": "specific",
             "topic": "Carnot cycle",
-            "items": [{"label": "Entropy", "hint": "why Carnot is the ceiling"}, {"label": "Otto cycle"}],
+            "items": [
+                {"label": "Entropy", "hint": "why Carnot is the ceiling"},
+                {"label": "Otto cycle"},
+            ],
         },
         "status": status,
         "error": None,
@@ -135,13 +140,16 @@ def test_from_tool_calls_reads_the_ok_call():
     }
 
 
-@pytest.mark.parametrize("raw", [
-    "[]",
-    None,
-    "not json",
-    json.dumps([_call(status="failed")]),
-    json.dumps([_call(args={"mode": "sideways"})]),
-])
+@pytest.mark.parametrize(
+    "raw",
+    [
+        "[]",
+        None,
+        "not json",
+        json.dumps([_call(status="failed")]),
+        json.dumps([_call(args={"mode": "sideways"})]),
+    ],
+)
 def test_from_tool_calls_none_without_a_valid_ok_call(raw):
     assert ts.from_tool_calls(raw) is None
 

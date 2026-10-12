@@ -53,8 +53,11 @@ def test_ended_match_only_when_no_active(client, db_session):
         confirmed_gaps=[ConceptEntry(name="ATP yield"), ConceptEntry(name="ETC location")],
     )
     _mk_session(
-        db_session, sid="s2", topic="glycolysis",
-        ended_at=datetime(2026, 7, 1), profile=profile,
+        db_session,
+        sid="s2",
+        topic="glycolysis",
+        ended_at=datetime(2026, 7, 1),
+        profile=profile,
     )
     r = _lookup(client, "Glycolysis")
     body = r.json()

@@ -6,6 +6,7 @@ not with the base package, so a base install raises
 ModuleNotFoundError: No module named 'orjson' on every tutor turn while the whole
 stubbed test suite stays green. Pin both halves here.
 """
+
 import importlib
 import tomllib
 from pathlib import Path

@@ -195,7 +195,9 @@ async def _trial_content_question() -> dict:
     user_id, session_id = _seed_session()
     with SessionLocal() as db:
         text, calls = await _run_turn(
-            db, session_id, user_id,
+            db,
+            session_id,
+            user_id,
             [{"role": "user", "content": CONTENT_QUESTION}],
         )
     forced = _asked_check(calls)
@@ -216,7 +218,9 @@ async def _trial_explicit_quiz() -> dict:
     user_id, session_id = _seed_session()
     with SessionLocal() as db:
         text, calls = await _run_turn(
-            db, session_id, user_id,
+            db,
+            session_id,
+            user_id,
             [{"role": "user", "content": QUIZ_REQUEST}],
         )
     fired = _asked_check(calls)
@@ -291,8 +295,14 @@ async def main() -> int:
                 r = {"pass": False, "error": repr(e)[:300]}
             r["trial"] = i + 1
             results[name].append(r)
-            print(f"{name} #{i + 1}: {'PASS' if r['pass'] else 'FAIL'}"
-                  + ("" if r["pass"] else f"  {json.dumps({k: v for k, v in r.items() if k not in ('text', 't2', 't3')})}"))
+            print(
+                f"{name} #{i + 1}: {'PASS' if r['pass'] else 'FAIL'}"
+                + (
+                    ""
+                    if r["pass"]
+                    else f"  {json.dumps({k: v for k, v in r.items() if k not in ('text', 't2', 't3')})}"
+                )
+            )
 
     total = sum(len(v) for v in results.values())
     passed = sum(1 for v in results.values() for r in v if r["pass"])
@@ -300,8 +310,10 @@ async def main() -> int:
     verdict = "PASS" if rate >= 0.85 else "FAIL"
     dur = time.time() - started
 
-    print(f"\n== {passed}/{total} = {rate:.0%} -> {verdict} "
-          f"(threshold 85%, model {settings.model}, {dur:.0f}s)")
+    print(
+        f"\n== {passed}/{total} = {rate:.0%} -> {verdict} "
+        f"(threshold 85%, model {settings.model}, {dur:.0f}s)"
+    )
     for name, v in results.items():
         p = sum(1 for r in v if r["pass"])
         print(f"   {name}: {p}/{len(v)}")

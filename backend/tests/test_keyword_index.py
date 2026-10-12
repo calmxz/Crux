@@ -9,9 +9,7 @@ from lib import keyword_index
 
 
 def test_build_from_text_drops_stopwords_and_stems():
-    stems = keyword_index.build_from_text(
-        "The runners are running quickly along the river."
-    )
+    stems = keyword_index.build_from_text("The runners are running quickly along the river.")
     assert "run" in stems or "runner" in stems
     assert "the" not in stems
     assert "are" not in stems
@@ -61,18 +59,18 @@ def test_merge_into_session_locks_row(db_session, monkeypatch):
 
     seen = {}
     real_get = db_session.get
+
     def spy(entity, ident, **kw):
         seen.update(kw)
         return real_get(entity, ident, **kw)
+
     monkeypatch.setattr(db_session, "get", spy)
     keyword_index.merge_into_session(db_session, "s1", {"stem"})
     assert seen.get("with_for_update") is True
 
 
 def test_acronym_and_digit_tokens_indexed():
-    stems = keyword_index.build_from_text(
-        "DNA replication, IPv4 subnetting, and 3NF normalization"
-    )
+    stems = keyword_index.build_from_text("DNA replication, IPv4 subnetting, and 3NF normalization")
     assert "dna" in stems
     assert "ipv4" in stems
     assert "3nf" in stems

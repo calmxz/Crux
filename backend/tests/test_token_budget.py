@@ -8,6 +8,7 @@ slack, not a spec number -- its job is to break loudly if prompt/window
 assembly regresses (e.g. someone removes truncation or starts resending
 full excerpts).
 """
+
 import json
 
 import litellm
@@ -54,31 +55,58 @@ def _assembled_turn():
     messages.append({"role": "user", "content": "Quiz me on the Calvin cycle."})
     chunk_text = "Chunk sentence about the Calvin cycle and carbon fixation. " * 40
     chunks = [
-        {"doc_id": f"d{i}", "doc_name": "bio-notes.pdf",
-         "text": f"<document_excerpt id='d{i}'>{chunk_text}</document_excerpt>"}
+        {
+            "doc_id": f"d{i}",
+            "doc_name": "bio-notes.pdf",
+            "text": f"<document_excerpt id='d{i}'>{chunk_text}</document_excerpt>",
+        }
         for i in range(5)
     ]
     full = [{"role": "system", "content": system_prompt}] + messages
     # Round 1: an older retrieval that pruning must stub as superseded.
-    full.append({
-        "role": "assistant", "content": None,
-        "tool_calls": [{"id": "c1", "type": "function",
-                        "function": {"name": "retrieve_chunks", "arguments": "{}"}}],
-    })
-    full.append({
-        "role": "tool", "tool_call_id": "c1", "name": "retrieve_chunks",
-        "content": json.dumps({"status": "ok", "data": {"chunks": chunks}}),
-    })
+    full.append(
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "c1",
+                    "type": "function",
+                    "function": {"name": "retrieve_chunks", "arguments": "{}"},
+                }
+            ],
+        }
+    )
+    full.append(
+        {
+            "role": "tool",
+            "tool_call_id": "c1",
+            "name": "retrieve_chunks",
+            "content": json.dumps({"status": "ok", "data": {"chunks": chunks}}),
+        }
+    )
     # Round 2: the current retrieval that pruning must keep intact.
-    full.append({
-        "role": "assistant", "content": None,
-        "tool_calls": [{"id": "c2", "type": "function",
-                        "function": {"name": "retrieve_chunks", "arguments": "{}"}}],
-    })
-    full.append({
-        "role": "tool", "tool_call_id": "c2", "name": "retrieve_chunks",
-        "content": json.dumps({"status": "ok", "data": {"chunks": chunks}}),
-    })
+    full.append(
+        {
+            "role": "assistant",
+            "content": None,
+            "tool_calls": [
+                {
+                    "id": "c2",
+                    "type": "function",
+                    "function": {"name": "retrieve_chunks", "arguments": "{}"},
+                }
+            ],
+        }
+    )
+    full.append(
+        {
+            "role": "tool",
+            "tool_call_id": "c2",
+            "name": "retrieve_chunks",
+            "content": json.dumps({"status": "ok", "data": {"chunks": chunks}}),
+        }
+    )
     context_budget.prune_superseded_excerpts(full)
     return full
 

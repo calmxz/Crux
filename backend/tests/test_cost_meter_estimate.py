@@ -61,9 +61,7 @@ def test_estimate_zero_delta_only_charges_prompt():
 
 def test_unknown_model_falls_back_to_litellm_price_table(monkeypatch):
     """P2 AC5: an unregistered model id must not raise mid-turn."""
-    monkeypatch.setattr(
-        "services.cost_meter.litellm.token_counter", lambda model, text: 10
-    )
+    monkeypatch.setattr("services.cost_meter.litellm.token_counter", lambda model, text: 10)
     monkeypatch.setattr(
         "services.cost_meter.litellm.cost_per_token",
         lambda model, prompt_tokens, completion_tokens: (0.001, 0.002),
@@ -73,11 +71,11 @@ def test_unknown_model_falls_back_to_litellm_price_table(monkeypatch):
 
 
 def test_unknown_model_double_failure_returns_zero(monkeypatch):
-    monkeypatch.setattr(
-        "services.cost_meter.litellm.token_counter", lambda model, text: 10
-    )
+    monkeypatch.setattr("services.cost_meter.litellm.token_counter", lambda model, text: 10)
+
     def _boom(**kwargs):
         raise ValueError("model not mapped")
+
     monkeypatch.setattr("services.cost_meter.litellm.cost_per_token", _boom)
     cost = estimate_cancelled_cost("some/unknown-model", "partial reply", 100)
     assert cost == Decimal("0")
@@ -100,21 +98,23 @@ def test_embedding_cost_token_math_fallback(monkeypatch):
     # completion_cost blows up on the fake object -> token-math fallback via
     # usage.prompt_tokens against the MODEL_RATES embedding entry.
     from services import cost_meter
+
     monkeypatch.setattr(
-        cost_meter.litellm, "completion_cost",
+        cost_meter.litellm,
+        "completion_cost",
         lambda **kw: (_ for _ in ()).throw(ValueError("unknown model")),
     )
-    cost = cost_meter.embedding_cost(
-        "gemini/gemini-embedding-2", _FakeEmbedResp(), ["some query"]
-    )
+    cost = cost_meter.embedding_cost("gemini/gemini-embedding-2", _FakeEmbedResp(), ["some query"])
     # 1000 tokens * 0.000200 / 1000 = 0.0002
     assert cost == Decimal("0.0002")
 
 
 def test_embedding_cost_unknown_model_returns_zero(monkeypatch):
     from services import cost_meter
+
     monkeypatch.setattr(
-        cost_meter.litellm, "completion_cost",
+        cost_meter.litellm,
+        "completion_cost",
         lambda **kw: (_ for _ in ()).throw(ValueError("unknown model")),
     )
     assert cost_meter.embedding_cost("nope/nope", _FakeEmbedResp(), ["q"]) == Decimal("0")
@@ -128,18 +128,15 @@ def test_meter_embedding_response_writes_ledger_and_log(db_session, monkeypatch)
 
     def _mk_user(db, uid):
         from db.models import User
+
         db.add(User(id=uid))
         db.flush()
 
     _mk_user(db_session, "uemb")
-    monkeypatch.setattr(
-        cost_meter.litellm, "completion_cost", lambda **kw: 0.002
-    )
+    monkeypatch.setattr(cost_meter.litellm, "completion_cost", lambda **kw: 0.002)
     cost_meter.meter_embedding_response(
         db_session, _FakeEmbedResp(), user_id="uemb", session_id="s1", texts=["q"]
     )
     assert cost_meter.current_spend(db_session, "uemb") == Decimal("0.0020")
-    row = db_session.execute(
-        select(LlmCallLog).where(LlmCallLog.user_id == "uemb")
-    ).scalar_one()
+    row = db_session.execute(select(LlmCallLog).where(LlmCallLog.user_id == "uemb")).scalar_one()
     assert row.purpose == "embedding"

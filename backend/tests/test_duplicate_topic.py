@@ -1,5 +1,6 @@
 """F-34: duplicate-topic detection is server-side, case-insensitive, and
 covers create + reopen."""
+
 from datetime import datetime, timezone
 
 import pytest
@@ -43,8 +44,7 @@ def test_create_allowed_after_end(client):
 def test_reopen_conflicts_with_active_same_topic(client):
     first = _create(client, "Mitosis")
     sid = first.json()["id"]
-    client.post(f"/api/sessions/{sid}/end",
-                headers={"Authorization": "Bearer test-dupe-user"})
+    client.post(f"/api/sessions/{sid}/end", headers={"Authorization": "Bearer test-dupe-user"})
     second = _create(client, "Mitosis")
     assert second.status_code == 201
     reopened = client.post(
@@ -64,15 +64,23 @@ def test_other_users_topic_does_not_conflict(client):
 def test_db_rejects_second_active_session_same_topic_casefold(db_session):
     db_session.add(User(id="u_ix"))
     db_session.flush()
-    db_session.add(SessionModel(
-        id="s_ix1", user_id="u_ix", topic="Calculus",
-        topic_profile_json=TopicProfile().model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id="s_ix1",
+            user_id="u_ix",
+            topic="Calculus",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
     db_session.commit()
-    db_session.add(SessionModel(
-        id="s_ix2", user_id="u_ix", topic="calculus",
-        topic_profile_json=TopicProfile().model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id="s_ix2",
+            user_id="u_ix",
+            topic="calculus",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
     with pytest.raises(IntegrityError):
         db_session.commit()
     db_session.rollback()
@@ -81,16 +89,24 @@ def test_db_rejects_second_active_session_same_topic_casefold(db_session):
 def test_db_allows_duplicate_topic_when_first_is_ended(db_session):
     db_session.add(User(id="u_ix2"))
     db_session.flush()
-    db_session.add(SessionModel(
-        id="s_ix3", user_id="u_ix2", topic="Algebra",
-        topic_profile_json=TopicProfile().model_dump_json(),
-        ended_at=datetime.now(timezone.utc),
-    ))
+    db_session.add(
+        SessionModel(
+            id="s_ix3",
+            user_id="u_ix2",
+            topic="Algebra",
+            topic_profile_json=TopicProfile().model_dump_json(),
+            ended_at=datetime.now(timezone.utc),
+        )
+    )
     db_session.commit()
-    db_session.add(SessionModel(
-        id="s_ix4", user_id="u_ix2", topic="Algebra",
-        topic_profile_json=TopicProfile().model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id="s_ix4",
+            user_id="u_ix2",
+            topic="Algebra",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
     db_session.commit()  # must not raise
 
 
@@ -106,9 +122,7 @@ def test_rename_active_session_to_duplicate_topic_409(client):
     session_a_id = session_a.json()["id"]
     session_b_id = session_b.json()["id"]
 
-    resp = client.patch(
-        f"/api/sessions/{session_b_id}", json={"topic": "A"}, headers=_AUTH
-    )
+    resp = client.patch(f"/api/sessions/{session_b_id}", json={"topic": "A"}, headers=_AUTH)
     assert resp.status_code == 409
     assert resp.json()["detail"]["code"] == "duplicate_topic"
     assert resp.json()["detail"]["session_id"] == session_a_id
@@ -121,9 +135,7 @@ def test_rename_ended_session_to_duplicate_topic_ok(client):
     ended = client.post(f"/api/sessions/{session_c_id}/end", headers=_AUTH)
     assert ended.status_code == 200
 
-    resp = client.patch(
-        f"/api/sessions/{session_c_id}", json={"topic": "A"}, headers=_AUTH
-    )
+    resp = client.patch(f"/api/sessions/{session_c_id}", json={"topic": "A"}, headers=_AUTH)
     assert resp.status_code == 200
 
 
@@ -210,9 +222,7 @@ def test_rename_race_maps_integrityerror_to_409(client, monkeypatch):
 
     _bypass_once(monkeypatch, sessions_route, "_active_session_on_topic")
 
-    resp = client.patch(
-        f"/api/sessions/{b_id}", json={"topic": "Force"}, headers=_AUTH
-    )
+    resp = client.patch(f"/api/sessions/{b_id}", json={"topic": "Force"}, headers=_AUTH)
     assert resp.status_code == 409
     assert resp.json()["detail"]["code"] == "duplicate_topic"
     assert resp.json()["detail"]["session_id"] == a_id

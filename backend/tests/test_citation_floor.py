@@ -55,9 +55,7 @@ def test_unparseable_score_passes(monkeypatch):
 def test_fields_match_the_previous_inline_builders(monkeypatch):
     monkeypatch.setattr(settings, "citation_min_similarity", 0.25)
     out = chunks_to_citations([_chunk(score=0.1)])
-    assert out == [
-        Citation(doc_id="d1", text="leaves convert light", page=3, doc_name="notes.pdf")
-    ]
+    assert out == [Citation(doc_id="d1", text="leaves convert light", page=3, doc_name="notes.pdf")]
 
 
 def test_missing_fields_default_like_the_previous_builders(monkeypatch):

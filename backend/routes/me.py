@@ -44,9 +44,7 @@ def get_me(
     # the first-ever call for a user needs the create + COMMIT round trip.
     user = db.get(User, user_id)
     if user is None:
-        user = ensure_user(
-            db, user_id, accepted_terms=accepted_terms_from_request(request)
-        )
+        user = ensure_user(db, user_id, accepted_terms=accepted_terms_from_request(request))
         db.commit()
     return _me_response(user)
 
@@ -70,9 +68,7 @@ def patch_me(
     ):
         raise HTTPException(status_code=422, detail="empty patch")
 
-    user = ensure_user(
-        db, user_id, accepted_terms=accepted_terms_from_request(request)
-    )
+    user = ensure_user(db, user_id, accepted_terms=accepted_terms_from_request(request))
     if req.display_name is not None:
         user.display_name = req.display_name.strip() or None
     if req.feedback_pref is not None:
@@ -99,9 +95,7 @@ def export_me(
     # takes exported_at's UTC day, the same value the frontend names it by.
     export = build_export(db, user_id)
     stamp = export.exported_at.date().isoformat()
-    response.headers["Content-Disposition"] = (
-        f'attachment; filename="crux-export-{stamp}.json"'
-    )
+    response.headers["Content-Disposition"] = f'attachment; filename="crux-export-{stamp}.json"'
     return export
 
 

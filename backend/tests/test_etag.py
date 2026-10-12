@@ -111,9 +111,10 @@ def test_non_matching_tag_returns_200_with_body(client, db_session):
 def test_mutation_changes_the_etag_and_stale_tag_gets_200(client, db_session):
     session_id = _new_session(client)
     before = client.get(f"/api/sessions/{session_id}").headers["etag"]
-    assert client.get(
-        f"/api/sessions/{session_id}", headers={"If-None-Match": before}
-    ).status_code == 304
+    assert (
+        client.get(f"/api/sessions/{session_id}", headers={"If-None-Match": before}).status_code
+        == 304
+    )
 
     r = client.patch(f"/api/sessions/{session_id}", json={"topic": "window functions"})
     assert r.status_code == 200, r.text
@@ -217,9 +218,7 @@ async def test_non_matching_path_is_forwarded_message_by_message():
         assert len(sent) == 3, "last chunk was buffered"
 
     scope = {"type": "http", "method": "GET", "path": "/api/chat/stream", "headers": []}
-    await ETagMiddleware(streaming_app, prefixes=HOT_PREFIXES)(
-        scope, _receive, collecting_send
-    )
+    await ETagMiddleware(streaming_app, prefixes=HOT_PREFIXES)(scope, _receive, collecting_send)
     assert len(sent) == 3
 
 
@@ -241,9 +240,7 @@ async def test_multi_chunk_body_hashes_as_one_whole():
         await send({"type": "http.response.body", "body": b"1}", "more_body": False})
 
     scope = {"type": "http", "method": "GET", "path": "/api/usage/summary", "headers": []}
-    await ETagMiddleware(chunked_app, prefixes=HOT_PREFIXES)(
-        scope, _receive, collecting_send
-    )
+    await ETagMiddleware(chunked_app, prefixes=HOT_PREFIXES)(scope, _receive, collecting_send)
 
     assert len(sent) == 2, "the tagged body must be coalesced into one message"
     headers = dict(sent[0]["headers"])
@@ -335,9 +332,7 @@ async def test_unknown_response_message_types_pass_through():
         await send({"type": "http.response.trailers", "headers": [(b"x-checksum", b"1")]})
 
     scope = {"type": "http", "method": "GET", "path": "/api/sessions", "headers": []}
-    await ETagMiddleware(app_with_trailers, prefixes=HOT_PREFIXES)(
-        scope, _receive, collecting_send
-    )
+    await ETagMiddleware(app_with_trailers, prefixes=HOT_PREFIXES)(scope, _receive, collecting_send)
     assert [m["type"] for m in sent] == [
         "http.response.start",
         "http.response.body",

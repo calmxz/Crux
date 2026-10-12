@@ -4,6 +4,7 @@ Char-based on purpose: deterministic, no tokenizer in the billed turn path,
 model-independent tests. 6000 chars approximates a 1.5k-token cap at ~4
 chars/token.
 """
+
 import json
 
 from agent.context_budget import (
@@ -49,14 +50,19 @@ def test_none_and_empty_are_safe():
 def _tool_msg(call_id, chunks):
     payload = {"status": "ok", "data": {"chunks": chunks}}
     return {
-        "role": "tool", "tool_call_id": call_id, "name": "retrieve_chunks",
+        "role": "tool",
+        "tool_call_id": call_id,
+        "name": "retrieve_chunks",
         "content": json.dumps(payload),
     }
 
 
 def _chunk(doc_id, doc_name, text):
-    return {"doc_id": doc_id, "doc_name": doc_name,
-            "text": f"<document_excerpt id='{doc_id}'>{text}</document_excerpt>"}
+    return {
+        "doc_id": doc_id,
+        "doc_name": doc_name,
+        "text": f"<document_excerpt id='{doc_id}'>{text}</document_excerpt>",
+    }
 
 
 def test_older_retrieval_stubbed_newest_kept():
@@ -93,7 +99,9 @@ def test_single_retrieval_is_noop():
 
 def test_non_retrieval_tool_messages_untouched():
     profile_tool = {
-        "role": "tool", "tool_call_id": "c0", "name": "update_topic_profile",
+        "role": "tool",
+        "tool_call_id": "c0",
+        "name": "update_topic_profile",
         "content": json.dumps({"status": "ok", "data": {}}),
     }
     older = _tool_msg("c1", [_chunk("d1", "a.pdf", "one")])
@@ -111,8 +119,8 @@ def make_carrier(doc_id):
 def test_sibling_retrievals_same_round_both_survive():
     messages = [
         {"role": "assistant", "content": "", "tool_calls": [{"id": "a"}, {"id": "b"}]},
-        make_carrier(doc_id="d1"),   # sibling 1, round 0
-        make_carrier(doc_id="d2"),   # sibling 2, same round
+        make_carrier(doc_id="d1"),  # sibling 1, round 0
+        make_carrier(doc_id="d2"),  # sibling 2, same round
     ]
     prune_superseded_excerpts(messages)
     assert "<document_excerpt" in messages[1]["content"]
@@ -122,9 +130,9 @@ def test_sibling_retrievals_same_round_both_survive():
 def test_older_round_stubbed_newer_round_kept():
     messages = [
         {"role": "assistant", "content": "", "tool_calls": [{"id": "a"}]},
-        make_carrier(doc_id="d1"),   # round 0 -> stub
+        make_carrier(doc_id="d1"),  # round 0 -> stub
         {"role": "assistant", "content": "", "tool_calls": [{"id": "b"}]},
-        make_carrier(doc_id="d2"),   # round 2 -> keep
+        make_carrier(doc_id="d2"),  # round 2 -> keep
     ]
     prune_superseded_excerpts(messages)
     assert messages[1]["content"].startswith("[superseded retrieval:")
@@ -147,7 +155,9 @@ def test_sibling_rounds_mixed():
 
 def test_malformed_content_still_stubbed_without_raising():
     older = {
-        "role": "tool", "tool_call_id": "c1", "name": "retrieve_chunks",
+        "role": "tool",
+        "tool_call_id": "c1",
+        "name": "retrieve_chunks",
         "content": "not json <document_excerpt id='d1'>x</document_excerpt>",
     }
     newer = _tool_msg("c2", [_chunk("d2", "b.pdf", "two")])

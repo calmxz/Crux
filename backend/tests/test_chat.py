@@ -57,9 +57,11 @@ def test_chat_stream_stub_persists_both_roles(client, db_session, monkeypatch):
     assert "event: assistant_delta" in body
     assert "event: done" in body
 
-    msgs = db_session.execute(
-        select(ChatMessage).where(ChatMessage.session_id == SESSION_ID)
-    ).scalars().all()
+    msgs = (
+        db_session.execute(select(ChatMessage).where(ChatMessage.session_id == SESSION_ID))
+        .scalars()
+        .all()
+    )
     roles = {m.role for m in msgs}
     assert roles == {"user", "assistant"}
     assistant = next(m for m in msgs if m.role == "assistant")
@@ -101,11 +103,15 @@ def test_prompt_build_failure_still_persists_user_message(client, db_session, mo
     status, _ = _post_stream(client, message="save me")
     assert status == 500
 
-    user_msgs = db_session.execute(
-        select(ChatMessage).where(
-            ChatMessage.session_id == SESSION_ID, ChatMessage.role == "user"
+    user_msgs = (
+        db_session.execute(
+            select(ChatMessage).where(
+                ChatMessage.session_id == SESSION_ID, ChatMessage.role == "user"
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     assert [m.content for m in user_msgs] == ["save me"]
 
 
@@ -123,9 +129,7 @@ def test_prepare_turn_failure_rerecords_embedding_spend(client, db_session, monk
             cost_holder.append(Decimal("0.5"))
         return False, None
 
-    monkeypatch.setattr(
-        "routes.chat.retrieval_service.semantic_fallback_required", fake_fallback
-    )
+    monkeypatch.setattr("routes.chat.retrieval_service.semantic_fallback_required", fake_fallback)
 
     def _boom(prompt_state):
         raise RuntimeError("boom")
@@ -168,9 +172,7 @@ def test_chat_stream_429_on_cap(client, db_session, monkeypatch):
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000")
 
 
-def test_reserved_spend_blocks_the_next_turn_before_any_real_cost(
-    db_session, monkeypatch
-):
+def test_reserved_spend_blocks_the_next_turn_before_any_real_cost(db_session, monkeypatch):
     """B-05: a turn that has reserved but not yet spent must already count
     against the cap, so a second concurrent turn at cap-minus-epsilon is
     rejected instead of both running an LLM call."""
@@ -246,9 +248,11 @@ def test_whitespace_only_message_rejected_with_422(client, db_session, monkeypat
     assert r.status_code == 422
     assert r.json()["detail"]["code"] == "empty_message"
 
-    msgs = db_session.execute(
-        select(ChatMessage).where(ChatMessage.session_id == SESSION_ID)
-    ).scalars().all()
+    msgs = (
+        db_session.execute(select(ChatMessage).where(ChatMessage.session_id == SESSION_ID))
+        .scalars()
+        .all()
+    )
     assert msgs == []
 
 
@@ -259,9 +263,11 @@ def test_empty_message_rejected_by_contract(client, db_session):
         headers=AUTH_HEADERS,
     )
     assert r.status_code == 422
-    msgs = db_session.execute(
-        select(ChatMessage).where(ChatMessage.session_id == SESSION_ID)
-    ).scalars().all()
+    msgs = (
+        db_session.execute(select(ChatMessage).where(ChatMessage.session_id == SESSION_ID))
+        .scalars()
+        .all()
+    )
     assert msgs == []
 
 
@@ -274,9 +280,7 @@ def _fake_profile(**overrides):
     defaults.update(overrides)
     for key in ("confirmed_gaps", "mastered_concepts"):
         if defaults.get(key):
-            defaults[key] = [
-                {"name": v} if isinstance(v, str) else v for v in defaults[key]
-            ]
+            defaults[key] = [{"name": v} if isinstance(v, str) else v for v in defaults[key]]
     return TopicProfile(**defaults)
 
 
@@ -294,8 +298,7 @@ def _call_build_prompt_state(profile, review_gaps, review_gap=None):
 
 
 def test_build_prompt_state_carries_learner_prefs():
-    prefs = {"feedback_pref": "direct_answers", "check_ins": "often",
-             "reply_length": "brief"}
+    prefs = {"feedback_pref": "direct_answers", "check_ins": "often", "reply_length": "brief"}
     state = _build_prompt_state(
         session=_fake_session(),
         profile=_fake_profile(),
@@ -436,20 +439,14 @@ def test_build_prompt_state_no_prefetched_chunks_omits_key():
 
 
 def test_review_gap_mastered_target_accepted():
-    profile = _fake_profile(
-        confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"]
-    )
-    state = _call_build_prompt_state(
-        profile, review_gaps=True, review_gap="photosynthesis"
-    )
+    profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
+    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="photosynthesis")
     assert state["review_gaps_target"] == "photosynthesis"
     assert state["review_gaps_retention"] is True
 
 
 def test_review_gap_gap_target_not_retention():
-    profile = _fake_profile(
-        confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"]
-    )
+    profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
     state = _call_build_prompt_state(profile, review_gaps=True, review_gap="gap-a")
     assert state["review_gaps_target"] == "gap-a"
     assert state["review_gaps_retention"] is False
@@ -464,9 +461,7 @@ def test_review_gaps_activates_with_only_mastered():
 
 
 def test_review_gap_invalid_still_falls_back_to_first_gap():
-    profile = _fake_profile(
-        confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"]
-    )
+    profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
     state = _call_build_prompt_state(profile, review_gaps=True, review_gap="junk")
     assert state["review_gaps_target"] == "gap-a"
     assert state["review_gaps_retention"] is False

@@ -12,8 +12,6 @@ def test_request_ids_are_unique(client):
 
 
 def test_cors_exposes_request_id(client):
-    r = client.get(
-        "/health", headers={"Origin": "http://localhost:5173"}
-    )
+    r = client.get("/health", headers={"Origin": "http://localhost:5173"})
     exposed = r.headers.get("access-control-expose-headers", "")
     assert "x-request-id" in exposed.lower()

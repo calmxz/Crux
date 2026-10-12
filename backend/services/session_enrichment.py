@@ -5,6 +5,7 @@ in services/profile_service.py) so the two payloads stay in lockstep.
 
 Two set-based queries total regardless of how many sessions are passed.
 """
+
 from __future__ import annotations
 
 import json
@@ -49,9 +50,7 @@ class SessionEnrichment:
     progress: SessionProgress
 
 
-def compute_enrichment(
-    db: Session, rows: list[SessionModel]
-) -> dict[str, SessionEnrichment]:
+def compute_enrichment(db: Session, rows: list[SessionModel]) -> dict[str, SessionEnrichment]:
     ids = [r.id for r in rows]
     counts: dict[str, int] = {}
     last_act: dict[str, datetime] = {}
@@ -74,10 +73,14 @@ def compute_enrichment(
         # Latest NON-EMPTY message per session. Rank by recency in SQL (portable
         # window fn), pick the first non-blank in Python because trim() in SQL
         # strips only spaces (not tabs/newlines) on both SQLite and Postgres.
-        rn = func.row_number().over(
-            partition_by=ChatMessage.session_id,
-            order_by=(ChatMessage.created_at.desc(), ChatMessage.id.desc()),
-        ).label("rn")
+        rn = (
+            func.row_number()
+            .over(
+                partition_by=ChatMessage.session_id,
+                order_by=(ChatMessage.created_at.desc(), ChatMessage.id.desc()),
+            )
+            .label("rn")
+        )
         sub = (
             select(
                 ChatMessage.session_id.label("sid"),

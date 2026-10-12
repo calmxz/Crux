@@ -89,9 +89,7 @@ def test_extensionless_filename_400(client, seeded):
 )
 def test_allowed_non_pdf_types_202(client, seeded, name, ctype, content):
     files = {"file": (name, io.BytesIO(content), ctype)}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 202, r.text
     assert r.json()["status"] == "pending"
 
@@ -147,9 +145,7 @@ def test_upload_into_ended_session_409(client, seeded, db_session):
     db_session.commit()
 
     files = {"file": ("notes.pdf", io.BytesIO(b"%PDF-fake"), "application/pdf")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 409, r.text
     assert r.json()["detail"]["code"] == "session_ended"
     assert db_session.query(Document).count() == 0
@@ -392,10 +388,7 @@ def test_concurrent_identical_uploads_resolve_to_the_existing_row(
     assert r.status_code == 202, r.text
     assert r.json()["filename"] == "winner.pdf"
     assert db_session.query(Document).count() == 1
-    assert (
-        db_session.query(Document).one().content_sha256
-        == hashlib.sha256(PDF_BYTES).hexdigest()
-    )
+    assert db_session.query(Document).one().content_sha256 == hashlib.sha256(PDF_BYTES).hexdigest()
 
 
 def test_read_bounded_returns_all_bytes_under_cap():
@@ -674,9 +667,7 @@ def test_pdf_over_page_limit_413(client, seeded, monkeypatch):
     loads and tokenises the whole document."""
     monkeypatch.setattr("routes.upload.settings.max_pages", 2)
     files = {"file": ("big.pdf", io.BytesIO(_blank_pdf_bytes(3)), "application/pdf")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 413, r.text
     detail = r.json()["detail"]
     assert detail["code"] == "page_limit_exceeded"
@@ -687,9 +678,7 @@ def test_pdf_over_page_limit_413(client, seeded, monkeypatch):
 def test_pdf_under_page_limit_accepted(client, seeded, monkeypatch):
     monkeypatch.setattr("routes.upload.settings.max_pages", 5)
     files = {"file": ("small.pdf", io.BytesIO(_blank_pdf_bytes(2)), "application/pdf")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 202, r.text
 
 
@@ -698,9 +687,7 @@ def test_unparseable_pdf_passes_the_page_gate(client, seeded, monkeypatch):
     ingestion pipeline reports the extraction failure as it always has."""
     monkeypatch.setattr("routes.upload.settings.max_pages", 1)
     files = {"file": ("broken.pdf", io.BytesIO(b"%PDF-fake"), "application/pdf")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 202, r.text
 
 
@@ -720,9 +707,7 @@ def test_pptx_over_slide_limit_413(client, seeded, monkeypatch):
             "application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
     }
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 413, r.text
     detail = r.json()["detail"]
     assert detail["code"] == "page_limit_exceeded"
@@ -752,26 +737,20 @@ def test_content_check_rejection_does_not_burn_slot(
     if callable(content):
         content = content()
     files = {"file": (name, io.BytesIO(content), "application/octet-stream")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == status, r.text
     assert r.json()["detail"]["code"] == code
     db_session.expire_all()
     assert _usage_count(db_session) == 0
 
 
-def test_cost_capped_invalid_upload_reports_415_not_429(
-    client, db_session, seeded, monkeypatch
-):
+def test_cost_capped_invalid_upload_reports_415_not_429(client, db_session, seeded, monkeypatch):
     """#430 / #423 precedence: what is wrong with the request is reported
     before what is wrong with the account's budget."""
     monkeypatch.setattr("services.cost_meter.settings.llm_hard_cap_usd", 0.10)
     cost_meter.record_cost(db_session, USER_ID, Decimal("0.2000"))
     db_session.commit()
     files = {"file": ("fake.pdf", io.BytesIO(b"not a pdf"), "application/pdf")}
-    r = client.post(
-        "/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files
-    )
+    r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 415, r.text
     assert r.json()["detail"]["code"] == "CONTENT_TYPE_MISMATCH"

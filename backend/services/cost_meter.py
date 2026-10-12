@@ -33,9 +33,7 @@ def _today_utc() -> str:
 
 def next_midnight_utc(now: datetime | None = None) -> datetime:
     now = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-    return (now + timedelta(days=1)).replace(
-        hour=0, minute=0, second=0, microsecond=0
-    )
+    return (now + timedelta(days=1)).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
 def midnight_utc_iso(now: datetime | None = None) -> str:
@@ -148,7 +146,13 @@ def adjust_cost(db: Session, user_id: str, delta) -> Decimal:
 
 
 def log_call(
-    db: Session, *, user_id: str, session_id, purpose: str, model: str, cost_usd,
+    db: Session,
+    *,
+    user_id: str,
+    session_id,
+    purpose: str,
+    model: str,
+    cost_usd,
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     cached_tokens: int | None = None,
@@ -170,13 +174,18 @@ def log_call(
         if cost <= _ZERO:
             return
         with db.begin_nested():
-            db.add(LlmCallLog(
-                user_id=user_id, session_id=session_id, purpose=purpose,
-                model=model, cost_usd=_quantize(cost),
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                cached_tokens=cached_tokens,
-            ))
+            db.add(
+                LlmCallLog(
+                    user_id=user_id,
+                    session_id=session_id,
+                    purpose=purpose,
+                    model=model,
+                    cost_usd=_quantize(cost),
+                    prompt_tokens=prompt_tokens,
+                    completion_tokens=completion_tokens,
+                    cached_tokens=cached_tokens,
+                )
+            )
     except Exception as e:  # noqa: BLE001 - isolation by design
         log.warning("llm_call_log write failed: %s", e)
 
@@ -291,20 +300,20 @@ def spend_subquery(user_id: str):
 MODEL_RATES: dict[str, dict[str, Decimal]] = {
     # Google Gemini 3.5 Flash-Lite — default chat model
     "gemini/gemini-3.5-flash-lite": {
-        "input_per_1k": Decimal("0.000300"),   # $0.30 / 1M tokens
+        "input_per_1k": Decimal("0.000300"),  # $0.30 / 1M tokens
         "output_per_1k": Decimal("0.002500"),  # $2.50 / 1M tokens
     },
     # Google Gemini 3.1 Flash-Lite — deprecated by Google, shutdown 2027-05-07;
     # kept for env-selected fallback
     "gemini/gemini-3.1-flash-lite": {
-        "input_per_1k": Decimal("0.000250"),   # $0.25 / 1M tokens
+        "input_per_1k": Decimal("0.000250"),  # $0.25 / 1M tokens
         "output_per_1k": Decimal("0.001500"),  # $1.50 / 1M tokens
     },
     # Anthropic Claude Sonnet 5 — project fallback model if gemini underperforms
     # (verified against the Claude API price table 2026-09-10)
     "anthropic/claude-sonnet-5": {
-        "input_per_1k": Decimal("0.002"),      # $2.00  / 1M tokens
-        "output_per_1k": Decimal("0.010"),     # $10.00 / 1M tokens
+        "input_per_1k": Decimal("0.002"),  # $2.00  / 1M tokens
+        "output_per_1k": Decimal("0.010"),  # $10.00 / 1M tokens
     },
     # Google Gemini embedding model
     "gemini/gemini-embedding-2": {
@@ -368,18 +377,23 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
     try:
         tokens = extract_usage(resp)["prompt_tokens"]
         if tokens is None:
-            tokens = sum(
-                litellm.token_counter(model=model, text=t or "") for t in texts
-            )
+            tokens = sum(litellm.token_counter(model=model, text=t or "") for t in texts)
         return Decimal(tokens) * rates["input_per_1k"] / Decimal(1000)
     except Exception as e:  # noqa: BLE001
         # Local tokenization/cost-estimation only; no credential in the exception.
-        log.warning("embedding token-math fallback failed: %s", e)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+        log.warning(
+            "embedding token-math fallback failed: %s", e
+        )  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         return Decimal("0")
 
 
 def meter_embedding_response(
-    db: Session, resp, *, user_id: str, session_id, texts: list[str],
+    db: Session,
+    resp,
+    *,
+    user_id: str,
+    session_id,
+    texts: list[str],
     purpose: str = "embedding",
 ) -> Decimal:
     """Record an embedding call on the capped ledger and the analytics log
@@ -393,8 +407,12 @@ def meter_embedding_response(
         cost = embedding_cost(settings.embedding_model, resp, texts)
         record_cost(db, user_id, cost)
         log_call(
-            db, user_id=user_id, session_id=session_id, purpose=purpose,
-            model=settings.embedding_model, cost_usd=cost,
+            db,
+            user_id=user_id,
+            session_id=session_id,
+            purpose=purpose,
+            model=settings.embedding_model,
+            cost_usd=cost,
             **extract_usage(resp),
         )
         return cost

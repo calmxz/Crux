@@ -49,13 +49,15 @@ def initial_state(knowledge_level: str | None) -> str | None:
 def register(db: Session, ctx: "ToolContext", args: SuggestTopicsArgs) -> ToolResult:
     if args.session_id != ctx.session_id:
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error=f"session_id mismatch: args={args.session_id} ctx={ctx.session_id}",
         )
     lo, hi = _ITEM_RANGE[args.mode]
     if not (lo <= len(args.items) <= hi):
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error=f"{args.mode} mode takes {lo}-{hi} items, got {len(args.items)}",
         )
 
@@ -66,13 +68,15 @@ def register(db: Session, ctx: "ToolContext", args: SuggestTopicsArgs) -> ToolRe
     if row.topic_suggest_state != AWAITING_LEVEL:
         db.commit()  # release the row lock
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error="topic suggestions are not due in this session; do not call suggest_topics",
         )
     if profile_service.profile_from_row(row).knowledge_level is None:
         db.commit()  # release the row lock
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error="the learner's level is not known yet; record it first",
         )
     row.topic_suggest_state = DONE
@@ -92,7 +96,8 @@ def from_tool_calls(tool_calls_json: str | None) -> TopicSuggestions | None:
         return None
     call = next(
         (
-            c for c in calls
+            c
+            for c in calls
             if isinstance(c, dict) and c.get("name") == TOOL_NAME and c.get("status") == "ok"
         ),
         None,
@@ -101,11 +106,13 @@ def from_tool_calls(tool_calls_json: str | None) -> TopicSuggestions | None:
         return None
     args = call.get("args") or {}
     try:
-        return TopicSuggestions.model_validate({
-            "mode": args.get("mode"),
-            "topic": args.get("topic"),
-            "items": args.get("items") or [],
-        })
+        return TopicSuggestions.model_validate(
+            {
+                "mode": args.get("mode"),
+                "topic": args.get("topic"),
+                "items": args.get("items") or [],
+            }
+        )
     except ValidationError:
         log.debug("unreadable suggest_topics args on a persisted message")
         return None

@@ -4,6 +4,7 @@ Dev/test must NOT be affected — CI's backend job and the `client` fixture in
 conftest.py never set SUPABASE_URL, and both rely on lifespan() completing
 without raising.
 """
+
 import pytest
 
 import main as main_module

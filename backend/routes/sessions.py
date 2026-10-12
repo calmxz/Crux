@@ -69,9 +69,7 @@ from services.session_enrichment import aware_utc as _aware_utc
 from services.session_enrichment import compute_enrichment
 from services.user_service import ensure_user
 
-NO_EXCHANGES_TEXT = (
-    "This session ended without any exchanges. Start a new session to continue."
-)
+NO_EXCHANGES_TEXT = "This session ended without any exchanges. Start a new session to continue."
 
 logger = logging.getLogger(__name__)
 
@@ -204,9 +202,7 @@ def _create_session_claim(
     # exclude_id=req.prior_session_id keeps a legitimate resume
     # self-exclusive: the prior being resumed is still active (ended_at IS
     # NULL) here and must not conflict with itself.
-    existing = _active_session_on_topic(
-        db, user_id, req.topic, exclude_id=req.prior_session_id
-    )
+    existing = _active_session_on_topic(db, user_id, req.topic, exclude_id=req.prior_session_id)
     if existing is not None:
         raise HTTPException(
             status_code=409,
@@ -270,13 +266,17 @@ def list_sessions(
     # F-06: unbounded before -- a heavy account loaded (and enriched) every
     # session it had ever created on one request. Default 100 keeps every
     # current caller's behaviour intact.
-    rows = db.execute(
-        select(SessionModel)
-        .where(SessionModel.user_id == user_id)
-        .order_by(SessionModel.created_at.desc())
-        .limit(limit)
-        .offset(offset)
-    ).scalars().all()
+    rows = (
+        db.execute(
+            select(SessionModel)
+            .where(SessionModel.user_id == user_id)
+            .order_by(SessionModel.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        .scalars()
+        .all()
+    )
     return _enrich_list_items(db, rows)
 
 
@@ -290,20 +290,15 @@ def _load_messages(
     q = select(ChatMessage).where(ChatMessage.session_id == session_id)
     if before is not None:
         q = q.where(ChatMessage.id < before)
-    window = list(
-        db.execute(q.order_by(ChatMessage.id.desc()).limit(limit + 1)).scalars().all()
-    )
+    window = list(db.execute(q.order_by(ChatMessage.id.desc()).limit(limit + 1)).scalars().all())
     has_more = len(window) > limit
     rows = list(reversed(window[:limit]))
     # Preload LearningEvents once iff some message may need reconstruction
     # (no persisted check_batch_json and not the open message). Avoids the
     # former per-item N+1 entirely; skipped when every batch is persisted.
-    needs_events = any(
-        m.check_batch_json is None and m.id != open_message_id for m in rows
-    )
+    needs_events = any(m.check_batch_json is None and m.id != open_message_id for m in rows)
     events = (
-        check_question_service.load_session_learning_events(db, session_id)
-        if needs_events else []
+        check_question_service.load_session_learning_events(db, session_id) if needs_events else []
     )
     out: list[Message] = []
     for m in rows:
@@ -384,13 +379,9 @@ def list_session_library(
     elif status == "ended":
         base = base.where(SessionModel.ended_at.is_not(None))
     if q:
-        base = base.where(
-            SessionModel.topic.ilike(f"%{_like_literal(q)}%", escape=LIKE_ESCAPE)
-        )
+        base = base.where(SessionModel.topic.ilike(f"%{_like_literal(q)}%", escape=LIKE_ESCAPE))
 
-    total = db.execute(
-        select(func.count()).select_from(base.subquery())
-    ).scalar_one()
+    total = db.execute(select(func.count()).select_from(base.subquery())).scalar_one()
 
     if sort == "created":
         ordered = base.order_by(SessionModel.created_at.desc(), SessionModel.id.desc())
@@ -415,7 +406,9 @@ def list_session_library(
         activity_desc = func.coalesce(last_act_sub.c.la, SessionModel.created_at).desc()
         joined = base.outerjoin(last_act_sub, last_act_sub.c.sid == SessionModel.id)
         if sort == "pinned_activity":
-            ordered = joined.order_by(SessionModel.pinned.desc(), activity_desc, SessionModel.id.desc())
+            ordered = joined.order_by(
+                SessionModel.pinned.desc(), activity_desc, SessionModel.id.desc()
+            )
         else:
             ordered = joined.order_by(activity_desc, SessionModel.id.desc())
 
@@ -563,9 +556,7 @@ def _end_session_claim(session_id: str, user_id: str, db: Session):
             SessionEndResponse(
                 id=row.id,
                 ended_at=_aware_utc(row.ended_at),
-                summary=_build_end_summary(
-                    db, session_id, profile.last_session_summary or ""
-                ),
+                summary=_build_end_summary(db, session_id, profile.last_session_summary or ""),
             ),
             warn,
             None,
@@ -623,9 +614,7 @@ async def end_session(
         return result
     finally:
         if settings.debug_timing:
-            logger.info(
-                "end_session timing total_ms=%.1f", (time.perf_counter() - t0) * 1000.0
-            )
+            logger.info("end_session timing total_ms=%.1f", (time.perf_counter() - t0) * 1000.0)
 
 
 @router.post("/sessions/{session_id}/reopen", response_model=SessionResponse)
@@ -638,9 +627,7 @@ def reopen_session(
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
-        existing = _active_session_on_topic(
-            db, user_id, row.topic, exclude_id=row.id
-        )
+        existing = _active_session_on_topic(db, user_id, row.topic, exclude_id=row.id)
         if existing is not None:
             raise HTTPException(
                 status_code=409,
@@ -651,9 +638,7 @@ def reopen_session(
             db.commit()
         except IntegrityError as e:
             db.rollback()
-            existing = _active_session_on_topic(
-                db, user_id, row.topic, exclude_id=row.id
-            )
+            existing = _active_session_on_topic(db, user_id, row.topic, exclude_id=row.id)
             raise HTTPException(
                 status_code=409,
                 detail={"code": DUPLICATE_TOPIC, "session_id": existing},
@@ -707,9 +692,7 @@ def update_session(
             # B-06: rename must honor the same duplicate-active-topic guard
             # as create/reopen; without it a rename reproduces the duplicate
             # state through the front door.
-            existing = _active_session_on_topic(
-                db, user_id, req.topic, exclude_id=row.id
-            )
+            existing = _active_session_on_topic(db, user_id, req.topic, exclude_id=row.id)
             if existing is not None:
                 raise HTTPException(
                     status_code=409,
@@ -727,9 +710,7 @@ def update_session(
         # ORM object, so row.topic would reload the pre-rename value from
         # the DB rather than reflecting the attempted (rejected) rename.
         db.rollback()
-        existing = _active_session_on_topic(
-            db, user_id, req.topic, exclude_id=row.id
-        )
+        existing = _active_session_on_topic(db, user_id, req.topic, exclude_id=row.id)
         raise HTTPException(
             status_code=409,
             detail={"code": DUPLICATE_TOPIC, "session_id": existing},
@@ -792,14 +773,18 @@ def answer_check(
 
 
 def _recent_history(db: Session, session_id: str) -> list[dict]:
-    rows = db.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id == session_id)
-        # C-18: see routes/chat.py::_prepare_turn_context -- id DESC breaks
-        # created_at ties so the history window is deterministic.
-        .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
-        .limit(20)
-    ).scalars().all()
+    rows = (
+        db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session_id)
+            # C-18: see routes/chat.py::_prepare_turn_context -- id DESC breaks
+            # created_at ties so the history window is deterministic.
+            .order_by(ChatMessage.created_at.desc(), ChatMessage.id.desc())
+            .limit(20)
+        )
+        .scalars()
+        .all()
+    )
     return [{"role": m.role, "content": m.content} for m in reversed(rows)]
 
 
@@ -863,8 +848,12 @@ def _stop_check_prepare(session_id: str, user_id: str, db: Session):
 
 
 def _followup_context(
-    db: Session, row: SessionModel, session_id: str, user_id: str,
-    summary: str, cooldown: dict | None,
+    db: Session,
+    row: SessionModel,
+    session_id: str,
+    user_id: str,
+    summary: str,
+    cooldown: dict | None,
 ):
     """Shared tail of the check follow-up turns (/check/complete and
     /check/stop): history plus the NON-persisted summary turn, prompt, and a
@@ -960,6 +949,7 @@ def _followup_response(request: Request, allowed, messages, system_prompt, ctx):
     """SSE response for a check follow-up turn: the daily-cap skip event, or
     the tutor's streamed reaction."""
     if not allowed:
+
         async def skipped_stream():
             yield StreamEvent("followup_skipped", {"reason": "daily_cap"}).to_sse()
 

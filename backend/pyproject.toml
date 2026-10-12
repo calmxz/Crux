@@ -61,6 +61,10 @@ line-length = 100
 target-version = "py312"
 extend-exclude = ["contracts/models.py"]
 
+[tool.ruff.format]
+# Applied migrations are historical; reformatting them would only churn reviewed files.
+exclude = ["db/alembic/versions/*"]
+
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
 ignore = ["B008", "E501"]

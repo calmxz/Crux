@@ -33,10 +33,8 @@ def _fake_current_user_id(request: Request) -> str:
         return "test-user"
     token = auth.split(None, 1)[1].strip()
     if token.startswith("test-"):
-        return token[len("test-"):]
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token"
-    )
+        return token[len("test-") :]
+    raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
 
 
 @pytest.fixture(autouse=True)
@@ -209,7 +207,9 @@ class _AuthInjectingClient(TestClient):
             for k, v in qs:
                 if k == "user_id":
                     user_id = user_id or v
-            url = urlunsplit((parts.scheme, parts.netloc, parts.path, urlencode(stripped), parts.fragment))
+            url = urlunsplit(
+                (parts.scheme, parts.netloc, parts.path, urlencode(stripped), parts.fragment)
+            )
 
         lower_keys = {k.lower() for k in headers}
         if user_id and "authorization" not in lower_keys:
@@ -222,7 +222,9 @@ class _AuthInjectingClient(TestClient):
 def client(db_session, monkeypatch):
     test_engine = db_session.get_bind()
 
-    monkeypatch.setattr(main_module, "create_tables", lambda: Base.metadata.create_all(bind=test_engine))
+    monkeypatch.setattr(
+        main_module, "create_tables", lambda: Base.metadata.create_all(bind=test_engine)
+    )
     monkeypatch.setattr(main_module, "validate_jwks_startup", lambda: None)
 
     def override_get_db():
@@ -238,11 +240,7 @@ def client(db_session, monkeypatch):
 def _text(content: str) -> SimpleNamespace:
     """Build a fake LiteLLM completion response with a plain text reply."""
     return SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(content=content, tool_calls=None)
-            )
-        ]
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=None))]
     )
 
 

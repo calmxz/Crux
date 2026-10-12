@@ -25,53 +25,96 @@ T0 = datetime(2026, 9, 1, 8, 0, tzinfo=timezone.utc)
 
 
 def _seed(db, user_id: str, *, topic_prefix: str = "") -> None:
-    db.add(User(
-        id=user_id, created_at=T0, display_name=f"{user_id} name",
-        feedback_pref="direct_answers", check_ins="often", reply_length="brief",
-        onboarding_complete=True, accepted_terms_at=T0, terms_version="v1",
-    ))
+    db.add(
+        User(
+            id=user_id,
+            created_at=T0,
+            display_name=f"{user_id} name",
+            feedback_pref="direct_answers",
+            check_ins="often",
+            reply_length="brief",
+            onboarding_complete=True,
+            accepted_terms_at=T0,
+            terms_version="v1",
+        )
+    )
     # Inserted newest first so the test proves the export sorts oldest first.
-    db.add(Session(
-        id=f"{user_id}-s2", user_id=user_id, topic=f"{topic_prefix}Joins",
-        created_at=T0 + timedelta(days=2),
-    ))
-    db.add(Session(
-        id=f"{user_id}-s1", user_id=user_id, topic=f"{topic_prefix}Indexes",
-        created_at=T0 + timedelta(days=1), ended_at=T0 + timedelta(days=1, hours=1),
-        pinned=True,
-        topic_profile_json=json.dumps({
-            "knowledge_level": "intermediate",
-            "confirmed_gaps": ["b-trees"],
-            "mastered_concepts": [{"name": "hash index", "evidence_type": "tested"}],
-        }),
-    ))
+    db.add(
+        Session(
+            id=f"{user_id}-s2",
+            user_id=user_id,
+            topic=f"{topic_prefix}Joins",
+            created_at=T0 + timedelta(days=2),
+        )
+    )
+    db.add(
+        Session(
+            id=f"{user_id}-s1",
+            user_id=user_id,
+            topic=f"{topic_prefix}Indexes",
+            created_at=T0 + timedelta(days=1),
+            ended_at=T0 + timedelta(days=1, hours=1),
+            pinned=True,
+            topic_profile_json=json.dumps(
+                {
+                    "knowledge_level": "intermediate",
+                    "confirmed_gaps": ["b-trees"],
+                    "mastered_concepts": [{"name": "hash index", "evidence_type": "tested"}],
+                }
+            ),
+        )
+    )
     db.flush()
     sid = f"{user_id}-s1"
     db.add(ChatMessage(session_id=sid, role="user", content=f"{user_id} asks"))
-    db.add(ChatMessage(
-        session_id=sid, role="assistant", content=f"{user_id} answers",
-        citations_json=json.dumps([{"doc_id": "1", "text": "quote", "page": 3}]),
-        tool_calls_json=json.dumps([{"name": "retrieve_chunks", "args": {}, "status": "ok"}]),
-        status="complete",
-    ))
-    db.add(LearningEvent(
-        session_id=sid, gap_tested="b-trees", question=f"{user_id} question?",
-        correct=False, selected_index=0, correct_index=1,
-        options_json=json.dumps(["a", "b"]), purpose="check",
-    ))
+    db.add(
+        ChatMessage(
+            session_id=sid,
+            role="assistant",
+            content=f"{user_id} answers",
+            citations_json=json.dumps([{"doc_id": "1", "text": "quote", "page": 3}]),
+            tool_calls_json=json.dumps([{"name": "retrieve_chunks", "args": {}, "status": "ok"}]),
+            status="complete",
+        )
+    )
+    db.add(
+        LearningEvent(
+            session_id=sid,
+            gap_tested="b-trees",
+            question=f"{user_id} question?",
+            correct=False,
+            selected_index=0,
+            correct_index=1,
+            options_json=json.dumps(["a", "b"]),
+            purpose="check",
+        )
+    )
     doc = Document(session_id=sid, filename=f"{user_id}.pdf", status="ready", page_count=12)
     db.add(doc)
     db.flush()
-    db.add(ChunkEmbedding(
-        session_id=sid, document_id=doc.id, chunk_index=0, page=1,
-        chunk_text=f"{user_id} secret chunk", embedding=[0.0] * settings.embedding_dim,
-    ))
+    db.add(
+        ChunkEmbedding(
+            session_id=sid,
+            document_id=doc.id,
+            chunk_index=0,
+            page=1,
+            chunk_text=f"{user_id} secret chunk",
+            embedding=[0.0] * settings.embedding_dim,
+        )
+    )
     db.add(UsageCounter(user_id=user_id, date_utc="2026-09-02", count=4))
     db.add(UsageCounter(user_id=user_id, date_utc="2026-09-03", count=1))
     db.add(DailyCostLedger(user_id=user_id, date_utc="2026-09-02", cost_usd=Decimal("0.0125")))
     db.add(DailyCostLedger(user_id=user_id, date_utc="2026-09-04", cost_usd=Decimal("0.0030")))
-    db.add(LlmCallLog(user_id=user_id, session_id=sid, purpose="chat",
-                      model="internal-model-name", cost_usd=Decimal("0.0010")))
+    db.add(
+        LlmCallLog(
+            user_id=user_id,
+            session_id=sid,
+            purpose="chat",
+            model="internal-model-name",
+            cost_usd=Decimal("0.0010"),
+        )
+    )
     db.commit()
 
 

@@ -16,7 +16,10 @@ from db.models import User
 def _load_migration():
     path = (
         Path(__file__).resolve().parents[1]
-        / "db" / "alembic" / "versions" / "0010_subjects_lessons.py"
+        / "db"
+        / "alembic"
+        / "versions"
+        / "0010_subjects_lessons.py"
     )
     spec = importlib.util.spec_from_file_location("migration_0010", path)
     mod = importlib.util.module_from_spec(spec)
@@ -52,10 +55,7 @@ def test_session_rolling_summary_columns(db_session):
 
 
 def _load_versions_module(filename: str, modname: str):
-    path = (
-        Path(__file__).resolve().parents[1]
-        / "db" / "alembic" / "versions" / filename
-    )
+    path = Path(__file__).resolve().parents[1] / "db" / "alembic" / "versions" / filename
     spec = importlib.util.spec_from_file_location(modname, path)
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
@@ -129,9 +129,7 @@ def test_documents_status_check_declared_on_model():
     persist a status no reader understands."""
     from db.models import Document
 
-    checks = {
-        c.name for c in Document.__table__.constraints if c.name is not None
-    }
+    checks = {c.name for c in Document.__table__.constraints if c.name is not None}
     assert "documents_status_check" in checks
 
 
@@ -139,9 +137,7 @@ def test_chat_messages_role_check_declared_on_model():
     """C-15: chat_messages.role had no CHECK even though status did."""
     from db.models import ChatMessage
 
-    checks = {
-        c.name for c in ChatMessage.__table__.constraints if c.name is not None
-    }
+    checks = {c.name for c in ChatMessage.__table__.constraints if c.name is not None}
     assert "chat_messages_role_check" in checks
 
 
@@ -248,33 +244,25 @@ def test_learner_preference_columns_default_on_bare_insert(db_session):
 
 
 def test_0027_chains_onto_0026():
-    mod = _load_versions_module(
-        "0027_chat_messages_sid_id_desc.py", "migration_0027"
-    )
+    mod = _load_versions_module("0027_chat_messages_sid_id_desc.py", "migration_0027")
     assert mod.revision == "0027_chat_messages_sid_id_desc"
     assert mod.down_revision == "0026_documents_content_sha256"
 
 
 def test_0026_chains_onto_0025():
-    mod = _load_versions_module(
-        "0026_documents_content_sha256.py", "migration_0026"
-    )
+    mod = _load_versions_module("0026_documents_content_sha256.py", "migration_0026")
     assert mod.revision == "0026_documents_content_sha256"
     assert mod.down_revision == "0025_learning_events_created_at"
 
 
 def test_0025_chains_onto_0024():
-    mod = _load_versions_module(
-        "0025_learning_events_created_at.py", "migration_0025"
-    )
+    mod = _load_versions_module("0025_learning_events_created_at.py", "migration_0025")
     assert mod.revision == "0025_learning_events_created_at"
     assert mod.down_revision == "0024_sessions_chunk_centroid"
 
 
 def test_0024_chains_onto_0023():
-    mod = _load_versions_module(
-        "0024_sessions_chunk_centroid.py", "migration_0024"
-    )
+    mod = _load_versions_module("0024_sessions_chunk_centroid.py", "migration_0024")
     assert mod.revision == "0024_sessions_chunk_centroid"
     assert mod.down_revision == "0023_worker_queue"
 
@@ -289,4 +277,6 @@ def test_revision_ids_fit_alembic_version_column():
         spec = importlib.util.spec_from_file_location(f"chk_{path.stem}", path)
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
-        assert len(mod.revision) <= 32, f"{path.name}: revision id {mod.revision!r} exceeds 32 chars"
+        assert len(mod.revision) <= 32, (
+            f"{path.name}: revision id {mod.revision!r} exceeds 32 chars"
+        )

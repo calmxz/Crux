@@ -24,14 +24,16 @@ def test_get_session_returns_tool_calls(client, db_session):
             session_id="s_tc",
             role="assistant",
             content="hi",
-            tool_calls_json=json.dumps([
-                {
-                    "name": "update_topic_profile",
-                    "args": {},
-                    "status": "failed",
-                    "error": "evidence_type must be declared/tested/inferred",
-                }
-            ]),
+            tool_calls_json=json.dumps(
+                [
+                    {
+                        "name": "update_topic_profile",
+                        "args": {},
+                        "status": "failed",
+                        "error": "evidence_type must be declared/tested/inferred",
+                    }
+                ]
+            ),
         )
     )
     db_session.commit()

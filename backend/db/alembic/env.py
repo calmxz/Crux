@@ -3,6 +3,7 @@
 URL is read from `settings.database_url` (which honors DATABASE_URL env).
 Models are imported from `db.models` so autogenerate sees them.
 """
+
 from logging.config import fileConfig
 
 from alembic import context
