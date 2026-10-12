@@ -19,6 +19,22 @@ jobs:
     runs-on: ubuntu-latest
     # Blocking since 2026-09-02 (Phase 6 complete; 16/16 green PR runs).
     timeout-minutes: 12
+    # Same database as production (and ci.yml): SQLite cannot run pgvector's
+    # `<=>` operator, and its transaction semantics differ from Postgres.
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: crux
+          POSTGRES_PASSWORD: crux
+          POSTGRES_DB: crux_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crux -d crux_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -61,11 +77,18 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Migrate e2e Postgres (alembic upgrade head)
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
+          CRUX_SKIP_DOTENV: "1"
+        run: alembic upgrade head
+
       - name: Start backend (stubbed LLM)
         working-directory: backend
         env:
           LLM_STUB: '1'
-          DATABASE_URL: 'sqlite:///./e2e.db'
+          DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
           # F-61: no Supabase in CI e2e; opt out of the unconfigured-auth fail-fast.
           AUTH_OPTIONAL: 'true'
         run: |

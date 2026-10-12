@@ -4,9 +4,15 @@ import { defineConfig, devices } from '@playwright/test'
 // with LLM_STUB=1 (or GEMINI_API_KEY=test) so responses are deterministic.
 // The frontend dev server is managed by Playwright via webServer below.
 //
+// The backend must run on Postgres + pgvector, as CI does: SQLite cannot run
+// pgvector's `<=>` vector search. Point DATABASE_URL at a pgvector database
+// migrated with `alembic upgrade head` (e.g. docker run pgvector/pgvector:pg17).
+//
 // Local run:
-//   1) cd backend && LLM_STUB=1 uvicorn main:app --port 8000
-//      (PowerShell: $env:LLM_STUB=1; uvicorn main:app --port 8000)
+//   1) cd backend && LLM_STUB=1 AUTH_OPTIONAL=true \
+//        DATABASE_URL=postgresql://crux:crux@localhost:5432/crux_e2e \
+//        uvicorn main:app --port 8000
+//      (PowerShell: set each with $env:NAME='value', then uvicorn main:app --port 8000)
 //   2) cd frontend && npm run test:e2e
 
 export default defineConfig({
