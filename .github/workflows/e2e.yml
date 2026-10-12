@@ -19,8 +19,12 @@ jobs:
     runs-on: ubuntu-latest
     # Blocking since 2026-09-02 (Phase 6 complete; 16/16 green PR runs).
     timeout-minutes: 12
-    # Same database as production (and ci.yml): SQLite cannot run pgvector's
-    # `<=>` operator, and its transaction semantics differ from Postgres.
+    # Same database as production, and the same service ci.yml runs for its
+    # Postgres-only tests: SQLite cannot run pgvector's `<=>` operator, and its
+    # transaction semantics differ from Postgres.
+    env:
+      DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
+      CRUX_SKIP_DOTENV: "1"
     services:
       postgres:
         image: pgvector/pgvector:pg17
@@ -79,23 +83,20 @@ jobs:
 
       - name: Migrate e2e Postgres (alembic upgrade head)
         working-directory: backend
-        env:
-          DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
-          CRUX_SKIP_DOTENV: "1"
         run: alembic upgrade head
 
       - name: Start backend (stubbed LLM)
         working-directory: backend
         env:
           LLM_STUB: '1'
-          DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
           # F-61: no Supabase in CI e2e; opt out of the unconfigured-auth fail-fast.
           AUTH_OPTIONAL: 'true'
         run: |
           nohup python -m uvicorn main:app --port 8000 --host 127.0.0.1 \
             > backend.log 2>&1 &
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+            # /ready probes the database; /health is liveness only.
+            if curl -sf http://127.0.0.1:8000/ready > /dev/null; then
               echo "backend ready"; exit 0
             fi
             sleep 1

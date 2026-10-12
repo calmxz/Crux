@@ -7,7 +7,7 @@ import { test, expect } from '@playwright/test'
 // content-flow spec in this folder (onboarding-to-chat, chat-stream, etc.),
 // which are skipped for the identical reason. The flow/assertions here target
 // the roadmap-slice3 Continue-topic path and are ready the moment the seeding
-// helper + Postgres service in e2e.yml land — un-skip then.
+// helper lands (e2e.yml runs on Postgres since #434) - un-skip then.
 test.describe.skip('resume carries profile', () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies()
