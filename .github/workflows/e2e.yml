@@ -85,12 +85,33 @@ jobs:
         working-directory: backend
         run: alembic upgrade head
 
+      # #518: no real Supabase in CI. A throwaway key pair stands in for it:
+      # the backend verifies tokens against this JWKS through its normal path,
+      # and e2e/support/auth.js signs test users' tokens with the private half.
+      # Only jwks/ is served; the private key stays on disk.
+      - name: Serve e2e JWKS
+        working-directory: frontend
+        run: |
+          node e2e/support/auth-keys.js
+          nohup python -m http.server 8787 --bind 127.0.0.1 \
+            --directory e2e/.auth/jwks > jwks.log 2>&1 &
+          for i in $(seq 1 10); do
+            if curl -sf http://127.0.0.1:8787/jwks.json > /dev/null; then
+              echo "jwks ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "jwks server failed to start"; cat jwks.log; exit 1
+
       - name: Start backend (stubbed LLM)
         working-directory: backend
         env:
           LLM_STUB: '1'
-          # F-61: no Supabase in CI e2e; opt out of the unconfigured-auth fail-fast.
-          AUTH_OPTIONAL: 'true'
+          # Fake issuer origin; must match ISSUER_ORIGIN in e2e/support/auth-keys.js.
+          # Nothing else switches on from SUPABASE_URL alone: the admin client
+          # also needs SUPABASE_SECRET_KEY, which stays unset.
+          SUPABASE_URL: 'http://e2e-auth.invalid'
+          SUPABASE_JWKS_URL_OVERRIDE: 'http://127.0.0.1:8787/jwks.json'
         run: |
           nohup python -m uvicorn main:app --port 8000 --host 127.0.0.1 \
             > backend.log 2>&1 &

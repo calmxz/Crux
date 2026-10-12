@@ -513,6 +513,29 @@ describe('apiClient', () => {
       expect(fetchMock).toHaveBeenCalledTimes(5)
     })
 
+    // #518: the profiles are derived from sessions, so a new session has to
+    // show on the combined profile at once, not up to a TTL later.
+    it('a session write drops cached profile GETs', async () => {
+      fetchMock.mockReturnValueOnce(jsonResp(200, { total_sessions: 0 }))
+      await apiGet('/profile/aggregate')
+      fetchMock.mockReturnValueOnce(jsonResp(201, {}))
+      await apiPost('/sessions', {})
+      fetchMock.mockReturnValueOnce(jsonResp(200, { total_sessions: 1 }))
+      await expect(apiGet('/profile/aggregate')).resolves.toEqual({ total_sessions: 1 })
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
+    // GET /sessions/:id embeds the session's topic_profile.
+    it('a profile write drops cached session GETs', async () => {
+      fetchMock.mockReturnValueOnce(jsonResp(200, { n: 1 }))
+      await apiGet('/sessions/abc')
+      fetchMock.mockReturnValueOnce(jsonResp(200, {}))
+      await apiPatch('/profile/abc', { knowledge_level: 'advanced' })
+      fetchMock.mockReturnValueOnce(jsonResp(200, { n: 2 }))
+      await expect(apiGet('/sessions/abc')).resolves.toEqual({ n: 2 })
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
     it('a write under one root leaves another root cached', async () => {
       fetchMock.mockReturnValueOnce(jsonResp(200, { me: 1 }))
       await apiGet('/me')

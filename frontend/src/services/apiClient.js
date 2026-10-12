@@ -59,6 +59,15 @@ function _isSegmentPrefix(prefix, path) {
   return path === prefix || path.startsWith(prefix.endsWith('/') ? prefix : `${prefix}/`)
 }
 
+// Roots whose GETs read each other's data, so a write under one also drops
+// the other: every profile is derived from sessions (a new session is a new
+// topic on /profile/aggregate), and GET /sessions/:id embeds the session's
+// topic_profile.
+const LINKED_ROOTS = {
+  '/sessions': ['/profile'],
+  '/profile': ['/sessions'],
+}
+
 // Any write drops cached GETs on the same resource, in both directions:
 // POST /sessions invalidates GET /sessions?cursor=..., and DELETE
 // /sessions/abc/end invalidates GET /sessions/abc.
@@ -76,6 +85,7 @@ export function invalidateGetCache(path) {
   // under a resource root therefore also drops every cached GET under that
   // root. Coarse, but a 5 s cache gains nothing from being clever here.
   const root = `/${target.split('/').filter(Boolean)[0] ?? ''}`
+  const roots = [root, ...(LINKED_ROOTS[root] ?? [])]
 
   for (const url of _getCache.keys()) {
     const cached = _pathOfUrl(url)
@@ -83,7 +93,7 @@ export function invalidateGetCache(path) {
     if (
       _isSegmentPrefix(cached, target) ||
       _isSegmentPrefix(target, cached) ||
-      _isSegmentPrefix(root, cached)
+      roots.some((r) => _isSegmentPrefix(r, cached))
     ) {
       _getCache.delete(url)
     }

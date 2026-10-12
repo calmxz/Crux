@@ -1,18 +1,13 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Spec assumes
-// pre-auth flow (no /login gate), removed in Phase 7. e2e.yml runs on Postgres
-// since #434; restore once an auth session seeding helper lands.
-test.describe.skip('profile navigation', () => {
-  test.beforeEach(async ({ context }) => {
+import { signIn } from './support/auth.js'
+
+// Runs against the real e2e backend (Postgres). The combined profile is reached
+// from the sidebar, and a session's own profile from its topic card there.
+test.describe('profile navigation', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // ignore
-      }
-    })
+    await signIn(page)
   })
 
   test('home -> combined profile -> back; session -> session profile', async ({ page }) => {
@@ -22,24 +17,24 @@ test.describe.skip('profile navigation', () => {
     await expect(page).toHaveURL(/\/$/)
 
     // Home -> Combined profile
-    await page.getByTestId('home-profile-link').click()
+    await page.getByTestId('sidebar-profile').first().click()
     await expect(page).toHaveURL(/\/profile$/)
-    await expect(page.getByTestId('agg-learning')).toBeVisible()
+    await expect(page.getByTestId('aggregate-profile')).toBeVisible()
 
     // Empty state on first run.
-    await expect(page.getByTestId('agg-empty')).toBeVisible()
-    await page.getByTestId('back-button').click()
+    await expect(page.getByTestId('aprof-empty')).toBeVisible()
+    await page.goBack()
     await expect(page).toHaveURL(/\/$/)
 
     // Create a session and visit its per-session profile.
-    await page.getByTestId('home-new-session').click()
-    await page.getByTestId('new-topic').fill('Recursion')
-    await page.getByTestId('new-submit').click()
+    await page.getByTestId('home-quick-topic').fill('Recursion')
+    await page.getByTestId('home-quick-go').click()
     await expect(page).toHaveURL(/\/session\//)
 
     const sessionId = page.url().split('/session/')[1].split(/[?#]/)[0]
 
-    await page.getByTestId('session-profile-link').click()
+    await page.getByTestId('sidebar-profile').first().click()
+    await page.getByTestId('aprof-topic-card').getByRole('link', { name: 'Open profile' }).click()
     await expect(page).toHaveURL(new RegExp(`/session/${sessionId}/profile$`))
     await expect(page.getByTestId('session-profile')).toBeVisible()
     await expect(page.getByTestId('sprof-mastered')).toBeVisible()

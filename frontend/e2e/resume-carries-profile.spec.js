@@ -1,23 +1,12 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. The app now
-// redirects unauthenticated visits to /login (see auth.spec.js), and no
-// auth-session-seeding helper exists yet to get a Playwright session past that
-// gate, so the onboarding step below times out. Skipped to match every other
-// content-flow spec in this folder (onboarding-to-chat, chat-stream, etc.),
-// which are skipped for the identical reason. The flow/assertions here target
-// the roadmap-slice3 Continue-topic path and are ready the moment the seeding
-// helper lands (e2e.yml runs on Postgres since #434) - un-skip then.
-test.describe.skip('resume carries profile', () => {
-  test.beforeEach(async ({ context }) => {
+import { signIn } from './support/auth.js'
+
+// Runs against the real e2e backend (Postgres, LLM_STUB=1).
+test.describe('resume carries profile', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // Ignore SecurityErrors on isolated/about:blank pages.
-      }
-    })
+    await signIn(page)
   })
 
   test('continue topic from library carries profile into a new session', async ({ page }) => {
@@ -42,15 +31,11 @@ test.describe.skip('resume carries profile', () => {
     await page.getByTestId('session-send').click()
     await expect(page.getByTestId('msg-assistant').last()).toContainText('[STUB:fresh]')
 
-    // End session A via the sidebar row's overflow menu (ticket 10 also added
-    // an in-page End control on SessionView itself, but the row menu exercises
-    // the same shared useSessionActions.confirmEnd path). Awaits the
-    // end-of-session summary synchronously and persists it onto
-    // topic_profile.last_session_summary.
-    await page
-      .locator(`[data-session-id="${sessionId}"] [data-testid="sidebar-row-menu-trigger"]`)
-      .click()
-
+    // End session A via the in-page End control (ticket 10). It shares
+    // useSessionActions.confirmEnd with the sidebar row menu, which cannot be
+    // used here: a session created from Home is not listed in the sidebar
+    // until the list refetches (#522). Awaits the end-of-session summary
+    // synchronously and persists it onto topic_profile.last_session_summary.
     // Start waiting for the end-session request before clicking: the click
     // resolves on event dispatch, not on the async handler, and the
     // subsequent page.goto is a full-page navigation that would abort an
@@ -61,7 +46,7 @@ test.describe.skip('resume carries profile', () => {
       (r) => r.url().includes(`/sessions/${sessionId}/end`) && r.ok(),
     )
 
-    await page.getByTestId('sidebar-row-menu-end').click()
+    await page.getByTestId('session-action-end').click()
     // E-12: End now sits behind a PrimeVue confirm dialog (same contract as
     // file delete); the request only fires on the destructive accept.
     await page.locator('.p-confirmdialog button.confirm-delete-strong').click()

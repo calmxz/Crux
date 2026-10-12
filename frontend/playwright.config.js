@@ -11,12 +11,18 @@ import { defineConfig, devices } from '@playwright/test'
 //   0) docker run -d --rm --name crux-e2e -p 55432:5432 -e POSTGRES_USER=crux \
 //        -e POSTGRES_PASSWORD=crux -e POSTGRES_DB=crux_e2e pgvector/pgvector:pg17
 //      (port 55432 avoids a native Postgres on 5432)
-//   1) In backend/, with these set:
+//   1) In frontend/: `node e2e/support/auth-keys.js`, then serve the JWKS:
+//        python -m http.server 8787 --bind 127.0.0.1 --directory e2e/.auth/jwks
+//      Specs sign in with e2e/support/auth.js, whose tokens the backend
+//      verifies against this JWKS (#518).
+//   2) In backend/, with these set:
 //        DATABASE_URL=postgresql://crux:crux@localhost:55432/crux_e2e
-//        CRUX_SKIP_DOTENV=1 LLM_STUB=1 AUTH_OPTIONAL=true
+//        CRUX_SKIP_DOTENV=1 LLM_STUB=1
+//        SUPABASE_URL=http://e2e-auth.invalid
+//        SUPABASE_JWKS_URL_OVERRIDE=http://127.0.0.1:8787/jwks.json
 //      run `alembic upgrade head` (retry for a few seconds if the container
 //      is still starting), then `uvicorn main:app --port 8000`
-//   2) In frontend/: npm run test:e2e
+//   3) In frontend/: VITE_API_BASE_URL=http://localhost:8000/api npm run test:e2e
 
 export default defineConfig({
   testDir: './e2e',
