@@ -527,8 +527,8 @@ one stream pump shared by chat and the check follow-ups.
   #423 (no behaviour change); #441 moves their writes to `active_session`
   together with the read-only profile page.
 
-  **Amended 2026-10-01 (B7):** `_to_response` is #468 (rename only, no
-  behaviour change).
+  **Amended 2026-10-01 (B7):** `_to_response` is #468 (rename, and the
+  session helper reads the profile off its row; no behaviour change).
 
 ## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
 
