@@ -1,27 +1,13 @@
 """TDD: sessions.quiz_cooldown_json column + cooldown helpers."""
 
-from sqlalchemy import create_engine, inspect
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy import inspect
 
-from db.database import Base
 from db.models import Session as SessionModel
 from db.models import User
 
 
-def _make_session():
-    engine = create_engine(
-        "sqlite://",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
-    Base.metadata.create_all(engine)
-    return sessionmaker(bind=engine)()
-
-
-def test_session_has_quiz_cooldown_column():
-    db = _make_session()
-    cols = {c["name"] for c in inspect(db.get_bind()).get_columns("sessions")}
+def test_session_has_quiz_cooldown_column(db_session):
+    cols = {c["name"] for c in inspect(db_session.get_bind()).get_columns("sessions")}
     assert "quiz_cooldown_json" in cols
 
 
@@ -81,8 +67,8 @@ def test_build_quiz_cooldown_set_on_skip():
     assert cd["last_score"] == "1/1"  # graded excludes skips
 
 
-def test_set_get_clear_quiz_cooldown_roundtrip():
-    db = _make_session()
+def test_set_get_clear_quiz_cooldown_roundtrip(db_session):
+    db = db_session
     _seed_session(db)
     assert cqs.get_quiz_cooldown(db, "s1") is None
     cqs.set_quiz_cooldown(db, "s1", {"gap": "g", "last_score": "0/1", "missed": ["q0"]})
@@ -114,8 +100,8 @@ def _one_item_args(sid="s1"):
     )
 
 
-def test_register_blocked_when_suppress_check():
-    db = _make_session()
+def test_register_blocked_when_suppress_check(db_session):
+    db = db_session
     _seed_session(db)
     ctx = ToolContext(
         db=db,
@@ -129,8 +115,8 @@ def test_register_blocked_when_suppress_check():
     assert cqs.get_pending_check(db, "s1") is None  # no batch opened
 
 
-def test_register_allowed_when_not_suppressed():
-    db = _make_session()
+def test_register_allowed_when_not_suppressed(db_session):
+    db = db_session
     _seed_session(db)
     ctx = ToolContext(
         db=db,

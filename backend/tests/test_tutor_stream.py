@@ -304,8 +304,13 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
 
     from agent import tutor
 
+    # Set once the consumer has taken the first chunk and asked for more: the
+    # stream is parked mid-flight, which is the state the cancel must hit.
+    mid_stream = asyncio.Event()
+
     async def _slow_stream():
         yield _content_chunk("partial ")
+        mid_stream.set()
         await asyncio.sleep(10)
 
     monkeypatch.setattr(
@@ -322,7 +327,7 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(mid_stream.wait(), timeout=5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -440,8 +445,13 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
     estimate_spy = MagicMock(return_value=Decimal("0.01"))
     monkeypatch.setattr("agent.tutor.cost_meter.estimate_cancelled_cost", estimate_spy)
 
+    # Set once the consumer has taken the first chunk and asked for more: the
+    # stream is parked mid-flight, which is the state the cancel must hit.
+    mid_stream = asyncio.Event()
+
     async def _slow_stream():
         yield _content_chunk("partial ")
+        mid_stream.set()
         await asyncio.sleep(10)
 
     monkeypatch.setattr(
@@ -458,7 +468,7 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(mid_stream.wait(), timeout=5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
@@ -952,8 +962,13 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
         ),
     )
 
+    # Set once the consumer has taken the first chunk and asked for more: the
+    # stream is parked mid-flight, which is the state the cancel must hit.
+    mid_stream = asyncio.Event()
+
     async def _slow_stream():
         yield _content_chunk("partial ")
+        mid_stream.set()
         await asyncio.sleep(10)
 
     turns = [turn1, turn2, _slow_stream()]
@@ -999,7 +1014,7 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
+    await asyncio.wait_for(mid_stream.wait(), timeout=5)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task
