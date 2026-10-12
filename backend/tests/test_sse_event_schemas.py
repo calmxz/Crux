@@ -56,11 +56,25 @@ def test_done_no_longer_lists_total_cost_usd():
         validate_event("done", {"message_id": "m", "total_cost_usd": "0.1"})
 
 
-def test_check_question_allows_null_set_position():
-    validate_event(
-        "check_question",
-        {"gap": "g", "total": 0, "items": [], "set_index": None, "set_total": None},
-    )
+def test_check_question_requires_set_position():
+    # The only producer (check_question_service.register) always sends 1..3.
+    base = {"gap": "g", "total": 0, "items": [], "set_index": 1, "set_total": 3}
+    validate_event("check_question", base)
+    for field in ("set_index", "set_total"):
+        with pytest.raises(SseContractError, match=field):
+            validate_event("check_question", {k: v for k, v in base.items() if k != field})
+        with pytest.raises(SseContractError, match=field):
+            validate_event("check_question", {**base, field: None})
+        with pytest.raises(SseContractError, match=field):
+            validate_event("check_question", {**base, field: 4})
+
+
+def test_citation_requires_text():
+    validate_event("citations", [{"doc_id": "d", "text": "t"}])
+    with pytest.raises(SseContractError, match="text"):
+        validate_event("citations", [{"doc_id": "d"}])
+    with pytest.raises(SseContractError, match="text"):
+        validate_event("citations", [{"doc_id": "d", "text": None}])
 
 
 def test_tool_call_done_rejects_unlisted_field():

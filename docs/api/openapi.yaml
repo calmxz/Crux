@@ -2202,10 +2202,10 @@ x-sse-events:
       items:
         type: object
         additionalProperties: false
-        required: [doc_id]
+        required: [doc_id, text]
         properties:
           doc_id:   { type: string }
-          text:     { type: [string, "null"], default: null }
+          text:     { type: string }
           page:     { type: [integer, "null"], default: null }
           doc_name: { type: [string, "null"], default: null }
 
@@ -2255,12 +2255,12 @@ x-sse-events:
     data:
       type: object
       additionalProperties: false
-      required: [gap, total, items]
+      required: [gap, total, set_index, set_total, items]
       properties:
         gap:       { type: string }
         total:     { type: integer }
-        set_index: { type: [integer, "null"], description: 1-based set position within the check. }
-        set_total: { type: [integer, "null"], description: Sets in the check. }
+        set_index: { type: integer, minimum: 1, maximum: 3, description: 1-based set position within the check. }
+        set_total: { type: integer, minimum: 1, maximum: 3, description: Sets in the check. }
         items:
           type: array
           items:
