@@ -40,6 +40,11 @@ test.describe('chat stream', () => {
   test('Stop button cancels mid-stream and shows the (stopped) marker', async ({ page }) => {
     await openFreshSession(page, 'Operating systems')
 
+    // The stub LLM emits its whole reply at once, so on a fast runner the
+    // stream ends before Stop can be clicked. Hold the request open until the
+    // client aborts it: a handler that never answers keeps the turn mid-stream.
+    await page.route('**/api/chat/stream', () => {})
+
     await page.getByTestId('session-input').fill('Write a long essay on operating systems history')
     await page.getByTestId('session-send').click()
 
