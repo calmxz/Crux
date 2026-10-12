@@ -16,6 +16,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+import db.models  # noqa: F401 -- registers every model on Base.metadata for db_session
 import main as main_module
 from db.database import Base, get_db
 from main import app

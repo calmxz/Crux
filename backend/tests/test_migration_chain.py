@@ -89,12 +89,6 @@ def test_chat_messages_sid_id_desc_index_declared_on_model():
     assert "ix_chat_messages_sid_id_desc" in names
 
 
-# The CHECK-constraint tests below run against db_session's engine:
-# model-derived schema on in-memory SQLite, the only way to exercise the
-# constraints without a live Postgres (the alembic chain itself is
-# Postgres-only from 0003 on).
-
-
 # C-16: the five tables 0001_phase7_baseline created with a nullable,
 # defaultless created_at. chunk_embeddings and llm_call_log are out of scope.
 CREATED_AT_TABLES = ("users", "sessions", "learning_events", "documents", "chat_messages")
@@ -132,6 +126,10 @@ def test_chat_messages_role_check_declared_on_model():
     assert "chat_messages_role_check" in checks
 
 
+# The created_at and CHECK-constraint tests below run against db_session's engine:
+# model-derived schema on in-memory SQLite, the only way to exercise the
+# constraints without a live Postgres (the alembic chain itself is
+# Postgres-only from 0003 on).
 @pytest.mark.parametrize("table", CREATED_AT_TABLES)
 def test_created_at_is_not_null_with_server_default(table, db_session):
     """C-16: a row written outside the ORM must still get a timestamp."""
