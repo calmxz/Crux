@@ -68,9 +68,7 @@ describe('ChatEmptyState', () => {
 
     it('renders "No transcript stored for this session." line', () => {
       const wrapper = mount(ChatEmptyState, { props: { archived: true } })
-      expect(wrapper.find('.empty-line').text()).toBe(
-        'No transcript stored for this session.',
-      )
+      expect(wrapper.find('.empty-line').text()).toBe('No transcript stored for this session.')
     })
 
     it('root element has class "archived-empty"', () => {

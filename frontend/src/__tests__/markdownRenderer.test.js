@@ -14,7 +14,9 @@ describe('markdownRenderer link rel', () => {
     const html = renderMarkdown('see https://example.com for more')
     const anchor = html.match(/<a\b[^>]*>/)
     expect(anchor).not.toBeNull()
-    expect(anchor[0]).toMatch(/rel="[^"]*noopener[^"]*nofollow[^"]*"|rel="[^"]*nofollow[^"]*noopener[^"]*"/)
+    expect(anchor[0]).toMatch(
+      /rel="[^"]*noopener[^"]*nofollow[^"]*"|rel="[^"]*nofollow[^"]*noopener[^"]*"/,
+    )
   })
 
   it('emits rel tokens without duplicates (merge dedups)', () => {

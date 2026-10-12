@@ -68,7 +68,6 @@ export function useSidebar() {
     drawerOpen.value = false
   }
 
-
   onMounted(() => {
     if (typeof window === 'undefined') return
 
