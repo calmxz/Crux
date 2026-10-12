@@ -78,12 +78,13 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-def _to_response(db: Session, row: SessionModel) -> SessionResponse:
+def _session_response(db: Session, row: SessionModel) -> SessionResponse:
+    """Build the SessionResponse for one row; the profile is read off the row."""
     return SessionResponse(
         id=row.id,
         user_id=row.user_id,
         topic=row.topic,
-        topic_profile=profile_service.load_profile(db, row.id),
+        topic_profile=profile_service.profile_from_row(row),
         created_at=_aware_utc(row.created_at),
         ended_at=_aware_utc(row.ended_at),
         ingestion_status=documents_service.session_ingestion_status(db, row.id),
@@ -256,7 +257,7 @@ def _create_session_finish(
             detail={"code": DUPLICATE_TOPIC, "session_id": existing},
         ) from e
     db.refresh(new_session)
-    return _to_response(db, new_session)
+    return _session_response(db, new_session)
 
 
 @router.get("/sessions", response_model=list[SessionListItem])
@@ -658,7 +659,7 @@ def reopen_session(
                 detail={"code": DUPLICATE_TOPIC, "session_id": existing},
             ) from e
         db.refresh(row)
-    return _to_response(db, row)
+    return _session_response(db, row)
 
 
 @router.get("/sessions/{session_id}/ingestion", response_model=SessionIngestionStatus)
@@ -734,7 +735,7 @@ def update_session(
             detail={"code": DUPLICATE_TOPIC, "session_id": existing},
         ) from e
     db.refresh(row)
-    return _to_response(db, row)
+    return _session_response(db, row)
 
 
 @router.post("/sessions/{session_id}/check/skip", response_model=CheckSkipResponse)
