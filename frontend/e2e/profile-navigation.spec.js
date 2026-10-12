@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test'
 
 // TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Spec assumes
-// pre-auth flow (no /login gate) and SQLite backend; both removed in Phase 7.
-// Restore once auth session seeding helper + Postgres service in e2e.yml land.
+// pre-auth flow (no /login gate), removed in Phase 7. e2e.yml runs on Postgres
+// since #434; restore once an auth session seeding helper lands.
 test.describe.skip('profile navigation', () => {
   test.beforeEach(async ({ context }) => {
     await context.clearCookies()

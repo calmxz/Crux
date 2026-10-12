@@ -2,8 +2,8 @@ import { test, expect } from '@playwright/test'
 
 // TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Like the other
 // specs in this folder, this one assumes the pre-auth flow (no /login gate) and a
-// seeded session; both need the auth-session seeding helper + Postgres service in
-// e2e.yml. Un-skip once that lands.
+// seeded session, which needs an auth-session seeding helper (e2e.yml runs on
+// Postgres since #434). Un-skip once that lands.
 //
 // Also assumes the backend runs with LLM_STUB=1 so /chat/stream emits
 // deterministic chunked deltas.
