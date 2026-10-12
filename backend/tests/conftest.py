@@ -56,6 +56,7 @@ def _no_ingest_thread(monkeypatch):
 
 _TESTS_DIR = os.path.normcase(os.path.dirname(os.path.abspath(__file__))) + os.sep
 _sse_seen_key = pytest.StashKey[set[str]]()
+_sse_deselected_key = pytest.StashKey[bool]()
 
 
 def pytest_configure(config):
@@ -70,7 +71,8 @@ def pytest_configure(config):
 def _validate_stream_events(request, monkeypatch):
     marker = request.node.get_closest_marker("sse_unchecked")
     if marker is not None:
-        if not marker.args or not marker.args[0]:
+        reason = marker.args[0] if marker.args else marker.kwargs.get("reason")
+        if not reason:
             pytest.fail("@pytest.mark.sse_unchecked needs a reason")
         yield
         return
@@ -86,11 +88,6 @@ def _validate_stream_events(request, monkeypatch):
 
     def checked_init(self, *args, **kwargs):
         orig_init(self, *args, **kwargs)
-        # Frame 1 is the StreamEvent(...) call site; test fakes do not count
-        # toward coverage.
-        caller = os.path.normcase(sys._getframe(1).f_code.co_filename)
-        if not caller.startswith(_TESTS_DIR):
-            seen.add(self.type)
         try:
             validate_event(self.type, self.data)
         except SseContractError as e:
@@ -98,6 +95,11 @@ def _validate_stream_events(request, monkeypatch):
             # exception into an `error` event, which would hide the violation.
             violations.append(str(e))
             raise
+        # Frame 1 is the StreamEvent(...) call site; test fakes and off-spec
+        # events do not count toward coverage.
+        caller = os.path.normcase(sys._getframe(1).f_code.co_filename)
+        if not caller.startswith(_TESTS_DIR):
+            seen.add(self.type)
 
     monkeypatch.setattr(StreamEvent, "__init__", checked_init)
     yield
@@ -113,17 +115,28 @@ def _is_whole_suite_run(config) -> bool:
         config.args_source == pytest.Config.ArgsSource.INVOCATION_DIR
         and os.path.normcase(str(config.invocation_params.dir)) + os.sep == _TESTS_DIR
     )
+    # -k, -m, --lf, --sw and --deselect all narrow the run by deselecting;
+    # --ignore narrows it at collection.
     return (
         no_paths
         and not config.getoption("keyword")
         and not config.getoption("markexpr")
-        and not config.getoption("lf", False)
-        and not config.getoption("deselect", None)
+        and not config.getoption("collectonly")
+        and not config.getoption("ignore")
+        and not config.getoption("ignore_glob")
+        and not config.stash.get(_sse_deselected_key, False)
     )
 
 
+def pytest_deselected(items):
+    if items:
+        items[0].config.stash[_sse_deselected_key] = True
+
+
 def pytest_sessionfinish(session, exitstatus):
-    if exitstatus not in (pytest.ExitCode.OK, pytest.ExitCode.TESTS_FAILED):
+    # Only a clean run is judged: after a failure (or -x) the missing list
+    # would be noise over the real error.
+    if exitstatus != pytest.ExitCode.OK:
         return
     if not _is_whole_suite_run(session.config):
         return

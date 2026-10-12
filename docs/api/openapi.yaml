@@ -2160,7 +2160,8 @@ components:
 
 # ---------------------------------------------------------------------------
 # SSE event contract reference (vendor extension — not processed by codegen)
-# Describes the Server-Sent Events emitted by POST /chat/stream.
+# Describes the Server-Sent Events emitted by POST /chat/stream and the
+# sessions check/complete and check/stop streams.
 # Backend tests validate every emitted StreamEvent against this block
 # (backend/tests/conftest.py); an unlisted field fails.
 # ---------------------------------------------------------------------------

@@ -138,9 +138,11 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   closed with `additionalProperties: false`, so a new field goes into the block
   in the same commit as its emitter. Test fakes are validated too; a test that
   must build an off-spec event opts out with `@pytest.mark.sse_unchecked("reason")`.
-  A whole-suite run (no paths, `-k`, `-m`, `--lf`, `--deselect`) also fails if
-  any type in the block was never built by non-test code, so a new event type
-  needs a test that reaches its real emitter.
+  A clean whole-suite run also fails if any type in the block was never built,
+  on-spec, by non-test code, so a new event type needs a test that reaches its
+  real emitter. Runs that are narrowed (paths, `-k`, `-m`, `--ignore`, or
+  anything that deselects, such as `--lf` or `--sw`), collect-only, or already
+  failing skip this check.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
