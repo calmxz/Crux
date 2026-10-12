@@ -111,9 +111,8 @@ def _record_partial_cost(ctx, snapshots: list[list[dict]], text: str, purpose: s
             prompt_tokens_total += litellm.token_counter(model=settings.model, messages=snapshot)
         except Exception as e:
             # Local tokenization only; no credential in the exception.
-            log.warning(
-                "token_counter failed: %s", e
-            )  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+            log.warning("token_counter failed: %s", e)
     try:
         cost = cost_meter.estimate_cancelled_cost(settings.model, text, prompt_tokens_total)
     except Exception as e:
@@ -287,9 +286,8 @@ async def run_streaming(
                     cost = cost_meter.estimate_cancelled_cost(settings.model, content_buf, pt)
                 except Exception as e2:  # noqa: BLE001
                     # Local tokenization/cost-estimation only; no credential in the exception.
-                    log.warning(
-                        "stream cost token-math fallback failed: %s", e2
-                    )  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+                    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+                    log.warning("stream cost token-math fallback failed: %s", e2)
                     cost = 0.0
             if cost > 0:
                 try:

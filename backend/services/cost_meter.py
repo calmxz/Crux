@@ -381,9 +381,8 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
         return Decimal(tokens) * rates["input_per_1k"] / Decimal(1000)
     except Exception as e:  # noqa: BLE001
         # Local tokenization/cost-estimation only; no credential in the exception.
-        log.warning(
-            "embedding token-math fallback failed: %s", e
-        )  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+        # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+        log.warning("embedding token-math fallback failed: %s", e)
         return Decimal("0")
 
 
