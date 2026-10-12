@@ -21,7 +21,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api")
 
 
-def _to_response(user) -> MeResponse:
+def _me_response(user: User) -> MeResponse:
+    """Build the MeResponse from the users row, defaulting unset preferences."""
     return MeResponse(
         display_name=user.display_name,
         # NULL = never set on the server; the effective preference is the
@@ -47,7 +48,7 @@ def get_me(
             db, user_id, accepted_terms=accepted_terms_from_request(request)
         )
         db.commit()
-    return _to_response(user)
+    return _me_response(user)
 
 
 @router.patch("/me", response_model=MeResponse)
@@ -84,7 +85,7 @@ def patch_me(
         user.onboarding_complete = req.onboarding_complete
     db.commit()
     db.refresh(user)
-    return _to_response(user)
+    return _me_response(user)
 
 
 @router.get("/me/export", response_model=DataExport)
