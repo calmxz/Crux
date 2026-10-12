@@ -1,22 +1,13 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Like the other
-// specs in this folder, this one assumes the pre-auth flow (no /login gate) and a
-// seeded session, which needs an auth-session seeding helper (e2e.yml runs on
-// Postgres since #434). Un-skip once that lands.
-//
-// Also assumes the backend runs with LLM_STUB=1 so /chat/stream emits
+import { signIn } from './support/auth.js'
+
+// Runs against the real e2e backend with LLM_STUB=1, so /chat/stream emits
 // deterministic chunked deltas.
-test.describe.skip('chat stream', () => {
-  test.beforeEach(async ({ context }) => {
+test.describe('chat stream', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // Ignore SecurityErrors on isolated/about:blank pages.
-      }
-    })
+    await signIn(page)
   })
 
   async function openFreshSession(page, topic) {
@@ -26,11 +17,8 @@ test.describe.skip('chat stream', () => {
     await page.getByTestId('onboarding-submit').click()
 
     await expect(page).toHaveURL(/\/$/)
-    await page.getByTestId('home-new-session').click()
-    await expect(page).toHaveURL(/\/new$/)
-
-    await page.getByTestId('new-topic').fill(topic)
-    await page.getByTestId('new-submit').click()
+    await page.getByTestId('home-quick-topic').fill(topic)
+    await page.getByTestId('home-quick-go').click()
     await expect(page).toHaveURL(/\/session\//)
     await expect(page.getByTestId('session-input')).toBeVisible()
   }
@@ -51,6 +39,11 @@ test.describe.skip('chat stream', () => {
 
   test('Stop button cancels mid-stream and shows the (stopped) marker', async ({ page }) => {
     await openFreshSession(page, 'Operating systems')
+
+    // The stub LLM emits its whole reply at once, so on a fast runner the
+    // stream ends before Stop can be clicked. Hold the request open until the
+    // client aborts it: a handler that never answers keeps the turn mid-stream.
+    await page.route('**/api/chat/stream', () => {})
 
     await page.getByTestId('session-input').fill('Write a long essay on operating systems history')
     await page.getByTestId('session-send').click()

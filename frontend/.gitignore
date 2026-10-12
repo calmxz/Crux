@@ -37,3 +37,6 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# #518 e2e sign-in key pair (generated per run by e2e/support/auth-keys.js)
+e2e/.auth/
