@@ -536,6 +536,20 @@ describe('apiClient', () => {
       expect(fetchMock).toHaveBeenCalledTimes(3)
     })
 
+    // The review queue joins sessions and reads their topic profiles.
+    it.each([
+      ['session', () => apiPost('/sessions/abc/end', {})],
+      ['profile', () => apiDelete('/profile/abc')],
+    ])('a %s write drops the cached review queue', async (_, write) => {
+      fetchMock.mockReturnValueOnce(jsonResp(200, { n: 1 }))
+      await apiGet('/review/queue')
+      fetchMock.mockReturnValueOnce(jsonResp(200, {}))
+      await write()
+      fetchMock.mockReturnValueOnce(jsonResp(200, { n: 2 }))
+      await expect(apiGet('/review/queue')).resolves.toEqual({ n: 2 })
+      expect(fetchMock).toHaveBeenCalledTimes(3)
+    })
+
     it('a write under one root leaves another root cached', async () => {
       fetchMock.mockReturnValueOnce(jsonResp(200, { me: 1 }))
       await apiGet('/me')

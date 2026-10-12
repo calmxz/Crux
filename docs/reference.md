@@ -236,10 +236,11 @@ under the write's **resource root** (first path segment, query stripped) is
 dropped, so `POST /sessions/abc/end` drops `GET /sessions/abc` and also the
 sibling lists `GET /sessions/library` and `GET /sessions?..`, which the
 bidirectional prefix rule alone would have missed. Roots whose GETs read each
-other's data are linked in `LINKED_ROOTS` and drop together: `/sessions` and
-`/profile` (every profile derives from sessions, and `GET /sessions/:id` embeds
-the topic profile; without the link a new session missed the combined profile
-for up to 5 s, #518). A new root derived from another one must be added there.
+other's data are linked in `LINKED_ROOTS`. A write under `/sessions` or
+`/profile` drops both of those roots and `/review`. Every profile derives from
+sessions, `GET /sessions/:id` embeds the topic profile, and the review queue
+joins both. Without the link, a new session was missing from the combined
+profile for up to 5 s (#518). A new root derived from another one must be added there.
 A write under `/sessions` still leaves `/me` or `/documents` entries alone.
 Coarse on purpose: a 5 s cache
 gains nothing from finer rules and a stale list is a visible bug.
@@ -357,7 +358,7 @@ Specs that call the e2e backend sign in with `signIn(page)` from
 `frontend/e2e/support/auth.js`. It stubs GoTrue (`auth/v1/settings|token|user`)
 and signs in through the real `/login` form, but the access token it returns is
 a real RS256 JWT for a fresh random user id. So every test starts on an empty,
-not-yet-onboarded account. `e2e/support/auth-keys.js` writes a throwaway key
+not-yet-onboarded account. `node e2e/support/gen-auth-keys.js` writes a throwaway key
 pair to `frontend/e2e/.auth/` (gitignored). The e2e job serves only `jwks/`
 over `http.server` on 8787 and boots the backend with
 `SUPABASE_URL=http://e2e-auth.invalid` and

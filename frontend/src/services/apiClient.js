@@ -61,11 +61,11 @@ function _isSegmentPrefix(prefix, path) {
 
 // Roots whose GETs read each other's data, so a write under one also drops
 // the other: every profile is derived from sessions (a new session is a new
-// topic on /profile/aggregate), and GET /sessions/:id embeds the session's
-// topic_profile.
+// topic on /profile/aggregate), GET /sessions/:id embeds the session's
+// topic_profile, and the read-only /review queue joins both.
 const LINKED_ROOTS = {
-  '/sessions': ['/profile'],
-  '/profile': ['/sessions'],
+  '/sessions': ['/profile', '/review'],
+  '/profile': ['/sessions', '/review'],
 }
 
 // Any write drops cached GETs on the same resource, in both directions:

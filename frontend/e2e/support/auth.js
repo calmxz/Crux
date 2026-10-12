@@ -5,19 +5,21 @@
 // backend verifies it against the JWKS the e2e job serves and every /api call
 // runs authenticated against Postgres.
 import { createSign, randomUUID } from 'node:crypto'
-import { readFileSync } from 'node:fs'
 import { expect } from '@playwright/test'
 
-import { ISSUER_ORIGIN, KID, PRIVATE_KEY_PATH } from './auth-keys.js'
+import { ISSUER_ORIGIN, readSigningKey } from './auth-keys.js'
+
+const API_BASE_URL = process.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
 
 const b64url = (value) => Buffer.from(value).toString('base64url')
 
 function signAccessToken(claims) {
-  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid: KID }))
+  const { kid, privateKey } = readSigningKey()
+  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT', kid }))
   const payload = b64url(JSON.stringify(claims))
   const signer = createSign('RSA-SHA256')
   signer.update(`${header}.${payload}`)
-  const signature = signer.sign(readFileSync(PRIVATE_KEY_PATH)).toString('base64url')
+  const signature = signer.sign(privateKey).toString('base64url')
 
   return `${header}.${payload}.${signature}`
 }
@@ -51,6 +53,20 @@ export async function signIn(page) {
     iat: now,
     exp: now + 3600,
   })
+
+  // Fail here, by name, if the backend rejects the token (stale key, issuer
+  // mismatch, JWKS not served). Otherwise the stubbed login still succeeds and
+  // the spec times out later on an unrelated locator.
+  const me = await page.request.get(`${API_BASE_URL}/me`, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  })
+
+  if (!me.ok()) {
+    throw new Error(
+      `e2e backend rejected the signIn token: ${me.status()} ${await me.text()}. ` +
+        'Check the served JWKS and that SUPABASE_URL matches ISSUER_ORIGIN.',
+    )
+  }
 
   const user = {
     id: userId,

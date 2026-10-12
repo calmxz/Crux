@@ -39,4 +39,25 @@ test.describe('profile navigation', () => {
     await expect(page.getByTestId('sprof-mastered')).toBeVisible()
     await expect(page.getByTestId('sprof-gaps')).toBeVisible()
   })
+
+  // #518: the session write must drop the combined profile cached on the
+  // first visit (5s GET cache), or the new topic is missing from it.
+  test('a session started just after viewing the profile shows on it', async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('onboarding-name').fill('Eddy')
+    await page.getByTestId('onboarding-submit').click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByTestId('sidebar-profile').first().click()
+    await expect(page.getByTestId('aprof-empty')).toBeVisible()
+    await page.goBack()
+
+    await page.getByTestId('home-quick-topic').fill('Recursion')
+    await page.getByTestId('home-quick-go').click()
+    await expect(page).toHaveURL(/\/session\//)
+
+    await page.getByTestId('sidebar-profile').first().click()
+    await expect(page.getByTestId('aprof-topic-card')).toHaveCount(1)
+    await expect(page.getByTestId('aprof-empty')).toHaveCount(0)
+  })
 })

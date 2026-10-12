@@ -11,7 +11,7 @@ import { defineConfig, devices } from '@playwright/test'
 //   0) docker run -d --rm --name crux-e2e -p 55432:5432 -e POSTGRES_USER=crux \
 //        -e POSTGRES_PASSWORD=crux -e POSTGRES_DB=crux_e2e pgvector/pgvector:pg17
 //      (port 55432 avoids a native Postgres on 5432)
-//   1) In frontend/: `node e2e/support/auth-keys.js`, then serve the JWKS:
+//   1) In frontend/: `node e2e/support/gen-auth-keys.js`, then serve the JWKS:
 //        python -m http.server 8787 --bind 127.0.0.1 --directory e2e/.auth/jwks
 //      Specs sign in with e2e/support/auth.js, whose tokens the backend
 //      verifies against this JWKS (#518).

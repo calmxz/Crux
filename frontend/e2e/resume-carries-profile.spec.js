@@ -23,8 +23,8 @@ test.describe('resume carries profile', () => {
     await page.getByTestId('home-quick-go').click()
     await expect(page).toHaveURL(/\/session\//)
 
-    // Capture session id from the URL so we can target the sidebar row and
-    // the library's Continue-topic button for it later.
+    // Capture session id from the URL so we can await its end request and
+    // target the library's Continue-topic button for it later.
     const sessionId = page.url().split('/session/')[1].split(/[?#]/)[0]
 
     await page.getByTestId('session-input').fill('teach me base cases')
