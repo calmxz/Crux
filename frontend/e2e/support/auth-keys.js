@@ -24,9 +24,9 @@ export const PRIVATE_KEY_PATH = join(AUTH_DIR, 'private.pem')
 
 export const KID = 'crux-e2e'
 
-// Must equal the backend's SUPABASE_URL: the token's `iss` is this plus
-// /auth/v1. Override both together with E2E_SUPABASE_URL if needed.
-export const ISSUER_ORIGIN = process.env.E2E_SUPABASE_URL || 'http://e2e-auth.invalid'
+// Must equal the backend's SUPABASE_URL (e2e.yml): the token's `iss` is this
+// plus /auth/v1.
+export const ISSUER_ORIGIN = 'http://e2e-auth.invalid'
 
 function writeKeys() {
   const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 })

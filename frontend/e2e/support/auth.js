@@ -45,7 +45,7 @@ export async function signIn(page) {
     sub: userId,
     aud: 'authenticated',
     role: 'authenticated',
-    iss: `${ISSUER_ORIGIN.replace(/\/+$/, '')}/auth/v1`,
+    iss: `${ISSUER_ORIGIN}/auth/v1`,
     email,
     user_metadata: userMetadata,
     iat: now,

@@ -235,8 +235,13 @@ Invalidation after any non-GET settles (success or failure): every cached GET
 under the write's **resource root** (first path segment, query stripped) is
 dropped, so `POST /sessions/abc/end` drops `GET /sessions/abc` and also the
 sibling lists `GET /sessions/library` and `GET /sessions?..`, which the
-bidirectional prefix rule alone would have missed. A write under `/sessions`
-leaves `/me` or `/documents` entries alone. Coarse on purpose: a 5 s cache
+bidirectional prefix rule alone would have missed. Roots whose GETs read each
+other's data are linked in `LINKED_ROOTS` and drop together: `/sessions` and
+`/profile` (every profile derives from sessions, and `GET /sessions/:id` embeds
+the topic profile; without the link a new session missed the combined profile
+for up to 5 s, #518). A new root derived from another one must be added there.
+A write under `/sessions` still leaves `/me` or `/documents` entries alone.
+Coarse on purpose: a 5 s cache
 gains nothing from finer rules and a stale list is a visible bug.
 Two writers bypass `request()` and call the exported `invalidateGetCache(path)`
 themselves once they settle, success or failure: `chatStreamService`
@@ -345,6 +350,28 @@ previous account's data into the next one's store. Streams use the separate
 `ABANDONED` sentinel on `_streamSid` instead (`_streamSuperseded()`).
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
+
+### E2E sign-in against the real backend (#518)
+
+Specs that call the e2e backend sign in with `signIn(page)` from
+`frontend/e2e/support/auth.js`. It stubs GoTrue (`auth/v1/settings|token|user`)
+and signs in through the real `/login` form, but the access token it returns is
+a real RS256 JWT for a fresh random user id. So every test starts on an empty,
+not-yet-onboarded account. `e2e/support/auth-keys.js` writes a throwaway key
+pair to `frontend/e2e/.auth/` (gitignored). The e2e job serves only `jwks/`
+over `http.server` on 8787 and boots the backend with
+`SUPABASE_URL=http://e2e-auth.invalid` and
+`SUPABASE_JWKS_URL_OVERRIDE=http://127.0.0.1:8787/jwks.json`. The backend has
+no test branch: it verifies through the normal JWKS path, and
+`backend/tests/test_auth_served_jwks.py` pins that a foreign key is still a 401.
+Gotchas:
+- `ISSUER_ORIGIN` in `auth-keys.js` must equal the job's `SUPABASE_URL`.
+- Never pair `signIn` with an `addInitScript` storage wipe. It re-runs on every
+  navigation and drops the supabase-js session.
+- `VITE_SUPABASE_URL` stays unset in CI, so the client uses its placeholder
+  host, which the `**/auth/v1/**` routes still match.
+
+Local run steps are in the `playwright.config.js` header.
 
 ### Favicon generation
 

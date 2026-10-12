@@ -4,7 +4,7 @@ import { apiDelete, apiGet, apiPatch } from './apiClient.js'
 // prefix. user_id is resolved from the Authorization header server-side.
 // fresh: true -- the response carries the etag that patchProfile/
 // deleteProfileItem send back as If-Match. Our own writes invalidate the F-18
-// GET cache by path prefix, but the tutor agent writes this profile server-side
+// GET cache (by resource root, /sessions and /profile linked), but the tutor agent writes this profile server-side
 // during a turn (update_topic_profile); a cached read taken within the 5s TTL
 // of a pre-turn read would hand the next write a stale etag and 412 it.
 export const getSessionProfile = (sessionId) =>
