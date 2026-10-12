@@ -5,7 +5,12 @@
 // `globalThis.__supabaseAuthStub` and calling .mockResolvedValueOnce(...)
 // on individual stub methods.
 
+import { ReadableStream } from 'node:stream/web'
 import { vi, beforeEach } from 'vitest'
+
+// The vmThreads pool runs each file in a vm context that does not inherit
+// Node's web-stream globals, and jsdom provides none. SSE tests need it.
+globalThis.ReadableStream ??= ReadableStream
 
 const authStub = {
   getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
