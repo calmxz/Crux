@@ -5,11 +5,14 @@ import { defineConfig, devices } from '@playwright/test'
 // The frontend dev server is managed by Playwright via webServer below.
 //
 // The backend must run on Postgres + pgvector, as CI does: SQLite cannot run
-// pgvector's `<=>` vector search. Point DATABASE_URL at a pgvector database
-// migrated with `alembic upgrade head` (e.g. docker run pgvector/pgvector:pg17).
+// pgvector's `<=>` vector search.
 //
 // Local run:
-//   1) cd backend && LLM_STUB=1 AUTH_OPTIONAL=true \
+//   0) docker run -d --rm --name crux-e2e -p 5432:5432 -e POSTGRES_USER=crux \
+//        -e POSTGRES_PASSWORD=crux -e POSTGRES_DB=crux_e2e pgvector/pgvector:pg17
+//      cd backend && CRUX_SKIP_DOTENV=1 \
+//        DATABASE_URL=postgresql://crux:crux@localhost:5432/crux_e2e alembic upgrade head
+//   1) cd backend && LLM_STUB=1 AUTH_OPTIONAL=true CRUX_SKIP_DOTENV=1 \
 //        DATABASE_URL=postgresql://crux:crux@localhost:5432/crux_e2e \
 //        uvicorn main:app --port 8000
 //      (PowerShell: set each with $env:NAME='value', then uvicorn main:app --port 8000)
