@@ -1,9 +1,10 @@
 name: E2E
 
 on:
-  # No paths filter: this job is a required branch-protection check, and a
-  # PR filtered out by paths would never trigger it, leaving the check stuck
-  # at "Expected - Waiting for status" forever.
+  # No paths filter, so e2e runs on every PR. It is advisory: not a required
+  # branch-protection check on dev or main (docs/decisions.md). If it is ever
+  # made required, keep it unfiltered: a PR skipped by a paths filter would
+  # leave the check stuck at "Expected - Waiting for status" forever.
   pull_request:
   push:
     branches: [main, dev]
@@ -17,7 +18,6 @@ jobs:
   playwright:
     name: Playwright (chromium)
     runs-on: ubuntu-latest
-    # Blocking since 2026-09-02 (Phase 6 complete; 16/16 green PR runs).
     timeout-minutes: 12
     # Same database as production, and the same service ci.yml runs for its
     # Postgres-only tests: SQLite cannot run pgvector's `<=>` operator, and its
