@@ -747,7 +747,8 @@ async def test_run_streaming_ask_check_question_dispatches_sibling_first(db_sess
     dispatch = MagicMock(
         return_value=ToolResult(
             ok=True, status="ok", error=None,
-            data={"gap": "x", "total": 1, "items": [{"question": "What is x?", "options": ["yes", "no"]}]},
+            data={"gap": "x", "total": 1, "set_index": 1, "set_total": 1,
+                  "items": [{"question": "What is x?", "options": ["yes", "no"]}]},
         )
     )
     monkeypatch.setattr("agent.tutor.tools.dispatch", dispatch)

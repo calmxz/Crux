@@ -3,6 +3,18 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
+
+#463 asked for `check_question.set_index` / `set_total` to become nullable,
+because the tutor reads them with `data.get`. We made them required integers
+1..3 instead, and made `citations[].text` a required string (it was optional
+and nullable). The only producers always send these: `AskCheckQuestionsArgs`
+requires both set fields (1..3) and the `Citation` model requires `text`. A
+spec looser than the emitter lets a regression that drops the field pass the
+suite; a strict one fails it before merge. Nothing on the wire changes. The
+frontend keeps its `?? null` on set fields, which reloaded pre-set batches
+(`CheckBatch`, a different schema) still need.
+
 ## 2026-10-03 - Anti-slop Oxlint plugin adopted, partly (#470)
 
 Vendored dmmulroy/anti-slop into `frontend/.oxlint/anti-slop/` (the

@@ -105,7 +105,8 @@ def _make_fake_run_streaming_asking():
         data = result.data or {}
         yield StreamEvent(
             "check_question",
-            {"gap": data.get("gap"), "items": data.get("items", []), "total": data.get("total", 0)},
+            {"gap": data.get("gap"), "items": data.get("items", []), "total": data.get("total", 0),
+             "set_index": data.get("set_index"), "set_total": data.get("set_total")},
         )
         yield StreamEvent("done", {"message_id": str(msg.id)})
 

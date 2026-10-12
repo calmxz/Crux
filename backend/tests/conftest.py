@@ -49,6 +49,112 @@ def _no_ingest_thread(monkeypatch):
     monkeypatch.setattr(settings, "ingest_in_process", False)
 
 
+# --- SSE contract (#463) ---------------------------------------------------
+# Every StreamEvent built in the suite is validated against the x-sse-events
+# block of docs/api/openapi.yaml. Types built by non-test code are recorded;
+# a whole-suite run fails if any of the block's types was never emitted.
+
+_TESTS_DIR = os.path.normcase(os.path.dirname(os.path.abspath(__file__))) + os.sep
+_sse_seen_key = pytest.StashKey[set[str]]()
+_sse_deselected_key = pytest.StashKey[bool]()
+
+
+def pytest_configure(config):
+    config.addinivalue_line(
+        "markers",
+        "sse_unchecked(reason): skip x-sse-events validation of StreamEvents in this test",
+    )
+    config.stash[_sse_seen_key] = set()
+
+
+@pytest.fixture(autouse=True)
+def _validate_stream_events(request, monkeypatch):
+    marker = request.node.get_closest_marker("sse_unchecked")
+    if marker is not None:
+        reason = marker.args[0] if marker.args else marker.kwargs.get("reason")
+        if not reason:
+            pytest.fail("@pytest.mark.sse_unchecked needs a reason")
+        yield
+        return
+
+    import sys
+
+    from agent.stream_events import StreamEvent
+    from tests.sse_contract import SseContractError, validate_event
+
+    seen = request.config.stash[_sse_seen_key]
+    violations: list[str] = []
+    orig_init = StreamEvent.__init__
+
+    def checked_init(self, *args, **kwargs):
+        orig_init(self, *args, **kwargs)
+        try:
+            validate_event(self.type, self.data)
+        except SseContractError as e:
+            # Recorded as well as raised: tutor.run_streaming turns any
+            # exception into an `error` event, which would hide the violation.
+            violations.append(str(e))
+            raise
+        # Frame 1 is the StreamEvent(...) call site; test fakes and off-spec
+        # events do not count toward coverage.
+        caller = os.path.normcase(sys._getframe(1).f_code.co_filename)
+        if not caller.startswith(_TESTS_DIR):
+            seen.add(self.type)
+
+    monkeypatch.setattr(StreamEvent, "__init__", checked_init)
+    yield
+    if violations:
+        pytest.fail("\n".join(violations), pytrace=False)
+
+
+def _is_whole_suite_run(config) -> bool:
+    # No path was given on the command line: args_source is TESTPATHS from
+    # backend/, INVOCATION_DIR from backend/tests/. (config.args is never
+    # empty: pyproject sets testpaths.)
+    no_paths = config.args_source == pytest.Config.ArgsSource.TESTPATHS or (
+        config.args_source == pytest.Config.ArgsSource.INVOCATION_DIR
+        and os.path.normcase(str(config.invocation_params.dir)) + os.sep == _TESTS_DIR
+    )
+    # -k, -m, --lf, --sw and --deselect all narrow the run by deselecting;
+    # --ignore narrows it at collection.
+    return (
+        no_paths
+        and not config.getoption("keyword")
+        and not config.getoption("markexpr")
+        and not config.getoption("collectonly")
+        and not config.getoption("ignore")
+        and not config.getoption("ignore_glob")
+        and not config.stash.get(_sse_deselected_key, False)
+    )
+
+
+def pytest_deselected(items):
+    if items:
+        items[0].config.stash[_sse_deselected_key] = True
+
+
+def pytest_sessionfinish(session, exitstatus):
+    # Only a clean run is judged: after a failure (or -x) the missing list
+    # would be noise over the real error.
+    if exitstatus != pytest.ExitCode.OK:
+        return
+    if not _is_whole_suite_run(session.config):
+        return
+    from tests.sse_contract import sse_event_schemas
+
+    missing = sorted(set(sse_event_schemas()) - session.config.stash[_sse_seen_key])
+    if missing:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is not None:
+            reporter.ensure_newline()
+            reporter.write_sep(
+                "=",
+                "SSE event types never emitted by non-test code: " + ", ".join(missing),
+                red=True,
+            )
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 @pytest.fixture
 def db_session():
     engine = create_engine(

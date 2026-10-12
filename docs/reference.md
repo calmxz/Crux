@@ -132,6 +132,17 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   and the registry in the same commit. `frontend/src/lib/errorCodes.js` holds
   only the codes the frontend handles; `errorCodes.test.js` fails if one is not
   in the spec block.
+- SSE events (#463): an autouse fixture in `backend/tests/conftest.py` validates
+  the `data` of every `StreamEvent` built in the suite against the `x-sse-events`
+  block of `docs/api/openapi.yaml` (jsonschema, Draft 2020-12). Every object is
+  closed with `additionalProperties: false`, so a new field goes into the block
+  in the same commit as its emitter. Test fakes are validated too; a test that
+  must build an off-spec event opts out with `@pytest.mark.sse_unchecked("reason")`.
+  A clean whole-suite run also fails if any type in the block was never built,
+  on-spec, by non-test code, so a new event type needs a test that reaches its
+  real emitter. Runs that are narrowed (paths, `-k`, `-m`, `--ignore`, or
+  anything that deselects, such as `--lf` or `--sw`), collect-only, or already
+  failing skip this check.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
