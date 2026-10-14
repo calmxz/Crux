@@ -108,7 +108,8 @@ const bootError = computed(() =>
 const displayError = computed(() => startError.value || bootError.value)
 
 onMounted(() => {
-  // U-05: boot-path load - failure is handled locally (bootError above), so
+  // U-05: boot-path load - failure is reported inline (bootError above, or
+  // the sidebar's error line while its list is on screen), so
   // a transient backend hiccup must not toast on Home's first mount. Silence
   // comes from { silent: true } on the getSessionLibrary calls inside
   // store.listSessions() (session.js), not from sessionsApi.listSessions.

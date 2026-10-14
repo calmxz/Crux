@@ -111,10 +111,16 @@ export const __test__ = {
   _setExpanded(v) {
     desktopExpanded.value = v
   },
-  // Seeds the state that `mode` reads, one mode at a time.
+  // Seeds the state that `mode` reads, one mode at a time. The window width
+  // moves too, so a resize event re-reads the same layout.
   _setMode(m) {
     const desktop = m === 'expanded' || m === 'collapsed'
     viewport.value = desktop ? BREAKPOINT : BREAKPOINT - 1
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: viewport.value,
+    })
     desktopExpanded.value = m !== 'collapsed'
     drawerOpen.value = m === 'drawer-open'
   },
