@@ -323,6 +323,216 @@ describe('session store', () => {
     })
   })
 
+  describe('#524 row changes made during an in-flight list survive it landing', () => {
+    const row = (over = {}) => ({ id: 's1', topic: 'Old', pinned: false, ended_at: null, ...over })
+
+    // Starts a listSessions() whose two pages stay pending; the returned
+    // function lands them with the given snapshot and awaits the list.
+    function startList(s) {
+      let resolveActive, resolveEnded
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(new Promise((r) => (resolveActive = r)))
+        .mockReturnValueOnce(new Promise((r) => (resolveEnded = r)))
+      const listing = s.listSessions()
+
+      return (active, ended = [], totals = {}) => {
+        resolveActive({ items: active, total: totals.active ?? active.length })
+        resolveEnded({ items: ended, total: totals.ended ?? ended.length })
+
+        return listing
+      }
+    }
+
+    function deferred() {
+      let resolve, reject
+
+      const promise = new Promise((res, rej) => {
+        resolve = res
+        reject = rej
+      })
+
+      return { promise, resolve, reject }
+    }
+
+    const ENDED_AT = '2026-10-14T01:00:00Z'
+
+    it('end: the snapshot showing the row active keeps it ended and moves the totals', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      s.activeTotal = 1
+      const land = startList(s)
+      await s.endSession('s1')
+      await land([row()], [], { active: 1, ended: 0 })
+      expect(s.sessions[0].ended_at).toBe(ENDED_AT)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('end: a snapshot that already shows the row ended keeps its own totals', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      s.activeTotal = 1
+      const land = startList(s)
+      await s.endSession('s1')
+      await land([], [row({ ended_at: '2026-10-14T00:59:00Z' })], { active: 0, ended: 1 })
+      expect(s.sessions[0].ended_at).toBe('2026-10-14T00:59:00Z')
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('reopen: the snapshot showing the row ended keeps it active and moves the totals', async () => {
+      sessionsApi.reopenSession.mockResolvedValueOnce({ ok: true })
+      const s = useSessionStore()
+      s.sessions = [row({ ended_at: ENDED_AT })]
+      s.endedTotal = 1
+      const land = startList(s)
+      await s.reopenSession('s1')
+      await land([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
+      expect(s.sessions[0].ended_at).toBeNull()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(0)
+    })
+
+    it('pin: the snapshot showing the row unpinned keeps it pinned', async () => {
+      sessionsApi.setPinned.mockResolvedValueOnce({})
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      await s.setPinned('s1', true)
+      await land([row()])
+      expect(s.sessions[0].pinned).toBe(true)
+    })
+
+    it('rename: the snapshot showing the old topic keeps the new one', async () => {
+      sessionsApi.renameSession.mockResolvedValueOnce({})
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      await s.renameSession('s1', 'New')
+      await land([row()])
+      expect(s.sessions[0].topic).toBe('New')
+    })
+
+    it('continueTopic: the prior it ended stays ended in the snapshot', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce({ id: 'new', topic: 'Old', ended_at: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      s.activeTotal = 1
+      const land = startList(s)
+      await s.continueTopic(s.sessions[0])
+      await land([row()], [], { active: 1, ended: 0 })
+      expect(s.sessions.find((r) => r.id === 's1').ended_at).toBeTruthy()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('a pin still pending when the list lands shows on the landed row', async () => {
+      const pin = deferred()
+      sessionsApi.setPinned.mockReturnValueOnce(pin.promise)
+      const s = useSessionStore()
+      s.sessions = [row()]
+      // Started before the list: its snapshot may still predate the pin.
+      const pinning = s.setPinned('s1', true)
+      const land = startList(s)
+      await land([row()])
+      expect(s.sessions[0].pinned).toBe(true)
+      pin.resolve({})
+      await pinning
+      expect(s.sessions[0].pinned).toBe(true)
+    })
+
+    it('a pin that fails before the list lands is not re-applied', async () => {
+      sessionsApi.setPinned.mockRejectedValueOnce(new Error('nope'))
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      await expect(s.setPinned('s1', true)).rejects.toThrow('nope')
+      await land([row()])
+      expect(s.sessions[0].pinned).toBe(false)
+    })
+
+    it('a pin that fails after the list lands rolls back the landed row', async () => {
+      const pin = deferred()
+      sessionsApi.setPinned.mockReturnValueOnce(pin.promise)
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      const pinning = s.setPinned('s1', true)
+      await land([row()])
+      expect(s.sessions[0].pinned).toBe(true)
+      pin.reject(new Error('nope'))
+      await expect(pinning).rejects.toThrow('nope')
+      expect(s.sessions[0].pinned).toBe(false)
+    })
+
+    it('a row outside the snapshot needs nothing: no insert, totals stay the snapshot', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      s.activeTotal = 1
+      const land = startList(s)
+      await s.endSession('s1')
+      await land([row({ id: 'other' })], [], { active: 5, ended: 2 })
+      expect(s.sessions.map((r) => r.id)).toEqual(['other'])
+      expect(s.activeTotal).toBe(5)
+      expect(s.endedTotal).toBe(2)
+    })
+
+    it('tracking clears when the list settles: a later list is authoritative', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      await s.endSession('s1')
+      await land([row()])
+      // e.g. reopened elsewhere; the next list must not re-end it
+      const landNext = startList(s)
+      await landNext([row()], [], { active: 1, ended: 0 })
+      expect(s.sessions[0].ended_at).toBeNull()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(0)
+    })
+
+    it('tracking clears when the list fails, too', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(Promise.reject(new Error('network')))
+        .mockResolvedValueOnce({ items: [], total: 0 })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const failing = s.listSessions()
+      await s.endSession('s1')
+      await expect(failing).rejects.toThrow('network')
+      const land = startList(s)
+      await land([row()], [], { active: 1, ended: 0 })
+      expect(s.sessions[0].ended_at).toBeNull()
+      expect(s.activeTotal).toBe(1)
+    })
+
+    it('a pin or end resolving after reset() leaves nothing tracked for the next list', async () => {
+      const pin = deferred()
+      const end = deferred()
+      sessionsApi.setPinned.mockReturnValueOnce(pin.promise)
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.sessions = [row()]
+      startList(s)
+      const pinning = s.setPinned('s1', true)
+      const ending = s.endSession('s1')
+      s.reset()
+      pin.resolve({})
+      end.resolve({ ended_at: ENDED_AT, summary: null })
+      await Promise.all([pinning, ending])
+      const land = startList(s)
+      await land([row()], [], { active: 1, ended: 0 })
+      expect(s.sessions[0]).toMatchObject({ pinned: false, ended_at: null })
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(0)
+    })
+  })
+
   it('endSession moves the total from active to ended unconditionally, even when the session is outside the loaded window', async () => {
     sessionsApi.endSession.mockResolvedValueOnce({ ended_at: '2026-01-01', summary: null })
     const s = useSessionStore()

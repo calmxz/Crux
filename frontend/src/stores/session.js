@@ -124,11 +124,75 @@ export const useSessionStore = defineStore('session', () => {
   // previous account's data into the reset store (F-02 class). What the
   // action returns or rethrows to its caller is unchanged.
   let _resetEpoch = 0
-  // #522: rows _insertCreated added while a listSessions() was in flight. That
-  // list's snapshot may predate them, so it re-applies them when it lands and
-  // then clears this. A create with no list in flight is not tracked: any
-  // later list starts after the create committed and already has it.
-  let _createdDuringList = []
+  // #522 / #524: local window changes a listSessions() snapshot may predate.
+  // Each entry is { apply(rows, counts), settled }; a landing list runs every
+  // entry, in order, over its incoming rows and totals before writing them.
+  // A create, end or reopen is recorded on success only while a list is in
+  // flight (any later list starts after it committed). An optimistic pin or
+  // rename is recorded from its start, because a list started before it
+  // commits can land while it is still pending. Settled entries are dropped
+  // when the in-flight list settles; a failed pin/rename drops its own entry.
+  // reset() clears all of it.
+  let _listReplays = []
+
+  function _untrackReplay(replay) {
+    _listReplays = _listReplays.filter((r) => r !== replay)
+  }
+
+  // An end/reopen observed on success while a list is in flight. Follows the
+  // SHARED TOTALS RULE against the incoming row: a snapshot already in the
+  // target state counted the move itself; one in the prior state did not.
+  function _trackStatusChange(id, endedAt) {
+    if (!_inflight.has('list')) return
+    _listReplays.push({
+      settled: true,
+      apply(rows, counts) {
+        const r = rows.find((s) => s.id === id)
+
+        if (!r || Boolean(r.ended_at) === Boolean(endedAt)) return
+        r.ended_at = endedAt
+
+        if (endedAt) {
+          counts.active = Math.max(0, counts.active - 1)
+          counts.ended += 1
+        } else {
+          counts.ended = Math.max(0, counts.ended - 1)
+          counts.active += 1
+        }
+      },
+    })
+  }
+
+  // An optimistic field write (pin, rename). Remembers each landed row it
+  // overwrote so a later failure can roll back the row the user now sees.
+  function _trackFieldWrite(id, field, value) {
+    const landed = []
+
+    const replay = {
+      settled: false,
+      apply(rows) {
+        const r = rows.find((s) => s.id === id)
+
+        if (!r) return
+        landed.push({ row: r, prev: r[field] })
+        r[field] = value
+      },
+      rollback() {
+        for (const { row, prev } of landed) row[field] = prev
+      },
+    }
+
+    _listReplays.push(replay)
+
+    return replay
+  }
+
+  // Success: keep the entry only for a list still in flight.
+  function _settleFieldWrite(replay) {
+    replay.settled = true
+
+    if (!_inflight.has('list')) _untrackReplay(replay)
+  }
 
   function _epochGuard() {
     const epoch = _resetEpoch
@@ -236,7 +300,18 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!_insertWindowRow(sessions.value, row)) return false
 
-    if (_inflight.has('list')) _createdDuringList.push(row)
+    // When the snapshot already has it, the server copy and count win.
+    if (_inflight.has('list')) {
+      _listReplays.push({
+        settled: true,
+        apply(rows, counts) {
+          if (!_insertWindowRow(rows, row)) return
+
+          if (row.ended_at) counts.ended += 1
+          else counts.active += 1
+        },
+      })
+    }
 
     return true
   }
@@ -317,23 +392,15 @@ export const useSessionStore = defineStore('session', () => {
         }
 
         if (!live()) return merged
-        let activeCount = activePage.total
-        let endedCount = endedPage.total
+        const counts = { active: activePage.total, ended: endedPage.total }
 
-        // #522: a session created while this fetch was in flight may be
-        // missing from its snapshot (rows and totals alike); re-apply it. When
-        // the snapshot already has it, the server copy and count win.
-        for (const row of _createdDuringList) {
-          if (!_insertWindowRow(merged, row)) continue
-
-          if (row.ended_at) endedCount += 1
-          else activeCount += 1
-        }
+        // #522 / #524: re-apply local changes this snapshot may predate.
+        for (const replay of _listReplays) replay.apply(merged, counts)
 
         sessions.value = merged
         sessionsLoaded.value = true
-        activeTotal.value = activeCount
-        endedTotal.value = endedCount
+        activeTotal.value = counts.active
+        endedTotal.value = counts.ended
 
         return sessions.value
       } catch (e) {
@@ -341,7 +408,7 @@ export const useSessionStore = defineStore('session', () => {
       } finally {
         if (live()) {
           loading.value = false
-          _createdDuringList = []
+          _listReplays = _listReplays.filter((r) => !r.settled)
         }
       }
     })
@@ -562,6 +629,7 @@ export const useSessionStore = defineStore('session', () => {
       const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
 
       for (const r of observed) r.ended_at = resp.ended_at
+      _trackStatusChange(id, resp.ended_at)
 
       if (
         currentSession.value &&
@@ -619,6 +687,7 @@ export const useSessionStore = defineStore('session', () => {
       const alreadyActive = observed.length > 0 && observed.every((r) => !r.ended_at)
 
       for (const r of observed) r.ended_at = null
+      _trackStatusChange(sessionId, null)
 
       if (!alreadyActive) {
         endedTotal.value = Math.max(0, endedTotal.value - 1)
@@ -670,6 +739,7 @@ export const useSessionStore = defineStore('session', () => {
         const endedAt = new Date().toISOString()
 
         for (const r of observed) r.ended_at = endedAt
+        _trackStatusChange(prior.id, endedAt)
       }
 
       // The new session is always active. The prior only moves active ->
@@ -709,14 +779,21 @@ export const useSessionStore = defineStore('session', () => {
     const prevs = observed.map((r) => r.topic)
 
     for (const r of observed) r.topic = topic
+    const replay = _trackFieldWrite(id, 'topic', topic)
 
     try {
-      return await sessionsApi.renameSession(id, topic)
+      const resp = await sessionsApi.renameSession(id, topic)
+      _settleFieldWrite(replay)
+
+      return resp
     } catch (e) {
+      _untrackReplay(replay)
+
       if (live()) {
         observed.forEach((r, i) => {
           r.topic = prevs[i]
         })
+        replay.rollback()
       }
 
       // F-07: background action - rollback and rethrow, but never write the
@@ -732,14 +809,21 @@ export const useSessionStore = defineStore('session', () => {
     const prevs = observed.map((r) => r.pinned)
 
     for (const r of observed) r.pinned = pinned
+    const replay = _trackFieldWrite(id, 'pinned', pinned)
 
     try {
-      return await sessionsApi.setPinned(id, pinned)
+      const resp = await sessionsApi.setPinned(id, pinned)
+      _settleFieldWrite(replay)
+
+      return resp
     } catch (e) {
+      _untrackReplay(replay)
+
       if (live()) {
         observed.forEach((r, i) => {
           r.pinned = prevs[i]
         })
+        replay.rollback()
       }
 
       // F-07: background action - rollback and rethrow, but never write the
@@ -1323,7 +1407,7 @@ export const useSessionStore = defineStore('session', () => {
     abandonStream()
     _resetEpoch += 1
     _inflight.clear()
-    _createdDuringList = []
+    _listReplays = []
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
