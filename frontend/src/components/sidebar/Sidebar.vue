@@ -43,6 +43,8 @@ const listEl = ref(null)
 
 const asideEl = ref(null)
 
+const searchInputEl = ref(null)
+
 const statusFilter = ref('active') // 'active' | 'ended'
 
 const STATUS_TABS = [
@@ -395,7 +397,7 @@ watch(isExpanded, (expanded) => {
 async function onRailSearch() {
   toggleDesktop()
   await nextTick()
-  asideEl.value?.querySelector('[data-testid="sidebar-search"]')?.focus()
+  searchInputEl.value?.focus()
 }
 
 function onNewSession() {
@@ -693,6 +695,7 @@ async function onSignOut() {
         <path d="M13 13 L17.5 17.5" />
       </svg>
       <input
+        ref="searchInputEl"
         v-model="searchQuery"
         type="search"
         class="sb-search-input"

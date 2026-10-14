@@ -28,6 +28,14 @@ For each test the diff adds or edits, name the product-code line whose breakage 
 
 When a diff adds a writer to existing shared state (a store ref, a module-level variable), find every reader of that state and confirm each reader's assumption still holds: "non-empty means loaded", "this total mirrors these rows", "only X ever sets this". A reader that infers something from the state's shape breaks silently when a new writer changes that shape. (#522: a create that inserted sidebar rows broke a `sessions.length` "loaded" check and an `activeTotal` count; both reached review.)
 
+## A display rule covers every surface
+
+When a diff decides what the UI may say about a state ("never shows the account as empty until a list loads"), list every surface that renders that state and check each one in every reachable state (after a create, during a retry, after a sign-out): empty hints, rows, counts and totals, View all links, tab labels, alerts. A gate that fixes the hint but leaves the count still tells the learner the wrong thing. (#544: the error line replaced the empty hints, then the "View all N" link and the "Ended (N)" tab count each showed local-only totals; they surfaced in review rounds 3 and 4.)
+
+## A self-removing control says where focus goes
+
+When a control unmounts or is replaced as the result of its own activation (a Retry that turns into a skeleton, a menu item that closes its menu), the diff states where keyboard focus lands on success and on failure, and a test pins it with the element attached to the document. Focus left on the body sends a keyboard user back to the top of the page. (#544: Retry dropped focus to the body; the restore, then its pointer-press guard, took two review rounds.)
+
 ## Fixes reach every sibling path
 
 When a diff adds a guard or fixes a case on one path, find the parallel paths that do the same job (the other copies an action patches, the success and failure branches, the replayed and the live write) and confirm each one gets the same treatment or has a stated reason not to. (#524: a rollback guard went onto rows a list had landed but not onto the observed copies one loop above; the bug-hunt review caught it.)
