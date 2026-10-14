@@ -111,7 +111,11 @@ export const __test__ = {
   _setExpanded(v) {
     desktopExpanded.value = v
   },
-  _setDrawerOpen(v) {
-    drawerOpen.value = v
+  // Seeds the state that `mode` reads, one mode at a time.
+  _setMode(m) {
+    const desktop = m === 'expanded' || m === 'collapsed'
+    viewport.value = desktop ? BREAKPOINT : BREAKPOINT - 1
+    desktopExpanded.value = m !== 'collapsed'
+    drawerOpen.value = m === 'drawer-open'
   },
 }

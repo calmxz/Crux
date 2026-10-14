@@ -58,12 +58,7 @@ describe('HomeView', () => {
     setMode('drawer-closed')
   })
 
-  function setMode(mode) {
-    const desktop = mode === 'expanded' || mode === 'collapsed'
-    sidebarTest._setViewport(desktop ? sidebarTest.BREAKPOINT : sidebarTest.BREAKPOINT - 1)
-    sidebarTest._setExpanded(mode !== 'collapsed')
-    sidebarTest._setDrawerOpen(mode === 'drawer-open')
-  }
+  const setMode = sidebarTest._setMode
 
   // #549: one failure, one report. The sidebar's error line reports it while
   // the sidebar's list is on screen; otherwise Home does, with the same copy.
@@ -86,6 +81,7 @@ describe('HomeView', () => {
     it.each(['collapsed', 'drawer-closed'])('shows the list-failed copy in %s', async (mode) => {
       setMode(mode)
       const wrapper = await mountFailedFirstList()
+      // The literal, not LIST_FAILED_COPY: pins the words the brief asked for.
       expect(wrapper.get('[data-testid="home-error"]').text()).toBe("Couldn't load your sessions.")
     })
 
@@ -115,18 +111,21 @@ describe('HomeView', () => {
       expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
     })
 
-    it('still shows a start-attempt failure in expanded mode', async () => {
-      setMode('expanded')
-      const store = useSessionStore()
-      vi.spyOn(store, 'lookupTopic').mockResolvedValue({ active_match: null, ended_match: null })
-      vi.spyOn(store, 'createSession').mockRejectedValue(new Error('create failed'))
-      const wrapper = await mountFailedFirstList()
-      await wrapper.get('[data-testid="home-quick-topic"]').setValue('Recursion')
-      await wrapper.get('[data-testid="home-quick-go"]').trigger('click')
-      await flushPromises()
-      expect(store.firstListFailed).toBe(true)
-      expect(wrapper.get('[data-testid="home-error"]').text()).toBe('create failed')
-    })
+    it.each(['expanded', 'collapsed'])(
+      'shows a start-attempt failure over it in %s',
+      async (mode) => {
+        setMode(mode)
+        const store = useSessionStore()
+        vi.spyOn(store, 'lookupTopic').mockResolvedValue({ active_match: null, ended_match: null })
+        vi.spyOn(store, 'createSession').mockRejectedValue(new Error('create failed'))
+        const wrapper = await mountFailedFirstList()
+        await wrapper.get('[data-testid="home-quick-topic"]').setValue('Recursion')
+        await wrapper.get('[data-testid="home-quick-go"]').trigger('click')
+        await flushPromises()
+        expect(store.firstListFailed).toBe(true)
+        expect(wrapper.get('[data-testid="home-error"]').text()).toBe('create failed')
+      },
+    )
   })
 
   it('calls listSessions on mount', async () => {
