@@ -98,7 +98,13 @@ export const useSessionStore = defineStore('session', () => {
   // Only listSessions and reset() write it.
   const listLoading = ref(false)
   const detailLoading = ref(false)
+  // The session page's error. #537: the sidebar list never writes it (that
+  // failure goes to listError) and pin/rename never clear it.
   const error = ref(null)
+  // #537: the latest sidebar list fetch's failure, read by HomeView's boot
+  // error. Cleared when a list starts, set when it fails; the #528 follow-up's
+  // failure stays silent. Only listSessions and reset() write it.
+  const listError = ref(null)
   const dailyCapInfo = ref(null) // { cap, used, resets_at }
   const dailyCapReached = computed(() => dailyCapInfo.value !== null)
   const costCapInfo = ref(null) // { used_usd, soft_cap_usd, hard_cap_usd, resets_at }
@@ -259,7 +265,6 @@ export const useSessionStore = defineStore('session', () => {
   // A copy a later write already changed is left alone.
   async function _optimisticWrite(id, field, value, request) {
     const live = _epochGuard()
-    error.value = null
     const observed = _observedRows(id)
     const prevs = observed.map((r) => r[field])
 
@@ -491,7 +496,7 @@ export const useSessionStore = defineStore('session', () => {
     // DECISION: Promise.all is all-or-nothing -- if either page's request
     // rejects, the other page's already-resolved items/total are discarded
     // and sessions/activeTotal/endedTotal are left at their stale pre-call
-    // values (listSessions' catch records the error for the first fetch and
+    // values (listSessions' catch records listError for the first fetch and
     // swallows it for the #528 follow-up). Accepted:
     // a half-merged window (only one status populated) is worse UX than a
     // stale-but-consistent one, and the caller can retry.
@@ -530,7 +535,7 @@ export const useSessionStore = defineStore('session', () => {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
       listLoading.value = true
-      error.value = null
+      listError.value = null
       _listPending = true
 
       try {
@@ -561,7 +566,8 @@ export const useSessionStore = defineStore('session', () => {
 
         return live() ? sessions.value : landed
       } catch (e) {
-        _setError(e, live)
+        if (live()) listError.value = friendlyError(e)
+        throw e
       } finally {
         if (live()) {
           listLoading.value = false
@@ -1514,6 +1520,7 @@ export const useSessionStore = defineStore('session', () => {
     checkAnswering.value = false
     checkCompleting.value = false
     error.value = null
+    listError.value = null
     dailyCapInfo.value = null
     costCapInfo.value = null
     pendingSummary.value = null
@@ -1537,6 +1544,7 @@ export const useSessionStore = defineStore('session', () => {
     listLoading,
     detailLoading,
     error,
+    listError,
     dailyCapReached,
     dailyCapInfo,
     costCapReached,

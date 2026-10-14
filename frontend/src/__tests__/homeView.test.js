@@ -14,8 +14,11 @@ vi.mock('vue-router', () => ({
 
 const apiEndSession = vi.fn()
 
+const apiGetSessionLibrary = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', () => ({
   endSession: (...args) => apiEndSession(...args),
+  getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
 }))
 
 const stubs = {
@@ -46,6 +49,8 @@ describe('HomeView', () => {
     setActivePinia(createPinia())
     push.mockClear()
     apiEndSession.mockReset()
+    apiGetSessionLibrary.mockReset()
+    apiGetSessionLibrary.mockResolvedValue({ items: [], total: 0 })
   })
 
   it('calls listSessions on mount', async () => {
@@ -64,41 +69,44 @@ describe('HomeView', () => {
     expect(w.find('[data-testid="home-mode-quick"]').exists()).toBe(true)
   })
 
-  it('shows error from store', () => {
-    const store = useSessionStore()
-    store.error = 'list failed'
+  // #537: the boot error is the list's own failure (store.listError).
+  it('a failed first list with no rows shows the boot error', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('list failed'))
     const wrapper = mountView()
+    await flushPromises()
     expect(wrapper.get('[data-testid="home-error"]').text()).toBe('list failed')
   })
 
-  // F-07: a background sidebar action failure (rename/pin) writing store.error
-  // must not nuke an already-loaded Home screen -- the fatal error branch is
-  // scoped to Home's own load (no sessions yet).
-  it('keeps the mode cards mounted when a background error arrives but sessions are already loaded', () => {
+  // F-07: the fatal error branch is scoped to Home's own load (no sessions
+  // yet): a failed re-list must not nuke an already-loaded Home screen.
+  it('keeps the mode cards mounted and shows no boot error when a list fails but sessions are already loaded', async () => {
     const store = useSessionStore()
-    store.error = 'boom'
     store.sessions = [{ id: 's1' }]
+    apiGetSessionLibrary.mockRejectedValue(new Error('boom'))
     const wrapper = mountView()
+    await flushPromises()
+    expect(store.listError).toBe('boom')
     expect(wrapper.find('[data-testid="home-mode-quick"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })
 
-  it('shows the fatal error branch when there are no sessions to render', () => {
+  // #537: the session page's error is not a boot error.
+  it("does not show the session page's error as a boot error", async () => {
     const store = useSessionStore()
-    store.error = 'boom'
-    store.sessions = []
+    store.error = 'The tutor stopped responding. Please try again.'
     const wrapper = mountView()
-    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })
 
   // E-01: a boot-time list failure with zero sessions used to hide the start
   // form entirely (v-if/v-else on store.error), leaving the learner with no
   // way to start a session. The form must stay mounted regardless.
-  it('does not hide the start form when store.error is set and there are no sessions (E-01)', () => {
-    const store = useSessionStore()
-    store.error = 'boom'
-    store.sessions = []
+  it('does not hide the start form when the first list fails and there are no sessions (E-01)', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('boom'))
     const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-quick-topic"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-quick-go"]').exists()).toBe(true)
   })
