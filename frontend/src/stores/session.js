@@ -196,12 +196,14 @@ export const useSessionStore = defineStore('session', () => {
     return held
   }
 
-  // The active window is the server's pinned_activity order, then ended rows.
-  // A new row is unpinned with the latest activity, so it goes right after
-  // the pinned active rows. Returns false when `list` already holds the id.
-  function _placeRow(list, row) {
+  // The window is the server's pinned_activity active order, then ended rows.
+  // A locally created row has the latest activity, so an active one goes
+  // right after the pinned active rows and an ended one (ended while a list
+  // fetch was in flight) goes last. Returns false when `list` already holds
+  // the id.
+  function _insertWindowRow(list, row) {
     if (list.some((s) => s.id === row.id)) return false
-    const i = list.findIndex((s) => !(s.pinned && !s.ended_at))
+    const i = row.ended_at ? -1 : list.findIndex((s) => !(s.pinned && !s.ended_at))
 
     list.splice(i === -1 ? list.length : i, 0, row)
 
@@ -226,7 +228,7 @@ export const useSessionStore = defineStore('session', () => {
       last_session_summary: null,
     }
 
-    if (_placeRow(sessions.value, row)) _localCreates.push({ seq: ++_createSeq, row })
+    if (_insertWindowRow(sessions.value, row)) _localCreates.push({ seq: ++_createSeq, row })
   }
 
   // Route a backend cap envelope (HTTP 429 detail or SSE error payload)
@@ -315,13 +317,10 @@ export const useSessionStore = defineStore('session', () => {
         _localCreates = _localCreates.filter((c) => c.seq > startSeq)
 
         for (const { row } of _localCreates) {
-          if (row.ended_at) {
-            if (merged.some((s) => s.id === row.id)) continue
-            merged.push(row)
-            endedCount += 1
-          } else if (_placeRow(merged, row)) {
-            activeCount += 1
-          }
+          if (!_insertWindowRow(merged, row)) continue
+
+          if (row.ended_at) endedCount += 1
+          else activeCount += 1
         }
 
         sessions.value = merged
