@@ -267,21 +267,33 @@ const showEndedListError = computed(() => listFailed.value && !cappedEndedRows.v
 // ended sessions.
 const showEndedSkeleton = computed(() => listLoading.value && !sessionsLoaded.value)
 
-const RETRY_SELECTOR = '[data-testid="sidebar-list-retry"]'
+// Whichever tab's error line is mounted (only one tab renders at a time).
+const listErrorEl = ref(null)
 
 // Silent like the mount-time call: the error line is the only report, and it
 // returns on its own if this attempt fails too. The line unmounts while the
 // list runs, dropping a keyboard user's focus to the body; if it comes back,
-// so does their focus, unless they have since moved it elsewhere.
+// so does their focus, unless they have since moved it: focused something
+// else, or pressed a pointer anywhere (a click on plain text leaves focus on
+// the body too).
 async function onRetryList() {
-  const hadFocus = document.activeElement === asideEl.value?.querySelector(RETRY_SELECTOR)
-  await sessionStore.listSessions().catch(() => {})
+  const hadFocus = !!listErrorEl.value?.hasFocus()
+  let pointerPressed = false
+  const onPointer = () => (pointerPressed = true)
 
-  if (!hadFocus) return
+  if (hadFocus) document.addEventListener('pointerdown', onPointer, true)
+
+  try {
+    await sessionStore.listSessions().catch(() => {})
+  } finally {
+    document.removeEventListener('pointerdown', onPointer, true)
+  }
+
+  if (!hadFocus || pointerPressed) return
   await nextTick()
 
   if (document.activeElement && document.activeElement !== document.body) return
-  asideEl.value?.querySelector(RETRY_SELECTOR)?.focus()
+  listErrorEl.value?.focus()
 }
 
 const showEmptyHint = computed(
@@ -807,7 +819,11 @@ async function onSignOut() {
                     />
                   </ul>
                 </div>
-                <SidebarListError v-if="showActiveListError" @retry="onRetryList" />
+                <SidebarListError
+                  v-if="showActiveListError"
+                  ref="listErrorEl"
+                  @retry="onRetryList"
+                />
                 <p v-else-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
                   No sessions yet. Click + New session above.
                 </p>
@@ -842,7 +858,11 @@ async function onSignOut() {
                 state="ended"
               />
             </ul>
-            <SidebarListError v-else-if="showEndedListError" @retry="onRetryList" />
+            <SidebarListError
+              v-else-if="showEndedListError"
+              ref="listErrorEl"
+              @retry="onRetryList"
+            />
             <SidebarSkeletonList v-else-if="showEndedSkeleton" :count="3" />
             <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
               No ended sessions yet.

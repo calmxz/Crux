@@ -2580,16 +2580,36 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
     wrapper = mount(Sidebar, { attachTo: document.body })
     await flushPromises()
-    let reject
-    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => (reject = r)))
+    const rejects = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => rejects.push(r)))
     retryBtn().element.focus()
     await retryBtn().trigger('click')
     await flushPromises()
     const search = wrapper.find('[data-testid="sidebar-search"]').element
     search.focus()
-    reject(new Error('offline'))
+
+    for (const reject of rejects) reject(new Error('offline'))
     await flushPromises()
+    expect(errorLine().exists()).toBe(true)
     expect(document.activeElement).toBe(search)
+  })
+
+  it('a failed Retry leaves focus alone after a pointer press elsewhere', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    const rejects = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => rejects.push(r)))
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    // A click on plain text: focus stays on the body, but the learner moved on.
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+
+    for (const reject of rejects) reject(new Error('offline'))
+    await flushPromises()
+    expect(errorLine().exists()).toBe(true)
+    expect(document.activeElement).not.toBe(retryBtn().element)
   })
 
   it('Retry on the Ended tab says no "No ended sessions yet" while it runs', async () => {

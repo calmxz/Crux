@@ -1,5 +1,14 @@
 <script setup>
+import { ref } from 'vue'
+
 defineEmits(['retry'])
+
+const retryEl = ref(null)
+
+defineExpose({
+  focus: () => retryEl.value?.focus(),
+  hasFocus: () => !!retryEl.value && document.activeElement === retryEl.value,
+})
 </script>
 
 <template>
@@ -9,6 +18,7 @@ defineEmits(['retry'])
   <div class="sb-list-error" role="alert" data-testid="sidebar-list-error">
     <p class="sb-list-error-msg">Couldn't load your sessions.</p>
     <button
+      ref="retryEl"
       type="button"
       class="sb-list-retry coarse-2x"
       data-testid="sidebar-list-retry"
