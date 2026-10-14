@@ -2690,6 +2690,22 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     expect(errorLine().exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="sidebar-view-all-ended"]').exists()).toBe(false)
+    // The tab's count is the same local-only total.
+    expect(store.endedTotal).toBe(1)
+    expect(wrapper.find('[data-testid="sidebar-status-ended"]').text()).not.toContain('(1)')
+  })
+
+  it('hides View all while a retry of the first list runs, too', async () => {
+    await mountFailed()
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(useSessionStore().listLoading).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-view-all-active"]').exists()).toBe(false)
   })
 
   it('a create whose re-list succeeds clears the error line and shows the account', async () => {

@@ -289,11 +289,21 @@ export const useSessionStore = defineStore('session', () => {
     if (_insertCreated(created)) activeTotal.value += 1
 
     if (sessionsLoaded.value || !listError.value) return
+
+    if (_claimRelistSlot()) _relist()
+  }
+
+  // The throttle relistIfStale and _addCreated share: false while the last
+  // landing or the last throttled attempt is recent, else stamps this attempt.
+  // A Retry or a mount-time list is not a throttled attempt, so a create just
+  // after one still re-lists.
+  function _claimRelistSlot() {
     const now = Date.now()
 
-    if (_isRecent(_relistTriedAt, now)) return
+    if (_isRecent(_listLandedAt, now) || _isRecent(_relistTriedAt, now)) return false
     _relistTriedAt = now
-    _relist()
+
+    return true
   }
 
   // The optimistic write behind renameSession / setPinned: patch every
@@ -585,11 +595,7 @@ export const useSessionStore = defineStore('session', () => {
   // silent, de-duped with any list in flight, and a failure keeps the current
   // window.
   function relistIfStale() {
-    if (!sessionsLoaded.value) return
-    const now = Date.now()
-
-    if (_isRecent(_listLandedAt, now) || _isRecent(_relistTriedAt, now)) return
-    _relistTriedAt = now
+    if (!sessionsLoaded.value || !_claimRelistSlot()) return
     listSessions().catch(() => {})
   }
 

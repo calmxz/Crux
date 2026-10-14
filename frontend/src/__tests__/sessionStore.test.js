@@ -1608,7 +1608,17 @@ describe('#544 a create after a failed first list retries the list', () => {
     expect(lists()).toBe(1)
   })
 
-  it('throttles: creates made offline re-list at most once per 30s', async () => {
+  // A real macrotask: lets a re-list, including _relist's deferred path,
+  // start and fail before counting.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it.each([
+    ['createSession', (s) => s.createSession({ topic: 'Graphs', seedMode: 'fresh' })],
+    [
+      'continueTopic',
+      (s) => s.continueTopic({ id: 'prior', topic: 'Graphs', ended_at: '2026-10-13T00:00:00Z' }),
+    ],
+  ])('throttles: %s made offline re-lists at most once per 30s', async (_, create) => {
     vi.useFakeTimers({ toFake: ['Date'] })
 
     try {
@@ -1619,8 +1629,9 @@ describe('#544 a create after a failed first list retries the list', () => {
 
       const createOffline = async (id) => {
         sessionsApi.createSession.mockResolvedValueOnce(created({ id }))
-        await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
-        await vi.waitFor(() => expect(s.listLoading).toBe(false))
+        await create(s)
+        await settle()
+        expect(s.listLoading).toBe(false)
       }
 
       await createOffline('n1')

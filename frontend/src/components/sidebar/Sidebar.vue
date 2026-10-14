@@ -246,16 +246,21 @@ const activeRendered = computed(
 // window (#534).
 const listFailed = computed(() => !sessionsLoaded.value && !!listError.value)
 
+// While the first list has failed, or a retry of it runs, the totals count
+// only local creates, never a loaded total, so nothing shows them (#544).
+const totalsUnloaded = computed(
+  () => !sessionsLoaded.value && (listFailed.value || listLoading.value),
+)
+
 // View all is the list's closing line whenever rows are rendered. The
 // zero-rows guard stays: reopenSession bumps activeTotal for a session
 // outside the (windowed) `sessions` array (e.g. reopened from the library
 // page), so the sidebar can sit at activeTotal=1 with zero rendered active
 // rows. Without this guard it would show "View all 1 sessions" under an
-// empty Active list. Hidden too while the first list has failed: its count
-// is only the local creates, never a loaded total (#544).
-const showViewAllActive = computed(() => activeRendered.value > 0 && !listFailed.value)
+// empty Active list.
+const showViewAllActive = computed(() => activeRendered.value > 0 && !totalsUnloaded.value)
 
-const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0 && !listFailed.value)
+const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0 && !totalsUnloaded.value)
 
 const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
 
@@ -714,7 +719,7 @@ async function onSignOut() {
         @click="statusFilter = t.key"
       >
         {{ t.label }}
-        <span v-if="t.key === 'ended' && endedTotal" class="sb-section-count"
+        <span v-if="t.key === 'ended' && endedTotal && !totalsUnloaded" class="sb-section-count"
           >({{ endedTotal }})</span
         >
       </button>
