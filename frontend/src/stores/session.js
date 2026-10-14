@@ -57,7 +57,8 @@ export const useSessionStore = defineStore('session', () => {
   const sessions = ref([])
   // True once a listSessions() has filled the window this sign-in. A create
   // can make `sessions` non-empty without a list fetch, so its length cannot
-  // stand in for "loaded" (Sidebar's mount-time fetch reads this).
+  // stand in for "loaded" (Sidebar's mount-time fetch and #534's
+  // relistIfStale read this).
   const sessionsLoaded = ref(false)
   // The sidebar's server-side search results. Owned by the store rather than
   // by Sidebar.vue because the sidebar RENDERS these row objects directly and
@@ -73,19 +74,19 @@ export const useSessionStore = defineStore('session', () => {
   // activeTotal / endedTotal are a LOCAL MIRROR of the server's per-status
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
-  // and reset(). Every listSessions() call site is mount-time (HomeView,
-  // NewSessionView, Sidebar onMounted) or the throttled re-list when the tab
-  // becomes visible again (#534, relistIfStale), and a mutation never triggers a refetch
-  // -- deliberately, since a refetch costs a round-trip and re-sorts the
-  // sidebar under the user mid-action. So any transition a mutating action
-  // fails to mirror here persists until the tab is next hidden and shown
-  // (#534), or the page reloads. The same rule is
+  // and reset(). Outside the exceptions below, every listSessions() call
+  // site is mount-time (HomeView,
+  // NewSessionView, Sidebar onMounted), and a mutation never triggers a
+  // refetch -- deliberately, since a refetch costs a round-trip and re-sorts
+  // the sidebar under the user mid-action. So any transition a mutating action
+  // fails to mirror here persists until the next list. The same rule is
   // why a create inserts its row locally rather than refetching the window.
-  // Two narrow exceptions: a list fetch that lands having raced a status
-  // change re-lists exactly once (#528, see listSessions), and a status change
+  // Three narrow exceptions: a list fetch that lands having raced a status
+  // change re-lists exactly once (#528, see listSessions), a status change
   // whose reply arrives after a list landed, for a session outside that
   // window, re-lists instead of moving the totals when no other list is in
-  // flight (#533, see _statusChangeGuard).
+  // flight (#533, see _statusChangeGuard), and the tab becoming visible again
+  // re-lists, throttled (#534, see relistIfStale).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, judged by _statusChangeGuard() (the shared
   // rule documented on _observedRows() below, plus #533's landed-list cases).
@@ -482,7 +483,8 @@ export const useSessionStore = defineStore('session', () => {
   // page reads put the same session in both (its rows de-dupe below, its
   // totals cannot). `live` false skips every write.
   async function _landListSnapshot(live) {
-    // Background fetch (mount-time callers, or the #528 re-list) — silent
+    // Background fetch (mount-time callers, a #528/#533 re-list, or the
+    // #534 visibility re-list) — silent
     // because a background load must never toast (U-05).
     const [activePage, endedPage] = await Promise.all([
       sessionsApi.getSessionLibrary(
@@ -534,17 +536,19 @@ export const useSessionStore = defineStore('session', () => {
     return { rows: merged, raced }
   }
 
-  // #534: the second exception to the no-refetch rule. The sidebar calls this
+  // #534: the third exception to the no-refetch rule. The sidebar calls this
   // when the tab becomes visible again, so a change made on another device or
   // tab (or a totals residue, see #528) shows up without a reload. Skipped
   // until the window has loaded this sign-in (the mount-time fetch owns the
   // first load) and while the last landing is under RELIST_THROTTLE_MS old.
   // Otherwise one listSessions(): silent, de-duped with any list in flight,
-  // and a failure keeps the current window.
+  // and a failure keeps the current window. A negative age (the wall clock
+  // moved back) counts as stale, so a clock change cannot mute it.
   function relistIfStale() {
-    if (!sessionsLoaded.value || _listLandedAt === null) return
+    if (!sessionsLoaded.value) return
+    const age = Date.now() - _listLandedAt
 
-    if (Date.now() - _listLandedAt < RELIST_THROTTLE_MS) return
+    if (age >= 0 && age < RELIST_THROTTLE_MS) return
     listSessions().catch(() => {})
   }
 
@@ -561,7 +565,7 @@ export const useSessionStore = defineStore('session', () => {
         if (!live()) return rows
 
         if (!raced) return sessions.value
-        // #528: one of the two exceptions to the no-refetch rule. The snapshot's
+        // #528: one of the three exceptions to the no-refetch rule. The snapshot's
         // totals may predate a status change or count one session twice, and
         // no local adjustment can tell which, so fetch one fresh list. Its
         // own race result is ignored: at most one extra round trip. The rows

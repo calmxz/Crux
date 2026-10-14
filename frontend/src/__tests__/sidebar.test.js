@@ -1685,13 +1685,52 @@ describe('Sidebar.vue — re-list when the tab becomes visible', () => {
     vi.setSystemTime(new Date('2026-10-14T10:00:40Z'))
     await showTab()
     expect(lists()).toBe(2)
-    // Within 30s of the focus re-fetch's own landing: skipped.
+    // Within 30s of the visibility re-list's own landing: skipped.
     vi.setSystemTime(new Date('2026-10-14T10:01:05Z'))
     await showTab()
     expect(lists()).toBe(2)
     vi.setSystemTime(new Date('2026-10-14T10:01:10Z'))
     await showTab()
     expect(lists()).toBe(3)
+  })
+
+  it('measures the throttle from a #528 follow-up landing too', async () => {
+    signIn()
+    await mountSidebar()
+    // A list whose two pages both hold s1 raced a status change: #528
+    // fetches one follow-up list inside the same listSessions().
+    const s1 = { id: 's1', topic: 'T', created_at: '2026-10-14T09:00:00Z', ended_at: null }
+    apiGetSessionLibrary
+      .mockResolvedValueOnce({ items: [s1], total: 1, limit: 40, offset: 0 })
+      .mockResolvedValueOnce({ items: [{ ...s1, ended_at: 'x' }], total: 1, limit: 40, offset: 0 })
+    vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+    let release
+    const gate = new Promise((resolve) => (release = resolve))
+    apiGetSessionLibrary.mockImplementationOnce(() =>
+      gate.then(() => ({ items: [], total: 0, limit: 40, offset: 0 })),
+    )
+    const pending = useSessionStore().listSessions()
+    await flushPromises()
+    // The follow-up lands 20s later.
+    vi.setSystemTime(new Date('2026-10-14T10:01:20Z'))
+    release()
+    await pending
+    expect(lists()).toBe(3)
+    // 35s after the first landing but 15s after the follow-up's: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:01:35Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+    vi.setSystemTime(new Date('2026-10-14T10:01:50Z'))
+    await showTab()
+    expect(lists()).toBe(4)
+  })
+
+  it('treats a wall clock moved backwards as stale', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T09:00:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
   })
 
   it('makes no fetch when signed out', async () => {

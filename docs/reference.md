@@ -356,8 +356,9 @@ only if it is still the same promise.
 ### Sidebar session window (#522, #524, #528, #533, #534)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
-corpus, and a mutation never refetches it (two exceptions, below). Besides
-mount, it is re-fetched when the tab becomes visible again (#534, below).
+corpus, and a mutation never refetches it. Three exceptions, below: the
+#528 and #533 re-lists after a status-change race, and the #534 re-list when
+the tab becomes visible again.
 `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
@@ -415,7 +416,7 @@ the last unmount). When the document turns visible and the user is signed in,
 it calls the store's `relistIfStale()`. That calls `listSessions()` unless the
 window has not loaded this sign-in (`sessionsLoaded`) or a list wrote the
 window under 30 seconds ago (`_listLandedAt`, set by every landing, cleared by
-`reset()`). A list still in flight is joined through `_inflight`. The event
+`reset()`; a negative age from a clock moved back counts as stale). A list still in flight is joined through `_inflight`. The event
 runs as its own task, never in the microtasks between a list's `finally` and
 its `_inflight` removal, so it cannot join a finished fetch.
 

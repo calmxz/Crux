@@ -5,7 +5,9 @@ how-it-works lookup belongs in `docs/reference.md` instead.
 
 ## 2026-10-14 - Re-list the sidebar when the tab becomes visible, throttled (#534)
 
-The second exception to the no-refetch rule (#528 is the first). Until now the
+The third exception to the no-refetch rule (after #528's re-list of a raced
+list and #533's re-list on a late reply), and the first not caused by a
+status change. Until now the
 sidebar window and its totals were fetched only at mount, so a change made on
 another device or tab never showed before a reload, and a totals residue from
 #528 lasted for the life of the page. Now, when the document goes from hidden
@@ -22,10 +24,13 @@ running cost; a re-fetch on window `focus` alone or on network reconnect. The
 listener lives with the sidebar, the only consumer of the window, and a
 module-scoped count keeps it to one listener however many sidebars mount.
 
-Until #537 lands, a failed visibility re-list writes the store's shared
-`error` like any list, so returning offline to an open session can show the
-list failure in the session page's error line. #537 moves the list's failure
-to its own ref.
+Until #537 lands, a visibility re-list uses the store's shared `error` like
+any list: it clears it when it starts, wiping an error the session page was
+showing, and a failure (returning to the tab offline) shows up in the session
+page's error line. #537 moves the list's error to its own ref. Also accepted:
+the re-list sets `listLoading`, so an account with no sessions briefly shows
+the sidebar skeleton instead of its empty state; accounts with rows keep them
+on screen.
 
 ## 2026-10-14 - One re-list after a list that raced a status change (#528)
 
