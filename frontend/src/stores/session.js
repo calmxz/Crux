@@ -75,8 +75,8 @@ export const useSessionStore = defineStore('session', () => {
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
   // and reset(). Outside the exceptions below, every listSessions() call
-  // site is mount-time (HomeView, Sidebar onMounted), and a mutation never triggers a
-  // refetch -- deliberately, since a refetch costs a round-trip and re-sorts
+  // site is mount-time (HomeView, Sidebar onMounted), and a mutation never
+  // triggers a refetch -- deliberately, since a refetch costs a round-trip and re-sorts
   // the sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists until the next list. The same rule is
   // why a create inserts its row locally rather than refetching the window.
@@ -106,11 +106,12 @@ export const useSessionStore = defineStore('session', () => {
   // failure goes to listError) and pin/rename never clear it.
   const error = ref(null)
   // #537: the latest sidebar list fetch's failure; whether to show it is
-  // firstListFailed's call (#546). Cleared when a list starts, set when it fails; the #528 follow-up's
-  // failure stays silent. Only listSessions and reset() write it.
+  // firstListFailed's call (#546). Cleared when a list starts, set when it
+  // fails; the #528 follow-up's failure stays silent. Only listSessions and
+  // reset() write it.
   const listError = ref(null)
   // #546: the one rule for showing a list failure, read by HomeView's boot
-  // error and the sidebar's error line. Only while no list has loaded this
+  // error, the sidebar's error line and _addCreated's re-list. Only while no list has loaded this
   // sign-in: once one has, a later failure keeps the window silently (#534),
   // and rows a create inserted cannot stand in for a loaded list (#544).
   const firstListFailed = computed(() => !sessionsLoaded.value && !!listError.value)
@@ -286,13 +287,13 @@ export const useSessionStore = defineStore('session', () => {
   // sidebar's error alert re-announced) cost at most one per
   // RELIST_THROTTLE_MS. It never doubles a list: one already running has
   // cleared listError, and a 'relist' from _statusChangeGuard means a list
-  // landed, setting sessionsLoaded. A failure leaves listError, so the
-  // sidebar's error line stays. After a load, a failed list keeps its window
+  // landed, setting sessionsLoaded. A failure leaves firstListFailed set, so
+  // the error lines stay. After a load, a failed list keeps its window
   // (#534), so this stays out of the way.
   function _addCreated(created) {
     if (_insertCreated(created)) activeTotal.value += 1
 
-    if (sessionsLoaded.value || !listError.value) return
+    if (!firstListFailed.value) return
 
     if (_claimRelistSlot()) _relist()
   }

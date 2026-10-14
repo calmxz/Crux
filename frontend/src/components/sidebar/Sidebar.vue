@@ -36,7 +36,7 @@ const { name: userName } = storeToRefs(userStore)
 
 const sessionStore = useSessionStore()
 
-// listFailed (#544): until a list has loaded this sign-in, a failed list
+// firstListFailed (#544): until a list has loaded this sign-in, a failed list
 // leaves both tabs unvouched for, so each shows an error line: in place of its
 // empty hint, or under the rows a create inserted, which must not pass for
 // the whole account. Once one has loaded, a later failure stays silent and
@@ -46,7 +46,7 @@ const {
   sessions,
   sessionsLoaded,
   listLoading,
-  firstListFailed: listFailed,
+  firstListFailed,
   activeTotal,
   endedTotal,
   searchRows,
@@ -257,7 +257,7 @@ const activeRendered = computed(
 // While the first list has failed, or a retry of it runs, the totals count
 // only local creates, never a loaded total, so nothing shows them (#544).
 const totalsUnloaded = computed(
-  () => !sessionsLoaded.value && (listFailed.value || listLoading.value),
+  () => !sessionsLoaded.value && (firstListFailed.value || listLoading.value),
 )
 
 // View all is the list's closing line whenever rows are rendered. The
@@ -831,7 +831,7 @@ async function onSignOut() {
                     />
                   </ul>
                 </div>
-                <SidebarListError v-if="listFailed" ref="listErrorEl" @retry="onRetryList" />
+                <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
                 <p v-else-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
                   No sessions yet. Click + New session above.
                 </p>
@@ -866,7 +866,7 @@ async function onSignOut() {
                 state="ended"
               />
             </ul>
-            <SidebarListError v-if="listFailed" ref="listErrorEl" @retry="onRetryList" />
+            <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
             <template v-else-if="!cappedEndedRows.length">
               <SidebarSkeletonList v-if="showEndedSkeleton" :count="3" />
               <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">

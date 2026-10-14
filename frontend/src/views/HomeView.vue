@@ -95,7 +95,8 @@ const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 
 // #537: the list's own failure, never the session page's store.error. #546:
 // shown on the sidebar's rule, so a failure after a loaded list stays silent.
-const bootError = computed(() => (store.firstListFailed ? friendlyError(store.listError) : null))
+// listError is already friendly copy (the store's _setError formats it).
+const bootError = computed(() => (store.firstListFailed ? store.listError : null))
 
 const displayError = computed(() => startError.value || bootError.value)
 
