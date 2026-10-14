@@ -177,8 +177,8 @@ export const useSessionStore = defineStore('session', () => {
   // previous value (not a shared `prev`): the window copy and the search copy
   // can legitimately disagree, e.g. the search response is fresher. The
   // replay also writes the value onto rows a list lands while this is
-  // pending, and a failure rolls those back too (the rows the user now sees),
-  // unless a later write already changed them.
+  // pending, and a failure rolls those back too (the rows the user now sees).
+  // A copy a later write already changed is left alone.
   async function _optimisticWrite(id, field, value, request) {
     const live = _epochGuard()
     error.value = null
@@ -213,7 +213,7 @@ export const useSessionStore = defineStore('session', () => {
 
       if (live()) {
         observed.forEach((r, i) => {
-          r[field] = prevs[i]
+          if (r[field] === value) r[field] = prevs[i]
         })
 
         for (const { row, prev } of landed) {
