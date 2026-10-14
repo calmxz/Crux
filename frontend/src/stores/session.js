@@ -132,18 +132,25 @@ export const useSessionStore = defineStore('session', () => {
   // rename is recorded from its start, because a list started before it
   // commits can land while it is still pending. Settled entries are dropped
   // when the in-flight list settles; a failed pin/rename drops its own entry.
-  // reset() clears all of it.
+  // reset() clears all of it. (Not the request "replay" of the SHARED TOTALS
+  // RULE below: these re-apply a local change onto a list snapshot.)
   let _listReplays = []
+  // True from a listSessions() start until its own finally. Not
+  // _inflight.has('list'): that entry outlives the finally by a microtask, and
+  // a change recorded in that gap would wait for, and override, the next list.
+  let _listPending = false
 
   function _untrackReplay(replay) {
     _listReplays = _listReplays.filter((r) => r !== replay)
   }
 
-  // An end/reopen observed on success while a list is in flight. Follows the
-  // SHARED TOTALS RULE against the incoming row: a snapshot already in the
-  // target state counted the move itself; one in the prior state did not.
+  // An end/reopen observed on success while a list is in flight. Judged
+  // against the incoming row alone: a snapshot already in the target state
+  // counted the move itself; one in the prior state did not. Unlike the
+  // SHARED TOTALS RULE's nothing-observed case, a row absent from the snapshot
+  // needs nothing: the snapshot's totals are the server's, not a local mirror.
   function _trackStatusChange(id, endedAt) {
-    if (!_inflight.has('list')) return
+    if (!_listPending) return
     _listReplays.push({
       settled: true,
       apply(rows, counts) {
@@ -163,9 +170,22 @@ export const useSessionStore = defineStore('session', () => {
     })
   }
 
-  // An optimistic field write (pin, rename). Remembers each landed row it
-  // overwrote so a later failure can roll back the row the user now sees.
-  function _trackFieldWrite(id, field, value) {
+  // The optimistic write behind renameSession / setPinned: patch every
+  // observed copy now, send `request`, roll back on failure. Every observed
+  // copy is a target -- a search row can be the only rendered copy of a
+  // session outside the loaded window. Each copy rolls back to its OWN
+  // previous value (not a shared `prev`): the window copy and the search copy
+  // can legitimately disagree, e.g. the search response is fresher. The
+  // replay also writes the value onto rows a list lands while this is
+  // pending, and a failure rolls those back too (the rows the user now sees),
+  // unless a later write already changed them.
+  async function _optimisticWrite(id, field, value, request) {
+    const live = _epochGuard()
+    error.value = null
+    const observed = _observedRows(id)
+    const prevs = observed.map((r) => r[field])
+
+    for (const r of observed) r[field] = value
     const landed = []
 
     const replay = {
@@ -177,21 +197,34 @@ export const useSessionStore = defineStore('session', () => {
         landed.push({ row: r, prev: r[field] })
         r[field] = value
       },
-      rollback() {
-        for (const { row, prev } of landed) row[field] = prev
-      },
     }
 
     _listReplays.push(replay)
 
-    return replay
-  }
+    try {
+      const resp = await request()
+      replay.settled = true
 
-  // Success: keep the entry only for a list still in flight.
-  function _settleFieldWrite(replay) {
-    replay.settled = true
+      if (!_listPending) _untrackReplay(replay)
 
-    if (!_inflight.has('list')) _untrackReplay(replay)
+      return resp
+    } catch (e) {
+      _untrackReplay(replay)
+
+      if (live()) {
+        observed.forEach((r, i) => {
+          r[field] = prevs[i]
+        })
+
+        for (const { row, prev } of landed) {
+          if (row[field] === value) row[field] = prev
+        }
+      }
+
+      // F-07: background action - rollback and rethrow, but never write the
+      // global error (it unmounts unrelated screens). Callers toast.
+      throw e
+    }
   }
 
   function _epochGuard() {
@@ -301,7 +334,7 @@ export const useSessionStore = defineStore('session', () => {
     if (!_insertWindowRow(sessions.value, row)) return false
 
     // When the snapshot already has it, the server copy and count win.
-    if (_inflight.has('list')) {
+    if (_listPending) {
       _listReplays.push({
         settled: true,
         apply(rows, counts) {
@@ -361,6 +394,7 @@ export const useSessionStore = defineStore('session', () => {
       const live = _epochGuard()
       loading.value = true
       error.value = null
+      _listPending = true
 
       try {
         // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
@@ -408,6 +442,7 @@ export const useSessionStore = defineStore('session', () => {
       } finally {
         if (live()) {
           loading.value = false
+          _listPending = false
           _listReplays = _listReplays.filter((r) => !r.settled)
         }
       }
@@ -767,69 +802,12 @@ export const useSessionStore = defineStore('session', () => {
     }
   }
 
-  async function renameSession(id, topic) {
-    const live = _epochGuard()
-    error.value = null
-    // Every observed copy is a mutation target -- a search row can be the
-    // only rendered copy of a session outside the loaded window. Each copy
-    // rolls back to its OWN previous value (not a shared `prev`): the window
-    // copy and the search copy can legitimately disagree, e.g. the search
-    // response is fresher.
-    const observed = _observedRows(id)
-    const prevs = observed.map((r) => r.topic)
-
-    for (const r of observed) r.topic = topic
-    const replay = _trackFieldWrite(id, 'topic', topic)
-
-    try {
-      const resp = await sessionsApi.renameSession(id, topic)
-      _settleFieldWrite(replay)
-
-      return resp
-    } catch (e) {
-      _untrackReplay(replay)
-
-      if (live()) {
-        observed.forEach((r, i) => {
-          r.topic = prevs[i]
-        })
-        replay.rollback()
-      }
-
-      // F-07: background action - rollback and rethrow, but never write the
-      // global error (it unmounts unrelated screens). Callers toast.
-      throw e
-    }
+  function renameSession(id, topic) {
+    return _optimisticWrite(id, 'topic', topic, () => sessionsApi.renameSession(id, topic))
   }
 
-  async function setPinned(id, pinned) {
-    const live = _epochGuard()
-    error.value = null
-    const observed = _observedRows(id)
-    const prevs = observed.map((r) => r.pinned)
-
-    for (const r of observed) r.pinned = pinned
-    const replay = _trackFieldWrite(id, 'pinned', pinned)
-
-    try {
-      const resp = await sessionsApi.setPinned(id, pinned)
-      _settleFieldWrite(replay)
-
-      return resp
-    } catch (e) {
-      _untrackReplay(replay)
-
-      if (live()) {
-        observed.forEach((r, i) => {
-          r.pinned = prevs[i]
-        })
-        replay.rollback()
-      }
-
-      // F-07: background action - rollback and rethrow, but never write the
-      // global error (it unmounts unrelated screens). Callers toast.
-      throw e
-    }
+  function setPinned(id, pinned) {
+    return _optimisticWrite(id, 'pinned', pinned, () => sessionsApi.setPinned(id, pinned))
   }
 
   // Batch shape: { gap, total, currentIndex, viewIndex, setIndex, setTotal, items: [
@@ -1408,6 +1386,7 @@ export const useSessionStore = defineStore('session', () => {
     _resetEpoch += 1
     _inflight.clear()
     _listReplays = []
+    _listPending = false
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null

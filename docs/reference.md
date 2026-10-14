@@ -373,7 +373,8 @@ before the list writes them:
   was counted by the snapshot, and a row outside the snapshot needs nothing.
 - Pin and rename are recorded from their optimistic start, because a list that
   started before the write committed can land while it is still pending. A
-  failed write drops its entry and also rolls back any landed row it patched.
+  failed write drops its entry and also rolls back any landed row it patched,
+  unless a later write has already changed that row.
 - Settled entries clear when the in-flight list settles, success or failure.
   `reset()` clears them all. A new action that changes window rows locally must
   record a replay, or an in-flight list will revert it.

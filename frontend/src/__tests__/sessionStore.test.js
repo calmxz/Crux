@@ -467,6 +467,20 @@ describe('session store', () => {
       expect(s.sessions[0].pinned).toBe(false)
     })
 
+    it('a failed rename does not roll back a later rename that succeeded on the landed row', async () => {
+      const first = deferred()
+      sessionsApi.renameSession.mockReturnValueOnce(first.promise).mockResolvedValueOnce({})
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = startList(s)
+      const renaming = s.renameSession('s1', 'B')
+      await land([row()])
+      await s.renameSession('s1', 'C')
+      first.reject(new Error('nope'))
+      await expect(renaming).rejects.toThrow('nope')
+      expect(s.sessions[0].topic).toBe('C')
+    })
+
     it('a row outside the snapshot needs nothing: no insert, totals stay the snapshot', async () => {
       sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
       const s = useSessionStore()
