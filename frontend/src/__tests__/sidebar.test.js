@@ -45,12 +45,15 @@ vi.mock('@/services/reviewApi.js', () => ({
 
 const apiGetSessionLibrary = vi.fn()
 
+const apiCreateSession = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
   const actual = await importOriginal()
 
   return {
     ...actual,
     getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
+    createSession: (...args) => apiCreateSession(...args),
   }
 })
 
@@ -105,6 +108,27 @@ describe('Sidebar.vue — session list rendering', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('No sessions yet')
+  })
+
+  // #522: a create on a fresh account must show its row, not the empty hint.
+  it('shows the created session row instead of the empty hint after a create', async () => {
+    apiCreateSession.mockResolvedValueOnce({
+      id: 'n1',
+      user_id: 'u',
+      topic: 'Graphs',
+      created_at: new Date().toISOString(),
+      ended_at: null,
+      pinned: false,
+      topic_profile: null,
+      ingestion_status: null,
+    })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').text()).toContain('Graphs')
   })
 
   it('renders Active section with rows; no Ended section when empty', async () => {
@@ -1543,15 +1567,36 @@ describe('Sidebar.vue — mount fetch', () => {
     expect(listSpy).toHaveBeenCalled()
   })
 
-  it('skips list fetch when sessions already populated', async () => {
+  it('skips list fetch when a list has already loaded', async () => {
     const auth = useAuthStore()
     auth.session = { user: { id: 'u-1' }, access_token: 't' }
     const store = useSessionStore()
     store.sessions = [{ id: 'a1', topic: 'X', created_at: '2026-05-20T10:00:00Z', ended_at: null }]
+    store.sessionsLoaded = true
     const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(listSpy).not.toHaveBeenCalled()
+  })
+
+  // #522: a create inserts a row without loading the window, so a non-empty
+  // `sessions` must not stand in for "loaded".
+  it('still fetches when the only rows came from a create', async () => {
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    const store = useSessionStore()
+    apiCreateSession.mockResolvedValueOnce({
+      id: 'n1',
+      topic: 'Graphs',
+      created_at: '2026-05-20T10:00:00Z',
+      ended_at: null,
+      pinned: false,
+    })
+    await store.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(listSpy).toHaveBeenCalled()
   })
 
   it('skips list fetch when unauthenticated', async () => {

@@ -237,10 +237,11 @@ const activeRendered = computed(
 )
 
 // View all is the list's closing line whenever rows are rendered. The
-// zero-rows guard stays: createSession bumps activeTotal without pushing
-// into the (windowed) `sessions` array, so a fresh account can sit at
-// activeTotal=1 with zero rendered rows. Without this guard the sidebar
-// would show "No sessions yet" and "View all 1 sessions" at once.
+// zero-rows guard stays: reopenSession bumps activeTotal for a session
+// outside the (windowed) `sessions` array (e.g. reopened from the library
+// page), so the sidebar can sit at activeTotal=1 with zero rendered active
+// rows. Without this guard it would show "View all 1 sessions" under an
+// empty Active list.
 const showViewAllActive = computed(() => activeRendered.value > 0)
 
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
@@ -266,8 +267,9 @@ const showEmptyActiveHint = computed(
 )
 
 // Fetch only if we haven't loaded yet. HomeView also calls listSessions on mount;
-// the store de-dupes concurrent calls via _inflight, and skipping when populated
-// avoids the deep-link redundant fetch.
+// the store de-dupes concurrent calls via _inflight, and skipping once a list
+// has loaded avoids the deep-link redundant fetch. Not `sessions.length`: a
+// create inserts a row without loading the rest of the window (#522).
 onMounted(async () => {
   // Fit-to-height: measure once the list column exists (desktop or drawer) and
   // again whenever it resizes. Guarded so jsdom -- which has no
@@ -277,7 +279,7 @@ onMounted(async () => {
     listResizeObserver.observe(listEl.value)
   }
 
-  if (isAuthenticated.value && !sessions.value.length) {
+  if (isAuthenticated.value && !sessionStore.sessionsLoaded) {
     await sessionStore.listSessions().catch(() => {})
   }
 

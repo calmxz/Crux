@@ -174,6 +174,155 @@ describe('session store', () => {
     expect(s.activeTotal).toBe(4)
   })
 
+  describe('#522 created session lands in the sidebar window', () => {
+    const created = (over = {}) => ({
+      id: 'new',
+      user_id: 'u',
+      topic: 'Graphs',
+      created_at: '2026-10-14T00:00:00Z',
+      ended_at: null,
+      pinned: false,
+      topic_profile: null,
+      ingestion_status: null,
+      ...over,
+    })
+
+    it('inserts the created session into an empty window in list-item shape', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessions).toHaveLength(1)
+      expect(s.sessions[0]).toMatchObject({
+        id: 'new',
+        topic: 'Graphs',
+        pinned: false,
+        ended_at: null,
+        last_activity_at: '2026-10-14T00:00:00Z',
+        message_count: 0,
+      })
+      // A separate list row, not the detail object: both are observed copies.
+      expect(s.sessions[0]).not.toBe(s.currentSession)
+    })
+
+    it('lands after pinned active rows and before existing unpinned rows', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      s.sessions = [
+        { id: 'p1', pinned: true, ended_at: null },
+        { id: 'p2', pinned: true, ended_at: null },
+        { id: 'a1', pinned: false, ended_at: null },
+        { id: 'e1', pinned: true, ended_at: '2026-01-01' },
+      ]
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessions.map((r) => r.id)).toEqual(['p1', 'p2', 'new', 'a1', 'e1'])
+    })
+
+    it('lands before ended rows when no active rows exist', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      s.sessions = [{ id: 'e1', pinned: true, ended_at: '2026-01-01' }]
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessions.map((r) => r.id)).toEqual(['new', 'e1'])
+    })
+
+    it('continueTopic inserts the new session and still ends the prior locally', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created({ topic: 'Calculus' }))
+      const s = useSessionStore()
+      s.sessions = [
+        { id: 'p1', pinned: true, ended_at: null },
+        { id: 'old-1', topic: 'Calculus', pinned: false, ended_at: null },
+      ]
+      s.activeTotal = 3
+      s.endedTotal = 1
+      await s.continueTopic({ id: 'old-1', topic: 'Calculus' })
+      expect(s.sessions.map((r) => r.id)).toEqual(['p1', 'new', 'old-1'])
+      expect(s.sessions.find((r) => r.id === 'old-1').ended_at).toBeTruthy()
+      expect(s.activeTotal).toBe(3)
+      expect(s.endedTotal).toBe(2)
+    })
+
+    it('does not duplicate or recount a row whose id is already in the window', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      // A list that landed after the create committed: its row and total
+      // already include the session.
+      s.sessions = [{ id: 'new', topic: 'Graphs', pinned: false, ended_at: null }]
+      s.activeTotal = 1
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessions.filter((r) => r.id === 'new')).toHaveLength(1)
+      expect(s.activeTotal).toBe(1)
+    })
+
+    it('sessionsLoaded tracks a landed list, not a create, and reset() clears it', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessionsLoaded).toBe(false)
+      sessionsApi.getSessionLibrary.mockResolvedValue({ items: [], total: 0, limit: 40, offset: 0 })
+      await s.listSessions()
+      expect(s.sessionsLoaded).toBe(true)
+      s.reset()
+      expect(s.sessionsLoaded).toBe(false)
+    })
+
+    it('does not insert when the create resolves after reset()', async () => {
+      let resolve
+      sessionsApi.createSession.mockReturnValueOnce(new Promise((r) => (resolve = r)))
+      const s = useSessionStore()
+      const p = s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      s.reset()
+      resolve(created())
+      await p
+      expect(s.sessions).toEqual([])
+      expect(s.activeTotal).toBe(0)
+    })
+
+    it('keeps the created session when a list fetch started before the create resolves after it', async () => {
+      let resolveActive
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(new Promise((r) => (resolveActive = r)))
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 40, offset: 0 })
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      const listing = s.listSessions()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      // The list snapshot predates the create: neither its rows nor its total
+      // include the new session.
+      resolveActive({ items: [{ id: 'a1', pinned: false, ended_at: null }], total: 1 })
+      await listing
+      expect(s.sessions.map((r) => r.id)).toEqual(['new', 'a1'])
+      expect(s.activeTotal).toBe(2)
+    })
+
+    it('does not double-count when the late list result already includes the created session', async () => {
+      let resolveActive
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(new Promise((r) => (resolveActive = r)))
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 40, offset: 0 })
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      const listing = s.listSessions()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      resolveActive({ items: [{ id: 'new', pinned: false, ended_at: null }], total: 1 })
+      await listing
+      expect(s.sessions.map((r) => r.id)).toEqual(['new'])
+      expect(s.activeTotal).toBe(1)
+    })
+
+    it('a later list fetch is authoritative for sessions created before it started', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      // e.g. the session was deleted elsewhere; the fresh list does not carry it
+      sessionsApi.getSessionLibrary
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 40, offset: 0 })
+        .mockResolvedValueOnce({ items: [], total: 0, limit: 40, offset: 0 })
+      await s.listSessions()
+      expect(s.sessions).toEqual([])
+      expect(s.activeTotal).toBe(0)
+    })
+  })
+
   it('endSession moves the total from active to ended unconditionally, even when the session is outside the loaded window', async () => {
     sessionsApi.endSession.mockResolvedValueOnce({ ended_at: '2026-01-01', summary: null })
     const s = useSessionStore()

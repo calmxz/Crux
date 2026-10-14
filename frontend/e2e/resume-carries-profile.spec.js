@@ -31,11 +31,9 @@ test.describe('resume carries profile', () => {
     await page.getByTestId('session-send').click()
     await expect(page.getByTestId('msg-assistant').last()).toContainText('[STUB:fresh]')
 
-    // End session A via the in-page End control (ticket 10). It shares
-    // useSessionActions.confirmEnd with the sidebar row menu, which cannot be
-    // used here: a session created from Home is not listed in the sidebar
-    // until the list refetches (#522). Awaits the end-of-session summary
-    // synchronously and persists it onto topic_profile.last_session_summary.
+    // End session A through its sidebar row menu. Awaits the end-of-session
+    // summary synchronously and persists it onto
+    // topic_profile.last_session_summary.
     // Start waiting for the end-session request before clicking: the click
     // resolves on event dispatch, not on the async handler, and the
     // subsequent page.goto is a full-page navigation that would abort an
@@ -46,7 +44,11 @@ test.describe('resume carries profile', () => {
       (r) => r.url().includes(`/sessions/${sessionId}/end`) && r.ok(),
     )
 
-    await page.getByTestId('session-action-end').click()
+    const row = page.getByTestId(`sidebar-row-${sessionId}`)
+
+    await row.hover()
+    await row.getByTestId('sidebar-row-menu-trigger').click()
+    await page.getByTestId('sidebar-row-menu-end').click()
     // E-12: End now sits behind a PrimeVue confirm dialog (same contract as
     // file delete); the request only fires on the destructive accept.
     await page.locator('.p-confirmdialog button.confirm-delete-strong').click()
