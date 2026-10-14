@@ -129,11 +129,14 @@ export const useSessionStore = defineStore('session', () => {
   // #522 / #524: local window changes a listSessions() snapshot may predate.
   // Each entry is { apply(rows, counts), settled }; a landing list runs every
   // entry, in order, over its incoming rows and totals before writing them.
+  // An apply() that returns true found the snapshot unjudgeable and makes the
+  // list re-list once (#528).
   // A create, end or reopen is recorded on success only while a list is in
   // flight (any later list starts after it committed). An optimistic pin or
   // rename is recorded from its start, because a list started before it
   // commits can land while it is still pending. Settled entries are dropped
-  // when the in-flight list settles; a failed pin/rename drops its own entry.
+  // when the in-flight list settles, and before a #528 re-list starts; a
+  // failed pin/rename drops its own entry.
   // reset() clears all of it. (Not the request "replay" of the SHARED TOTALS
   // RULE below: these re-apply a local change onto a list snapshot.)
   let _listReplays = []
@@ -144,6 +147,10 @@ export const useSessionStore = defineStore('session', () => {
 
   function _untrackReplay(replay) {
     _listReplays = _listReplays.filter((r) => r !== replay)
+  }
+
+  function _dropSettledReplays() {
+    _listReplays = _listReplays.filter((r) => !r.settled)
   }
 
   // An end/reopen observed on success while a list is in flight. Judged
@@ -416,7 +423,8 @@ export const useSessionStore = defineStore('session', () => {
     // DECISION: Promise.all is all-or-nothing -- if either page's request
     // rejects, the other page's already-resolved items/total are discarded
     // and sessions/activeTotal/endedTotal are left at their stale pre-call
-    // values (the catch block below only records the error). Accepted:
+    // values (listSessions' catch records the error for the first fetch and
+    // swallows it for the #528 follow-up). Accepted:
     // a half-merged window (only one status populated) is worse UX than a
     // stale-but-consistent one, and the caller can retry.
     const seen = new Set()
@@ -459,7 +467,9 @@ export const useSessionStore = defineStore('session', () => {
       try {
         const { rows, raced } = await _landListSnapshot(live)
 
-        if (!raced || !live()) return rows
+        if (!live()) return rows
+
+        if (!raced) return sessions.value
         // #528: the one exception to the no-refetch rule. The snapshot's
         // totals may predate a status change or count one session twice, and
         // no local adjustment can tell which, so fetch one fresh list. Its
@@ -468,7 +478,7 @@ export const useSessionStore = defineStore('session', () => {
         loading.value = false
         // The changes just replayed committed before this fetch starts;
         // pending pin/rename entries stay and replay onto it too.
-        _listReplays = _listReplays.filter((r) => !r.settled)
+        _dropSettledReplays()
 
         try {
           await _landListSnapshot(live)
@@ -484,7 +494,7 @@ export const useSessionStore = defineStore('session', () => {
         if (live()) {
           loading.value = false
           _listPending = false
-          _listReplays = _listReplays.filter((r) => !r.settled)
+          _dropSettledReplays()
         }
       }
     })

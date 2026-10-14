@@ -20,6 +20,12 @@ ignored, and a follow-up that fails leaves the first result. A list with no
 race costs exactly what it did. Refetch-always was rejected: a round trip and
 a re-sort after every action.
 
+Known residue, accepted: a race inside the follow-up itself (an out-of-window
+change during it, or a second straddle) is not re-listed again, and a change
+that commits while a list is in flight but whose response arrives after the
+list lands is not recorded as a replay at all, so the trigger never sees it.
+Both leave the totals off by one until the next mount-time list.
+
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
 #463 asked for `check_question.set_index` / `set_total` to become nullable,

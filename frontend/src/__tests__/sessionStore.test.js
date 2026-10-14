@@ -649,6 +649,27 @@ describe('session store', () => {
       expect(getSessionLibrary).toHaveBeenCalledTimes(2)
     })
 
+    it('an end made while the follow-up is in flight is replayed onto it', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      // 'x' straddles the two pages.
+      land([row(), row({ id: 'x' })], [row({ id: 'x', ended_at: ENDED_AT })], {
+        active: 2,
+        ended: 1,
+      })
+      await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
+      await s.endSession('s1')
+      // The follow-up snapshot predates the end.
+      landFollowUp([row()], [], { active: 1, ended: 0 })
+      await listing
+      expect(s.sessions[0].ended_at).toBe(ENDED_AT)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
     it('a follow-up whose own snapshot matches a trigger does not fetch again', async () => {
       const s = useSessionStore()
       const land = queuePages()
