@@ -30,13 +30,29 @@ rows (other views look rows up or check whether it is empty), and a module-scope
 one listener however many sidebars mount. A failed first load is not retried
 on return: the brief leaves the first load to the mount-time fetch.
 
-Until #537 lands, a visibility re-list uses the store's shared `error` like
-any list: it clears it when it starts, wiping an error the session page was
-showing, and a failure (returning to the tab offline) shows up in the session
-page's error line. #537 moves the list's error to its own ref. Also accepted:
-the re-list sets `listLoading`, so while it runs an account with no sessions
-shows the sidebar skeleton instead of its empty state, and one with only
-ended sessions hides its no-active-sessions hint. Rows stay on screen.
+A visibility re-list writes only the list's own `listError` (#537, below), so
+a tab switch neither wipes an error the session page is showing nor puts a
+failed re-list (returning to the tab offline) in the page's error line. Also
+accepted: the re-list sets `listLoading`, so while it runs an account with no
+sessions shows the sidebar skeleton instead of its empty state, and one with
+only ended sessions hides its no-active-sessions hint. Rows stay on screen.
+
+## 2026-10-14 - The sidebar list has its own error (#537)
+
+The session store had one `error` slot shared by the session page and the
+sidebar list. A list fetch cleared it on start and wrote its failure into it,
+so a list could wipe a session-page error (a stream error, the duplicate-reopen
+link, `SESSION_ENDED_COPY`) or put its own failure in the page's banner; and
+pin/rename cleared it on start though their failures never write it (callers
+toast). Now `listSessions` writes only `listError` (cleared on start, set on
+failure, epoch-guarded, cleared by `reset()`; the #528 follow-up stays silent),
+and pin/rename leave `error` alone. HomeView's boot error reads `listError`.
+Side effect, accepted: Home's mount-time list used to wipe a session-page
+`error` left over from navigation; it no longer does, so that error stays until
+the next action that clears it (normally the next `loadSession`). Nothing on
+Home renders `error`, so this is invisible unless a session page is shown
+without a fresh load. Left alone on purpose: end/reopen/continueTopic/create/load still clear and set
+`error`; who owns the session page's errors is a separate decision.
 
 ## 2026-10-14 - One re-list after a list that raced a status change (#528)
 

@@ -346,7 +346,8 @@ bumps `_resetEpoch`, clears `_inflight` and `_listReplays`, and nulls
 `_latestRequestedId`. Any
 async action must call `const live = _epochGuard()` before its first `await`
 and gate every later state write on `live()`: data writes, `finally` flag
-clears, and the error write (`_setError(e, live)`). Return or rethrow to the
+clears, and the error write (`_setError(e, live)`, or
+`_setError(e, live, listError)` for the sidebar list, #537). Return or rethrow to the
 caller unchanged. Without the gate, a request in flight at sign-out writes the
 previous account's data into the next one's store. Streams use the separate
 `ABANDONED` sentinel on `_streamSid` instead (`_streamSuperseded()`).

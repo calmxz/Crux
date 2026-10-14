@@ -74,11 +74,11 @@ describe('session store', () => {
     expect(s.error).toBeNull()
   })
 
-  it('listSessions surfaces error and rethrows', async () => {
+  it('listSessions surfaces its failure in listError and rethrows', async () => {
     sessionsApi.getSessionLibrary.mockRejectedValueOnce(new Error('nope'))
     const s = useSessionStore()
     await expect(s.listSessions('u1')).rejects.toThrow('nope')
-    expect(s.error).toBe('nope')
+    expect(s.listError).toBe('nope')
   })
 
   it('createSession sets currentSession and resets messages', async () => {
@@ -715,6 +715,7 @@ describe('session store', () => {
       expect(s.activeTotal).toBe(3)
       expect(s.endedTotal).toBe(1)
       expect(s.error).toBeNull()
+      expect(s.listError).toBeNull()
       expect(s.listLoading).toBe(false)
     })
 
@@ -1167,6 +1168,100 @@ describe('session store', () => {
       detail.resolve({ id: 's1', messages: [] })
       await loading
       expect(s.detailLoading).toBe(false)
+    })
+  })
+
+  describe('#537 the list has its own error, and the session page error is not its', () => {
+    const PAGE_ERROR = 'The tutor stopped responding. Please try again.'
+
+    it.each([
+      ['null', null],
+      ["another action's", PAGE_ERROR],
+    ])('a failed list sets listError and leaves a %s error unchanged', async (_, prior) => {
+      getSessionLibrary.mockRejectedValue(new Error('offline'))
+      const s = useSessionStore()
+      s.error = prior
+      await expect(s.listSessions()).rejects.toThrow('offline')
+      expect(s.listError).toBe('offline')
+      expect(s.error).toBe(prior)
+    })
+
+    it('a list starting clears listError and leaves an existing error in place', async () => {
+      const active = deferred()
+      const ended = deferred()
+      getSessionLibrary.mockReturnValueOnce(active.promise).mockReturnValueOnce(ended.promise)
+      const s = useSessionStore()
+      s.listError = 'earlier list failure'
+      s.error = PAGE_ERROR
+      const listing = s.listSessions()
+      expect(s.listError).toBeNull()
+      expect(s.error).toBe(PAGE_ERROR)
+      active.resolve({ items: [], total: 0 })
+      ended.resolve({ items: [], total: 0 })
+      await listing
+      expect(s.listError).toBeNull()
+      expect(s.error).toBe(PAGE_ERROR)
+    })
+
+    it.each([
+      ['setPinned', 'succeeds'],
+      ['setPinned', 'fails'],
+      ['renameSession', 'succeeds'],
+      ['renameSession', 'fails'],
+    ])('%s leaves an existing error in place (call %s)', async (name, outcome) => {
+      const d = deferred()
+      sessionsApi[name].mockReturnValueOnce(d.promise)
+      const s = useSessionStore()
+      seedSession(s)
+      s.error = PAGE_ERROR
+      const run = name === 'setPinned' ? s.setPinned('s1', true) : s.renameSession('s1', 'New')
+      const running = run.catch(() => {})
+      expect(s.error).toBe(PAGE_ERROR)
+
+      if (outcome === 'succeeds') d.resolve({})
+      else d.reject(new Error('nope'))
+      await running
+      expect(s.error).toBe(PAGE_ERROR)
+    })
+
+    it('reset() clears listError', async () => {
+      getSessionLibrary.mockRejectedValue(new Error('offline'))
+      const s = useSessionStore()
+      await s.listSessions().catch(() => {})
+      expect(s.listError).toBe('offline')
+      s.reset()
+      expect(s.listError).toBeNull()
+    })
+
+    it('a list from before a reset does not write listError', async () => {
+      const active = deferred()
+      const ended = deferred()
+      getSessionLibrary.mockReturnValueOnce(active.promise).mockReturnValueOnce(ended.promise)
+      const s = useSessionStore()
+      const listing = s.listSessions()
+      s.reset()
+      active.reject(new Error('prev account'))
+      ended.reject(new Error('prev account'))
+      await expect(listing).rejects.toThrow('prev account')
+      expect(s.listError).toBeNull()
+      expect(s.error).toBeNull()
+    })
+
+    it('a failed #528 follow-up writes neither ref', async () => {
+      const ENDED_AT = '2026-10-14T01:00:00Z'
+      const row = (over = {}) => ({ id: 's1', topic: 'T', pinned: false, ended_at: null, ...over })
+      getSessionLibrary
+        // The triggering fetch: the same id in both pages.
+        .mockResolvedValueOnce({ items: [row()], total: 1 })
+        .mockResolvedValueOnce({ items: [row({ ended_at: ENDED_AT })], total: 1 })
+        .mockRejectedValueOnce(new Error('network'))
+        .mockRejectedValueOnce(new Error('network'))
+      const s = useSessionStore()
+      s.error = PAGE_ERROR
+      await s.listSessions()
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.listError).toBeNull()
+      expect(s.error).toBe(PAGE_ERROR)
     })
   })
 
