@@ -945,6 +945,57 @@ describe('session store', () => {
       expect(s.endedTotal).toBe(1)
     })
 
+    it('a landed window row judges even while a later list is in flight', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.currentSession = row()
+      const land = queuePages()
+      const listing = s.listSessions()
+      const ending = s.endSession('s1')
+      land([row({ id: 'a' })], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await listing
+      // A second list starts and fails after the reply: its totals never land.
+      sessionsApi.getSessionLibrary
+        .mockRejectedValueOnce(new Error('network'))
+        .mockRejectedValueOnce(new Error('network'))
+      const relisting = s.listSessions().catch(() => {})
+      end.resolve({ ended_at: ENDED_AT, summary: null })
+      await ending
+      await relisting
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    // Releases the reply at each microtask offset after the pages resolve, so
+    // one run lands it while the list's _inflight entry outlives _listPending.
+    // Whichever path each offset takes, the totals must end at the server's.
+    it.each([...Array(12).keys()])(
+      'an end outside the window released %i microtasks after the pages ends at the server totals',
+      async (ticks) => {
+        const end = deferred()
+        sessionsApi.endSession.mockReturnValueOnce(end.promise)
+        const s = useSessionStore()
+        s.currentSession = row({ id: 'lib' })
+        const land = queuePages()
+        const listing = s.listSessions()
+        const ending = s.endSession('lib')
+        // Any further fetch (the #528 follow-up or the #533 re-list) is fresh.
+        sessionsApi.getSessionLibrary.mockResolvedValue({ items: [], total: 2 })
+        // The snapshot predates the end: 'lib' is still counted active.
+        land([row()], [], { active: 3, ended: 1 })
+
+        for (let i = 0; i < ticks; i++) await Promise.resolve()
+        end.resolve({ ended_at: ENDED_AT, summary: null })
+        await ending
+        await listing
+        await vi.waitFor(() => {
+          expect(s.activeTotal).toBe(2)
+          expect(s.endedTotal).toBe(2)
+        })
+      },
+    )
+
     it('an end with no list landed since its start makes no extra fetch', async () => {
       sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
       const s = useSessionStore()

@@ -85,8 +85,8 @@ export const useSessionStore = defineStore('session', () => {
   // window, re-lists instead of moving the totals (#533, see
   // _statusChangeGuard).
   // CONTRACT for any new action that moves a session between active and
-  // ended: it must move these too, using the shared rule documented on
-  // _observedRows() below.
+  // ended: it must move these too, judged by _statusChangeGuard() (the shared
+  // rule documented on _observedRows() below, plus #533's landed-list cases).
   const activeTotal = ref(0)
   const endedTotal = ref(0)
   const messages = ref([])
@@ -195,28 +195,31 @@ export const useSessionStore = defineStore('session', () => {
   // The returned function decides, from a reply, what the totals need:
   // 'move', 'skip' (already counted), or 'relist'. Call it BEFORE patching
   // the observed copies, which would make every copy read as already moved.
-  // With no list landed since the start, or one still in flight (its replay
-  // and #528 decide), it is the SHARED TOTALS RULE unchanged. Once a list
-  // has landed, that list may already count the change, so:
+  // With no list landed since the start it is the SHARED TOTALS RULE
+  // unchanged. Once a list has landed, that list may already count the
+  // change, so:
   //   - the landed window row alone judges when there is one: it is the
   //     server's state as of that snapshot, while another copy (the open
-  //     detail, the caller's row) can still show the prior state.
+  //     detail, the caller's row) can still show the prior state. This holds
+  //     with a later list in flight too, whose totals may never land.
   //   - with no window row, copies all in the target state still mean an
-  //     earlier action counted it; otherwise nothing local can tell whether
-  //     the snapshot predates the commit, so it re-lists (#528's reasoning).
+  //     earlier action counted it.
+  //   - otherwise nothing local can tell whether the snapshot predates the
+  //     commit, so it re-lists (#528's reasoning). With a list in flight it
+  //     moves instead: the replay recorded for that list, and #528, decide.
   function _statusChangeGuard() {
     const landedAtStart = _listsLanded
 
     return (id, endedAt, observed) => {
       const inTarget = (r) => Boolean(r.ended_at) === Boolean(endedAt)
-      const listLanded = !_listPending && _listsLanded !== landedAtStart
+      const listLanded = _listsLanded !== landedAtStart
       const windowRow = listLanded && sessions.value.find((s) => s.id === id)
 
       if (windowRow) return inTarget(windowRow) ? 'skip' : 'move'
 
       if (observed.length > 0 && observed.every(inTarget)) return 'skip'
 
-      return listLanded ? 'relist' : 'move'
+      return listLanded && !_listPending ? 'relist' : 'move'
     }
   }
 
@@ -232,7 +235,11 @@ export const useSessionStore = defineStore('session', () => {
     // Like the mount-time callers: a failed list keeps the landed totals.
     const run = () => listSessions().catch(() => {})
 
-    if (!settling) return run()
+    if (!settling) {
+      run()
+
+      return
+    }
 
     settling
       .catch(() => {})
@@ -341,7 +348,9 @@ export const useSessionStore = defineStore('session', () => {
   // own items array the store never sees). Together these are the ONLY
   // observations the store has of a session's active/ended state.
   //
-  // SHARED TOTALS RULE (endSession / reopenSession / continueTopic):
+  // SHARED TOTALS RULE (endSession / reopenSession / continueTopic; applied
+  // through _statusChangeGuard, which overrides it once a list has landed
+  // since the request started):
   //   move the totals unless EVERY observed copy already shows the target
   //   state -- in that case the transition was counted when it first
   //   happened. With nothing observed we cannot see the state at all, so we

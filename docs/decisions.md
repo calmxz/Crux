@@ -41,7 +41,8 @@ so judging all copies counted the change twice. With no row (and no copy
 already in the target state), the action does not move the totals and calls
 `listSessions()` once instead; re-listing beats a local guess for the same
 reason as #528. With a list still in flight, its recorded replay and #528
-decide.
+decide. Accepted, as for the #528 follow-up: a failed re-list keeps the landed
+totals, which may predate the change, until the next mount-time list.
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 

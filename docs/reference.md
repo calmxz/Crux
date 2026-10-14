@@ -396,11 +396,13 @@ races it cannot see are listed in `docs/decisions.md` (2026-10-14).
 Late reply (#533): end/reopen/continueTopic call `_statusChangeGuard()` when
 their request starts (it notes `_listsLanded`, bumped each time a list writes
 the window). On the reply, before patching, its judge returns `'move'`,
-`'skip'` or `'relist'`. With no list landed since, or one still in flight, it
-is the shared totals rule. Once a list has landed: the landed window row alone
-decides when there is one (the open detail or the caller's row can be a stale
-separate copy), copies all in the target state skip, and otherwise `_relist()`
-calls `listSessions()` instead of moving the totals. Observed copies are always
+`'skip'` or `'relist'`. With no list landed since, it is the shared totals
+rule. Once a list has landed: the landed window row alone decides when there
+is one (the open detail or the caller's row can be a stale separate copy),
+even with a later list in flight. Copies all in the target state skip.
+Otherwise `_relist()` calls `listSessions()` instead of moving the totals, or,
+with a list in flight, the totals move and that list's replay decides (#528).
+Observed copies are always
 patched. `_relist()` runs after `_trackStatusChange`, or the re-list would
 record that replay against itself and re-list again, and it waits out a list
 whose `_inflight` entry outlives `_listPending`, so it never joins a finished
