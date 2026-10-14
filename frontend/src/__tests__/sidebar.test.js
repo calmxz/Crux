@@ -2656,16 +2656,38 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(true)
   })
 
-  it('a session created after a failed first list renders as a row', async () => {
+  // The create re-lists (store, #544); here that list fails too.
+  it('a session created after a failed first list renders as a row, with the error line under it', async () => {
     await mountFailed()
     apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
     await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
     await flushPromises()
     expect(wrapper.find('[data-testid="sidebar-row-n1"]').text()).toContain('Graphs')
     expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
-    // No loaded list vouches for the Ended tab, so it keeps the error line.
+    // One row must not pass for the whole account.
+    expect(errorLine().exists()).toBe(true)
     await showEnded()
     expect(errorLine().exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+  })
+
+  it('a created session that was then ended shows on the Ended tab with the error line under it', async () => {
+    await mountFailed()
+    useSessionStore().sessions = [row('e1', { ended_at: '2026-10-14T09:30:00Z' })]
+    await showEnded()
+    expect(wrapper.find('[data-testid="sidebar-row-e1"]').exists()).toBe(true)
+    expect(errorLine().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+  })
+
+  it('a create whose re-list succeeds clears the error line and shows the account', async () => {
+    await mountFailed()
+    serveLists({ active: [row('n1', { topic: 'Graphs' }), row('a1')] })
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
   })
 })

@@ -6,11 +6,14 @@ how-it-works lookup belongs in `docs/reference.md` instead.
 ## 2026-10-14 - A failed first list shows an error line, not an empty account (#544)
 
 Until a list has loaded this sign-in (`sessionsLoaded`), a failed list
-(`listError`) replaces the sidebar's empty hints on both tabs with "Couldn't
-load your sessions." and a silent Retry; after a load, a failure stays silent
-(#534). The error line replaces only an empty state, so a row a create
-inserted after the failure hides it on the Active tab; Retry is then reachable
-from the Ended tab, or a reload. Also accepted: the Ended tab shows the
+(`listError`) puts "Couldn't load your sessions." and a silent Retry on both
+sidebar tabs; after a load, a failure stays silent (#534). Two calls beyond
+the brief, made by the maintainer after review: the line also shows under
+rows a create inserted (the brief had it replace only an empty state, so one
+created row passed for the whole account, and nothing re-listed), and a
+create or continue-topic after a failed first list re-lists once (store
+`_relistIfFirstListFailed`, the brief excluded store changes). The re-list
+cannot double one already running or a #533 re-list. Also accepted: the Ended tab shows the
 skeleton while a never-loaded list runs (it used to say "No ended sessions
 yet" during the first load). Retry unmounts the line while it runs; on a
 failed retry focus returns to Retry unless the learner focused something else

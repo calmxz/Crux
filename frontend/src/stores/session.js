@@ -264,6 +264,18 @@ export const useSessionStore = defineStore('session', () => {
       })
   }
 
+  // #544: a create after a failed first list (nothing loaded this sign-in)
+  // re-lists once, so the created row is not left standing in for the whole
+  // account. Call it after _insertCreated: the landing list replaces the row
+  // and the total it bumped with the server's. It never doubles a list: one
+  // already running has cleared listError, and a 'relist' from
+  // _statusChangeGuard means a list landed, setting sessionsLoaded. A failure
+  // leaves listError, so the sidebar's error line stays. After a load, a
+  // failed list keeps its window (#534), so this stays out of the way.
+  function _relistIfFirstListFailed() {
+    if (!sessionsLoaded.value && listError.value) _relist()
+  }
+
   // The optimistic write behind renameSession / setPinned: patch every
   // observed copy now, send `request`, roll back on failure. Every observed
   // copy is a target -- a search row can be the only rendered copy of a
@@ -627,6 +639,7 @@ export const useSessionStore = defineStore('session', () => {
       // and show it in the sidebar window, unless a list fetch that landed
       // first already did both.
       if (_insertCreated(created)) activeTotal.value += 1
+      _relistIfFirstListFailed()
 
       currentSession.value = created
       currentSessionId.value = created.id
@@ -937,6 +950,7 @@ export const useSessionStore = defineStore('session', () => {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       } else if (totals === 'relist') _relist()
+      _relistIfFirstListFailed()
 
       currentSession.value = created
       currentSessionId.value = created.id

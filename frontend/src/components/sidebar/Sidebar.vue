@@ -251,15 +251,12 @@ const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
 
 const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
 
-// #544: until a list has loaded this sign-in, nothing vouches for an empty
-// tab, so a failed list shows an error line where an empty hint would be.
-// Once one has loaded, a later failure stays silent and keeps the window
-// (#534). Rows a create inserted still render; only the empty states give way.
+// #544: until a list has loaded this sign-in, a failed list leaves both tabs
+// unvouched for, so each shows an error line: in place of its empty hint, or
+// under the rows a create inserted, which must not pass for the whole
+// account. Once one has loaded, a later failure stays silent and keeps the
+// window (#534).
 const listFailed = computed(() => !sessionsLoaded.value && !!listError.value)
-
-const showActiveListError = computed(() => listFailed.value && !activeRendered.value)
-
-const showEndedListError = computed(() => listFailed.value && !cappedEndedRows.value.length)
 
 // Keyed on sessionsLoaded, not on sessions.length like the Active tab's
 // showSkeleton: rows a create inserted are active, so they cannot vouch for
@@ -819,11 +816,7 @@ async function onSignOut() {
                     />
                   </ul>
                 </div>
-                <SidebarListError
-                  v-if="showActiveListError"
-                  ref="listErrorEl"
-                  @retry="onRetryList"
-                />
+                <SidebarListError v-if="listFailed" ref="listErrorEl" @retry="onRetryList" />
                 <p v-else-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
                   No sessions yet. Click + New session above.
                 </p>
@@ -858,15 +851,13 @@ async function onSignOut() {
                 state="ended"
               />
             </ul>
-            <SidebarListError
-              v-else-if="showEndedListError"
-              ref="listErrorEl"
-              @retry="onRetryList"
-            />
-            <SidebarSkeletonList v-else-if="showEndedSkeleton" :count="3" />
-            <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
-              No ended sessions yet.
-            </p>
+            <SidebarListError v-if="listFailed" ref="listErrorEl" @retry="onRetryList" />
+            <template v-else-if="!cappedEndedRows.length">
+              <SidebarSkeletonList v-if="showEndedSkeleton" :count="3" />
+              <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
+                No ended sessions yet.
+              </p>
+            </template>
             <RouterLink
               v-if="showViewAllEnded"
               class="sb-view-all"
