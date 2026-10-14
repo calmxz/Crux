@@ -75,8 +75,8 @@ export const useSessionStore = defineStore('session', () => {
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
   // and reset(). Outside the exceptions below, every listSessions() call
-  // site is mount-time (HomeView, Sidebar onMounted), and a mutation never
-  // triggers a refetch -- deliberately, since a refetch costs a round-trip and re-sorts
+  // site is mount-time (HomeView, Sidebar onMounted) or the sidebar's Retry
+  // after a failed first list, and a mutation never triggers a refetch -- deliberately, since a refetch costs a round-trip and re-sorts
   // the sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists until the next list. The same rule is
   // why a create inserts its row locally rather than refetching the window.

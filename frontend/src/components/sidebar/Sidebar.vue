@@ -257,7 +257,7 @@ const activeRendered = computed(
 // While the first list has failed, or a retry of it runs, the totals count
 // only local creates, never a loaded total, so nothing shows them (#544).
 const totalsUnloaded = computed(
-  () => !sessionsLoaded.value && (firstListFailed.value || listLoading.value),
+  () => firstListFailed.value || (!sessionsLoaded.value && listLoading.value),
 )
 
 // View all is the list's closing line whenever rows are rendered. The
