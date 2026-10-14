@@ -90,11 +90,13 @@ describe('HomeView', () => {
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })
 
-  // #537: the session page's error is not a boot error.
+  // #537: the session page's error is not a boot error. Written after the
+  // mount's list settles, so that list cannot have cleared it.
   it("does not show the session page's error as a boot error", async () => {
     const store = useSessionStore()
-    store.error = 'The tutor stopped responding. Please try again.'
     const wrapper = mountView()
+    await flushPromises()
+    store.error = 'The tutor stopped responding. Please try again.'
     await flushPromises()
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })

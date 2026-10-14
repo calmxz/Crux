@@ -12,9 +12,12 @@ link, `SESSION_ENDED_COPY`) or put its own failure in the page's banner; and
 pin/rename cleared it on start though their failures never write it (callers
 toast). Now `listSessions` writes only `listError` (cleared on start, set on
 failure, epoch-guarded, cleared by `reset()`; the #528 follow-up stays silent),
-and pin/rename leave `error` alone. HomeView's boot error reads `listError`,
-so it also no longer shows a session-page error left over from navigation.
-Left alone on purpose: end/reopen/continueTopic/create/load still clear and set
+and pin/rename leave `error` alone. HomeView's boot error reads `listError`.
+Side effect, accepted: Home's mount-time list used to wipe a session-page
+`error` left over from navigation; it no longer does, so that error stays until
+the next action that clears it (normally the next `loadSession`). Nothing on
+Home renders `error`, so this is invisible unless a session page is shown
+without a fresh load. Left alone on purpose: end/reopen/continueTopic/create/load still clear and set
 `error`; who owns the session page's errors is a separate decision.
 
 ## 2026-10-14 - One re-list after a list that raced a status change (#528)
