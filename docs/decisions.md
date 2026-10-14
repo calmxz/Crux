@@ -3,6 +3,17 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - Home's boot error follows the sidebar's first-list-failed rule (#546)
+
+Home's boot error and the sidebar's error line both read the store's
+`firstListFailed` (`!sessionsLoaded && listError`), replacing Home's
+`listError && !sessions.length`. So an account that loaded with zero sessions
+stays quiet on Home when a later list fails (the #534 visibility re-list, or
+Home's own unthrottled mount-time list), as the sidebar already did. The one
+change in the other direction: when the first list failed and a create
+inserted a row, Home now shows its error too, since a created row cannot
+vouch for the account any more than it does in the sidebar (#544).
+
 ## 2026-10-14 - A failed first list shows an error line, not an empty account (#544)
 
 Until a list has loaded this sign-in (`sessionsLoaded`), a failed list

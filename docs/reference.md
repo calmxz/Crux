@@ -427,16 +427,19 @@ a list's `finally` and its `_inflight` removal, so it cannot join a finished
 fetch.
 
 Failed first list (#544): until a list has loaded this sign-in, a failed one
-(`!sessionsLoaded && listError`) is the only state where the window vouches
-for nothing. The sidebar shows `SidebarListError` (message + silent Retry) on
-both tabs, in place of an empty hint or under rows a create inserted, and
-hides every total-derived surface (View all links, the Ended tab count) while
-that list has failed or a retry of it runs: the totals then count only local
-creates. A new surface that renders `activeTotal`, `endedTotal` or an empty
-state reads the same gate. `_addCreated` re-lists in this state through
-`_relist()`, sharing the #534 throttle via `_claimRelistSlot`. Retry and
-mount-time lists are not throttled attempts. After a load, a failed list
-stays silent and keeps the window (#534).
+(the store's `firstListFailed`, `!sessionsLoaded && listError`) is the only
+state where the window vouches for nothing, and the only state any surface
+reports a list failure in: Home's boot error reads the same computed (#546).
+The sidebar shows `SidebarListError` (message + silent Retry) on both tabs,
+in place of an empty hint or under rows a create inserted, and hides every
+total-derived surface (View all links, the Ended tab count) while that list
+has failed or a retry of it runs: the totals then count only local creates. A
+new surface that renders `activeTotal`, `endedTotal` or an empty state reads
+the same gate. `_addCreated` re-lists in this state through `_relist()`,
+sharing the #534 throttle via `_claimRelistSlot`. Retry and mount-time lists
+are not throttled attempts. After a load, a failed list stays silent and
+keeps the window (#534), on Home as in the sidebar, including an account that
+loaded with zero sessions.
 
 Ordering matrix. A change to the totals or replay logic is checked against
 each row, for a session inside and outside the window. In a store test, seed
