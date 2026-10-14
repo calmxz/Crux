@@ -42,6 +42,27 @@ export default defineConfig([
 
   ...pluginOxlint.buildFromOxlintConfigFile('.oxlintrc.json'),
 
+  // data-testid is a test hook: product code reaches elements through template
+  // refs, an exposed method, or a class/attribute it owns, so renaming a test
+  // hook can never silently break behaviour (focus restore, #544).
+  {
+    files: ['src/**/*.{vue,js}'],
+    ignores: ['src/**/__tests__/**'],
+    rules: {
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'Literal[value=/data-testid/]',
+          message: 'Product code must not select by data-testid; use a ref or an owned class.',
+        },
+        {
+          selector: 'TemplateElement[value.raw=/data-testid/]',
+          message: 'Product code must not select by data-testid; use a ref or an owned class.',
+        },
+      ],
+    },
+  },
+
   // Single-word component names that are intentional (design-specified filenames).
   {
     files: ['src/components/chat/Composer.vue'],

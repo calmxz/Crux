@@ -86,7 +86,7 @@ function refocusOwnTrigger() {
 function refocusRowTrigger(id) {
   nextTick(() => {
     const row = document.querySelector(`[data-session-id="${id}"]`)
-    row?.querySelector('[data-testid="sidebar-row-menu-trigger"]')?.focus()
+    row?.querySelector('.sb-row-menu-trigger')?.focus()
   })
 }
 
