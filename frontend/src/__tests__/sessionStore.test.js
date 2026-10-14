@@ -1533,6 +1533,162 @@ describe('session store', () => {
   })
 })
 
+describe('#544 a create after a failed first list retries the list', () => {
+  const created = (over = {}) => ({
+    id: 'new',
+    user_id: 'u',
+    topic: 'Graphs',
+    created_at: '2026-10-14T00:00:00Z',
+    ended_at: null,
+    pinned: false,
+    topic_profile: null,
+    ingestion_status: null,
+    ...over,
+  })
+
+  // One list is an active page and an ended page; answer each by its status.
+  function serveLists({ active = [], ended = [] } = {}) {
+    getSessionLibrary.mockImplementation(async ({ status }) => {
+      const items = status === 'ended' ? ended : active
+
+      return { items, total: items.length, limit: 40, offset: 0 }
+    })
+  }
+
+  const lists = () => getSessionLibrary.mock.calls.length / 2
+
+  async function failFirstList(s) {
+    getSessionLibrary.mockRejectedValue(new Error('offline'))
+    await s.listSessions().catch(() => {})
+    getSessionLibrary.mockClear()
+    expect(s.sessionsLoaded).toBe(false)
+    expect(s.listError).toBe('offline')
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    vi.clearAllMocks()
+    getSessionLibrary.mockReset()
+  })
+
+  it('createSession lists once and lands the server window, counting the new session once', async () => {
+    const s = useSessionStore()
+    await failFirstList(s)
+    const server = { id: 'new', topic: 'Graphs', pinned: false, ended_at: null }
+    serveLists({ active: [server, { id: 'a1', pinned: false, ended_at: null }] })
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await vi.waitFor(() => expect(s.sessionsLoaded).toBe(true))
+    expect(lists()).toBe(1)
+    expect(s.listError).toBeNull()
+    expect(s.sessions.map((r) => r.id)).toEqual(['new', 'a1'])
+    expect(s.activeTotal).toBe(2)
+  })
+
+  it('a failed retry keeps the created row and listError, silently', async () => {
+    const s = useSessionStore()
+    await failFirstList(s)
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await vi.waitFor(() => expect(lists()).toBe(1))
+    await vi.waitFor(() => expect(s.listLoading).toBe(false))
+    expect(s.listError).toBe('offline')
+    expect(s.sessionsLoaded).toBe(false)
+    expect(s.sessions.map((r) => r.id)).toEqual(['new'])
+    expect(s.error).toBeNull()
+  })
+
+  it('continueTopic lists once too', async () => {
+    const s = useSessionStore()
+    await failFirstList(s)
+    serveLists()
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.continueTopic({ id: 'prior', topic: 'Graphs', ended_at: '2026-10-13T00:00:00Z' })
+    await vi.waitFor(() => expect(s.sessionsLoaded).toBe(true))
+    expect(lists()).toBe(1)
+  })
+
+  // A real macrotask: lets a re-list, including _relist's deferred path,
+  // start and fail before counting.
+  const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+  it.each([
+    ['createSession', (s) => s.createSession({ topic: 'Graphs', seedMode: 'fresh' })],
+    [
+      'continueTopic',
+      (s) => s.continueTopic({ id: 'prior', topic: 'Graphs', ended_at: '2026-10-13T00:00:00Z' }),
+    ],
+  ])('throttles: %s made offline re-lists at most once per 30s', async (_, create) => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+
+    try {
+      vi.setSystemTime(new Date('2026-10-14T10:00:00Z'))
+      const s = useSessionStore()
+      await failFirstList(s)
+      getSessionLibrary.mockRejectedValue(new Error('offline'))
+
+      const createOffline = async (id) => {
+        sessionsApi.createSession.mockResolvedValueOnce(created({ id }))
+        await create(s)
+        await settle()
+        expect(s.listLoading).toBe(false)
+      }
+
+      await createOffline('n1')
+      expect(lists()).toBe(1)
+      vi.setSystemTime(new Date('2026-10-14T10:00:20Z'))
+      await createOffline('n2')
+      expect(lists()).toBe(1)
+      vi.setSystemTime(new Date('2026-10-14T10:00:31Z'))
+      await createOffline('n3')
+      expect(lists()).toBe(2)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does not list when no list has failed', async () => {
+    const s = useSessionStore()
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await Promise.resolve()
+    expect(lists()).toBe(0)
+  })
+
+  it('does not list when a later list failed after one loaded (#534 keeps the window)', async () => {
+    const s = useSessionStore()
+    serveLists()
+    await s.listSessions()
+    getSessionLibrary.mockRejectedValue(new Error('offline'))
+    await s.listSessions().catch(() => {})
+    getSessionLibrary.mockClear()
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await Promise.resolve()
+    expect(lists()).toBe(0)
+  })
+
+  it('a sign-out while the retry runs lands nothing', async () => {
+    const s = useSessionStore()
+    await failFirstList(s)
+    const pages = []
+    getSessionLibrary.mockImplementation(() => new Promise((resolve) => pages.push(resolve)))
+    sessionsApi.createSession.mockResolvedValueOnce(created())
+    await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await vi.waitFor(() => expect(lists()).toBe(1))
+    s.reset()
+
+    for (const resolve of pages) {
+      resolve({ items: [{ id: 'other', ended_at: null }], total: 1, limit: 40, offset: 0 })
+    }
+
+    await vi.waitFor(() => expect(s.listLoading).toBe(false))
+    expect(s.sessions).toEqual([])
+    expect(s.sessionsLoaded).toBe(false)
+    expect(s.activeTotal).toBe(0)
+  })
+})
+
 describe('listSessions via library endpoint', () => {
   let store
 

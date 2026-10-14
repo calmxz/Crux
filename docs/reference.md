@@ -354,18 +354,20 @@ previous account's data into the next one's store. Streams use the separate
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
 
-### Sidebar session window (#522, #524, #528, #533, #534)
+### Sidebar session window (#522, #524, #528, #533, #534, #544)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
-corpus, and a mutation never refetches it. Three exceptions, below: the
-#528 and #533 re-lists after a status-change race, and the #534 re-list when
-the tab becomes visible again.
+corpus, and a mutation never refetches it. Four exceptions, below: the
+#528 and #533 re-lists after a status-change race, the #534 re-list when
+the tab becomes visible again, and the #544 re-list after a create made
+while the first list has failed.
 `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
-created session locally via `_insertCreated` (list-item shape, after the
-pinned active rows), counting it in `activeTotal` only if the row was not
-already there. "Has the window loaded?" is `sessionsLoaded`, never
-`sessions.length`: a create makes the window non-empty without loading it.
+created session locally via `_addCreated` -> `_insertCreated` (list-item
+shape, after the pinned active rows), counting it in `activeTotal` only if
+the row was not already there. "Has the window loaded?" is `sessionsLoaded`,
+never `sessions.length`: a create makes the window non-empty without loading
+it.
 
 A list snapshot can predate a local change, so every window change is
 recorded in `_listReplays` and re-applied onto the incoming rows and totals
@@ -416,12 +418,25 @@ mounted sidebars (module-scoped count; added on the first mount, removed on
 the last unmount). When the document turns visible and the user is signed in,
 it calls the store's `relistIfStale()`. That calls `listSessions()` unless the
 window has not loaded this sign-in (`sessionsLoaded`), or a list wrote the
-window (`_listLandedAt`, set by every landing) or a visibility re-list was
+window (`_listLandedAt`, set by every landing) or a throttled re-list was
 attempted (`_relistTriedAt`, so offline returns are throttled too) under 30
-seconds ago. `reset()` clears both; a negative age from a clock moved back
-counts as stale. A list still in flight is joined through `_inflight`. The event
-runs as its own task, never in the microtasks between a list's `finally` and
-its `_inflight` removal, so it cannot join a finished fetch.
+seconds ago (`_claimRelistSlot`). `reset()` clears both; a negative age from
+a clock moved back counts as stale. A list still in flight is joined through
+`_inflight`. The event runs as its own task, never in the microtasks between
+a list's `finally` and its `_inflight` removal, so it cannot join a finished
+fetch.
+
+Failed first list (#544): until a list has loaded this sign-in, a failed one
+(`!sessionsLoaded && listError`) is the only state where the window vouches
+for nothing. The sidebar shows `SidebarListError` (message + silent Retry) on
+both tabs, in place of an empty hint or under rows a create inserted, and
+hides every total-derived surface (View all links, the Ended tab count) while
+that list has failed or a retry of it runs: the totals then count only local
+creates. A new surface that renders `activeTotal`, `endedTotal` or an empty
+state reads the same gate. `_addCreated` re-lists in this state through
+`_relist()`, sharing the #534 throttle via `_claimRelistSlot`. Retry and
+mount-time lists are not throttled attempts. After a load, a failed list
+stays silent and keeps the window (#534).
 
 Ordering matrix. A change to the totals or replay logic is checked against
 each row, for a session inside and outside the window. In a store test, seed
