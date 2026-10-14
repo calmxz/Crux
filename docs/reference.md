@@ -384,12 +384,14 @@ before the list writes them:
 Re-list (#528): when a list lands and an end/reopen/prior-end replay found no
 row, or the same id is in both the active and the ended page (a change
 committed between the two parallel page reads), the snapshot's totals may be
-off by one. The list still writes its result, drops `loading`, clears its
+off by one. The list still writes its result, drops `loading` (and its
+`finally` then leaves `loading` to any mutation started since), clears its
 settled replays, and runs one more fetch inside the same shared `'list'`
 promise, so `_listPending` and replay tracking cover it too. The follow-up's
 own race result is ignored (capped at one), its failure is swallowed (the
 first result stays, no `error`), and the epoch guard drops it after `reset()`.
-Creates and pin/rename never trigger it: their replays are exact.
+Creates and pin/rename never trigger it: their replays are exact. Residual
+races it cannot see are listed in `docs/decisions.md` (2026-10-14).
 
 ### E2E sign-in against the real backend (#518)
 

@@ -407,7 +407,7 @@ export const useSessionStore = defineStore('session', () => {
   // page reads put the same session in both (its rows de-dupe below, its
   // totals cannot). `live` false skips every write.
   async function _landListSnapshot(live) {
-    // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
+    // Background fetch (mount-time callers, or the #528 re-list) — silent
     // because a background load must never toast (U-05).
     const [activePage, endedPage] = await Promise.all([
       sessionsApi.getSessionLibrary(
@@ -463,6 +463,7 @@ export const useSessionStore = defineStore('session', () => {
       loading.value = true
       error.value = null
       _listPending = true
+      let loadingDropped = false
 
       try {
         const { rows, raced } = await _landListSnapshot(live)
@@ -475,24 +476,28 @@ export const useSessionStore = defineStore('session', () => {
         // no local adjustment can tell which, so fetch one fresh list. Its
         // own race result is ignored: at most one extra round trip. The rows
         // above stay rendered while it runs, so the skeleton flag drops now.
+        // A mutation started after this owns `loading`; the finally must not
+        // clear it.
         loading.value = false
+        loadingDropped = true
         // The changes just replayed committed before this fetch starts;
         // pending pin/rename entries stay and replay onto it too.
         _dropSettledReplays()
+        let landed = rows
 
         try {
-          await _landListSnapshot(live)
+          landed = (await _landListSnapshot(live)).rows
         } catch {
           // Silent like every list fetch, and not an error the user can act
           // on: the triggering fetch's rows and totals stay.
         }
 
-        return sessions.value
+        return live() ? sessions.value : landed
       } catch (e) {
         _setError(e, live)
       } finally {
         if (live()) {
-          loading.value = false
+          if (!loadingDropped) loading.value = false
           _listPending = false
           _dropSettledReplays()
         }

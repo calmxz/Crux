@@ -710,11 +710,52 @@ describe('session store', () => {
       await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
       s.reset()
       landFollowUp([row({ id: 'prev-account' })], [], { active: 7, ended: 7 })
-      await listing
+      // The caller still gets what was fetched, never the reset store.
+      await expect(listing).resolves.toEqual([row({ id: 'prev-account' })])
       expect(s.sessions).toEqual([])
       expect(s.sessionsLoaded).toBe(false)
       expect(s.activeTotal).toBe(0)
       expect(s.endedTotal).toBe(0)
+    })
+
+    it('the follow-up landing does not clear loading for a mutation started after the trigger', async () => {
+      let resolveCreate
+      sessionsApi.createSession.mockReturnValueOnce(new Promise((r) => (resolveCreate = r)))
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
+      const creating = s.createSession({ topic: 'T', seedMode: 'fresh' })
+      landFollowUp([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
+      await listing
+      expect(s.loading).toBe(true)
+      resolveCreate({ id: 'new', topic: 'T', ended_at: null })
+      await creating
+      expect(s.loading).toBe(false)
+    })
+
+    it('a pin pending across both fetches lands on the follow-up rows and rolls back there', async () => {
+      let rejectPin
+      sessionsApi.setPinned.mockReturnValueOnce(new Promise((_, rej) => (rejectPin = rej)))
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      const pinning = s.setPinned('s1', true)
+      land([row(), row({ id: 'x' })], [row({ id: 'x', ended_at: ENDED_AT })], {
+        active: 2,
+        ended: 1,
+      })
+      landFollowUp([row()], [row({ id: 'x', ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.sessions[0].pinned).toBe(true)
+      rejectPin(new Error('nope'))
+      await expect(pinning).rejects.toThrow('nope')
+      expect(s.sessions[0].pinned).toBe(false)
     })
 
     it('drops the loading flag once the triggering fetch has written its rows', async () => {

@@ -10,7 +10,7 @@ local changes are mirrored, and changes made while a list is in flight are
 replayed onto its snapshot (#522 / #524). Two races defeat replay. An end,
 reopen or continueTopic prior-end on a session outside the loaded window has
 no snapshot row to judge, and a change committing between the parallel
-active and ended page reads puts one session in both pages. Neither snapshot
+active and ended page reads can put one session in both pages. Neither snapshot
 says whether its totals predate the change, so no local adjustment can be
 right; only a fresh list can. So a landing list that sees either case fetches
 one more list. Only those triggers, because they are the cases where the
@@ -24,7 +24,11 @@ Known residue, accepted: a race inside the follow-up itself (an out-of-window
 change during it, or a second straddle) is not re-listed again, and a change
 that commits while a list is in flight but whose response arrives after the
 list lands is not recorded as a replay at all, so the trigger never sees it.
-Both leave the totals off by one until the next mount-time list.
+The opposite straddle order (the page that would gain the session is read
+first, so it is in neither page) is invisible to the snapshot too. All of
+these leave the totals off by one until the next mount-time list; the real
+fix is server-side (both pages and totals from one transaction), which #528
+ruled out of scope.
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
