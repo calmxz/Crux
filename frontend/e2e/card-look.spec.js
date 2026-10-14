@@ -8,7 +8,8 @@
 // value computed at test time from the same CSS variables would move with the
 // bug. To re-record after an intended visual change, run
 //   CARD_LOOK_RECORD=1 npx playwright test e2e/card-look.spec.js
-// and paste the printed objects into LOOK.
+// and fold the printed objects back into LOOK, keeping the shared shapes
+// (CARD, JOINED, LEARNER, strip, bare) where the values still match them.
 //
 // Like auth.spec.js and mobile-390-check-card.spec.js it runs entirely
 // offline: Supabase GoTrue and every /api call are stubbed with page.route,
@@ -47,6 +48,10 @@ const BOX_PROPS = [
 // so BOX_PROPS alone would pin nothing #457 can break. They also pin the text
 // look that the shared `.error-line` / `.text-btn` classes take over.
 const TEXT_PROPS = ['color', 'textDecorationLine', 'fontSize']
+
+// Focus rings stay per component (docs/decisions.md, F6), so a focused read
+// pins the ring as well as the box.
+const FOCUS_PROPS = ['outlineColor', 'outlineStyle', 'outlineWidth', 'outlineOffset']
 
 // Recorded from `dev` (light theme). The shared shapes below are the parts
 // whose recorded values were identical across surfaces; each surface adds its
@@ -111,7 +116,7 @@ function strip(tab, padding) {
 function bare(color, textDecorationLine, fontSize) {
   return {
     backgroundColor: 'rgba(0, 0, 0, 0)',
-    ...edges(color),
+    ...edges('none'),
     borderTopWidth: '0px',
     borderRightWidth: '0px',
     borderBottomWidth: '0px',
@@ -144,6 +149,8 @@ const LOOK = {
   topicIntercept: { ...CARD, padding: '14px 40px 14px 16px' },
   // Library
   libraryRow: { ...CARD, padding: '14px 16px' },
+  // Its :hover edge darkens to the drop colour and stays local (#455).
+  libraryRowHover: { ...CARD, ...edges('rgb(196, 200, 208)'), padding: '14px 16px' },
   focusChip: { ...CARD, padding: '2.4px 8px' },
   libraryEmpty: { ...CARD, padding: '32px 28px' },
   libraryError: bare(ALERT, 'none', '17px'),
@@ -171,7 +178,15 @@ const LOOK = {
   recallCard: { ...LEARNER, padding: '10px 12px' },
   // Focus adds only an outline; this pins that the box does not change, in
   // particular that base.css's :focus-visible radius does not win.
-  recallCardFocused: { ...LEARNER, padding: '10px 12px' },
+  recallCardFocused: {
+    ...LEARNER,
+    padding: '10px 12px',
+    // Recall's own soft ring, not base.css's solid ink-learner one.
+    outlineColor: 'rgba(29, 79, 196, 0.35)',
+    outlineStyle: 'solid',
+    outlineWidth: '2px',
+    outlineOffset: '2px',
+  },
   // Settings and Account
   settingsPanel: { ...JOINED, padding: '24px 32px 32px' },
   accountPanel: { ...CARD, padding: '24px 32px 32px' },
@@ -184,19 +199,22 @@ const LOOK = {
   textButton: bare(LINK, 'underline', '14px'),
   // Sidebar
   sidebarCurrentRow: { ...CARD, padding: '0px' },
+  // The current row stays white on hover and focus, over the translucent
+  // .sb-row:hover background.
+  sidebarCurrentRowHover: { ...CARD, padding: '0px' },
+  sidebarCurrentRowFocusWithin: { ...CARD, padding: '0px' },
   // 390px
   authCoverMobile: { ...CARD, boxShadow: AUTH_LIFT, padding: '24px' },
   recallSheetMobile: { ...JOINED, padding: '12px' },
   recallCardMobile: { ...LEARNER, padding: '10px 12px' },
   cueCardMobile: { ...JOINED, padding: '6.4px 11.2px' },
-  // Edge lines top and bottom only, the lift instead of the drop. The side
-  // colours are the text colour, since those borders have no width.
+  // Edge lines top and bottom only, the lift instead of the drop.
   cueDrawerMobile: {
     backgroundColor: 'rgb(255, 255, 255)',
     borderTopColor: EDGE,
-    borderRightColor: 'rgb(27, 27, 26)',
+    borderRightColor: 'none',
     borderBottomColor: EDGE,
-    borderLeftColor: 'rgb(27, 27, 26)',
+    borderLeftColor: 'none',
     borderTopWidth: '1px',
     borderRightWidth: '0px',
     borderBottomWidth: '1px',
@@ -211,10 +229,18 @@ const LOOK = {
 }
 
 function readLook(locator, props) {
-  return locator.evaluate(
-    (el, names) => Object.fromEntries(names.map((n) => [n, getComputedStyle(el)[n]])),
-    props,
-  )
+  return locator.evaluate((el, names) => {
+    const style = getComputedStyle(el)
+    const look = Object.fromEntries(names.map((n) => [n, style[n]]))
+
+    // A border with no width shows no colour, and a pure move may change
+    // that unseen colour (e.g. onto a shared shorthand). Don't pin it.
+    for (const side of ['Top', 'Right', 'Bottom', 'Left']) {
+      if (look[`border${side}Width`] === '0px') look[`border${side}Color`] = 'none'
+    }
+
+    return look
+  }, props)
 }
 
 // Polls, so land animations and border transitions settle before the compare.
@@ -224,8 +250,17 @@ async function expectLook(name, locator, extra = []) {
   const props = [...BOX_PROPS, ...extra]
 
   if (RECORD) {
-    await locator.page().waitForTimeout(800)
-    console.log(`  ${JSON.stringify(name)}: ${JSON.stringify(await readLook(locator, props))},`)
+    // Record only a settled value: read until two reads 300ms apart agree.
+    let prev
+    let look = JSON.stringify(await readLook(locator, props))
+
+    while (look !== prev) {
+      prev = look
+      await locator.page().waitForTimeout(300)
+      look = JSON.stringify(await readLook(locator, props))
+    }
+
+    console.log(`  ${JSON.stringify(name)}: ${look},`)
 
     return
   }
@@ -427,8 +462,7 @@ function baseApi() {
 }
 
 // Unlike e2e/support/auth.js's signIn, needs no backend. Signs in through the
-// real form so supabase-js persists the session itself, then parks the mouse where it hovers nothing: a pointer left over the
-// submit button's spot would put whatever lands there next in :hover.
+// real form so supabase-js persists the session itself.
 async function signInOffline(page, api) {
   await stubAuth(page)
   await stubApi(page, api)
@@ -437,6 +471,12 @@ async function signInOffline(page, api) {
   await page.getByTestId('login-password').fill('hunter2pw')
   await page.getByTestId('login-submit').click()
   await expect(page).toHaveURL(/\/$/)
+  await parkMouse(page)
+}
+
+// Moves the pointer where it hovers nothing. After a click the pointer stays
+// put, and whatever lands under it next would read in :hover.
+async function parkMouse(page) {
   const { width, height } = page.viewportSize()
   await page.mouse.move(width - 1, height - 1)
 }
@@ -485,6 +525,7 @@ test.describe('card look at desktop', () => {
     await page.getByTestId('login-email').fill('me@example.com')
     await page.getByTestId('login-password').fill('wrongpass')
     await page.getByTestId('login-submit').click()
+    await parkMouse(page)
     await expectLook('loginStatus', page.getByTestId('login-error'))
   })
 
@@ -511,6 +552,7 @@ test.describe('card look at desktop', () => {
 
     await page.getByTestId('home-quick-topic').fill('Cellular respiration')
     await page.getByTestId('home-quick-go').click()
+    await parkMouse(page)
     await expectLook('topicIntercept', page.getByTestId('start-intercept'))
   })
 
@@ -521,6 +563,9 @@ test.describe('card look at desktop', () => {
     await page.goto('/sessions')
     const row = page.getByTestId(`library-card-${SESSION_ID}`)
     await expectLook('libraryRow', row)
+    await row.hover()
+    await expectLook('libraryRowHover', row)
+    await parkMouse(page)
     await expectLook('focusChip', row.getByTestId('chip-focus'))
 
     api['/sessions/library'] = { items: [], total: 0, limit: 20, offset: 0 }
@@ -553,7 +598,15 @@ test.describe('card look at desktop', () => {
     await expectLook('learnerTurn', page.getByTestId('msg-user'))
     await expectLook('composer', page.getByTestId('session-input').locator('..'))
     await expectLook('cueCard', page.getByTestId('cue-focus').locator('..'))
-    await expectLook('sidebarCurrentRow', page.getByTestId(`sidebar-row-${SESSION_ID}`))
+    const sidebarRow = page.getByTestId(`sidebar-row-${SESSION_ID}`)
+    await expectLook('sidebarCurrentRow', sidebarRow)
+    // docs/decisions.md (F6) names this row's :hover background as a trap
+    // for the move onto .card.
+    await sidebarRow.hover()
+    await expectLook('sidebarCurrentRowHover', sidebarRow)
+    await parkMouse(page)
+    await sidebarRow.getByTestId('sidebar-row-open').focus()
+    await expectLook('sidebarCurrentRowFocusWithin', sidebarRow)
   })
 
   test('session: ended card', async ({ page }) => {
@@ -648,7 +701,7 @@ test.describe('card look at desktop', () => {
     await expectLook('recallCard', card)
 
     await tabTo(page, card)
-    await expectLook('recallCardFocused', card)
+    await expectLook('recallCardFocused', card, FOCUS_PROPS)
   })
 
   test('settings and account: the sheet panels', async ({ page }) => {
@@ -671,6 +724,7 @@ test.describe('card look at desktop', () => {
     await expectLook('profileSection', page.getByTestId('sprof-events'))
 
     await page.getByTestId('level-select').getByRole('button', { name: 'beginner' }).click()
+    await parkMouse(page)
     await expectLook('profileConflict', page.getByTestId('sprof-conflict'))
   })
 
@@ -743,7 +797,7 @@ test.describe('card look at 390px', () => {
     // Below 900px the cue body is a collapsed strip; disclosed, it becomes a
     // drawer card hanging below the strip.
     await page.getByTestId('cue-disclosure').click()
-    await page.mouse.move(MOBILE.width - 1, MOBILE.height - 1)
+    await parkMouse(page)
     const cueCard = page.getByTestId('cue-focus').locator('..')
     await expectLook('cueCardMobile', cueCard)
     // cue card -> its section -> the cue body

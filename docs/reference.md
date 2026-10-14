@@ -499,8 +499,11 @@ only the Vite dev server is needed (`npx playwright test e2e/card-look.spec.js`
 from `frontend/`). The expected values are literals recorded from the browser,
 never derived from the CSS. After a deliberate visual change, re-record:
 `CARD_LOOK_RECORD=1 npx playwright test e2e/card-look.spec.js` prints each
-surface's values instead of asserting; paste them into `LOOK`. A surface the
-refactor only moves must pass unchanged without re-recording.
+surface's values (once two reads agree) instead of asserting. Fold them back
+into `LOOK`, keeping the shared shapes (`CARD`, `JOINED`, `LEARNER`, `strip`,
+`bare`) where they still match. A surface the refactor only moves must pass
+unchanged without re-recording. Zero-width borders read as colour `none`, so
+an unseen side colour never fails a move.
 Gotchas:
 - The session page focuses the composer after the session loads. Reading
   before that focus lands races it and pins the `:focus-within` border; wait
