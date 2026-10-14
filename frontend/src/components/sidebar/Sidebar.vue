@@ -738,6 +738,8 @@ async function onSignOut() {
     <nav ref="listEl" class="sb-list-wrap" aria-label="Sessions" :aria-hidden="isRail || null">
       <template v-if="isExpanded">
         <template v-if="searching">
+          <!-- #549: results stand in for the list, not for its failure. -->
+          <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
           <p
             class="sb-search-count label"
             data-testid="sidebar-search-count"

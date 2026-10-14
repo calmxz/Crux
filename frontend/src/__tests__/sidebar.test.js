@@ -2514,6 +2514,27 @@ describe('Sidebar.vue — failed first list (#544)', () => {
 
   // #549: Home reports the failure in these two layouts on the premise that
   // the sidebar renders no error line there.
+  // #549: search results replace the list but not its failure; Home is quiet
+  // while the sidebar is open, so the line is the only report.
+  it('keeps the error line above search results', async () => {
+    await mountFailed()
+    serveLists({ active: [row('r1')] })
+    vi.useFakeTimers()
+
+    try {
+      await wrapper.find('[data-testid="sidebar-search"]').setValue('Topic')
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(wrapper.find('[data-testid="sidebar-search-count"]').text()).toBe('1 match')
+    expect(useSessionStore().firstListFailed).toBe(true)
+    expect(errorLine().exists()).toBe(true)
+    expect(retryBtn().exists()).toBe(true)
+  })
+
   it.each(['collapsed', 'drawer-closed'])('renders no error line in %s', async (mode) => {
     sidebarTest._setMode(mode)
     await mountFailed()
