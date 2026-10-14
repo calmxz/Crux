@@ -21,6 +21,17 @@ import * as streamSvc from '@/services/chatStreamService.js'
 import { ERR_DAILY_CAP_REACHED, ERR_DAILY_COST_CAP_REACHED } from '@/lib/errorCodes.js'
 import { SESSION_ENDED_COPY, StreamAbortedError } from '@/lib/errors.js'
 
+function deferred() {
+  let resolve, reject
+
+  const promise = new Promise((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 class ApiErrorLike extends Error {
   constructor(status, body) {
     super('api error')
@@ -44,6 +55,7 @@ describe('session store', () => {
     expect(out).toEqual([{ id: 's1' }])
     expect(s.sessions).toEqual([{ id: 's1' }])
     expect(s.listLoading).toBe(false)
+    expect(s.error).toBeNull()
   })
 
   it('listSessions surfaces error and rethrows', async () => {
@@ -341,17 +353,6 @@ describe('session store', () => {
 
         return listing
       }
-    }
-
-    function deferred() {
-      let resolve, reject
-
-      const promise = new Promise((res, rej) => {
-        resolve = res
-        reject = rej
-      })
-
-      return { promise, resolve, reject }
     }
 
     const ENDED_AT = '2026-10-14T01:00:00Z'
@@ -777,17 +778,6 @@ describe('session store', () => {
 
   describe('#532 listLoading belongs to the sidebar list fetch alone', () => {
     const ENDED_AT = '2026-10-14T01:00:00Z'
-
-    function deferred() {
-      let resolve, reject
-
-      const promise = new Promise((res, rej) => {
-        resolve = res
-        reject = rej
-      })
-
-      return { promise, resolve, reject }
-    }
 
     // Each action with the API call it awaits and the value that call resolves to.
     const ACTIONS = {
@@ -2099,17 +2089,6 @@ describe('session store — streaming', () => {
 // #414 fix 3: a request still in flight at sign-out must not write the
 // previous account's data into the reset store (F-02 class).
 describe('session store - late results after reset()', () => {
-  function deferred() {
-    let resolve, reject
-
-    const promise = new Promise((res, rej) => {
-      resolve = res
-      reject = rej
-    })
-
-    return { promise, resolve, reject }
-  }
-
   const page = (items, total) => ({ items, total, limit: 40, offset: 0 })
 
   beforeEach(() => {

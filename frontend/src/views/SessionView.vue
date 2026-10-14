@@ -701,8 +701,7 @@ onUnmounted(() => window.scrollTo(0, 0))
 onUnmounted(() => store.abandonStream())
 
 // Show the "typing" placeholder when we've appended the user message but the
-// tutor reply hasn't arrived yet. Driven by `sending` rather than `store.listLoading`
-// so list-load spinners don't flicker the placeholder.
+// tutor reply hasn't arrived yet. Driven by `sending`, the send's own flag.
 const awaitingResponse = computed(() => {
   if (!sending.value) return false
   const last = store.messages[store.messages.length - 1]
