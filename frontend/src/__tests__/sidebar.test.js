@@ -2664,8 +2664,9 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="sidebar-row-n1"]').text()).toContain('Graphs')
     expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
-    // One row must not pass for the whole account.
+    // One row must not pass for the whole account, nor its local count for a total.
     expect(errorLine().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-view-all-active"]').exists()).toBe(false)
     await showEnded()
     expect(errorLine().exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
@@ -2673,11 +2674,22 @@ describe('Sidebar.vue — failed first list (#544)', () => {
 
   it('a created session that was then ended shows on the Ended tab with the error line under it', async () => {
     await mountFailed()
-    useSessionStore().sessions = [row('e1', { ended_at: '2026-10-14T09:30:00Z' })]
+    const store = useSessionStore()
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await store.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    const api = await import('@/services/sessionsApi.js')
+    vi.spyOn(api, 'endSession').mockResolvedValue({
+      ended_at: '2026-10-14T09:30:00Z',
+      summary: null,
+    })
+    await store.endSession('n1')
+    await flushPromises()
     await showEnded()
-    expect(wrapper.find('[data-testid="sidebar-row-e1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
     expect(errorLine().exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-view-all-ended"]').exists()).toBe(false)
   })
 
   it('a create whose re-list succeeds clears the error line and shows the account', async () => {

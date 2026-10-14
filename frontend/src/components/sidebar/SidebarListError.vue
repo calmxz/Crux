@@ -12,9 +12,10 @@ defineExpose({
 </script>
 
 <template>
-  <!-- #544: the sidebar's stand-in for an empty hint when no list has loaded
-       this sign-in and the latest one failed. Same shape as the session
-       page's error line: the message, then a written Retry. -->
+  <!-- #544: shown when no list has loaded this sign-in and the latest one
+       failed: in place of a tab's empty hint, or under the rows a create
+       inserted. Same shape as the session page's error line: the message,
+       then a written Retry. -->
   <div class="sb-list-error" role="alert" data-testid="sidebar-list-error">
     <p class="sb-list-error-msg">Couldn't load your sessions.</p>
     <button

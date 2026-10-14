@@ -7,15 +7,19 @@ how-it-works lookup belongs in `docs/reference.md` instead.
 
 Until a list has loaded this sign-in (`sessionsLoaded`), a failed list
 (`listError`) puts "Couldn't load your sessions." and a silent Retry on both
-sidebar tabs; after a load, a failure stays silent (#534). Two calls beyond
-the brief, made by the maintainer after review: the line also shows under
-rows a create inserted (the brief had it replace only an empty state, so one
+sidebar tabs, and hides the View all links (their counts are only local
+creates); after a load, a failure stays silent (#534). Two calls beyond the
+brief, made by the maintainer after review: the line also shows under rows
+a create inserted (the brief had it replace only an empty state, so one
 created row passed for the whole account, and nothing re-listed), and a
-create or continue-topic after a failed first list re-lists once (store
-`_relistIfFirstListFailed`, the brief excluded store changes). The re-list
-cannot double one already running or a #533 re-list. Also accepted: the Ended tab shows the
-skeleton while a never-loaded list runs (it used to say "No ended sessions
-yet" during the first load). Retry unmounts the line while it runs; on a
+create or continue-topic in that state re-lists (store `_addCreated`; the
+brief excluded store changes). That is the fourth exception to the
+no-refetch rule. It shares the #534 throttle, so creates made offline cost at
+most one failing list (and one re-announced error alert) per 30 seconds, and
+it cannot double a list already running or a #533 re-list. Retry itself is
+not throttled: it is the learner's own request. Also accepted: the Ended tab
+shows the skeleton while a never-loaded list runs (it used to say "No ended
+sessions yet" during the first load). Retry unmounts the line while it runs; on a
 failed retry focus returns to Retry unless the learner focused something else
 or pressed a pointer meanwhile. On success focus is left on the body.
 Rejected for now: keeping the line mounted (busy) through the retry instead of

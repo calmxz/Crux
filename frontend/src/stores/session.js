@@ -81,12 +81,14 @@ export const useSessionStore = defineStore('session', () => {
   // the sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists until the next list. The same rule is
   // why a create inserts its row locally rather than refetching the window.
-  // Three narrow exceptions: a list fetch that lands having raced a status
+  // Four narrow exceptions: a list fetch that lands having raced a status
   // change re-lists exactly once (#528, see listSessions), a status change
   // whose reply arrives after a list landed, for a session outside that
   // window, re-lists instead of moving the totals when no other list is in
-  // flight (#533, see _statusChangeGuard), and the tab becoming visible again
-  // re-lists, throttled (#534, see relistIfStale).
+  // flight (#533, see _statusChangeGuard), the tab becoming visible again
+  // re-lists, throttled (#534, see relistIfStale), and a create made while
+  // no list has loaded and the last one failed re-lists, throttled the same
+  // (#544, see _addCreated).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, judged by _statusChangeGuard() (the shared
   // rule documented on _observedRows() below, plus #533's landed-list cases).
@@ -164,11 +166,18 @@ export const useSessionStore = defineStore('session', () => {
   let _listsLanded = 0
   // #534: Date.now() when a list fetch last wrote the window, whatever
   // started it (mount, #528 follow-up, #533 re-list, a visibility re-list).
-  // relistIfStale() throttles on it, and on its own last attempt, so a failing
-  // re-list (offline) is throttled too. reset() clears both.
+  // relistIfStale() throttles on it, and on the last throttled attempt (its
+  // own, or a create's #544 re-list), so a failing re-list (offline) is
+  // throttled too. reset() clears both.
   let _listLandedAt = null
   let _relistTriedAt = null
   const RELIST_THROTTLE_MS = 30_000
+
+  // Under RELIST_THROTTLE_MS old. A negative age (the wall clock moved back)
+  // counts as stale, so a clock change cannot mute a re-list.
+  function _isRecent(at, now) {
+    return at !== null && now - at >= 0 && now - at < RELIST_THROTTLE_MS
+  }
 
   function _untrackReplay(replay) {
     _listReplays = _listReplays.filter((r) => r !== replay)
@@ -264,16 +273,27 @@ export const useSessionStore = defineStore('session', () => {
       })
   }
 
-  // #544: a create after a failed first list (nothing loaded this sign-in)
-  // re-lists once, so the created row is not left standing in for the whole
-  // account. Call it after _insertCreated: the landing list replaces the row
-  // and the total it bumped with the server's. It never doubles a list: one
-  // already running has cleared listError, and a 'relist' from
-  // _statusChangeGuard means a list landed, setting sessionsLoaded. A failure
-  // leaves listError, so the sidebar's error line stays. After a load, a
-  // failed list keeps its window (#534), so this stays out of the way.
-  function _relistIfFirstListFailed() {
-    if (!sessionsLoaded.value && listError.value) _relist()
+  // A created session joins the window and the active total, unless a list
+  // that landed first already holds it. #544: a create after a failed first
+  // list (nothing loaded this sign-in) also re-lists, so the created row is
+  // not left standing in for the whole account; the landing list replaces
+  // the row and the bumped total with the server's. Throttled with
+  // relistIfStale, so creates made offline (each a failing list pair, and the
+  // sidebar's error alert re-announced) cost at most one per
+  // RELIST_THROTTLE_MS. It never doubles a list: one already running has
+  // cleared listError, and a 'relist' from _statusChangeGuard means a list
+  // landed, setting sessionsLoaded. A failure leaves listError, so the
+  // sidebar's error line stays. After a load, a failed list keeps its window
+  // (#534), so this stays out of the way.
+  function _addCreated(created) {
+    if (_insertCreated(created)) activeTotal.value += 1
+
+    if (sessionsLoaded.value || !listError.value) return
+    const now = Date.now()
+
+    if (_isRecent(_relistTriedAt, now)) return
+    _relistTriedAt = now
+    _relist()
   }
 
   // The optimistic write behind renameSession / setPinned: patch every
@@ -561,16 +581,14 @@ export const useSessionStore = defineStore('session', () => {
   // tab (or a totals residue, see #528) shows up without a reload. Skipped
   // until the window has loaded this sign-in (the mount-time fetch owns the
   // first load) and while the last landing or the last attempt is under
-  // RELIST_THROTTLE_MS old. Otherwise one listSessions(): silent, de-duped
-  // with any list in flight, and a failure keeps the current window. A
-  // negative age (the wall clock moved back) counts as stale, so a clock
-  // change cannot mute it.
+  // RELIST_THROTTLE_MS old (see _isRecent). Otherwise one listSessions():
+  // silent, de-duped with any list in flight, and a failure keeps the current
+  // window.
   function relistIfStale() {
     if (!sessionsLoaded.value) return
     const now = Date.now()
-    const recent = (at) => at !== null && now - at >= 0 && now - at < RELIST_THROTTLE_MS
 
-    if (recent(_listLandedAt) || recent(_relistTriedAt)) return
+    if (_isRecent(_listLandedAt, now) || _isRecent(_relistTriedAt, now)) return
     _relistTriedAt = now
     listSessions().catch(() => {})
   }
@@ -638,8 +656,7 @@ export const useSessionStore = defineStore('session', () => {
       // A freshly created session is always active server-side; count it
       // and show it in the sidebar window, unless a list fetch that landed
       // first already did both.
-      if (_insertCreated(created)) activeTotal.value += 1
-      _relistIfFirstListFailed()
+      _addCreated(created)
 
       currentSession.value = created
       currentSessionId.value = created.id
@@ -944,13 +961,12 @@ export const useSessionStore = defineStore('session', () => {
       // so in the normal case the prior is already counted in endedTotal
       // and there is no transition to apply here. The new session is not
       // counted again when a list fetch that landed first already holds it.
-      if (_insertCreated(created)) activeTotal.value += 1
+      _addCreated(created)
 
       if (totals === 'move') {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       } else if (totals === 'relist') _relist()
-      _relistIfFirstListFailed()
 
       currentSession.value = created
       currentSessionId.value = created.id

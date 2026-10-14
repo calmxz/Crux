@@ -239,24 +239,25 @@ const activeRendered = computed(
   () => cappedPinnedActive.value.length + cappedActiveFlat.value.length,
 )
 
-// View all is the list's closing line whenever rows are rendered. The
-// zero-rows guard stays: reopenSession bumps activeTotal for a session
-// outside the (windowed) `sessions` array (e.g. reopened from the library
-// page), so the sidebar can sit at activeTotal=1 with zero rendered active
-// rows. Without this guard it would show "View all 1 sessions" under an
-// empty Active list.
-const showViewAllActive = computed(() => activeRendered.value > 0)
-
-const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
-
-const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
-
 // #544: until a list has loaded this sign-in, a failed list leaves both tabs
 // unvouched for, so each shows an error line: in place of its empty hint, or
 // under the rows a create inserted, which must not pass for the whole
 // account. Once one has loaded, a later failure stays silent and keeps the
 // window (#534).
 const listFailed = computed(() => !sessionsLoaded.value && !!listError.value)
+
+// View all is the list's closing line whenever rows are rendered. The
+// zero-rows guard stays: reopenSession bumps activeTotal for a session
+// outside the (windowed) `sessions` array (e.g. reopened from the library
+// page), so the sidebar can sit at activeTotal=1 with zero rendered active
+// rows. Without this guard it would show "View all 1 sessions" under an
+// empty Active list. Hidden too while the first list has failed: its count
+// is only the local creates, never a loaded total (#544).
+const showViewAllActive = computed(() => activeRendered.value > 0 && !listFailed.value)
+
+const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0 && !listFailed.value)
+
+const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
 
 // Keyed on sessionsLoaded, not on sessions.length like the Active tab's
 // showSkeleton: rows a create inserted are active, so they cannot vouch for
