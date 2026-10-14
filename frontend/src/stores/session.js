@@ -448,9 +448,10 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   // `live` (from _epochGuard) skips the write for an action that outlived a
-  // reset(); the rethrow to the caller is unconditional.
-  function _setError(e, live = null) {
-    if (!live || live()) error.value = friendlyError(e)
+  // reset(); the rethrow to the caller is unconditional. `target` is the ref
+  // written: the session page's `error`, or listError for the list (#537).
+  function _setError(e, live = null, target = error) {
+    if (!live || live()) target.value = friendlyError(e)
     throw e
   }
 
@@ -566,8 +567,7 @@ export const useSessionStore = defineStore('session', () => {
 
         return live() ? sessions.value : landed
       } catch (e) {
-        if (live()) listError.value = friendlyError(e)
-        throw e
+        _setError(e, live, listError)
       } finally {
         if (live()) {
           listLoading.value = false
