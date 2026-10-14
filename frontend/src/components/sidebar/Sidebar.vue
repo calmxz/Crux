@@ -267,10 +267,21 @@ const showEndedListError = computed(() => listFailed.value && !cappedEndedRows.v
 // ended sessions.
 const showEndedSkeleton = computed(() => listLoading.value && !sessionsLoaded.value)
 
+const RETRY_SELECTOR = '[data-testid="sidebar-list-retry"]'
+
 // Silent like the mount-time call: the error line is the only report, and it
-// returns on its own if this attempt fails too.
-function onRetryList() {
-  sessionStore.listSessions().catch(() => {})
+// returns on its own if this attempt fails too. The line unmounts while the
+// list runs, dropping a keyboard user's focus to the body; if it comes back,
+// so does their focus, unless they have since moved it elsewhere.
+async function onRetryList() {
+  const hadFocus = document.activeElement === asideEl.value?.querySelector(RETRY_SELECTOR)
+  await sessionStore.listSessions().catch(() => {})
+
+  if (!hadFocus) return
+  await nextTick()
+
+  if (document.activeElement && document.activeElement !== document.body) return
+  asideEl.value?.querySelector(RETRY_SELECTOR)?.focus()
 }
 
 const showEmptyHint = computed(

@@ -2566,6 +2566,32 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     expect(showWarn).not.toHaveBeenCalled()
   })
 
+  it('a failed Retry hands keyboard focus back to the new Retry button', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(retryBtn().element)
+  })
+
+  it('a failed Retry leaves focus alone if the learner moved it meanwhile', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    let reject
+    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => (reject = r)))
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    const search = wrapper.find('[data-testid="sidebar-search"]').element
+    search.focus()
+    reject(new Error('offline'))
+    await flushPromises()
+    expect(document.activeElement).toBe(search)
+  })
+
   it('Retry on the Ended tab says no "No ended sessions yet" while it runs', async () => {
     await mountFailed()
     await showEnded()
