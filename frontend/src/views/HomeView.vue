@@ -48,7 +48,7 @@
         @cancel="cancel"
       />
 
-      <!-- E-01: the form above must stay mounted regardless of store.error --
+      <!-- E-01: the form above must stay mounted regardless of any error --
            this paragraph only ever adds a message underneath it. It shows
            either a start-attempt failure (createSession/lookupTopic/
            continueTopic rejecting) or, absent that, a boot-time list failure
@@ -93,14 +93,15 @@ watch(quickTopic, () => cancel())
 
 const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 
+// #537: the list's own failure, never the session page's store.error.
 const bootError = computed(() =>
-  store.error && !store.sessions.length ? friendlyError(store.error) : null,
+  store.listError && !store.sessions.length ? friendlyError(store.listError) : null,
 )
 
 const displayError = computed(() => startError.value || bootError.value)
 
 onMounted(() => {
-  // U-05: boot-path load - failure is handled locally (store error state), so
+  // U-05: boot-path load - failure is handled locally (store.listError), so
   // a transient backend hiccup must not toast on Home's first mount. Silence
   // comes from { silent: true } on the getSessionLibrary calls inside
   // store.listSessions() (session.js), not from sessionsApi.listSessions.
