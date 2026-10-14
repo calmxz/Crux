@@ -51,8 +51,8 @@
       <!-- E-01: the form above must stay mounted regardless of any error --
            this paragraph only ever adds a message underneath it. It shows
            either a start-attempt failure (createSession/lookupTopic/
-           continueTopic rejecting) or, absent that, a boot-time list failure
-           when there are no sessions yet to show instead. -->
+           continueTopic rejecting) or, absent that, a failure of the first
+           list of this sign-in (store.firstListFailed, #546). -->
       <p v-if="displayError" class="error" data-testid="home-error" role="alert">
         {{ displayError }}
       </p>
@@ -93,10 +93,9 @@ watch(quickTopic, () => cancel())
 
 const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 
-// #537: the list's own failure, never the session page's store.error.
-const bootError = computed(() =>
-  store.listError && !store.sessions.length ? friendlyError(store.listError) : null,
-)
+// #537: the list's own failure, never the session page's store.error. #546:
+// shown on the sidebar's rule, so a failure after a loaded list stays silent.
+const bootError = computed(() => (store.firstListFailed ? friendlyError(store.listError) : null))
 
 const displayError = computed(() => startError.value || bootError.value)
 

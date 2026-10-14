@@ -427,8 +427,10 @@ a list's `finally` and its `_inflight` removal, so it cannot join a finished
 fetch.
 
 Failed first list (#544): until a list has loaded this sign-in, a failed one
-(`!sessionsLoaded && listError`) is the only state where the window vouches
-for nothing. The sidebar shows `SidebarListError` (message + silent Retry) on
+(the store's `firstListFailed`, `!sessionsLoaded && listError`) is the only
+state where the window vouches for nothing, and the only state any surface
+reports a list failure in: Home's boot error reads the same computed (#546).
+The sidebar shows `SidebarListError` (message + silent Retry) on
 both tabs, in place of an empty hint or under rows a create inserted, and
 hides every total-derived surface (View all links, the Ended tab count) while
 that list has failed or a retry of it runs: the totals then count only local

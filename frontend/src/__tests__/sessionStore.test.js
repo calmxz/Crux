@@ -1265,6 +1265,66 @@ describe('session store', () => {
     })
   })
 
+  // #546: one rule for every surface that reports a list failure.
+  describe('#546 firstListFailed', () => {
+    const fail = () => getSessionLibrary.mockRejectedValue(new Error('offline'))
+
+    it('is false before any list', () => {
+      expect(useSessionStore().firstListFailed).toBe(false)
+    })
+
+    it('is true when the first list fails with no rows', async () => {
+      fail()
+      const s = useSessionStore()
+      await s.listSessions().catch(() => {})
+      expect(s.firstListFailed).toBe(true)
+    })
+
+    it('is true when the first list failed and a create inserted a row', () => {
+      const s = useSessionStore()
+      s.sessions = [{ id: 'new', pinned: false, ended_at: null }]
+      s.sessionsLoaded = false
+      s.listError = 'offline'
+      expect(s.firstListFailed).toBe(true)
+    })
+
+    it('is false while a retry of the first list is in flight', async () => {
+      const active = deferred()
+      const ended = deferred()
+      fail()
+      const s = useSessionStore()
+      await s.listSessions().catch(() => {})
+      getSessionLibrary.mockReturnValueOnce(active.promise).mockReturnValueOnce(ended.promise)
+      const retry = s.listSessions()
+      expect(s.firstListFailed).toBe(false)
+      active.resolve({ items: [], total: 0 })
+      ended.resolve({ items: [], total: 0 })
+      await retry
+    })
+
+    it.each([
+      ['zero sessions', []],
+      ['rows', [{ id: 's1', pinned: false, ended_at: null }]],
+    ])('is false when a list fails after one loaded with %s', async (_, items) => {
+      getSessionLibrary.mockResolvedValue({ items, total: items.length })
+      const s = useSessionStore()
+      await s.listSessions()
+      fail()
+      await s.listSessions().catch(() => {})
+      expect(s.listError).toBe('offline')
+      expect(s.sessions).toHaveLength(items.length)
+      expect(s.firstListFailed).toBe(false)
+    })
+
+    it('is false after reset()', async () => {
+      fail()
+      const s = useSessionStore()
+      await s.listSessions().catch(() => {})
+      s.reset()
+      expect(s.firstListFailed).toBe(false)
+    })
+  })
+
   it('endSession moves the total from active to ended unconditionally, even when the session is outside the loaded window', async () => {
     sessionsApi.endSession.mockResolvedValueOnce({ ended_at: '2026-01-01', summary: null })
     const s = useSessionStore()

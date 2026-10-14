@@ -36,8 +36,21 @@ const { name: userName } = storeToRefs(userStore)
 
 const sessionStore = useSessionStore()
 
-const { sessions, sessionsLoaded, listLoading, listError, activeTotal, endedTotal, searchRows } =
-  storeToRefs(sessionStore)
+// listFailed (#544): until a list has loaded this sign-in, a failed list
+// leaves both tabs unvouched for, so each shows an error line: in place of its
+// empty hint, or under the rows a create inserted, which must not pass for
+// the whole account. Once one has loaded, a later failure stays silent and
+// keeps the window (#534). The store owns the rule so Home's boot error reads
+// the same one (#546).
+const {
+  sessions,
+  sessionsLoaded,
+  listLoading,
+  firstListFailed: listFailed,
+  activeTotal,
+  endedTotal,
+  searchRows,
+} = storeToRefs(sessionStore)
 
 const listEl = ref(null)
 
@@ -240,13 +253,6 @@ const cappedEndedRows = computed(() => endedRows.value.slice(0, renderCap.value)
 const activeRendered = computed(
   () => cappedPinnedActive.value.length + cappedActiveFlat.value.length,
 )
-
-// #544: until a list has loaded this sign-in, a failed list leaves both tabs
-// unvouched for, so each shows an error line: in place of its empty hint, or
-// under the rows a create inserted, which must not pass for the whole
-// account. Once one has loaded, a later failure stays silent and keeps the
-// window (#534).
-const listFailed = computed(() => !sessionsLoaded.value && !!listError.value)
 
 // While the first list has failed, or a retry of it runs, the totals count
 // only local creates, never a loaded total, so nothing shows them (#544).

@@ -75,8 +75,7 @@ export const useSessionStore = defineStore('session', () => {
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
   // and reset(). Outside the exceptions below, every listSessions() call
-  // site is mount-time (HomeView,
-  // NewSessionView, Sidebar onMounted), and a mutation never triggers a
+  // site is mount-time (HomeView, Sidebar onMounted), and a mutation never triggers a
   // refetch -- deliberately, since a refetch costs a round-trip and re-sorts
   // the sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists until the next list. The same rule is
@@ -106,10 +105,15 @@ export const useSessionStore = defineStore('session', () => {
   // The session page's error. #537: the sidebar list never writes it (that
   // failure goes to listError) and pin/rename never clear it.
   const error = ref(null)
-  // #537: the latest sidebar list fetch's failure, read by HomeView's boot
-  // error. Cleared when a list starts, set when it fails; the #528 follow-up's
+  // #537: the latest sidebar list fetch's failure; whether to show it is
+  // firstListFailed's call (#546). Cleared when a list starts, set when it fails; the #528 follow-up's
   // failure stays silent. Only listSessions and reset() write it.
   const listError = ref(null)
+  // #546: the one rule for showing a list failure, read by HomeView's boot
+  // error and the sidebar's error line. Only while no list has loaded this
+  // sign-in: once one has, a later failure keeps the window silently (#534),
+  // and rows a create inserted cannot stand in for a loaded list (#544).
+  const firstListFailed = computed(() => !sessionsLoaded.value && !!listError.value)
   const dailyCapInfo = ref(null) // { cap, used, resets_at }
   const dailyCapReached = computed(() => dailyCapInfo.value !== null)
   const costCapInfo = ref(null) // { used_usd, soft_cap_usd, hard_cap_usd, resets_at }
@@ -1615,6 +1619,7 @@ export const useSessionStore = defineStore('session', () => {
     detailLoading,
     error,
     listError,
+    firstListFailed,
     dailyCapReached,
     dailyCapInfo,
     costCapReached,

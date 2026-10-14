@@ -82,12 +82,64 @@ describe('HomeView', () => {
   it('keeps the mode cards mounted and shows no boot error when a list fails but sessions are already loaded', async () => {
     const store = useSessionStore()
     store.sessions = [{ id: 's1' }]
+    store.sessionsLoaded = true
     apiGetSessionLibrary.mockRejectedValue(new Error('boom'))
     const wrapper = mountView()
     await flushPromises()
     expect(store.listError).toBe('boom')
     expect(wrapper.find('[data-testid="home-mode-quick"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+  })
+
+  // #546: the boot error follows the sidebar's rule (store.firstListFailed),
+  // so an account that loaded with zero sessions stays quiet on a later
+  // failure, and a create cannot vouch for a list that never loaded.
+  describe('#546 boot error only for a failed first list', () => {
+    it('stays hidden when the visibility re-list fails on a loaded empty account', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+
+      try {
+        vi.setSystemTime(new Date('2026-10-14T10:00:00Z'))
+        const store = useSessionStore()
+        const wrapper = mountView()
+        await flushPromises()
+        expect(store.sessionsLoaded).toBe(true)
+        expect(store.sessions).toHaveLength(0)
+
+        apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+        vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+        store.relistIfStale()
+        await flushPromises()
+        expect(store.listError).toBe('offline')
+        expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays hidden when Home remounts offline on a loaded empty account', async () => {
+      const store = useSessionStore()
+      mountView().unmount()
+      await flushPromises()
+      expect(store.sessionsLoaded).toBe(true)
+
+      apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(store.listError).toBe('offline')
+      expect(store.sessions).toHaveLength(0)
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+    })
+
+    it('shows when the first list failed even though a create inserted a row', async () => {
+      const store = useSessionStore()
+      store.sessions = [{ id: 'new', pinned: false, ended_at: null }]
+      apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(store.sessionsLoaded).toBe(false)
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe('offline')
+    })
   })
 
   // #537: the session page's error is not a boot error. Written after the
