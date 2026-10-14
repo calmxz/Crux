@@ -776,6 +776,269 @@ describe('session store', () => {
     })
   })
 
+  describe('#533 a status change whose reply lands after a list re-lists when the session is outside it', () => {
+    const row = (over = {}) => ({ id: 's1', topic: 'T', pinned: false, ended_at: null, ...over })
+    const ENDED_AT = '2026-10-14T01:00:00Z'
+
+    function queuePages() {
+      let resolveActive, resolveEnded
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(new Promise((r) => (resolveActive = r)))
+        .mockReturnValueOnce(new Promise((r) => (resolveEnded = r)))
+
+      return (active, ended = [], totals = {}) => {
+        resolveActive({ items: active, total: totals.active ?? active.length })
+        resolveEnded({ items: ended, total: totals.ended ?? ended.length })
+      }
+    }
+
+    // Starts `action` with its reply held, lands one list whose snapshot is
+    // the given one, then releases the reply. Returns the action's result.
+    async function replyAfterLanding(action, resolveReply, snapshot) {
+      const land = queuePages()
+      const listing = useSessionStore().listSessions()
+      const acting = action()
+      land(...snapshot)
+      await listing
+      resolveReply()
+
+      return acting
+    }
+
+    it('an end outside the window re-lists once, and the re-list totals win', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.currentSession = row({ id: 'lib' })
+
+      // The landed list already counts 'lib' as ended.
+      const ending = replyAfterLanding(
+        () => s.endSession('lib'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row()], [], { active: 2, ended: 1 }],
+      )
+
+      const landRelist = queuePages()
+      await ending
+      expect(s.currentSession.ended_at).toBe(ENDED_AT)
+      // The end alone moves nothing: the landed totals stay until the re-list.
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(1)
+      landRelist([row()], [], { active: 2, ended: 1 })
+      await vi.waitFor(() => expect(s.listLoading).toBe(false))
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(getSessionLibrary.mock.calls[2][1]).toEqual({ silent: true })
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('a reopen outside the window re-lists once, and the re-list totals win', async () => {
+      const reopen = deferred()
+      sessionsApi.reopenSession.mockReturnValueOnce(reopen.promise)
+      const s = useSessionStore()
+      s.currentSession = row({ id: 'lib', ended_at: ENDED_AT })
+
+      const reopening = replyAfterLanding(
+        () => s.reopenSession('lib'),
+        () => reopen.resolve({}),
+        [[row()], [], { active: 2, ended: 0 }],
+      )
+
+      const landRelist = queuePages()
+      await reopening
+      expect(s.currentSession.ended_at).toBeNull()
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(0)
+      landRelist([row()], [], { active: 2, ended: 0 })
+      await vi.waitFor(() => expect(s.listLoading).toBe(false))
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(0)
+    })
+
+    it("continueTopic's prior-end outside the window re-lists once", async () => {
+      const create = deferred()
+      sessionsApi.createSession.mockReturnValueOnce(create.promise)
+      const s = useSessionStore()
+      const prior = row({ id: 'lib' })
+
+      // The landed list already holds the new session and counts the prior ended.
+      const continuing = replyAfterLanding(
+        () => s.continueTopic(prior),
+        () => create.resolve({ id: 'new', topic: 'T', ended_at: null }),
+        [[row({ id: 'new' }), row()], [], { active: 2, ended: 1 }],
+      )
+
+      const landRelist = queuePages()
+      await continuing
+      expect(prior.ended_at).toBeTruthy()
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(1)
+      landRelist([row({ id: 'new' }), row()], [], { active: 2, ended: 1 })
+      await vi.waitFor(() => expect(s.listLoading).toBe(false))
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('an end inside the landed window makes no extra fetch, and its totals are right', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      await replyAfterLanding(
+        () => s.endSession('s1'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row({ id: 'a' })], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('ending the open session inside the landed window counts it once', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      // The open detail is its own object, still active when the list lands.
+      s.currentSession = row()
+      await replyAfterLanding(
+        () => s.endSession('s1'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row({ id: 'a' })], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.currentSession.ended_at).toBe(ENDED_AT)
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('a landed window row still in the prior state moves the totals once', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.currentSession = row()
+      // The snapshot predates the end: 's1' is still active and counted so.
+      await replyAfterLanding(
+        () => s.endSession('s1'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row()], [], { active: 1, ended: 0 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it("continueTopic's prior inside the landed window, shown ended there, is not counted again", async () => {
+      const create = deferred()
+      sessionsApi.createSession.mockReturnValueOnce(create.promise)
+      const s = useSessionStore()
+      // The caller's own copy still shows the prior active.
+      const prior = row({ id: 'p' })
+      await replyAfterLanding(
+        () => s.continueTopic(prior),
+        () => create.resolve({ id: 'new', topic: 'T', ended_at: null }),
+        [[row({ id: 'new' })], [row({ id: 'p', ended_at: ENDED_AT })], { active: 1, ended: 1 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(prior.ended_at).toBeTruthy()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    // A second list is pending when the reply arrives and then fails, so its
+    // totals never land: the landed window row alone must judge.
+    it.each([
+      ['already counted, skips', row({ ended_at: ENDED_AT }), { active: 1, ended: 1 }, [1, 1]],
+      ['in the prior state, moves', row(), { active: 2, ended: 0 }, [1, 1]],
+    ])(
+      'a landed window row %s even while a later list is in flight',
+      async (_, landedRow, totals, [active, ended]) => {
+        const end = deferred()
+        sessionsApi.endSession.mockReturnValueOnce(end.promise)
+        const s = useSessionStore()
+        s.currentSession = row()
+        const land = queuePages()
+        const listing = s.listSessions()
+        const ending = s.endSession('s1')
+        const [onActive, onEnded] = landedRow.ended_at ? [[], [landedRow]] : [[landedRow], []]
+        land([row({ id: 'a' }), ...onActive], onEnded, totals)
+        await listing
+        const second = deferred()
+        sessionsApi.getSessionLibrary
+          .mockReturnValueOnce(second.promise)
+          .mockReturnValueOnce(second.promise)
+        const relisting = s.listSessions().catch(() => {})
+        end.resolve({ ended_at: ENDED_AT, summary: null })
+        await ending
+        second.reject(new Error('network'))
+        await relisting
+        expect(s.activeTotal).toBe(active)
+        expect(s.endedTotal).toBe(ended)
+      },
+    )
+
+    // Releases the reply at each microtask offset after the pages resolve, so
+    // one run lands it while the list's _inflight entry outlives _listPending.
+    // Whichever path each offset takes, the totals must end at the server's.
+    it.each([...Array(12).keys()])(
+      'an end outside the window released %i microtasks after the pages ends at the server totals',
+      async (ticks) => {
+        const end = deferred()
+        sessionsApi.endSession.mockReturnValueOnce(end.promise)
+        const s = useSessionStore()
+        s.currentSession = row({ id: 'lib' })
+        const land = queuePages()
+        const listing = s.listSessions()
+        const ending = s.endSession('lib')
+        // Any further fetch (the #528 follow-up or the #533 re-list) is fresh.
+        sessionsApi.getSessionLibrary.mockResolvedValue({ items: [], total: 2 })
+        // The snapshot predates the end: 'lib' is still counted active.
+        land([row()], [], { active: 3, ended: 1 })
+
+        for (let i = 0; i < ticks; i++) await Promise.resolve()
+        end.resolve({ ended_at: ENDED_AT, summary: null })
+        await ending
+        await listing
+        await vi.waitFor(() => {
+          expect(s.activeTotal).toBe(2)
+          expect(s.endedTotal).toBe(2)
+        })
+      },
+    )
+
+    it('an end with no list landed since its start makes no extra fetch', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.currentSession = row({ id: 'lib' })
+      s.activeTotal = 2
+      s.endedTotal = 0
+      await s.endSession('lib')
+      expect(getSessionLibrary).not.toHaveBeenCalled()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('reset() between the landing and the reply: the late reply writes nothing and fetches nothing', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.currentSession = row({ id: 'lib' })
+      const land = queuePages()
+      const listing = s.listSessions()
+      const ending = s.endSession('lib')
+      land([row()], [], { active: 2, ended: 1 })
+      await listing
+      s.reset()
+      end.resolve({ ended_at: ENDED_AT, summary: null })
+      await ending
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.sessions).toEqual([])
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(0)
+      expect(s.pendingSummary).toBeNull()
+    })
+  })
+
   describe('#532 listLoading belongs to the sidebar list fetch alone', () => {
     const ENDED_AT = '2026-10-14T01:00:00Z'
 

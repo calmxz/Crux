@@ -21,16 +21,39 @@ race costs exactly what it did. Refetch-always was rejected: a round trip and
 a re-sort after every action.
 
 Known residue, accepted: a race inside the follow-up itself (an out-of-window
-change during it, or a second straddle) is not re-listed again, and a change
-that commits while a list is in flight but whose response arrives after the
-list lands is not recorded as a replay at all, so the trigger never sees it.
+change during it, or a second straddle) is not re-listed again. (A change that
+commits while a list is in flight but whose response arrives after the list
+lands is not recorded as a replay; #533 handles it on the action side, below.)
 The opposite straddle order (the page that would gain the session is read
 first, so it is in neither page) is invisible to the snapshot when the change
-came from another tab or device; a local one is caught by its replay. All of
+came from another tab or device. A local one is caught by its replay, with
+one gap: the page losing the session is read before the commit (row still
+there, still counted), the gaining page after it (counted, but the row falls
+past its first 40). No duplicate shows, the replay sees the row in its prior
+state and moves the totals, and the session is counted in both. Also
+accepted: a status-change reply that resumes in the microtasks between a
+list's write and its `finally` takes the in-flight path, and the `finally`
+drops its replay unapplied. That needs two network responses to settle in one
+microtask drain, which per-response fetch tasks should not produce. All of
 these leave the totals off by one until the next mount-time list; the real
 fix is server-side (both pages and totals from one transaction), which #528
-ruled out of scope. Tracked instead: the late reply as #533, and a re-list on
-tab focus (#534), which also heals the cross-device cases.
+ruled out of scope. Tracked instead: a re-list on tab focus (#534), which also
+heals the cross-device cases.
+
+Late reply (#533): an end, reopen or prior-end notes how many lists have
+landed when its request starts. If one landed before the reply, that list may
+already count the change. When the session has a row in it, that row alone
+decides: the #533 brief assumed every observed copy would match it, but the
+open session's detail is a separate object that still shows the prior state,
+so judging all copies counted the change twice. The row decides even while a
+later list is in flight, because that list may fail and never land its totals.
+With no row (and no copy already in the target state), the action does not
+move the totals and calls `listSessions()` once instead; re-listing beats a
+local guess for the same reason as #528. If another list is in flight at that
+point, the action moves the totals and that list's recorded replay and #528
+decide. Accepted until the next mount-time list: a failed re-list keeps landed
+totals that may predate the change, and a failed in-flight list keeps a move
+that may double-count it (accepted, see #540).
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
