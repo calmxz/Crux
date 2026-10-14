@@ -3,6 +3,21 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - A failed first list shows an error line, not an empty account (#544)
+
+Until a list has loaded this sign-in (`sessionsLoaded`), a failed list
+(`listError`) replaces the sidebar's empty hints on both tabs with "Couldn't
+load your sessions." and a silent Retry; after a load, a failure stays silent
+(#534). The error line replaces only an empty state, so a row a create
+inserted after the failure hides it on the Active tab; Retry is then reachable
+from the Ended tab, or a reload. Also accepted: the Ended tab shows the
+skeleton while a never-loaded list runs (it used to say "No ended sessions
+yet" during the first load). Retry unmounts the line while it runs; on a
+failed retry focus returns to Retry unless the learner focused something else
+or pressed a pointer meanwhile. On success focus is left on the body.
+Rejected for now: keeping the line mounted (busy) through the retry instead of
+the skeleton, which would avoid the focus loss but departs from the brief.
+
 ## 2026-10-14 - Re-list the sidebar when the tab becomes visible, throttled (#534)
 
 The third exception to the no-refetch rule (after #528's re-list of a raced
