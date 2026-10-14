@@ -16,6 +16,7 @@ import * as sessionsApi from '@/services/sessionsApi.js'
 import { runWhenIdle } from '@/utils/idle.js'
 import Logo from '@/components/Logo.vue'
 import SidebarSessionRow from './SidebarSessionRow.vue'
+import SidebarListError from './SidebarListError.vue'
 import SidebarSkeletonList from './SidebarSkeletonList.vue'
 import SidebarUserMenu from './SidebarUserMenu.vue'
 
@@ -35,7 +36,8 @@ const { name: userName } = storeToRefs(userStore)
 
 const sessionStore = useSessionStore()
 
-const { sessions, listLoading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
+const { sessions, sessionsLoaded, listLoading, listError, activeTotal, endedTotal, searchRows } =
+  storeToRefs(sessionStore)
 
 const listEl = ref(null)
 
@@ -248,6 +250,22 @@ const showViewAllActive = computed(() => activeRendered.value > 0)
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
 
 const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
+
+// #544: until a list has loaded this sign-in, nothing vouches for an empty
+// tab, so a failed list shows an error line where an empty hint would be.
+// Once one has loaded, a later failure stays silent and keeps the window
+// (#534). Rows a create inserted still render; only the empty states give way.
+const listFailed = computed(() => !sessionsLoaded.value && !!listError.value)
+
+const showActiveListError = computed(() => listFailed.value && !activeRendered.value)
+
+const showEndedListError = computed(() => listFailed.value && !cappedEndedRows.value.length)
+
+// Silent like the mount-time call: the error line is the only report, and it
+// returns on its own if this attempt fails too.
+function onRetryList() {
+  sessionStore.listSessions().catch(() => {})
+}
 
 const showEmptyHint = computed(
   () => !listLoading.value && !searching.value && !sessions.value.length,
@@ -772,7 +790,8 @@ async function onSignOut() {
                     />
                   </ul>
                 </div>
-                <p v-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
+                <SidebarListError v-if="showActiveListError" @retry="onRetryList" />
+                <p v-else-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
                   No sessions yet. Click + New session above.
                 </p>
                 <p
@@ -806,11 +825,11 @@ async function onSignOut() {
                 state="ended"
               />
             </ul>
-            <p
-              v-if="!cappedEndedRows.length"
-              class="sb-empty-hint"
-              data-testid="sidebar-ended-empty"
-            >
+            <SidebarListError v-else-if="showEndedListError" @retry="onRetryList" />
+            <!-- The Active tab's skeleton rule: a list that has never loaded
+                 cannot yet say there are no ended sessions. -->
+            <SidebarSkeletonList v-else-if="listLoading && !sessionsLoaded" :count="3" />
+            <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
               No ended sessions yet.
             </p>
             <RouterLink
