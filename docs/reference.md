@@ -407,6 +407,26 @@ Observed copies are always patched. `_relist()` runs after
 and re-list again, and it waits out a list whose `_inflight` entry outlives
 `_listPending`, so it never joins a finished fetch.
 
+Ordering matrix. A change to the totals or replay logic is checked against
+each row, for a session inside and outside the window. In a store test, seed
+the session with `seedSession` (in `sessionStore.test.js`), which puts it in
+the window, the open detail and the search results as separate objects, like
+the app holds them:
+
+| # | Ordering, relative to an action's request and reply |
+|---|---|
+| 1 | No list starts or lands between request and reply |
+| 2 | A list is in flight at the reply (replay recorded; #528 may re-list) |
+| 3 | A list lands between request and reply, none in flight at the reply |
+| 4 | A list lands, then a later list is in flight at the reply, and that list succeeds or fails |
+| 5 | The reply arrives during a #528 follow-up |
+| 6 | `reset()` between the request and the reply, or during a re-list |
+| 7 | The reply resumes in the microtasks while a list settles (between its write, its `finally`, and its `_inflight` removal) |
+
+Row 7 has no stable ordering to set up by hand. Release the reply after 0..N
+microtasks with `it.each` (the #533 sweep test in `sessionStore.test.js`), and
+check the sweep goes red when the guarded branch is removed.
+
 ### E2E sign-in against the real backend (#518)
 
 Specs that call the e2e backend sign in with `signIn(page)` from

@@ -32,6 +32,22 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
+// Holds one session in every copy the store reads (the sidebar window row, the
+// open detail, the search row), each a separate object as in the app. Pass
+// `false` for a copy the test needs absent, e.g. `window: false` for a session
+// a landing list will supply. Returns the session's fields.
+function seedSession(store, over = {}, { window = true, detail = true, search = true } = {}) {
+  const base = { id: 's1', topic: 'T', pinned: false, ended_at: null, ...over }
+
+  if (window) store.sessions = [...store.sessions, { ...base }]
+
+  if (detail) store.currentSession = { ...base }
+
+  if (search) store.searchRows = [...store.searchRows, { ...base }]
+
+  return base
+}
+
 class ApiErrorLike extends Error {
   constructor(status, body) {
     super('api error')
@@ -809,7 +825,7 @@ describe('session store', () => {
       const end = deferred()
       sessionsApi.endSession.mockReturnValueOnce(end.promise)
       const s = useSessionStore()
-      s.currentSession = row({ id: 'lib' })
+      seedSession(s, { id: 'lib' }, { window: false })
 
       // The landed list already counts 'lib' as ended.
       const ending = replyAfterLanding(
@@ -836,7 +852,7 @@ describe('session store', () => {
       const reopen = deferred()
       sessionsApi.reopenSession.mockReturnValueOnce(reopen.promise)
       const s = useSessionStore()
-      s.currentSession = row({ id: 'lib', ended_at: ENDED_AT })
+      seedSession(s, { id: 'lib', ended_at: ENDED_AT }, { window: false })
 
       const reopening = replyAfterLanding(
         () => s.reopenSession('lib'),
@@ -900,7 +916,7 @@ describe('session store', () => {
       sessionsApi.endSession.mockReturnValueOnce(end.promise)
       const s = useSessionStore()
       // The open detail is its own object, still active when the list lands.
-      s.currentSession = row()
+      seedSession(s, {}, { window: false })
       await replyAfterLanding(
         () => s.endSession('s1'),
         () => end.resolve({ ended_at: ENDED_AT, summary: null }),
@@ -916,7 +932,7 @@ describe('session store', () => {
       const end = deferred()
       sessionsApi.endSession.mockReturnValueOnce(end.promise)
       const s = useSessionStore()
-      s.currentSession = row()
+      seedSession(s, {}, { window: false })
       // The snapshot predates the end: 's1' is still active and counted so.
       await replyAfterLanding(
         () => s.endSession('s1'),
@@ -956,7 +972,7 @@ describe('session store', () => {
         const end = deferred()
         sessionsApi.endSession.mockReturnValueOnce(end.promise)
         const s = useSessionStore()
-        s.currentSession = row()
+        seedSession(s, {}, { window: false })
         const land = queuePages()
         const listing = s.listSessions()
         const ending = s.endSession('s1')
@@ -986,7 +1002,7 @@ describe('session store', () => {
         const end = deferred()
         sessionsApi.endSession.mockReturnValueOnce(end.promise)
         const s = useSessionStore()
-        s.currentSession = row({ id: 'lib' })
+        seedSession(s, { id: 'lib' }, { window: false })
         const land = queuePages()
         const listing = s.listSessions()
         const ending = s.endSession('lib')
@@ -1009,7 +1025,7 @@ describe('session store', () => {
     it('an end with no list landed since its start makes no extra fetch', async () => {
       sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
       const s = useSessionStore()
-      s.currentSession = row({ id: 'lib' })
+      seedSession(s, { id: 'lib' }, { window: false })
       s.activeTotal = 2
       s.endedTotal = 0
       await s.endSession('lib')
@@ -1022,7 +1038,7 @@ describe('session store', () => {
       const end = deferred()
       sessionsApi.endSession.mockReturnValueOnce(end.promise)
       const s = useSessionStore()
-      s.currentSession = row({ id: 'lib' })
+      seedSession(s, { id: 'lib' }, { window: false })
       const land = queuePages()
       const listing = s.listSessions()
       const ending = s.endSession('lib')
