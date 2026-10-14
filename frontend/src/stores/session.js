@@ -91,7 +91,9 @@ export const useSessionStore = defineStore('session', () => {
   const hasMoreMessages = ref(false)
   const loadingEarlier = ref(false)
   const loadEarlierError = ref(null)
-  const loading = ref(false)
+  // True while a sidebar list fetch has neither written its rows nor failed.
+  // Only listSessions and reset() write it.
+  const listLoading = ref(false)
   const detailLoading = ref(false)
   const error = ref(null)
   const dailyCapInfo = ref(null) // { cap, used, resets_at }
@@ -108,7 +110,7 @@ export const useSessionStore = defineStore('session', () => {
   // navigation (loadSession) so it never survives past its own screen.
   const duplicateReopen = ref(null) // { sessionId } | null
 
-  // Library-scoped state — never touches sidebar sessions/loading/error
+  // Library-scoped state — never touches sidebar sessions/listLoading/error
   const libraryLoading = ref(false)
 
   // In-flight-promise guard. Holds ONLY pending promises (deleted on settle),
@@ -460,10 +462,9 @@ export const useSessionStore = defineStore('session', () => {
   function listSessions() {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
-      loading.value = true
+      listLoading.value = true
       error.value = null
       _listPending = true
-      let loadingDropped = false
 
       try {
         const { rows, raced } = await _landListSnapshot(live)
@@ -475,13 +476,9 @@ export const useSessionStore = defineStore('session', () => {
         // totals may predate a status change or count one session twice, and
         // no local adjustment can tell which, so fetch one fresh list. Its
         // own race result is ignored: at most one extra round trip. The rows
-        // above stay rendered while it runs, so the skeleton flag drops now.
-        // Clearing here is when the no-race path clears it too. The finally
-        // must not clear it again a round trip later, over a mutation the
-        // user started on the rendered rows. (`loading` is one flag shared by
-        // every action; overlapping actions clearing each other is older.)
-        loading.value = false
-        loadingDropped = true
+        // above stay rendered while it runs, so the skeleton flag drops now,
+        // when the no-race path drops it too.
+        listLoading.value = false
         // The changes just replayed committed before this fetch starts;
         // pending pin/rename entries stay and replay onto it too.
         _dropSettledReplays()
@@ -500,7 +497,7 @@ export const useSessionStore = defineStore('session', () => {
         _setError(e, live)
       } finally {
         if (live()) {
-          if (!loadingDropped) loading.value = false
+          listLoading.value = false
           _listPending = false
           _dropSettledReplays()
         }
@@ -510,7 +507,6 @@ export const useSessionStore = defineStore('session', () => {
 
   async function createSession({ topic, seedMode, priorSessionId, declaredLevel } = {}) {
     const live = _epochGuard()
-    loading.value = true
     error.value = null
 
     try {
@@ -535,8 +531,6 @@ export const useSessionStore = defineStore('session', () => {
       return created
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
@@ -557,7 +551,6 @@ export const useSessionStore = defineStore('session', () => {
 
     return _shareInflight(id, async () => {
       const live = _epochGuard()
-      loading.value = true
       detailLoading.value = true
       error.value = null
       duplicateReopen.value = null
@@ -607,12 +600,9 @@ export const useSessionStore = defineStore('session', () => {
         _setError(e)
       } finally {
         // F-13: mirror the write discriminator - only the latest-requested
-        // load may clear the shared flags, else a superseded load drops the
-        // skeleton while the real target is still in flight.
-        if (live() && _latestRequestedId === id) {
-          loading.value = false
-          detailLoading.value = false
-        }
+        // load may clear the flag, else a superseded load drops the skeleton
+        // while the real target is still in flight.
+        if (live() && _latestRequestedId === id) detailLoading.value = false
       }
     })
   }
@@ -707,7 +697,6 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!id) throw new Error('no active session')
     const live = _epochGuard()
-    loading.value = true
     error.value = null
 
     try {
@@ -757,8 +746,6 @@ export const useSessionStore = defineStore('session', () => {
       return resp
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
@@ -768,7 +755,6 @@ export const useSessionStore = defineStore('session', () => {
 
   async function reopenSession(sessionId) {
     const live = _epochGuard()
-    loading.value = true
     error.value = null
     duplicateReopen.value = null
 
@@ -801,14 +787,11 @@ export const useSessionStore = defineStore('session', () => {
       }
 
       _setError(e)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
   async function continueTopic(prior) {
     const live = _epochGuard()
-    loading.value = true
     error.value = null
 
     try {
@@ -856,8 +839,6 @@ export const useSessionStore = defineStore('session', () => {
       return created
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
@@ -1458,7 +1439,7 @@ export const useSessionStore = defineStore('session', () => {
     hasMoreMessages.value = false
     loadingEarlier.value = false
     loadEarlierError.value = null
-    loading.value = false
+    listLoading.value = false
     detailLoading.value = false
     libraryLoading.value = false
     checkAnswering.value = false
@@ -1484,7 +1465,7 @@ export const useSessionStore = defineStore('session', () => {
     hasMoreMessages,
     loadingEarlier,
     loadEarlierError,
-    loading,
+    listLoading,
     detailLoading,
     error,
     dailyCapReached,

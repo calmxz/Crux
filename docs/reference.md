@@ -384,9 +384,8 @@ before the list writes them:
 Re-list (#528): when a list lands and an end/reopen/prior-end replay found no
 row, or the same id is in both the active and the ended page (a change
 committed between the two parallel page reads), the snapshot's totals may be
-off by one. The list still writes its result, drops `loading` (when
-the no-race path would; its `finally` does not clear it again after the
-follow-up), clears its
+off by one. The list still writes its result, drops `listLoading` (when
+the no-race path would; only the list and `reset()` write that flag, #532), clears its
 settled replays, and runs one more fetch inside the same shared `'list'`
 promise, so `_listPending` and replay tracking cover it too. The follow-up's
 own race result is ignored (capped at one), its failure is swallowed (the

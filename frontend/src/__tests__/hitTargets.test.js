@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { mount } from '@vue/test-utils'
+import { enableAutoUnmount, mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -12,6 +12,10 @@ import { resolve } from 'node:path'
 vi.mock('primevue/useconfirm', () => ({
   useConfirm: () => ({ require: vi.fn() }),
 }))
+
+// A mounted Sidebar schedules an idle badge fetch; unmounting cancels it so it
+// cannot fire after mockReset has cleared the next test's mocks.
+enableAutoUnmount(afterEach)
 
 // R1 (WCAG 2.5.5): drawn boxes stay on the 28/32px pitch; the hit area grows
 // to >= 44px on coarse pointers via a shared .hit-44 utility. This file

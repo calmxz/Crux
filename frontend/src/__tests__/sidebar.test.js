@@ -96,7 +96,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('shows skeleton while loading and no sessions yet', async () => {
     const store = useSessionStore()
-    store.loading = true
+    store.listLoading = true
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(wrapper.find('.sb-skel-list').exists()).toBe(true)

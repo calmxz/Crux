@@ -21,6 +21,17 @@ import * as streamSvc from '@/services/chatStreamService.js'
 import { ERR_DAILY_CAP_REACHED, ERR_DAILY_COST_CAP_REACHED } from '@/lib/errorCodes.js'
 import { SESSION_ENDED_COPY, StreamAbortedError } from '@/lib/errors.js'
 
+function deferred() {
+  let resolve, reject
+
+  const promise = new Promise((res, rej) => {
+    resolve = res
+    reject = rej
+  })
+
+  return { promise, resolve, reject }
+}
+
 class ApiErrorLike extends Error {
   constructor(status, body) {
     super('api error')
@@ -35,7 +46,7 @@ describe('session store', () => {
     vi.clearAllMocks()
   })
 
-  it('listSessions populates and clears loading/error', async () => {
+  it('listSessions populates and clears listLoading/error', async () => {
     sessionsApi.getSessionLibrary
       .mockResolvedValueOnce({ items: [{ id: 's1' }], total: 1, limit: 20, offset: 0 })
       .mockResolvedValueOnce({ items: [], total: 0, limit: 20, offset: 0 })
@@ -43,7 +54,8 @@ describe('session store', () => {
     const out = await s.listSessions('u1')
     expect(out).toEqual([{ id: 's1' }])
     expect(s.sessions).toEqual([{ id: 's1' }])
-    expect(s.loading).toBe(false)
+    expect(s.listLoading).toBe(false)
+    expect(s.error).toBeNull()
   })
 
   it('listSessions surfaces error and rethrows', async () => {
@@ -341,17 +353,6 @@ describe('session store', () => {
 
         return listing
       }
-    }
-
-    function deferred() {
-      let resolve, reject
-
-      const promise = new Promise((res, rej) => {
-        resolve = res
-        reject = rej
-      })
-
-      return { promise, resolve, reject }
     }
 
     const ENDED_AT = '2026-10-14T01:00:00Z'
@@ -698,7 +699,7 @@ describe('session store', () => {
       expect(s.activeTotal).toBe(3)
       expect(s.endedTotal).toBe(1)
       expect(s.error).toBeNull()
-      expect(s.loading).toBe(false)
+      expect(s.listLoading).toBe(false)
     })
 
     it('reset() while the follow-up is pending: its late result writes nothing', async () => {
@@ -718,7 +719,7 @@ describe('session store', () => {
       expect(s.endedTotal).toBe(0)
     })
 
-    it('the follow-up landing does not clear loading for a mutation started after the trigger', async () => {
+    it('a mutation started during the follow-up leaves listLoading false throughout', async () => {
       let resolveCreate
       sessionsApi.createSession.mockReturnValueOnce(new Promise((r) => (resolveCreate = r)))
       const s = useSessionStore()
@@ -728,12 +729,13 @@ describe('session store', () => {
       land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
       await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
       const creating = s.createSession({ topic: 'T', seedMode: 'fresh' })
+      expect(s.listLoading).toBe(false)
       landFollowUp([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
       await listing
-      expect(s.loading).toBe(true)
+      expect(s.listLoading).toBe(false)
       resolveCreate({ id: 'new', topic: 'T', ended_at: null })
       await creating
-      expect(s.loading).toBe(false)
+      expect(s.listLoading).toBe(false)
     })
 
     it('a pin pending across both fetches lands on the follow-up rows and rolls back there', async () => {
@@ -758,17 +760,134 @@ describe('session store', () => {
       expect(s.sessions[0].pinned).toBe(false)
     })
 
-    it('drops the loading flag once the triggering fetch has written its rows', async () => {
+    it('drops listLoading once the triggering fetch has written its rows, and keeps it false through the follow-up', async () => {
       const s = useSessionStore()
       const land = queuePages()
       const landFollowUp = queuePages()
       const listing = s.listSessions()
+      expect(s.listLoading).toBe(true)
       land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
       await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
       expect(s.sessions).toHaveLength(1)
-      expect(s.loading).toBe(false)
+      expect(s.listLoading).toBe(false)
       landFollowUp([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
       await listing
+      expect(s.listLoading).toBe(false)
+    })
+  })
+
+  describe('#532 listLoading belongs to the sidebar list fetch alone', () => {
+    const ENDED_AT = '2026-10-14T01:00:00Z'
+
+    // Each action with the API call it awaits and the value that call resolves to.
+    const ACTIONS = {
+      createSession: {
+        api: 'createSession',
+        value: { id: 'new', topic: 'T', ended_at: null },
+        run: (s) => s.createSession({ topic: 'T', seedMode: 'fresh' }),
+      },
+      loadSession: {
+        api: 'getSession',
+        value: { id: 's1', messages: [] },
+        run: (s) => s.loadSession('s1'),
+      },
+      endSession: {
+        api: 'endSession',
+        value: { ended_at: ENDED_AT, summary: null },
+        run: (s) => s.endSession('s1'),
+      },
+      reopenSession: {
+        api: 'reopenSession',
+        value: {},
+        run: (s) => s.reopenSession('s1'),
+      },
+      continueTopic: {
+        api: 'createSession',
+        value: { id: 'new', topic: 'T', ended_at: null },
+        run: (s) => s.continueTopic({ id: 's1', topic: 'T', ended_at: ENDED_AT }),
+      },
+    }
+
+    const CASES = Object.keys(ACTIONS).flatMap((name) => [
+      [name, 'succeeds'],
+      [name, 'fails'],
+    ])
+
+    function settle(d, action, outcome) {
+      if (outcome === 'succeeds') d.resolve(action.value)
+      else d.reject(new Error('nope'))
+    }
+
+    it('a list fetch sets it while running and clears it on success', async () => {
+      const active = deferred()
+      const ended = deferred()
+      getSessionLibrary.mockReturnValueOnce(active.promise).mockReturnValueOnce(ended.promise)
+      const s = useSessionStore()
+      const listing = s.listSessions()
+      expect(s.listLoading).toBe(true)
+      active.resolve({ items: [], total: 0 })
+      ended.resolve({ items: [], total: 0 })
+      await listing
+      expect(s.listLoading).toBe(false)
+    })
+
+    it('a list fetch clears it on failure', async () => {
+      getSessionLibrary.mockRejectedValue(new Error('nope'))
+      const s = useSessionStore()
+      const listing = s.listSessions()
+      expect(s.listLoading).toBe(true)
+      await expect(listing).rejects.toThrow('nope')
+      expect(s.listLoading).toBe(false)
+    })
+
+    it.each(CASES)('%s never sets it when no list is running (call %s)', async (name, outcome) => {
+      const action = ACTIONS[name]
+      const d = deferred()
+      sessionsApi[action.api].mockReturnValueOnce(d.promise)
+      const s = useSessionStore()
+      const running = action.run(s).catch(() => {})
+      expect(s.listLoading).toBe(false)
+      settle(d, action, outcome)
+      await running
+      expect(s.listLoading).toBe(false)
+    })
+
+    it.each(CASES)(
+      '%s never clears it while a list is running (call %s)',
+      async (name, outcome) => {
+        const action = ACTIONS[name]
+        const active = deferred()
+        const ended = deferred()
+        getSessionLibrary.mockReturnValueOnce(active.promise).mockReturnValueOnce(ended.promise)
+        // Any follow-up list fetch lands empty.
+        getSessionLibrary.mockResolvedValue({ items: [], total: 0 })
+        const d = deferred()
+        sessionsApi[action.api].mockReturnValueOnce(d.promise)
+        const s = useSessionStore()
+        const listing = s.listSessions()
+        const running = action.run(s).catch(() => {})
+        settle(d, action, outcome)
+        await running
+        expect(s.listLoading).toBe(true)
+        active.resolve({ items: [], total: 0 })
+        ended.resolve({ items: [], total: 0 })
+        await listing
+        expect(s.listLoading).toBe(false)
+      },
+    )
+
+    it('a list landing while a loadSession is pending leaves detailLoading true', async () => {
+      const detail = deferred()
+      sessionsApi.getSession.mockReturnValueOnce(detail.promise)
+      getSessionLibrary.mockResolvedValue({ items: [], total: 0 })
+      const s = useSessionStore()
+      const loading = s.loadSession('s1')
+      await s.listSessions()
+      expect(s.listLoading).toBe(false)
+      expect(s.detailLoading).toBe(true)
+      detail.resolve({ id: 's1', messages: [] })
+      await loading
+      expect(s.detailLoading).toBe(false)
     })
   })
 
@@ -1015,7 +1134,7 @@ describe('session store', () => {
     expect(store.error).toBeNull()
   })
 
-  it('superseded load settling first does not clear loading flags', async () => {
+  it('superseded load settling first does not clear detailLoading', async () => {
     const store = useSessionStore()
     let resolveB, resolveC
     sessionsApi.getSession
@@ -1970,17 +2089,6 @@ describe('session store — streaming', () => {
 // #414 fix 3: a request still in flight at sign-out must not write the
 // previous account's data into the reset store (F-02 class).
 describe('session store - late results after reset()', () => {
-  function deferred() {
-    let resolve, reject
-
-    const promise = new Promise((res, rej) => {
-      resolve = res
-      reject = rej
-    })
-
-    return { promise, resolve, reject }
-  }
-
   const page = (items, total) => ({ items, total, limit: 40, offset: 0 })
 
   beforeEach(() => {
@@ -1994,7 +2102,9 @@ describe('session store - late results after reset()', () => {
     const oldEnded = deferred()
     getSessionLibrary.mockReturnValueOnce(oldActive.promise).mockReturnValueOnce(oldEnded.promise)
     const stale = s.listSessions()
+    expect(s.listLoading).toBe(true)
     s.reset()
+    expect(s.listLoading).toBe(false)
 
     const newActive = deferred()
     const newEnded = deferred()
@@ -2002,7 +2112,7 @@ describe('session store - late results after reset()', () => {
     const fresh = s.listSessions()
     // A fresh request, not a join onto the old account's promise.
     expect(getSessionLibrary).toHaveBeenCalledTimes(4)
-    expect(s.loading).toBe(true)
+    expect(s.listLoading).toBe(true)
 
     oldActive.resolve(page([{ id: 'old-a' }], 5))
     oldEnded.resolve(page([{ id: 'old-e' }], 6))
@@ -2011,7 +2121,7 @@ describe('session store - late results after reset()', () => {
     expect(s.activeTotal).toBe(0)
     expect(s.endedTotal).toBe(0)
     // The stale finally left the new call's spinner and in-flight entry alone.
-    expect(s.loading).toBe(true)
+    expect(s.listLoading).toBe(true)
     getSessionLibrary.mockClear()
     const joined = s.listSessions()
     expect(getSessionLibrary).not.toHaveBeenCalled()
@@ -2022,7 +2132,7 @@ describe('session store - late results after reset()', () => {
     await joined
     expect(s.sessions.map((r) => r.id)).toEqual(['new-a'])
     expect(s.activeTotal).toBe(1)
-    expect(s.loading).toBe(false)
+    expect(s.listLoading).toBe(false)
   })
 
   it('loadSession: a stale detail writes nothing', async () => {
@@ -2041,7 +2151,7 @@ describe('session store - late results after reset()', () => {
     expect(s.currentSessionId).toBeNull()
     expect(s.messages).toEqual([])
     expect(s.pendingCheck).toBeNull()
-    expect(s.loading).toBe(false)
+    expect(s.listLoading).toBe(false)
     expect(s.detailLoading).toBe(false)
   })
 
