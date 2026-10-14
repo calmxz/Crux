@@ -74,10 +74,12 @@ export const useSessionStore = defineStore('session', () => {
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
   // and reset(). Every listSessions() call site is mount-time (HomeView,
-  // NewSessionView, Sidebar onMounted) and a mutation never triggers a refetch
+  // NewSessionView, Sidebar onMounted) or the throttled re-list when the tab
+  // becomes visible again (#534, relistIfStale), and a mutation never triggers a refetch
   // -- deliberately, since a refetch costs a round-trip and re-sorts the
   // sidebar under the user mid-action. So any transition a mutating action
-  // fails to mirror here persists for the life of the page. The same rule is
+  // fails to mirror here persists until the tab is next hidden and shown
+  // (#534), or the page reloads. The same rule is
   // why a create inserts its row locally rather than refetching the window.
   // Two narrow exceptions: a list fetch that lands having raced a status
   // change re-lists exactly once (#528, see listSessions), and a status change
@@ -153,6 +155,11 @@ export const useSessionStore = defineStore('session', () => {
   // action notes it when its request starts, so its reply can tell whether a
   // list landed in between.
   let _listsLanded = 0
+  // #534: Date.now() when a list fetch last wrote the window, whatever
+  // started it (mount, #528 follow-up, #533 re-list, a visibility re-list).
+  // relistIfStale() throttles on it. reset() clears it.
+  let _listLandedAt = null
+  const RELIST_THROTTLE_MS = 30_000
 
   function _untrackReplay(replay) {
     _listReplays = _listReplays.filter((r) => r !== replay)
@@ -522,8 +529,23 @@ export const useSessionStore = defineStore('session', () => {
     activeTotal.value = counts.active
     endedTotal.value = counts.ended
     _listsLanded += 1
+    _listLandedAt = Date.now()
 
     return { rows: merged, raced }
+  }
+
+  // #534: the second exception to the no-refetch rule. The sidebar calls this
+  // when the tab becomes visible again, so a change made on another device or
+  // tab (or a totals residue, see #528) shows up without a reload. Skipped
+  // until the window has loaded this sign-in (the mount-time fetch owns the
+  // first load) and while the last landing is under RELIST_THROTTLE_MS old.
+  // Otherwise one listSessions(): silent, de-duped with any list in flight,
+  // and a failure keeps the current window.
+  function relistIfStale() {
+    if (!sessionsLoaded.value || _listLandedAt === null) return
+
+    if (Date.now() - _listLandedAt < RELIST_THROTTLE_MS) return
+    listSessions().catch(() => {})
   }
 
   function listSessions() {
@@ -1496,6 +1518,7 @@ export const useSessionStore = defineStore('session', () => {
     _inflight.clear()
     _listReplays = []
     _listPending = false
+    _listLandedAt = null
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
@@ -1527,6 +1550,7 @@ export const useSessionStore = defineStore('session', () => {
     currentSession,
     sessions,
     sessionsLoaded,
+    relistIfStale,
     searchRows,
     activeTotal,
     endedTotal,

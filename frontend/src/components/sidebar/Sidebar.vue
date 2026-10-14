@@ -10,6 +10,7 @@ import { useAuthStore } from '@/stores/auth.js'
 import { useSessionStore } from '@/stores/session.js'
 import { useUserStore } from '@/stores/user.js'
 import { useSessionGroups } from '@/composables/useSessionGroups.js'
+import { useVisibilityRelist } from '@/composables/useVisibilityRelist.js'
 import { getReviewQueue } from '@/services/reviewApi.js'
 import * as sessionsApi from '@/services/sessionsApi.js'
 import { runWhenIdle } from '@/utils/idle.js'
@@ -267,6 +268,10 @@ const showEmptyActiveHint = computed(
     !activeRows.value.length &&
     !pinnedActive.value.length,
 )
+
+// #534: returning to the tab re-lists once the window is stale. The sidebar
+// is the only consumer of the window, so the listener lives with it.
+useVisibilityRelist()
 
 // Fetch only if we haven't loaded yet. HomeView also calls listSessions on mount;
 // the store de-dupes concurrent calls via _inflight, and skipping once a list
