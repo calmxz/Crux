@@ -353,10 +353,10 @@ previous account's data into the next one's store. Streams use the separate
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
 
-### Sidebar session window (#522, #524, #528)
+### Sidebar session window (#522, #524, #528, #533)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
-corpus, and a mutation never refetches it (one exception, below).
+corpus, and a mutation never refetches it (two exceptions, below).
 `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
@@ -392,6 +392,14 @@ own race result is ignored (capped at one), its failure is swallowed (the
 first result stays, no `error`), and the epoch guard drops it after `reset()`.
 Creates and pin/rename never trigger it: their replays are exact. Residual
 races it cannot see are listed in `docs/decisions.md` (2026-10-14).
+
+Late-reply re-list (#533): end/reopen/continueTopic note `_listsLanded` (bumped
+each time a list writes the window) when their request starts. If the count
+moved by the reply, no list is in flight, the totals rule would move the
+totals, and the session has no row in `sessions`, `_relistIfLandedWithout`
+skips the move and calls `listSessions()` (fire-and-forget) instead. Observed
+copies are still patched. It runs after `_trackStatusChange`, or the re-list
+would record that replay against itself and re-list again.
 
 ### E2E sign-in against the real backend (#518)
 

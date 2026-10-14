@@ -79,8 +79,11 @@ export const useSessionStore = defineStore('session', () => {
   // sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists for the life of the page. The same rule is
   // why a create inserts its row locally rather than refetching the window.
-  // One narrow exception (#528): a list fetch that lands having raced a status
-  // change re-lists exactly once (see listSessions).
+  // Two narrow exceptions: a list fetch that lands having raced a status
+  // change re-lists exactly once (#528, see listSessions), and a status change
+  // whose reply arrives after a list landed, for a session outside that
+  // window, re-lists instead of moving the totals (#533, see
+  // _relistIfLandedWithout).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, using the shared rule documented on
   // _observedRows() below.
@@ -146,6 +149,10 @@ export const useSessionStore = defineStore('session', () => {
   // _inflight.has('list'): that entry outlives the finally by a microtask, and
   // a change recorded in that gap would wait for, and override, the next list.
   let _listPending = false
+  // #533: bumped each time a list fetch writes the window. A status-change
+  // action notes it when its request starts, so its reply can tell whether a
+  // list landed in between.
+  let _listsLanded = 0
 
   function _untrackReplay(replay) {
     _listReplays = _listReplays.filter((r) => r !== replay)
@@ -182,6 +189,25 @@ export const useSessionStore = defineStore('session', () => {
         }
       },
     })
+  }
+
+  // #533: called by an end/reopen/continueTopic reply in place of moving the
+  // totals. A list that landed after the request started may already count
+  // the change. With the session in that window the SHARED TOTALS RULE judges
+  // it from the landed row; without it nothing can, so fetch one fresh list
+  // (silent, epoch-guarded, de-duped) instead. A list still in flight keeps
+  // the #528 path: the replay just recorded for it decides. Returns true when
+  // it re-listed, and the caller then leaves the totals alone. Call it after
+  // _trackStatusChange: a re-list started first would record that replay
+  // against itself and re-list a second time.
+  function _relistIfLandedWithout(id, landedAtStart) {
+    if (_listPending || _listsLanded === landedAtStart) return false
+
+    if (sessions.value.some((s) => s.id === id)) return false
+    // Like the mount-time callers: a failed list keeps the landed totals.
+    listSessions().catch(() => {})
+
+    return true
   }
 
   // The optimistic write behind renameSession / setPinned: patch every
@@ -455,6 +481,7 @@ export const useSessionStore = defineStore('session', () => {
     sessionsLoaded.value = true
     activeTotal.value = counts.active
     endedTotal.value = counts.ended
+    _listsLanded += 1
 
     return { rows: merged, raced }
   }
@@ -697,6 +724,7 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!id) throw new Error('no active session')
     const live = _epochGuard()
+    const landedAtStart = _listsLanded
     error.value = null
 
     try {
@@ -727,7 +755,7 @@ export const useSessionStore = defineStore('session', () => {
         }
       }
 
-      if (!alreadyEnded) {
+      if (!alreadyEnded && !_relistIfLandedWithout(id, landedAtStart)) {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       }
@@ -755,6 +783,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function reopenSession(sessionId) {
     const live = _epochGuard()
+    const landedAtStart = _listsLanded
     error.value = null
     duplicateReopen.value = null
 
@@ -769,7 +798,7 @@ export const useSessionStore = defineStore('session', () => {
       for (const r of observed) r.ended_at = null
       _trackStatusChange(sessionId, null)
 
-      if (!alreadyActive) {
+      if (!alreadyActive && !_relistIfLandedWithout(sessionId, landedAtStart)) {
         endedTotal.value = Math.max(0, endedTotal.value - 1)
         activeTotal.value += 1
       }
@@ -792,6 +821,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function continueTopic(prior) {
     const live = _epochGuard()
+    const landedAtStart = _listsLanded
     error.value = null
 
     try {
@@ -827,7 +857,7 @@ export const useSessionStore = defineStore('session', () => {
       // counted again when a list fetch that landed first already holds it.
       if (_insertCreated(created)) activeTotal.value += 1
 
-      if (!alreadyEnded) {
+      if (!alreadyEnded && !_relistIfLandedWithout(prior.id, landedAtStart)) {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       }
