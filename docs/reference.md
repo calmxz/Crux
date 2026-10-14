@@ -354,10 +354,12 @@ previous account's data into the next one's store. Streams use the separate
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
 
-### Sidebar session window (#522, #524, #528, #533)
+### Sidebar session window (#522, #524, #528, #533, #534)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
-corpus, and a mutation never refetches it (two exceptions, below).
+corpus, and a mutation never refetches it. Three exceptions, below: the
+#528 and #533 re-lists after a status-change race, and the #534 re-list when
+the tab becomes visible again.
 `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
@@ -407,6 +409,19 @@ Observed copies are always patched. `_relist()` runs after
 `_trackStatusChange`, or the re-list would record that replay against itself
 and re-list again, and it waits out a list whose `_inflight` entry outlives
 `_listPending`, so it never joins a finished fetch.
+
+Visibility re-list (#534): `composables/useVisibilityRelist.js`, called by
+`Sidebar.vue`, holds one `visibilitychange` listener on `document` for all
+mounted sidebars (module-scoped count; added on the first mount, removed on
+the last unmount). When the document turns visible and the user is signed in,
+it calls the store's `relistIfStale()`. That calls `listSessions()` unless the
+window has not loaded this sign-in (`sessionsLoaded`), or a list wrote the
+window (`_listLandedAt`, set by every landing) or a visibility re-list was
+attempted (`_relistTriedAt`, so offline returns are throttled too) under 30
+seconds ago. `reset()` clears both; a negative age from a clock moved back
+counts as stale. A list still in flight is joined through `_inflight`. The event
+runs as its own task, never in the microtasks between a list's `finally` and
+its `_inflight` removal, so it cannot join a finished fetch.
 
 Ordering matrix. A change to the totals or replay logic is checked against
 each row, for a session inside and outside the window. In a store test, seed

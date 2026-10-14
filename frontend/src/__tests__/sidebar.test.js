@@ -1608,6 +1608,219 @@ describe('Sidebar.vue — mount fetch', () => {
   })
 })
 
+// #534: returning to the tab re-fetches the sidebar list once, throttled by
+// the last landing. Real store; each list fetch is two library page calls.
+describe('Sidebar.vue — re-list when the tab becomes visible', () => {
+  let wrappers
+  let visibility
+
+  function signIn() {
+    useAuthStore().session = { user: { id: 'u-1' }, access_token: 't' }
+  }
+
+  async function mountSidebar() {
+    const w = mount(Sidebar)
+    wrappers.push(w)
+    await flushPromises()
+
+    return w
+  }
+
+  async function showTab() {
+    visibility = 'hidden'
+    document.dispatchEvent(new Event('visibilitychange'))
+    visibility = 'visible'
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+  }
+
+  const lists = () => apiGetSessionLibrary.mock.calls.length / 2
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    setViewport(1400)
+    sidebarTest._setExpanded(true)
+    routeRef.params = {}
+    wrappers = []
+    visibility = 'visible'
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+    // Date only: flushPromises needs real timers.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-14T10:00:00Z'))
+  })
+
+  afterEach(() => {
+    for (const w of wrappers) w.unmount()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('hidden then visible makes exactly one list fetch once the window is stale', async () => {
+    signIn()
+    await mountSidebar()
+    expect(lists()).toBe(1)
+    vi.setSystemTime(new Date('2026-10-14T10:00:30Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('a hidden event alone makes no fetch', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+    visibility = 'hidden'
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(lists()).toBe(1)
+  })
+
+  it('throttles to one fetch per 30s, measured from the last landing', async () => {
+    signIn()
+    await mountSidebar()
+    // Within 30s of the mount-time landing: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:00:29Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+    vi.setSystemTime(new Date('2026-10-14T10:00:40Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    // Within 30s of the visibility re-list's own landing: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:01:05Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    vi.setSystemTime(new Date('2026-10-14T10:01:10Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+  })
+
+  it('measures the throttle from a #528 follow-up landing too', async () => {
+    signIn()
+    await mountSidebar()
+    // A list whose two pages both hold s1 raced a status change: #528
+    // fetches one follow-up list inside the same listSessions().
+    const s1 = { id: 's1', topic: 'T', created_at: '2026-10-14T09:00:00Z', ended_at: null }
+    apiGetSessionLibrary
+      .mockResolvedValueOnce({ items: [s1], total: 1, limit: 40, offset: 0 })
+      .mockResolvedValueOnce({ items: [{ ...s1, ended_at: 'x' }], total: 1, limit: 40, offset: 0 })
+    vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+    let release
+    const gate = new Promise((resolve) => (release = resolve))
+    apiGetSessionLibrary.mockImplementationOnce(() =>
+      gate.then(() => ({ items: [], total: 0, limit: 40, offset: 0 })),
+    )
+    const pending = useSessionStore().listSessions()
+    await flushPromises()
+    // The follow-up lands 20s later.
+    vi.setSystemTime(new Date('2026-10-14T10:01:20Z'))
+    release()
+    await pending
+    expect(lists()).toBe(3)
+    // 35s after the first landing but 15s after the follow-up's: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:01:35Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+    vi.setSystemTime(new Date('2026-10-14T10:01:50Z'))
+    await showTab()
+    expect(lists()).toBe(4)
+  })
+
+  it('throttles a failed re-list from its attempt', async () => {
+    signIn()
+    await mountSidebar()
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    // Still offline, 10s later: no new request.
+    vi.setSystemTime(new Date('2026-10-14T10:05:10Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    vi.setSystemTime(new Date('2026-10-14T10:05:30Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+  })
+
+  it('treats a wall clock moved backwards as stale', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T09:00:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('makes no fetch when signed out', async () => {
+    signIn()
+    await mountSidebar()
+    useAuthStore().session = null
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('makes no fetch before the first list has loaded', async () => {
+    signIn()
+    // The mount-time fetch fails, so the window never loads this sign-in.
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    await mountSidebar()
+    expect(useSessionStore().sessionsLoaded).toBe(false)
+    apiGetSessionLibrary.mockClear()
+    apiGetSessionLibrary.mockResolvedValue({ items: [], total: 0, limit: 40, offset: 0 })
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(0)
+  })
+
+  it('makes no fetch after a sign-out reset, even once stale', async () => {
+    signIn()
+    await mountSidebar()
+    useSessionStore().reset()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('removes the listener on unmount', async () => {
+    signIn()
+    const w = await mountSidebar()
+    w.unmount()
+    wrappers = []
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('two mounted sidebars register one listener, kept until the last unmounts', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    signIn()
+    const first = await mountSidebar()
+    await mountSidebar()
+    const registered = add.mock.calls.filter(([type]) => type === 'visibilitychange')
+    expect(registered).toHaveLength(1)
+    first.unmount()
+    wrappers.shift()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('a visible event while a list is in flight joins it', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    const resolvers = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const pending = useSessionStore().listSessions()
+    expect(lists()).toBe(2)
+    await showTab()
+    expect(lists()).toBe(2)
+
+    for (const resolve of resolvers) resolve({ items: [], total: 0, limit: 40, offset: 0 })
+    await pending
+    expect(lists()).toBe(2)
+  })
+})
+
 describe('Sidebar.vue — recall entry', () => {
   let wrapper
   beforeEach(() => {

@@ -3,6 +3,40 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - Re-list the sidebar when the tab becomes visible, throttled (#534)
+
+The third exception to the no-refetch rule (after #528's re-list of a raced
+list and #533's re-list on a late reply), and the first not caused by a
+status change. Until now the
+sidebar window and its totals were fetched only at mount, so a change made on
+another device or tab never showed before a reload, and a totals residue from
+#528 lasted for the life of the page. Now, when the document goes from hidden
+to visible, the sidebar calls `listSessions()` once. That reuses the replay,
+epoch guard, silence, in-flight de-dupe and the #528 re-list unchanged. It is
+skipped when signed out, before the window has loaded this sign-in (the
+mount-time fetch owns the first load), and when any list landed, or a
+visibility re-list was attempted, under 30 seconds ago. Counting attempts
+keeps a tab returned to while offline from fetching on every switch; the
+cost is that the first return after reconnecting can wait out the rest of
+those 30 seconds. So tab
+switching starts at most one list fetch per 30 seconds; that list can still
+bring its own #528 follow-up or a #533 re-list, as any list can. A failure
+keeps the current window.
+
+Rejected: polling and live push (Supabase Realtime, SSE, WebSockets), for
+running cost; a re-fetch on window `focus` alone or on network reconnect. The
+listener lives with the sidebar, the only component that renders the window's
+rows (other views look rows up or check whether it is empty), and a module-scoped count keeps it to
+one listener however many sidebars mount. A failed first load is not retried
+on return: the brief leaves the first load to the mount-time fetch.
+
+A visibility re-list writes only the list's own `listError` (#537, below), so
+a tab switch neither wipes an error the session page is showing nor puts a
+failed re-list (returning to the tab offline) in the page's error line. Also
+accepted: the re-list sets `listLoading`, so while it runs an account with no
+sessions shows the sidebar skeleton instead of its empty state, and one with
+only ended sessions hides its no-active-sessions hint. Rows stay on screen.
+
 ## 2026-10-14 - The sidebar list has its own error (#537)
 
 The session store had one `error` slot shared by the session page and the
@@ -52,10 +86,11 @@ accepted: a status-change reply that resumes in the microtasks between a
 list's write and its `finally` takes the in-flight path, and the `finally`
 drops its replay unapplied. That needs two network responses to settle in one
 microtask drain, which per-response fetch tasks should not produce. All of
-these leave the totals off by one until the next mount-time list; the real
+these leave the totals off by one until the next list; the real
 fix is server-side (both pages and totals from one transaction), which #528
-ruled out of scope. Tracked instead: a re-list on tab focus (#534), which also
-heals the cross-device cases.
+ruled out of scope. The re-list when the tab becomes visible (#534, above)
+heals all of them, including the cross-device cases, the next time the
+learner returns to the tab at least 30 seconds after the last list.
 
 Late reply (#533): an end, reopen or prior-end notes how many lists have
 landed when its request starts. If one landed before the reply, that list may
@@ -68,7 +103,7 @@ With no row (and no copy already in the target state), the action does not
 move the totals and calls `listSessions()` once instead; re-listing beats a
 local guess for the same reason as #528. If another list is in flight at that
 point, the action moves the totals and that list's recorded replay and #528
-decide. Accepted until the next mount-time list: a failed re-list keeps landed
+decide. Accepted until the next list: a failed re-list keeps landed
 totals that may predate the change, and a failed in-flight list keeps a move
 that may double-count it (accepted, see #540).
 
