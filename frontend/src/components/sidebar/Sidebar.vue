@@ -237,10 +237,11 @@ const activeRendered = computed(
 )
 
 // View all is the list's closing line whenever rows are rendered. The
-// zero-rows guard stays: createSession bumps activeTotal without pushing
-// into the (windowed) `sessions` array, so a fresh account can sit at
-// activeTotal=1 with zero rendered rows. Without this guard the sidebar
-// would show "No sessions yet" and "View all 1 sessions" at once.
+// zero-rows guard stays: reopenSession bumps activeTotal for a session
+// outside the (windowed) `sessions` array (e.g. reopened from the library
+// page), so the sidebar can sit at activeTotal=1 with zero rendered active
+// rows. Without this guard it would show "View all 1 sessions" under an
+// empty Active list.
 const showViewAllActive = computed(() => activeRendered.value > 0)
 
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)

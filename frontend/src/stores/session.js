@@ -50,7 +50,10 @@ export const useSessionStore = defineStore('session', () => {
   const currentSessionId = ref(null)
   const currentSession = ref(null)
   // NOT the full corpus: a SIDEBAR_PAGE_LIMIT-sized window per status
-  // (40 active + 40 ended), refilled only by listSessions().
+  // (40 active + 40 ended), refilled by listSessions(). #522: createSession /
+  // continueTopic also insert the session they create (_insertCreated), so
+  // the active part may briefly hold one row past the page limit; the
+  // sidebar caps what it renders.
   const sessions = ref([])
   // The sidebar's server-side search results. Owned by the store rather than
   // by Sidebar.vue because the sidebar RENDERS these row objects directly and
@@ -70,7 +73,8 @@ export const useSessionStore = defineStore('session', () => {
   // NewSessionView, Sidebar onMounted) and nothing refetches after a mutation
   // -- deliberately, since a refetch costs a round-trip and re-sorts the
   // sidebar under the user mid-action. So any transition a mutating action
-  // fails to mirror here persists for the life of the page.
+  // fails to mirror here persists for the life of the page. The same rule is
+  // why a create inserts its row locally rather than refetching the window.
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, using the shared rule documented on
   // _observedRows() below.
@@ -116,6 +120,12 @@ export const useSessionStore = defineStore('session', () => {
   // previous account's data into the reset store (F-02 class). What the
   // action returns or rethrows to its caller is unchanged.
   let _resetEpoch = 0
+  // #522: rows _insertCreated added, tagged with a sequence number so a
+  // listSessions() that started before a create and resolves after it can
+  // re-apply the row its (older) snapshot lacks. Entries the server has seen
+  // by the time a list starts are dropped when that list lands.
+  let _createSeq = 0
+  let _localCreates = [] // { seq, row }
 
   function _epochGuard() {
     const epoch = _resetEpoch
@@ -186,6 +196,39 @@ export const useSessionStore = defineStore('session', () => {
     return held
   }
 
+  // The active window is the server's pinned_activity order, then ended rows.
+  // A new row is unpinned with the latest activity, so it goes right after
+  // the pinned active rows. Returns false when `list` already holds the id.
+  function _placeRow(list, row) {
+    if (list.some((s) => s.id === row.id)) return false
+    const i = list.findIndex((s) => !(s.pinned && !s.ended_at))
+
+    list.splice(i === -1 ? list.length : i, 0, row)
+
+    return true
+  }
+
+  // #522: map the POST /sessions body (SessionResponse) to the SessionListItem
+  // shape the sidebar row renders, and put it in the window. A separate object
+  // from `created` (which becomes currentSession): _observedRows treats the
+  // window row and the detail as two copies to keep in step.
+  function _insertCreated(created) {
+    const row = {
+      id: created.id,
+      topic: created.topic,
+      created_at: created.created_at,
+      ended_at: created.ended_at ?? null,
+      pinned: !!created.pinned,
+      last_activity_at: created.created_at ?? null,
+      message_count: 0,
+      last_message_preview: null,
+      progress: null,
+      last_session_summary: null,
+    }
+
+    if (_placeRow(sessions.value, row)) _localCreates.push({ seq: ++_createSeq, row })
+  }
+
   // Route a backend cap envelope (HTTP 429 detail or SSE error payload)
   // into the cap-banner refs. Unknown codes are a no-op.
   // Returns true when the envelope WAS a cap code, so an SSE caller knows the
@@ -229,6 +272,7 @@ export const useSessionStore = defineStore('session', () => {
   function listSessions() {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
+      const startSeq = _createSeq
       loading.value = true
       error.value = null
 
@@ -262,9 +306,27 @@ export const useSessionStore = defineStore('session', () => {
         }
 
         if (!live()) return merged
+        let activeCount = activePage.total
+        let endedCount = endedPage.total
+
+        // #522: a session created while this fetch was in flight is missing
+        // from its snapshot (rows and totals alike); re-apply it. Creates from
+        // before the fetch started are in the snapshot, so the server wins.
+        _localCreates = _localCreates.filter((c) => c.seq > startSeq)
+
+        for (const { row } of _localCreates) {
+          if (row.ended_at) {
+            if (merged.some((s) => s.id === row.id)) continue
+            merged.push(row)
+            endedCount += 1
+          } else if (_placeRow(merged, row)) {
+            activeCount += 1
+          }
+        }
+
         sessions.value = merged
-        activeTotal.value = activePage.total
-        endedTotal.value = endedPage.total
+        activeTotal.value = activeCount
+        endedTotal.value = endedCount
 
         return sessions.value
       } catch (e) {
@@ -290,9 +352,9 @@ export const useSessionStore = defineStore('session', () => {
 
       if (!live()) return created
       // A freshly created session is always active server-side; count it
-      // unconditionally even though it isn't added to the (windowed)
-      // `sessions` list here.
+      // unconditionally and show it in the sidebar window.
       activeTotal.value += 1
+      _insertCreated(created)
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
@@ -610,6 +672,7 @@ export const useSessionStore = defineStore('session', () => {
         endedTotal.value += 1
       }
 
+      _insertCreated(created)
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
@@ -1248,6 +1311,7 @@ export const useSessionStore = defineStore('session', () => {
     abandonStream()
     _resetEpoch += 1
     _inflight.clear()
+    _localCreates = []
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
