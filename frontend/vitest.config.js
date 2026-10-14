@@ -12,6 +12,9 @@ export default mergeConfig(
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
       setupFiles: ['./src/__tests__/setup.js'],
+      // Reset every mock (implementations and unconsumed *Once queues) before
+      // each test, so one test's leftover responses never feed the next.
+      mockReset: true,
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html'],
