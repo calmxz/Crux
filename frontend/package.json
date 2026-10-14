@@ -14,7 +14,7 @@
     "lint": "run-s lint:*",
     "lint:oxlint": "oxlint .",
     "lint:eslint": "eslint . --cache",
-    "fix": "run-s fix:*",
+    "fix": "oxlint --fix . && eslint . --cache --fix && prettier --write --experimental-cli src/",
     "fix:oxlint": "oxlint . --fix",
     "fix:eslint": "eslint . --fix --cache",
     "format": "prettier --write --experimental-cli src/",
