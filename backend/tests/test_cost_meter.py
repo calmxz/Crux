@@ -48,16 +48,12 @@ def test_check_cap_from_spend_matches_check_cap_semantics():
 
 def test_spend_subquery_returns_todays_spend(db_session):
     cost_meter.record_cost(db_session, "sq-user", Decimal("0.25"))
-    used = db_session.execute(
-        select(cost_meter.spend_subquery("sq-user"))
-    ).scalar_one()
+    used = db_session.execute(select(cost_meter.spend_subquery("sq-user"))).scalar_one()
     assert Decimal(str(used or 0)) == Decimal("0.25")
 
 
 def test_spend_subquery_zero_when_no_ledger_row(db_session):
-    used = db_session.execute(
-        select(cost_meter.spend_subquery("nobody"))
-    ).scalar_one()
+    used = db_session.execute(select(cost_meter.spend_subquery("nobody"))).scalar_one()
     assert Decimal(str(used or 0)) == Decimal("0")
 
 
@@ -79,9 +75,7 @@ def test_current_spend_reads_through_identity_map(db_session):
     row = db_session.get(DailyCostLedger, ("u43", cost_meter._today_utc()))
     assert row is not None
     # Mutate the row behind the ORM's back (simulates another session's commit).
-    db_session.execute(
-        text("UPDATE daily_cost_ledger SET cost_usd = 2.0 WHERE user_id = 'u43'")
-    )
+    db_session.execute(text("UPDATE daily_cost_ledger SET cost_usd = 2.0 WHERE user_id = 'u43'"))
     assert cost_meter.current_spend(db_session, "u43") == Decimal("2.0000")
     # The cached instance must remain stale (proves `row` was the identity-map
     # hit a cached read would have returned) while current_spend is fresh.
@@ -97,9 +91,7 @@ def test_record_cost_is_an_atomic_increment(db_session):
     db_session.commit()
     row = db_session.get(DailyCostLedger, ("u17", cost_meter._today_utc()))
     assert row is not None  # instance now cached with 0.5
-    db_session.execute(
-        text("UPDATE daily_cost_ledger SET cost_usd = 1.0 WHERE user_id = 'u17'")
-    )
+    db_session.execute(text("UPDATE daily_cost_ledger SET cost_usd = 1.0 WHERE user_id = 'u17'"))
     total = cost_meter.record_cost(db_session, "u17", Decimal("0.25"))
     # Read-modify-write on the cached 0.5 would yield 0.75; atomic SQL yields 1.25.
     assert total == Decimal("1.2500")

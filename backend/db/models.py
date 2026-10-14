@@ -60,7 +60,9 @@ class User(Base):
     )
 
     sessions: Mapped[list["Session"]] = relationship("Session", back_populates="user")
-    usage_counters: Mapped[list["UsageCounter"]] = relationship("UsageCounter", back_populates="user")
+    usage_counters: Mapped[list["UsageCounter"]] = relationship(
+        "UsageCounter", back_populates="user"
+    )
 
 
 class Session(Base):
@@ -92,9 +94,7 @@ class Session(Base):
     # #354: the once-per-session topic card. "awaiting_level" when the session
     # started without a level, "done" once suggest_topics ran, NULL otherwise.
     # See services/topic_suggest_service.py.
-    topic_suggest_state: Mapped[str | None] = mapped_column(
-        String(16), nullable=True, default=None
-    )
+    topic_suggest_state: Mapped[str | None] = mapped_column(String(16), nullable=True, default=None)
     # C-16: see User.created_at.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), default=_utcnow
@@ -114,7 +114,9 @@ class Session(Base):
 
     user: Mapped["User"] = relationship("User", back_populates="sessions")
     messages: Mapped[list["ChatMessage"]] = relationship("ChatMessage", back_populates="session")
-    learning_events: Mapped[list["LearningEvent"]] = relationship("LearningEvent", back_populates="session")
+    learning_events: Mapped[list["LearningEvent"]] = relationship(
+        "LearningEvent", back_populates="session"
+    )
     documents: Mapped[list["Document"]] = relationship("Document", back_populates="session")
 
 
@@ -159,9 +161,7 @@ class ChatMessage(Base):
 
 class UsageCounter(Base):
     __tablename__ = "usage_counters"
-    __table_args__ = (
-        UniqueConstraint("user_id", "date_utc", name="uq_usage_counters_user_date"),
-    )
+    __table_args__ = (UniqueConstraint("user_id", "date_utc", name="uq_usage_counters_user_date"),)
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
@@ -223,18 +223,14 @@ class Document(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    session_id: Mapped[str] = mapped_column(
-        ForeignKey("sessions.id"), nullable=False, index=True
-    )
+    session_id: Mapped[str] = mapped_column(ForeignKey("sessions.id"), nullable=False, index=True)
     filename: Mapped[str] = mapped_column(String, nullable=False)
     status: Mapped[str] = mapped_column(String, default="pending")
     error: Mapped[str | None] = mapped_column(Text, nullable=True)
     page_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     # C-08: sha256 of the uploaded bytes. NULL on rows created before 0026.
     content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    claimed_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
-    )
+    claimed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     # C-16: see User.created_at.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, server_default=func.now(), default=_utcnow
@@ -246,9 +242,7 @@ class Document(Base):
 class ChunkEmbedding(Base):
     __tablename__ = "chunk_embeddings"
     __table_args__ = (
-        UniqueConstraint(
-            "document_id", "chunk_index", name="uq_chunk_embeddings_doc_idx"
-        ),
+        UniqueConstraint("document_id", "chunk_index", name="uq_chunk_embeddings_doc_idx"),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid4()))
@@ -268,7 +262,9 @@ class DailyCostLedger(Base):
 
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), primary_key=True)
     date_utc: Mapped[str] = mapped_column(String, primary_key=True)  # YYYY-MM-DD
-    cost_usd: Mapped[Decimal] = mapped_column(Numeric(10, 4), default=Decimal("0.0000"), nullable=False)
+    cost_usd: Mapped[Decimal] = mapped_column(
+        Numeric(10, 4), default=Decimal("0.0000"), nullable=False
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=_utcnow, onupdate=_utcnow, nullable=False
     )

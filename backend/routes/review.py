@@ -60,9 +60,7 @@ def get_review_queue(
     # runs on every sidebar boot, so it must not be O(sessions) round trips.
     sids = {e.session_id for e in events}
     session_rows = (
-        db.execute(select(SessionModel).where(SessionModel.id.in_(sids)))
-        .scalars()
-        .all()
+        db.execute(select(SessionModel).where(SessionModel.id.in_(sids))).scalars().all()
         if sids
         else []
     )

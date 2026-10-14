@@ -1,5 +1,6 @@
 """F-14: max_iters / mid-turn-cap aborts persist already-streamed text as a
 'partial' assistant message; the F-01 error arm attaches an open batch."""
+
 import asyncio
 import json
 
@@ -20,8 +21,10 @@ def _mk_session(db):
 
 def _ctx(db, s):
     from datetime import datetime, timezone
-    return ToolContext(db=db, session_id=s.id, user_id="u1",
-                       turn_started_at=datetime.now(timezone.utc))
+
+    return ToolContext(
+        db=db, session_id=s.id, user_id="u1", turn_started_at=datetime.now(timezone.utc)
+    )
 
 
 class _FakeDelta:
@@ -38,17 +41,34 @@ class _FakeChunk:
 class _FakeStream:
     """Async iterator that streams one text token then one tool-call frag so
     the loop never produces a final answer and exhausts max_iters."""
+
     def __init__(self):
         self._items = [
             _FakeChunk(_FakeDelta(content="draft ")),
-            _FakeChunk(_FakeDelta(tool_calls=[type("T", (), {
-                "index": 0, "id": "tc1",
-                "function": type("F", (), {
-                    "name": "update_topic_profile",
-                    "arguments": json.dumps({"add_confirmed_gap": "x",
-                                             "evidence_type": "declared"}),
-                })(),
-            })()])),
+            _FakeChunk(
+                _FakeDelta(
+                    tool_calls=[
+                        type(
+                            "T",
+                            (),
+                            {
+                                "index": 0,
+                                "id": "tc1",
+                                "function": type(
+                                    "F",
+                                    (),
+                                    {
+                                        "name": "update_topic_profile",
+                                        "arguments": json.dumps(
+                                            {"add_confirmed_gap": "x", "evidence_type": "declared"}
+                                        ),
+                                    },
+                                )(),
+                            },
+                        )()
+                    ]
+                )
+            ),
         ]
 
     def __aiter__(self):
@@ -78,7 +98,9 @@ def test_max_iters_persists_partial(db_session, monkeypatch):
     async def run():
         events = []
         async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "hi"}], "sys", _ctx(db_session, s),
+            [{"role": "user", "content": "hi"}],
+            "sys",
+            _ctx(db_session, s),
             max_iters=2,
         ):
             events.append(ev)
@@ -88,9 +110,7 @@ def test_max_iters_persists_partial(db_session, monkeypatch):
     assert events[-1].type == "error"
     assert events[-1].data["code"] == "max_iters_reached"
     row = db_session.execute(
-        select(ChatMessage).where(
-            ChatMessage.session_id == s.id, ChatMessage.role == "assistant"
-        )
+        select(ChatMessage).where(ChatMessage.session_id == s.id, ChatMessage.role == "assistant")
     ).scalar_one()
     assert row.status == "partial"
     assert "draft" in row.content

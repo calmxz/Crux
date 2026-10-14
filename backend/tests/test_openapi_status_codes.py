@@ -105,9 +105,7 @@ def _collect_codes(
         # one level for any same-module helper, one extra for `_` helpers.
         if next_depth > 2 or (next_depth == 2 and not name.startswith("_")):
             continue
-        codes |= _collect_codes(
-            module_funcs[name], module_funcs, next_depth, seen | {name}
-        )
+        codes |= _collect_codes(module_funcs[name], module_funcs, next_depth, seen | {name})
     return codes
 
 
@@ -131,9 +129,7 @@ def _routes() -> dict[tuple[str, str], set[int]]:
         tree = ast.parse(module_path.read_text(encoding="utf-8"))
         prefix = _router_prefix(tree)
         module_funcs = {
-            n.name: n
-            for n in tree.body
-            if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
+            n.name: n for n in tree.body if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef))
         }
         for fn in module_funcs.values():
             for dec in fn.decorator_list:
@@ -167,7 +163,7 @@ def _documented() -> dict[tuple[str, str], set[int]]:
             if method.lower() not in HTTP_METHODS:
                 continue
             codes = set()
-            for code in (op.get("responses") or {}):
+            for code in op.get("responses") or {}:
                 # a documented `default` is not a wildcard for this check.
                 if str(code).isdigit():
                     codes.add(int(code))
@@ -195,18 +191,14 @@ def test_every_raised_status_code_is_documented():
 
 def test_every_documented_path_has_a_route():
     routes = _routes()
-    missing = sorted(
-        f"{m} {p}" for (m, p) in _documented() if (m, p) not in routes
-    )
+    missing = sorted(f"{m} {p}" for (m, p) in _documented() if (m, p) not in routes)
     assert not missing, "Documented in openapi.yaml but no route raises it:\n  " + "\n  ".join(
         missing
     )
 
 
 def test_no_path_documents_500():
-    offenders = sorted(
-        f"{m} {p}" for (m, p), codes in _documented().items() if 500 in codes
-    )
+    offenders = sorted(f"{m} {p}" for (m, p), codes in _documented().items() if 500 in codes)
     assert not offenders, "500 is unhandled and must never be documented:\n  " + "\n  ".join(
         offenders
     )

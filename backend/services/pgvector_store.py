@@ -76,9 +76,9 @@ def insert_chunks(
         for (chunk_index, page, text, embedding) in rows
     ]
     ins = dialect_insert(db)(ChunkEmbedding).values(values)
-    stmt = ins.on_conflict_do_nothing(
-        index_elements=["document_id", "chunk_index"]
-    ).returning(ChunkEmbedding.id)
+    stmt = ins.on_conflict_do_nothing(index_elements=["document_id", "chunk_index"]).returning(
+        ChunkEmbedding.id
+    )
     result = db.execute(stmt)
     inserted = len(result.fetchall())
     db.flush()
@@ -90,9 +90,7 @@ def delete_document_chunks(db: Session, document_id: int) -> int:
     Does NOT commit — the caller owns the transaction (F-28: chunk delete and
     document-row delete must land atomically). The FK also carries
     ON DELETE CASCADE (migration 0018) as a schema-level backstop."""
-    result = db.execute(
-        _delete(ChunkEmbedding).where(ChunkEmbedding.document_id == document_id)
-    )
+    result = db.execute(_delete(ChunkEmbedding).where(ChunkEmbedding.document_id == document_id))
     return result.rowcount or 0
 
 

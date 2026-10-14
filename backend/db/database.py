@@ -17,7 +17,7 @@ def _normalized_url(url: str) -> str:
     """Force psycopg3 driver for bare postgresql:// URLs. SQLAlchemy defaults
     to psycopg2 otherwise, which we don't ship. Idempotent for explicit drivers."""
     if url.startswith("postgresql://"):
-        return "postgresql+psycopg://" + url[len("postgresql://"):]
+        return "postgresql+psycopg://" + url[len("postgresql://") :]
     return url
 
 

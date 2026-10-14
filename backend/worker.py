@@ -32,12 +32,7 @@ RECOVER_EVERY_ITERATIONS = 30
 
 
 def claim_next(db) -> int | None:
-    stmt = (
-        select(Document.id)
-        .where(Document.status == "pending")
-        .order_by(Document.id)
-        .limit(1)
-    )
+    stmt = select(Document.id).where(Document.status == "pending").order_by(Document.id).limit(1)
     if db.get_bind().dialect.name == "postgresql":
         stmt = stmt.with_for_update(skip_locked=True)
     row = db.execute(stmt).first()

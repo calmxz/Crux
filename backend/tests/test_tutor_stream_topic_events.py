@@ -49,13 +49,19 @@ def _make_stream(*chunks):
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
 
 
 def _allow_cap(monkeypatch):
     cap = CapStatus(
-        allowed=True, used=Decimal("0.0"), soft_breached=False, urgent_breached=False,
-        soft_cap=Decimal("2.0"), urgent_cap=Decimal("2.70"), hard_cap=Decimal("3.0"),
+        allowed=True,
+        used=Decimal("0.0"),
+        soft_breached=False,
+        urgent_breached=False,
+        soft_cap=Decimal("2.0"),
+        urgent_cap=Decimal("2.70"),
+        hard_cap=Decimal("3.0"),
     )
     monkeypatch.setattr("agent.tutor.cost_meter.check_cap", MagicMock(return_value=cap))
 
@@ -86,14 +92,21 @@ SUGGEST = {
 def _session(db, sid, level=None, state=topic_suggest_service.AWAITING_LEVEL):
     db.add(UserModel(id=USER_ID))
     db.flush()
-    db.add(SessionModel(
-        id=sid, user_id=USER_ID, topic="Thermodynamics",
-        topic_profile_json=TopicProfile(knowledge_level=level).model_dump_json(),
-        topic_suggest_state=state,
-    ))
+    db.add(
+        SessionModel(
+            id=sid,
+            user_id=USER_ID,
+            topic="Thermodynamics",
+            topic_profile_json=TopicProfile(knowledge_level=level).model_dump_json(),
+            topic_suggest_state=state,
+        )
+    )
     db.commit()
     return ToolContext(
-        db=db, session_id=sid, user_id=USER_ID, turn_started_at=datetime.now(timezone.utc),
+        db=db,
+        session_id=sid,
+        user_id=USER_ID,
+        turn_started_at=datetime.now(timezone.utc),
     )
 
 
@@ -158,11 +171,14 @@ async def test_declared_level_patch_then_suggest_in_one_turn(monkeypatch, db_ses
     # it and offers the card in the same response.
     ctx = _session(db_session, "ts3", level=None)
     patch = _tool_fragment(
-        index=0, id="tc_lvl", name="update_topic_profile",
+        index=0,
+        id="tc_lvl",
+        name="update_topic_profile",
         arguments=json.dumps({"knowledge_level": "intermediate", "evidence_type": "declared"}),
     )
     turn1 = _make_stream(
-        _content_chunk("Intermediate it is."), _tool_chunk(patch, _suggest(index=1)),
+        _content_chunk("Intermediate it is."),
+        _tool_chunk(patch, _suggest(index=1)),
     )
     monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1]))
 
@@ -177,11 +193,24 @@ async def test_declared_level_patch_then_suggest_in_one_turn(monkeypatch, db_ses
 async def test_ask_and_suggest_bundled_only_the_first_terminal_runs(monkeypatch, db_session):
     ctx = _session(db_session, "ts4", level="beginner")
     ask = _tool_fragment(
-        index=0, id="tc_ask", name="ask_check_questions",
-        arguments=json.dumps({
-            "gap": "entropy", "set_index": 1, "set_total": 1,
-            "items": [{"question": "Q?", "options": ["a", "b"], "correct_index": 0, "explanation": "e."}],
-        }),
+        index=0,
+        id="tc_ask",
+        name="ask_check_questions",
+        arguments=json.dumps(
+            {
+                "gap": "entropy",
+                "set_index": 1,
+                "set_total": 1,
+                "items": [
+                    {
+                        "question": "Q?",
+                        "options": ["a", "b"],
+                        "correct_index": 0,
+                        "explanation": "e.",
+                    }
+                ],
+            }
+        ),
     )
     turn1 = _make_stream(_content_chunk("Quick check:"), _tool_chunk(ask, _suggest(index=1)))
     monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1]))
@@ -195,4 +224,7 @@ async def test_ask_and_suggest_bundled_only_the_first_terminal_runs(monkeypatch,
     assert [tc["name"] for tc in json.loads(msg.tool_calls_json)] == ["ask_check_questions"]
     db_session.expire_all()
     # The card is still owed; the next at-level reply offers it.
-    assert db_session.get(SessionModel, "ts4").topic_suggest_state == topic_suggest_service.AWAITING_LEVEL
+    assert (
+        db_session.get(SessionModel, "ts4").topic_suggest_state
+        == topic_suggest_service.AWAITING_LEVEL
+    )

@@ -2160,14 +2160,17 @@ components:
 
 # ---------------------------------------------------------------------------
 # SSE event contract reference (vendor extension — not processed by codegen)
-# Describes the Server-Sent Events emitted by POST /chat/stream.
-# Field names must match what agent/tutor.py actually yields.
+# Describes the Server-Sent Events emitted by POST /chat/stream and the
+# sessions check/complete and check/stop streams.
+# Backend tests validate every emitted StreamEvent against this block
+# (backend/tests/conftest.py); an unlisted field fails.
 # ---------------------------------------------------------------------------
 
 x-sse-events:
   tool_call_start:
     data:
       type: object
+      additionalProperties: false
       required: [id, name, args]
       properties:
         id:   { type: string }
@@ -2177,6 +2180,7 @@ x-sse-events:
   tool_call_done:
     data:
       type: object
+      additionalProperties: false
       required: [id, status]
       properties:
         id:      { type: string }
@@ -2187,6 +2191,7 @@ x-sse-events:
   assistant_delta:
     data:
       type: object
+      additionalProperties: false
       required: [text]
       properties:
         text: { type: string }
@@ -2196,16 +2201,18 @@ x-sse-events:
       type: array
       items:
         type: object
-        required: [doc_id]
+        additionalProperties: false
+        required: [doc_id, text]
         properties:
           doc_id:   { type: string }
-          text:     { type: [string, "null"], default: null }
+          text:     { type: string }
           page:     { type: [integer, "null"], default: null }
           doc_name: { type: [string, "null"], default: null }
 
   cost_warning:
     data:
       type: object
+      additionalProperties: false
       required: [level, used_usd, soft_cap_usd, urgent_cap_usd, hard_cap_usd]
       properties:
         level:          { type: string, enum: [soft, urgent] }
@@ -2217,23 +2224,25 @@ x-sse-events:
   done:
     data:
       type: object
+      additionalProperties: false
       required: [message_id]
       properties:
-        message_id:    { type: string }
-        total_cost_usd: { type: [string, "null"], default: null }
+        message_id: { type: string }
 
   cancelled:
     data:
       type: object
+      additionalProperties: false
       required: [message_id, partial_content_chars, estimated_cost_usd]
       properties:
-        message_id:           { type: string }
+        message_id:            { type: [string, "null"] }
         partial_content_chars: { type: integer }
-        estimated_cost_usd:   { type: string }
+        estimated_cost_usd:    { type: string }
 
   error:
     data:
       type: object
+      additionalProperties: false
       required: [code]
       properties:
         code:         { type: string }
@@ -2245,16 +2254,18 @@ x-sse-events:
   check_question:
     data:
       type: object
-      required: [gap, total, items]
+      additionalProperties: false
+      required: [gap, total, set_index, set_total, items]
       properties:
         gap:       { type: string }
         total:     { type: integer }
-        set_index: { type: integer, description: 1-based set position within the check. }
-        set_total: { type: integer, description: Sets in the check. }
+        set_index: { type: integer, minimum: 1, maximum: 3, description: 1-based set position within the check. }
+        set_total: { type: integer, minimum: 1, maximum: 3, description: Sets in the check. }
         items:
           type: array
           items:
             type: object
+            additionalProperties: false
             required: [question, options]
             properties:
               question: { type: string }
@@ -2265,6 +2276,7 @@ x-sse-events:
   topic_suggestions:
     data:
       type: object
+      additionalProperties: false
       required: [mode, topic, items]
       properties:
         mode:  { type: string, enum: [broad, specific] }
@@ -2273,6 +2285,7 @@ x-sse-events:
           type: array
           items:
             type: object
+            additionalProperties: false
             required: [label]
             properties:
               label: { type: string }
@@ -2281,6 +2294,7 @@ x-sse-events:
   followup_skipped:
     data:
       type: object
+      additionalProperties: false
       required: [reason]
       properties:
         reason: { type: string, enum: [daily_cap] }

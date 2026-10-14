@@ -15,8 +15,12 @@ from services import cost_meter
 
 def test_log_call_writes_row(db_session):
     cost_meter.log_call(
-        db_session, user_id="u1", session_id="s1", purpose="chat",
-        model="gemini/gemini-3.5-flash-lite", cost_usd=Decimal("0.0032"),
+        db_session,
+        user_id="u1",
+        session_id="s1",
+        purpose="chat",
+        model="gemini/gemini-3.5-flash-lite",
+        cost_usd=Decimal("0.0032"),
     )
     row = db_session.query(LlmCallLog).one()
     assert row.purpose == "chat" and row.session_id == "s1"
@@ -25,8 +29,12 @@ def test_log_call_writes_row(db_session):
 
 def test_log_call_zero_cost_skipped(db_session):
     cost_meter.log_call(
-        db_session, user_id="u1", session_id=None, purpose="summary",
-        model="m", cost_usd=0,
+        db_session,
+        user_id="u1",
+        session_id=None,
+        purpose="summary",
+        model="m",
+        cost_usd=0,
     )
     assert db_session.query(LlmCallLog).count() == 0
 
@@ -34,8 +42,12 @@ def test_log_call_zero_cost_skipped(db_session):
 def test_log_call_failure_is_isolated(db_session):
     with patch.object(db_session, "add", side_effect=RuntimeError("boom")):
         cost_meter.log_call(
-            db_session, user_id="u1", session_id="s1", purpose="chat",
-            model="m", cost_usd=Decimal("0.01"),
+            db_session,
+            user_id="u1",
+            session_id="s1",
+            purpose="chat",
+            model="m",
+            cost_usd=Decimal("0.01"),
         )  # must not raise
 
 
@@ -46,26 +58,41 @@ def test_log_call_flush_failure_does_not_break_session(db_session):
     assistant message) would raise and fail the user's turn."""
     with patch.object(db_session, "flush", side_effect=RuntimeError("boom")):
         cost_meter.log_call(
-            db_session, user_id="u1", session_id="s1", purpose="chat",
-            model="m", cost_usd=Decimal("0.01"),
+            db_session,
+            user_id="u1",
+            session_id="s1",
+            purpose="chat",
+            model="m",
+            cost_usd=Decimal("0.01"),
         )  # must not raise
 
     # Session must still be usable: no row was committed (savepoint rolled
     # back), and further work on the session must not raise.
     assert db_session.query(LlmCallLog).count() == 0
-    db_session.add(LlmCallLog(
-        user_id="u2", session_id=None, purpose="chat", model="m",
-        cost_usd=Decimal("0.02"),
-    ))
+    db_session.add(
+        LlmCallLog(
+            user_id="u2",
+            session_id=None,
+            purpose="chat",
+            model="m",
+            cost_usd=Decimal("0.02"),
+        )
+    )
     db_session.commit()
     assert db_session.query(LlmCallLog).count() == 1
 
 
 def test_log_call_persists_token_counts(db_session):
     cost_meter.log_call(
-        db_session, user_id="u1", session_id=None, purpose="chat",
-        model="m", cost_usd="0.0100",
-        prompt_tokens=1200, completion_tokens=340, cached_tokens=900,
+        db_session,
+        user_id="u1",
+        session_id=None,
+        purpose="chat",
+        model="m",
+        cost_usd="0.0100",
+        prompt_tokens=1200,
+        completion_tokens=340,
+        cached_tokens=900,
     )
     row = db_session.query(LlmCallLog).one()
     assert row.prompt_tokens == 1200
@@ -75,8 +102,12 @@ def test_log_call_persists_token_counts(db_session):
 
 def test_log_call_token_kwargs_default_null(db_session):
     cost_meter.log_call(
-        db_session, user_id="u1", session_id=None, purpose="chat",
-        model="m", cost_usd="0.0100",
+        db_session,
+        user_id="u1",
+        session_id=None,
+        purpose="chat",
+        model="m",
+        cost_usd="0.0100",
     )
     row = db_session.query(LlmCallLog).one()
     assert row.prompt_tokens is None

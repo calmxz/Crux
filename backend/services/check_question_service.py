@@ -167,18 +167,21 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
         return ToolResult(ok=False, status="failed", error=_SUPPRESSED)
     if args.session_id != ctx.session_id:
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error=f"session_id mismatch: args={args.session_id} ctx={ctx.session_id}",
         )
     if not (1 <= len(args.items) <= 5):
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error=f"items count {len(args.items)} out of range 1..5",
         )
     for n, it in enumerate(args.items):
         if not (0 <= it.correct_index < len(it.options)):
             return ToolResult(
-                ok=False, status="failed",
+                ok=False,
+                status="failed",
                 error=(
                     f"item {n}: correct_index {it.correct_index} out of range "
                     f"for {len(it.options)} options"
@@ -186,7 +189,8 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
             )
     if args.set_index > args.set_total:
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error=f"set_index {args.set_index} exceeds set_total {args.set_total}",
         )
 
@@ -199,7 +203,8 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
 
     if get_pending_check(db, ctx.session_id) is not None:
         return ToolResult(
-            ok=False, status="failed",
+            ok=False,
+            status="failed",
             error="a check-question batch is already open; resolve it first",
         )
 
@@ -210,7 +215,9 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
         purpose = "diagnostic" if ctx.diagnostic_required else "check"
         # Set 1 always starts a fresh check; any stale pointer is replaced.
         cc = {
-            "set_total": args.set_total, "last_set_index": 1, "gaps": [args.gap],
+            "set_total": args.set_total,
+            "last_set_index": 1,
+            "gaps": [args.gap],
             "purpose": purpose,
         }
     else:
@@ -247,7 +254,8 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
     set_current_check(db, ctx.session_id, cc, commit=False)
     _save(db, ctx.session_id, pc)
     return ToolResult(
-        ok=True, status="ok",
+        ok=True,
+        status="ok",
         data={
             "gap": args.gap,
             "total": len(args.items),
@@ -308,11 +316,18 @@ def answer(db: Session, session_id: str, index: int, selected_index: int) -> dic
     apply_effects = batch_purpose != "diagnostic"
     # Profile effect + LearningEvent, deferred into our single commit; does not clear.
     learning_event_service.record_from_answer(
-        db, session_id, gap=pc["gap"], question=item["question"],
-        correct=correct, clear_pending=False, commit=False,
+        db,
+        session_id,
+        gap=pc["gap"],
+        question=item["question"],
+        correct=correct,
+        clear_pending=False,
+        commit=False,
         apply_profile_effects=apply_effects,
-        selected_index=selected_index, correct_index=item["correct_index"],
-        options=item["options"], purpose=batch_purpose,
+        selected_index=selected_index,
+        correct_index=item["correct_index"],
+        options=item["options"],
+        purpose=batch_purpose,
     )
     item["status"] = "answered"
     item["selected_index"] = selected_index
@@ -435,8 +450,7 @@ def stop_open_check(db: Session, session_id: str) -> str | None:
         diagnostic_service.grade_if_diagnostic(db, session_id, force=True, commit=False)
         set_current_check(db, session_id, None)
         return (
-            f"[check results] learner stopped at set {cc['last_set_index']} "
-            f"of {cc['set_total']}."
+            f"[check results] learner stopped at set {cc['last_set_index']} of {cc['set_total']}."
         )
 
     if is_done(pc):
@@ -539,14 +553,20 @@ def load_session_learning_events(db: Session, session_id: str) -> list[LearningE
     """All LearningEvents for a session, oldest first. Loaded once per detail
     render so reconstruct_check_batch can match in memory instead of issuing one
     SELECT per check item (the former N+1)."""
-    return db.execute(
-        select(LearningEvent)
-        .where(LearningEvent.session_id == session_id)
-        .order_by(LearningEvent.created_at.asc(), LearningEvent.id.asc())
-    ).scalars().all()
+    return (
+        db.execute(
+            select(LearningEvent)
+            .where(LearningEvent.session_id == session_id)
+            .order_by(LearningEvent.created_at.asc(), LearningEvent.id.asc())
+        )
+        .scalars()
+        .all()
+    )
 
 
-def reconstruct_check_batch(db: Session, msg: ChatMessage, events: list | None = None) -> dict | None:
+def reconstruct_check_batch(
+    db: Session, msg: ChatMessage, events: list | None = None
+) -> dict | None:
     """Best-effort recap for an asking message with no persisted check_batch_json.
 
     Matches each item against the session's LearningEvents by
@@ -583,10 +603,11 @@ def reconstruct_check_batch(db: Session, msg: ChatMessage, events: list | None =
         question = it.get("question", "")
         # events are oldest-first; first match is the earliest at/after this turn.
         ev = next(
-            (e for e in events
-             if e.gap_tested == gap
-             and e.question == question
-             and e.created_at >= msg.created_at),
+            (
+                e
+                for e in events
+                if e.gap_tested == gap and e.question == question and e.created_at >= msg.created_at
+            ),
             None,
         )
         if ev is not None:
@@ -595,15 +616,17 @@ def reconstruct_check_batch(db: Session, msg: ChatMessage, events: list | None =
         else:
             status, correct = "skipped", None
             selected = None
-        items.append({
-            "question": question,
-            "options": it.get("options", []),
-            "status": status,
-            "selected_index": selected,
-            "correct_index": it.get("correct_index"),
-            "correct": correct,
-            "explanation": it.get("explanation"),
-        })
+        items.append(
+            {
+                "question": question,
+                "options": it.get("options", []),
+                "status": status,
+                "selected_index": selected,
+                "correct_index": it.get("correct_index"),
+                "correct": correct,
+                "explanation": it.get("explanation"),
+            }
+        )
 
     return {
         "gap": gap,

@@ -38,6 +38,7 @@ from services.cost_meter import CapStatus
 # Streaming chunk builders
 # ---------------------------------------------------------------------------
 
+
 def _content_chunk(token: str) -> SimpleNamespace:
     """A streamed chunk carrying a content token and no tool calls."""
     delta = SimpleNamespace(content=token, tool_calls=None)
@@ -70,10 +71,38 @@ def _tool_chunk(*fragments) -> SimpleNamespace:
 
 def _make_stream(*chunks):
     """Return a fresh async-generator instance yielding the given chunks."""
+
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
+
+
+def _parked_stream():
+    """Return (stream, mid_stream): a stream that yields one content chunk and
+    then parks, plus an Event set once the consumer has taken that chunk and
+    asked for more -- the mid-flight state a cancel test must hit."""
+    mid_stream = asyncio.Event()
+
+    async def _gen():
+        yield _content_chunk("partial ")
+        mid_stream.set()
+        await asyncio.sleep(10)
+
+    return _gen(), mid_stream
+
+
+async def _cancel_mid_stream(task, mid_stream):
+    """Cancel `task` once the stream is parked. If it never gets there, reap
+    the task first so it cannot outlive the test (and db_session) and fail."""
+    try:
+        await asyncio.wait_for(mid_stream.wait(), timeout=5)
+    except TimeoutError:
+        task.cancel()
+        await asyncio.gather(task, return_exceptions=True)
+        raise AssertionError("stream never reached its parked chunk") from None
+    task.cancel()
 
 
 def _ctx(db_session, session_id="s1"):
@@ -111,6 +140,7 @@ async def _drain(agen):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_run_streaming_yields_tool_then_delta_then_done(db_session, monkeypatch):
     _disable_stub(monkeypatch)
@@ -140,9 +170,7 @@ async def test_run_streaming_yields_tool_then_delta_then_done(db_session, monkey
     monkeypatch.setattr("agent.tutor.tools.dispatch", MagicMock(return_value=result))
 
     ctx = _ctx(db_session, session_id="s1")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx))
 
     types = [e.type for e in events]
     assert "tool_call_start" in types
@@ -164,11 +192,7 @@ async def test_run_streaming_yields_tool_then_delta_then_done(db_session, monkey
     ]
 
     # Persisted assistant message.
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == "s1")
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == "s1").one()
     assert msg.status == "complete"
     assert msg.content == "Hello world"
     assert msg.role == "assistant"
@@ -212,9 +236,7 @@ async def test_prefetched_citations_yielded_up_front(db_session, monkeypatch):
         ],
     )
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx))
 
     # The citations event fires up front -- before the first assistant_delta.
     first_relevant = next(e for e in events if e.type in ("citations", "assistant_delta"))
@@ -244,12 +266,12 @@ async def test_retrieve_chunks_dedupes_against_prefetched_citations(db_session, 
     from agent import tutor
 
     turn1 = _make_stream(
-        _tool_chunk(_tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"x"}')),
+        _tool_chunk(
+            _tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"x"}')
+        ),
     )
     turn2 = _make_stream(_content_chunk("final"))
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1, turn2])
-    )
+    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1, turn2]))
     monkeypatch.setattr(
         "agent.tutor.litellm.stream_chunk_builder", MagicMock(return_value=SimpleNamespace())
     )
@@ -276,9 +298,7 @@ async def test_retrieve_chunks_dedupes_against_prefetched_citations(db_session, 
         prefetched_citations=[Citation(doc_id="d1", text="leaves convert light")],
     )
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx))
 
     citation_events = [e for e in events if e.type == "citations"]
     # One up-front (prefetch seed) + one from the tool-path merge.
@@ -310,13 +330,11 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
 
     from agent import tutor
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
     monkeypatch.setattr(
         "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[_slow_stream()]),
+        AsyncMock(side_effect=[slow_stream]),
     )
 
     ctx = _ctx(db_session, session_id="s2")
@@ -324,22 +342,15 @@ async def test_run_streaming_persists_cancelled_on_cancel(db_session, monkeypatc
     received = []
 
     async def _consume():
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "go"}], "sys", ctx
-        ):
+        async for ev in tutor.run_streaming([{"role": "user", "content": "go"}], "sys", ctx):
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == "s2")
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == "s2").one()
     assert msg.status == "cancelled"
     assert "partial" in msg.content
     assert msg.cancelled_at is not None
@@ -424,9 +435,7 @@ async def test_no_token_counter_on_happy_path(db_session, monkeypatch):
     monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.0032))
 
     ctx = _ctx(db_session, session_id="s_no_token_counter")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert events[-1].type == "done"
     assert calls == []
@@ -454,13 +463,11 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
     estimate_spy = MagicMock(return_value=Decimal("0.01"))
     monkeypatch.setattr("agent.tutor.cost_meter.estimate_cancelled_cost", estimate_spy)
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
     monkeypatch.setattr(
         "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[_slow_stream()]),
+        AsyncMock(side_effect=[slow_stream]),
     )
 
     ctx = _ctx(db_session, session_id="s_cancel_tokens")
@@ -468,14 +475,11 @@ async def test_cancelled_stream_estimates_tokens_lazily(db_session, monkeypatch)
     received = []
 
     async def _consume():
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "go"}], "sys", ctx
-        ):
+        async for ev in tutor.run_streaming([{"role": "user", "content": "go"}], "sys", ctx):
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 
@@ -509,9 +513,7 @@ async def test_run_streaming_emits_error_on_cost_cap(db_session, monkeypatch):
     )
 
     ctx = _ctx(db_session, session_id="s3")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert events[-1].type == "error"
     assert events[-1].data["code"] == "daily_cost_cap_reached"
@@ -548,9 +550,7 @@ async def test_run_streaming_emits_cost_warning_when_soft_breached(db_session, m
     monkeypatch.setattr("agent.tutor.cost_meter.record_cost", MagicMock())
 
     ctx = _ctx(db_session, session_id="s_softcap")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     types = [e.type for e in events]
     assert "cost_warning" in types
@@ -595,9 +595,7 @@ async def test_run_streaming_cost_warning_marks_urgent_level(db_session, monkeyp
     monkeypatch.setattr("agent.tutor.cost_meter.record_cost", MagicMock())
 
     ctx = _ctx(db_session, session_id="s_urgentcap")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     cw = next(e for e in events if e.type == "cost_warning")
     assert cw.data["level"] == "urgent"
@@ -620,9 +618,7 @@ async def test_run_streaming_no_cost_warning_when_under_soft_cap(db_session, mon
     monkeypatch.setattr("agent.tutor.cost_meter.record_cost", MagicMock())
 
     ctx = _ctx(db_session, session_id="s_nosoft")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert "cost_warning" not in [e.type for e in events]
     assert events[-1].type == "done"
@@ -646,11 +642,7 @@ async def test_run_streaming_stub_mode_chunks(db_session, monkeypatch):
     joined = "".join(e.data["text"] for e in deltas)
     assert joined == stub_response(messages, "sys")
 
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == "s4")
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == "s4").one()
     assert msg.status == "complete"
     assert msg.content == stub_response(messages, "sys")
 
@@ -729,25 +721,40 @@ async def test_run_streaming_ask_check_question_dispatches_sibling_first(db_sess
                 1,
                 id="tc_1",
                 name="ask_check_questions",
-                arguments=json.dumps({
-                    "session_id": "s1", "gap": "x",
-                    "items": [{"question": "What is x?", "options": ["yes", "no"],
-                               "correct_index": 0, "explanation": "Yes."}],
-                }),
+                arguments=json.dumps(
+                    {
+                        "session_id": "s1",
+                        "gap": "x",
+                        "items": [
+                            {
+                                "question": "What is x?",
+                                "options": ["yes", "no"],
+                                "correct_index": 0,
+                                "explanation": "Yes.",
+                            }
+                        ],
+                    }
+                ),
             ),
         ),
     )
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1])
-    )
+    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1]))
     monkeypatch.setattr(
         "agent.tutor.litellm.stream_chunk_builder", MagicMock(return_value=SimpleNamespace())
     )
     monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.0))
     dispatch = MagicMock(
         return_value=ToolResult(
-            ok=True, status="ok", error=None,
-            data={"gap": "x", "total": 1, "items": [{"question": "What is x?", "options": ["yes", "no"]}]},
+            ok=True,
+            status="ok",
+            error=None,
+            data={
+                "gap": "x",
+                "total": 1,
+                "set_index": 1,
+                "set_total": 1,
+                "items": [{"question": "What is x?", "options": ["yes", "no"]}],
+            },
         )
     )
     monkeypatch.setattr("agent.tutor.tools.dispatch", dispatch)
@@ -755,18 +762,18 @@ async def test_run_streaming_ask_check_question_dispatches_sibling_first(db_sess
     # Seed user and session row for attach_message_id lock to succeed
     db_session.add(User(id="u1"))
     db_session.flush()
-    db_session.add(SessionModel(
-        id="s_ask_skip",
-        user_id="u1",
-        topic="test",
-        topic_profile_json=TopicProfile().model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id="s_ask_skip",
+            user_id="u1",
+            topic="test",
+            topic_profile_json=TopicProfile().model_dump_json(),
+        )
+    )
     db_session.commit()
 
     ctx = _ctx(db_session, session_id="s_ask_skip")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "quiz me"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "quiz me"}], "sys", ctx))
 
     # F-10: the bundled non-ask call is dispatched first, then the ask last.
     dispatched = [c.args[0] for c in dispatch.call_args_list]
@@ -786,16 +793,15 @@ async def test_stream_logs_token_usage(db_session, monkeypatch):
 
     from agent import tutor
 
-    built = SimpleNamespace(usage=SimpleNamespace(
-        prompt_tokens=1500, completion_tokens=200,
-        prompt_tokens_details=SimpleNamespace(cached_tokens=1100),
-    ))
-    monkeypatch.setattr(
-        "agent.tutor.litellm.stream_chunk_builder", MagicMock(return_value=built)
+    built = SimpleNamespace(
+        usage=SimpleNamespace(
+            prompt_tokens=1500,
+            completion_tokens=200,
+            prompt_tokens_details=SimpleNamespace(cached_tokens=1100),
+        )
     )
-    monkeypatch.setattr(
-        "agent.tutor.litellm.completion_cost", MagicMock(return_value=0.01)
-    )
+    monkeypatch.setattr("agent.tutor.litellm.stream_chunk_builder", MagicMock(return_value=built))
+    monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.01))
     log_call_spy = MagicMock()
     monkeypatch.setattr("agent.tutor.cost_meter.log_call", log_call_spy)
 
@@ -854,19 +860,13 @@ async def test_llm_exception_yields_error_event_and_persists_partial(db_session,
     monkeypatch.setattr("agent.tutor.litellm.acompletion", exploding_acompletion)
 
     ctx = _ctx(db_session, session_id="s_llm_exception")
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     error_events = [e for e in events if e.type == "error"]
     assert len(error_events) == 1
     assert error_events[0].data["code"] == "llm_failed"
 
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == "s_llm_exception")
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == "s_llm_exception").one()
     assert msg.status == "error"
 
 
@@ -888,10 +888,14 @@ async def test_prune_superseded_excerpts_wired_into_loop(db_session, monkeypatch
     from agent import tutor
 
     turn1 = _make_stream(
-        _tool_chunk(_tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"a"}')),
+        _tool_chunk(
+            _tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"a"}')
+        ),
     )
     turn2 = _make_stream(
-        _tool_chunk(_tool_fragment(0, id="tc_2", name="retrieve_chunks", arguments='{"query":"b"}')),
+        _tool_chunk(
+            _tool_fragment(0, id="tc_2", name="retrieve_chunks", arguments='{"query":"b"}')
+        ),
     )
     turn3 = _make_stream(_content_chunk("final answer"))
     turns = [turn1, turn2, turn3]
@@ -924,7 +928,9 @@ async def test_prune_superseded_excerpts_wired_into_loop(db_session, monkeypatch
 
     assert len(captured_messages) == 3
     third_call_msgs = captured_messages[2]
-    tool_msgs = [m for m in third_call_msgs if m.get("role") == "tool" and m.get("name") == "retrieve_chunks"]
+    tool_msgs = [
+        m for m in third_call_msgs if m.get("role") == "tool" and m.get("name") == "retrieve_chunks"
+    ]
     assert len(tool_msgs) == 2
     assert tool_msgs[0]["content"].startswith("[superseded retrieval:")
     assert "<document_excerpt" in tool_msgs[1]["content"]
@@ -956,17 +962,19 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
     from agent import tutor
 
     turn1 = _make_stream(
-        _tool_chunk(_tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"a"}')),
+        _tool_chunk(
+            _tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"a"}')
+        ),
     )
     turn2 = _make_stream(
-        _tool_chunk(_tool_fragment(0, id="tc_2", name="retrieve_chunks", arguments='{"query":"b"}')),
+        _tool_chunk(
+            _tool_fragment(0, id="tc_2", name="retrieve_chunks", arguments='{"query":"b"}')
+        ),
     )
 
-    async def _slow_stream():
-        yield _content_chunk("partial ")
-        await asyncio.sleep(10)
+    slow_stream, mid_stream = _parked_stream()
 
-    turns = [turn1, turn2, _slow_stream()]
+    turns = [turn1, turn2, slow_stream]
 
     async def _fake_acompletion(*args, **kwargs):
         return turns.pop(0)
@@ -1005,14 +1013,11 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
     received = []
 
     async def _consume():
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "go"}], "sys", ctx
-        ):
+        async for ev in tutor.run_streaming([{"role": "user", "content": "go"}], "sys", ctx):
             received.append(ev)
 
     task = asyncio.create_task(_consume())
-    await asyncio.sleep(0.05)
-    task.cancel()
+    await _cancel_mid_stream(task, mid_stream)
     with pytest.raises(asyncio.CancelledError):
         await task
 
@@ -1040,6 +1045,7 @@ async def test_cancelled_stream_prompt_tokens_survive_pruning(db_session, monkey
 # ---------------------------------------------------------------------------
 # Task 9: timeout, non-zero cost fallback, partial-cost on error arm
 # ---------------------------------------------------------------------------
+
 
 def _patch_acompletion_happy_text(monkeypatch, captured=None):
     """Single-iteration happy stream: one text chunk, no tool calls. If
@@ -1089,9 +1095,7 @@ async def test_error_arm_records_estimated_cost(db_session, monkeypatch):
     # the assertion below would be vacuous.
     monkeypatch.setattr("agent.tutor.litellm.token_counter", lambda **kw: 10000)
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert any(e.type == "error" for e in events)
     assert cost_meter.current_spend(db_session, ctx.user_id) > Decimal("0")
@@ -1119,9 +1123,7 @@ async def test_builder_failure_falls_back_to_token_math(db_session, monkeypatch)
     # avoids the 4-decimal quantization floor turning the estimate into $0.
     monkeypatch.setattr("agent.tutor.litellm.token_counter", lambda **kw: 10000)
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert any(e.type == "done" for e in events)
     assert cost_meter.current_spend(db_session, ctx.user_id) > Decimal("0")
@@ -1144,15 +1146,14 @@ async def test_acompletion_receives_timeout(db_session, monkeypatch):
     )
     monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.0))
 
-    await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert captured["timeout"] == settings.llm_timeout_s
 
 
 def test_summarize_labels_ignored_profile_patch():
     from agent.tutor import _summarize
+
     result = ToolResult(ok=True, status="ignored", data={"notes": ["inferred mastery ignored"]})
     assert "ignored" in _summarize("update_topic_profile", result).lower()
 
@@ -1254,9 +1255,7 @@ async def test_cancel_mid_dispatch_drains_inflight_thread_before_persisting(
     received = []
 
     async def _consume():
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "go"}], "sys", ctx
-        ):
+        async for ev in tutor.run_streaming([{"role": "user", "content": "go"}], "sys", ctx):
             received.append(ev)
 
     task = asyncio.create_task(_consume())

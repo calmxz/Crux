@@ -171,9 +171,7 @@ def test_query_respects_k_limit(db, seeded_session):
 def test_insert_then_count_matches(db, seeded_session):
     """Sanity: the rows we inserted are visible to a raw count query."""
     n = db.execute(
-        text(
-            "SELECT COUNT(*) FROM chunk_embeddings WHERE session_id = :sid"
-        ),
+        text("SELECT COUNT(*) FROM chunk_embeddings WHERE session_id = :sid"),
         {"sid": seeded_session["session_id"]},
     ).scalar()
     assert n == 3
@@ -191,7 +189,9 @@ def test_delete_document_chunks_removes_only_that_document(db, seeded_session):
     db.commit()
     db.refresh(other)
     pgvector_store.insert_chunks(
-        db, session_id=sid, document_id=other.id,
+        db,
+        session_id=sid,
+        document_id=other.id,
         rows=[(0, 1, "survivor chunk", _vec(4))],
     )
     db.commit()
@@ -201,14 +201,10 @@ def test_delete_document_chunks_removes_only_that_document(db, seeded_session):
     assert deleted == 3
 
     # Target's chunks gone; the other document's chunk survives.
-    survivors = pgvector_store.query_chunks(
-        db, session_id=sid, query_embedding=_vec(4), k=10
-    )
+    survivors = pgvector_store.query_chunks(db, session_id=sid, query_embedding=_vec(4), k=10)
     assert [c.doc_id for c in survivors] == [other.id]
 
     # Teardown for the extra doc (seeded_session only cleans its own rows).
-    db.execute(
-        text("DELETE FROM chunk_embeddings WHERE document_id = :d"), {"d": other.id}
-    )
+    db.execute(text("DELETE FROM chunk_embeddings WHERE document_id = :d"), {"d": other.id})
     db.execute(text("DELETE FROM documents WHERE id = :d"), {"d": other.id})
     db.commit()

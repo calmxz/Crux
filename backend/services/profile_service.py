@@ -52,13 +52,16 @@ def _has_correct_event_for(db: Session, session_id: str, gap: str) -> bool:
     check-question answer was recorded for this gap. canon-compared in Python
     because gap_tested is stored raw."""
     key = canon(gap)
-    rows = db.execute(
-        select(LearningEvent.gap_tested)
-        .where(
-            LearningEvent.session_id == session_id,
-            LearningEvent.correct.is_(True),
+    rows = (
+        db.execute(
+            select(LearningEvent.gap_tested).where(
+                LearningEvent.session_id == session_id,
+                LearningEvent.correct.is_(True),
+            )
         )
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
     return any(canon(g) == key for g in rows)
 
 
@@ -82,9 +85,7 @@ def upsert_entry(
     out = list(entries or [])
     existing = find_entry(out, name)
     if existing is None:
-        out.append(
-            ConceptEntry(name=name, evidence_type=evidence_type, last_event_at=stamp)
-        )
+        out.append(ConceptEntry(name=name, evidence_type=evidence_type, last_event_at=stamp))
         return out
     if evidence_type is not None:
         existing.evidence_type = evidence_type
@@ -117,9 +118,7 @@ def _validates(validate: Callable[[Any], object], value: Any) -> bool:
     return True
 
 
-def _drop_focus_on_dropped_gap(
-    known: dict, kept: dict, dropped: dict[str, int]
-) -> None:
+def _drop_focus_on_dropped_gap(known: dict, kept: dict, dropped: dict[str, int]) -> None:
     """F-22: a focus naming a gap entry that salvage dropped would dangle.
     A focus outside confirmed_gaps is otherwise legal (apply_patch sets it
     freely), so only a focus on a dropped entry is cleared."""
@@ -129,9 +128,7 @@ def _drop_focus_on_dropped_gap(
         return
     surviving = {canon(g["name"]) for g in kept["confirmed_gaps"]}
     lost = {
-        canon(g["name"])
-        for g in gaps
-        if isinstance(g, dict) and isinstance(g.get("name"), str)
+        canon(g["name"]) for g in gaps if isinstance(g, dict) and isinstance(g.get("name"), str)
     } - surviving
     if canon(focus) in lost:
         del kept["focus_target_gap"]
@@ -148,9 +145,7 @@ def _salvage_profile(known: dict) -> tuple[TopicProfile, dict[str, int]]:
     dropped: dict[str, int] = {}
     for key, value in known.items():
         if key in _CONCEPT_LIST_KEYS and isinstance(value, list):
-            kept[key] = [
-                v for v in value if _validates(ConceptEntry.model_validate, v)
-            ]
+            kept[key] = [v for v in value if _validates(ConceptEntry.model_validate, v)]
             lost = len(value) - len(kept[key])
         elif key == "subtopic_levels" and isinstance(value, dict):
             kept[key] = {
@@ -256,9 +251,7 @@ def _enforce_list_caps(profile: TopicProfile) -> None:
         setattr(profile, attr, keep)
 
 
-def save_profile(
-    db: Session, session_id: str, profile: TopicProfile, commit: bool = True
-) -> None:
+def save_profile(db: Session, session_id: str, profile: TopicProfile, commit: bool = True) -> None:
     _enforce_list_caps(profile)
     row = db.get(SessionModel, session_id)
     if row is None:
@@ -279,9 +272,7 @@ def lock_session_row(db: Session, session_id: str) -> SessionModel:
     the identity-map copy. Flushes first so the refresh keeps the caller's
     own pending edits (sessions run autoflush=False)."""
     db.flush()
-    row = db.get(
-        SessionModel, session_id, with_for_update=True, populate_existing=True
-    )
+    row = db.get(SessionModel, session_id, with_for_update=True, populate_existing=True)
     if row is None:
         raise ValueError(f"session not found: {session_id}")
     return row
@@ -318,13 +309,16 @@ def add_exclusive(
         profile,
         target,
         upsert_entry(
-            getattr(profile, target) or [], item,
-            evidence_type=evidence_type, stamp=stamp,
+            getattr(profile, target) or [],
+            item,
+            evidence_type=evidence_type,
+            stamp=stamp,
         ),
     )
     key = canon(item)
     setattr(
-        profile, other,
+        profile,
+        other,
         [e for e in (getattr(profile, other) or []) if canon(e.name) != key],
     )
     if other == "confirmed_gaps":
@@ -353,12 +347,16 @@ def apply_user_patch(
     profile = load_profile(db, session_id)
     if add_mastered is not None:
         add_exclusive(
-            profile, "mastered_concepts", add_mastered,
+            profile,
+            "mastered_concepts",
+            add_mastered,
             stamp=datetime.now(timezone.utc),
         )
     if add_gap is not None:
         add_exclusive(
-            profile, "confirmed_gaps", add_gap,
+            profile,
+            "confirmed_gaps",
+            add_gap,
             stamp=datetime.now(timezone.utc),
         )
     if knowledge_level is not None:
@@ -410,9 +408,7 @@ def remove_subtopic(db: Session, session_id: str, subtopic: str) -> TopicProfile
     return profile
 
 
-def apply_patch(
-    db: Session, ctx: ToolContext, args: UpdateTopicProfileArgs
-) -> ToolResult:
+def apply_patch(db: Session, ctx: ToolContext, args: UpdateTopicProfileArgs) -> ToolResult:
     if args.session_id != ctx.session_id:
         return ToolResult(
             ok=False,
@@ -476,10 +472,7 @@ def apply_patch(
             return ToolResult(
                 ok=False,
                 status="failed",
-                error=(
-                    "knowledge_level change requires evidence_type 'declared' "
-                    "or 'tested'"
-                ),
+                error=("knowledge_level change requires evidence_type 'declared' or 'tested'"),
             )
         profile.knowledge_level = args.knowledge_level
 
@@ -488,8 +481,11 @@ def apply_patch(
         # Route through the exclusivity choke point, like the user PATCH path,
         # so a concept never sits in both lists (B-03/F-13).
         add_exclusive(
-            profile, "confirmed_gaps", args.add_confirmed_gap,
-            evidence_type=gap_evidence, stamp=datetime.now(timezone.utc),
+            profile,
+            "confirmed_gaps",
+            args.add_confirmed_gap,
+            evidence_type=gap_evidence,
+            stamp=datetime.now(timezone.utc),
         )
 
     ignored_notes: list[str] = []
@@ -500,13 +496,14 @@ def apply_patch(
                 ok=False,
                 status="failed",
                 error=(
-                    "evidence_type must be 'declared' or 'tested' when "
-                    "add_mastered_concept is set"
+                    "evidence_type must be 'declared' or 'tested' when add_mastered_concept is set"
                 ),
             )
         if evidence in ("declared", "tested"):
             add_exclusive(
-                profile, "mastered_concepts", args.add_mastered_concept,
+                profile,
+                "mastered_concepts",
+                args.add_mastered_concept,
                 evidence_type=evidence,
                 stamp=datetime.now(timezone.utc),
             )

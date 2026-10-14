@@ -45,12 +45,15 @@ vi.mock('@/services/reviewApi.js', () => ({
 
 const apiGetSessionLibrary = vi.fn()
 
+const apiCreateSession = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', async (importOriginal) => {
   const actual = await importOriginal()
 
   return {
     ...actual,
     getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
+    createSession: (...args) => apiCreateSession(...args),
   }
 })
 
@@ -93,7 +96,7 @@ describe('Sidebar.vue — session list rendering', () => {
 
   it('shows skeleton while loading and no sessions yet', async () => {
     const store = useSessionStore()
-    store.loading = true
+    store.listLoading = true
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
@@ -105,6 +108,27 @@ describe('Sidebar.vue — session list rendering', () => {
     await flushPromises()
     expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('No sessions yet')
+  })
+
+  // #522: a create on a fresh account must show its row, not the empty hint.
+  it('shows the created session row instead of the empty hint after a create', async () => {
+    apiCreateSession.mockResolvedValueOnce({
+      id: 'n1',
+      user_id: 'u',
+      topic: 'Graphs',
+      created_at: new Date().toISOString(),
+      ended_at: null,
+      pinned: false,
+      topic_profile: null,
+      ingestion_status: null,
+    })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').text()).toContain('Graphs')
   })
 
   it('renders Active section with rows; no Ended section when empty', async () => {
@@ -1543,15 +1567,36 @@ describe('Sidebar.vue — mount fetch', () => {
     expect(listSpy).toHaveBeenCalled()
   })
 
-  it('skips list fetch when sessions already populated', async () => {
+  it('skips list fetch when a list has already loaded', async () => {
     const auth = useAuthStore()
     auth.session = { user: { id: 'u-1' }, access_token: 't' }
     const store = useSessionStore()
     store.sessions = [{ id: 'a1', topic: 'X', created_at: '2026-05-20T10:00:00Z', ended_at: null }]
+    store.sessionsLoaded = true
     const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(listSpy).not.toHaveBeenCalled()
+  })
+
+  // #522: a create inserts a row without loading the window, so a non-empty
+  // `sessions` must not stand in for "loaded".
+  it('still fetches when the only rows came from a create', async () => {
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    const store = useSessionStore()
+    apiCreateSession.mockResolvedValueOnce({
+      id: 'n1',
+      topic: 'Graphs',
+      created_at: '2026-05-20T10:00:00Z',
+      ended_at: null,
+      pinned: false,
+    })
+    await store.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(listSpy).toHaveBeenCalled()
   })
 
   it('skips list fetch when unauthenticated', async () => {
@@ -1560,6 +1605,219 @@ describe('Sidebar.vue — mount fetch', () => {
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(listSpy).not.toHaveBeenCalled()
+  })
+})
+
+// #534: returning to the tab re-fetches the sidebar list once, throttled by
+// the last landing. Real store; each list fetch is two library page calls.
+describe('Sidebar.vue — re-list when the tab becomes visible', () => {
+  let wrappers
+  let visibility
+
+  function signIn() {
+    useAuthStore().session = { user: { id: 'u-1' }, access_token: 't' }
+  }
+
+  async function mountSidebar() {
+    const w = mount(Sidebar)
+    wrappers.push(w)
+    await flushPromises()
+
+    return w
+  }
+
+  async function showTab() {
+    visibility = 'hidden'
+    document.dispatchEvent(new Event('visibilitychange'))
+    visibility = 'visible'
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+  }
+
+  const lists = () => apiGetSessionLibrary.mock.calls.length / 2
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    setViewport(1400)
+    sidebarTest._setExpanded(true)
+    routeRef.params = {}
+    wrappers = []
+    visibility = 'visible'
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility)
+    // Date only: flushPromises needs real timers.
+    vi.useFakeTimers({ toFake: ['Date'] })
+    vi.setSystemTime(new Date('2026-10-14T10:00:00Z'))
+  })
+
+  afterEach(() => {
+    for (const w of wrappers) w.unmount()
+    vi.useRealTimers()
+    vi.restoreAllMocks()
+  })
+
+  it('hidden then visible makes exactly one list fetch once the window is stale', async () => {
+    signIn()
+    await mountSidebar()
+    expect(lists()).toBe(1)
+    vi.setSystemTime(new Date('2026-10-14T10:00:30Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('a hidden event alone makes no fetch', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+    visibility = 'hidden'
+    document.dispatchEvent(new Event('visibilitychange'))
+    await flushPromises()
+    expect(lists()).toBe(1)
+  })
+
+  it('throttles to one fetch per 30s, measured from the last landing', async () => {
+    signIn()
+    await mountSidebar()
+    // Within 30s of the mount-time landing: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:00:29Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+    vi.setSystemTime(new Date('2026-10-14T10:00:40Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    // Within 30s of the visibility re-list's own landing: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:01:05Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    vi.setSystemTime(new Date('2026-10-14T10:01:10Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+  })
+
+  it('measures the throttle from a #528 follow-up landing too', async () => {
+    signIn()
+    await mountSidebar()
+    // A list whose two pages both hold s1 raced a status change: #528
+    // fetches one follow-up list inside the same listSessions().
+    const s1 = { id: 's1', topic: 'T', created_at: '2026-10-14T09:00:00Z', ended_at: null }
+    apiGetSessionLibrary
+      .mockResolvedValueOnce({ items: [s1], total: 1, limit: 40, offset: 0 })
+      .mockResolvedValueOnce({ items: [{ ...s1, ended_at: 'x' }], total: 1, limit: 40, offset: 0 })
+    vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+    let release
+    const gate = new Promise((resolve) => (release = resolve))
+    apiGetSessionLibrary.mockImplementationOnce(() =>
+      gate.then(() => ({ items: [], total: 0, limit: 40, offset: 0 })),
+    )
+    const pending = useSessionStore().listSessions()
+    await flushPromises()
+    // The follow-up lands 20s later.
+    vi.setSystemTime(new Date('2026-10-14T10:01:20Z'))
+    release()
+    await pending
+    expect(lists()).toBe(3)
+    // 35s after the first landing but 15s after the follow-up's: skipped.
+    vi.setSystemTime(new Date('2026-10-14T10:01:35Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+    vi.setSystemTime(new Date('2026-10-14T10:01:50Z'))
+    await showTab()
+    expect(lists()).toBe(4)
+  })
+
+  it('throttles a failed re-list from its attempt', async () => {
+    signIn()
+    await mountSidebar()
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    // Still offline, 10s later: no new request.
+    vi.setSystemTime(new Date('2026-10-14T10:05:10Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    vi.setSystemTime(new Date('2026-10-14T10:05:30Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+  })
+
+  it('treats a wall clock moved backwards as stale', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T09:00:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('makes no fetch when signed out', async () => {
+    signIn()
+    await mountSidebar()
+    useAuthStore().session = null
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('makes no fetch before the first list has loaded', async () => {
+    signIn()
+    // The mount-time fetch fails, so the window never loads this sign-in.
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    await mountSidebar()
+    expect(useSessionStore().sessionsLoaded).toBe(false)
+    apiGetSessionLibrary.mockClear()
+    apiGetSessionLibrary.mockResolvedValue({ items: [], total: 0, limit: 40, offset: 0 })
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(0)
+  })
+
+  it('makes no fetch after a sign-out reset, even once stale', async () => {
+    signIn()
+    await mountSidebar()
+    useSessionStore().reset()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('removes the listener on unmount', async () => {
+    signIn()
+    const w = await mountSidebar()
+    w.unmount()
+    wrappers = []
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(1)
+  })
+
+  it('two mounted sidebars register one listener, kept until the last unmounts', async () => {
+    const add = vi.spyOn(document, 'addEventListener')
+    signIn()
+    const first = await mountSidebar()
+    await mountSidebar()
+    const registered = add.mock.calls.filter(([type]) => type === 'visibilitychange')
+    expect(registered).toHaveLength(1)
+    first.unmount()
+    wrappers.shift()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+  })
+
+  it('a visible event while a list is in flight joins it', async () => {
+    signIn()
+    await mountSidebar()
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    const resolvers = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((resolve) => resolvers.push(resolve)))
+    const pending = useSessionStore().listSessions()
+    expect(lists()).toBe(2)
+    await showTab()
+    expect(lists()).toBe(2)
+
+    for (const resolve of resolvers) resolve({ items: [], total: 0, limit: 40, offset: 0 })
+    await pending
+    expect(lists()).toBe(2)
   })
 })
 
@@ -2175,5 +2433,324 @@ describe('Sidebar.vue — profile entry (#362)', () => {
     expect(el.text()).toContain('Profile')
     await el.trigger('click')
     expect(useSidebar().mode.value).not.toBe('drawer-open')
+  })
+})
+
+// #544: a failed first list must never read as an empty account.
+describe('Sidebar.vue — failed first list (#544)', () => {
+  let wrapper
+
+  const row = (id, extra = {}) => ({
+    id,
+    user_id: 'u',
+    topic: `Topic ${id}`,
+    created_at: '2026-10-14T09:00:00Z',
+    ended_at: null,
+    pinned: false,
+    topic_profile: null,
+    ingestion_status: null,
+    ...extra,
+  })
+
+  // One list is an active page and an ended page; answer each by its status.
+  function serveLists({ active = [], ended = [] } = {}) {
+    apiGetSessionLibrary.mockImplementation(async ({ status }) => {
+      const items = status === 'ended' ? ended : active
+
+      return { items, total: items.length, limit: 40, offset: 0 }
+    })
+  }
+
+  const errorLine = () => wrapper.find('[data-testid="sidebar-list-error"]')
+
+  const retryBtn = () => wrapper.find('[data-testid="sidebar-list-retry"]')
+
+  const showEnded = () => wrapper.find('[data-testid="sidebar-status-ended"]').trigger('click')
+
+  async function mountFailed() {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar)
+    await flushPromises()
+  }
+
+  // A later list on a window that already loaded, failing.
+  async function failLaterList() {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    await useSessionStore()
+      .listSessions()
+      .catch(() => {})
+    await flushPromises()
+    expect(useSessionStore().listError).toBeTruthy()
+  }
+
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    localStorage.clear()
+    setViewport(1400)
+    sidebarTest._setExpanded(true)
+    routeRef.params = {}
+    routeRef.fullPath = '/'
+    showError.mockClear()
+    showWarn.mockClear()
+    useAuthStore().session = { user: { id: 'u-1' }, access_token: 't' }
+  })
+
+  afterEach(() => {
+    wrapper?.unmount()
+    vi.restoreAllMocks()
+  })
+
+  it('shows the error line with Retry, and no empty hint, on the Active tab', async () => {
+    await mountFailed()
+    expect(useSessionStore().sessionsLoaded).toBe(false)
+    expect(errorLine().exists()).toBe(true)
+    expect(errorLine().attributes('role')).toBe('alert')
+    expect(errorLine().text()).toContain("Couldn't load your sessions.")
+    expect(retryBtn().exists()).toBe(true)
+    expect(retryBtn().classes()).toContain('coarse-2x')
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-empty-active"]').exists()).toBe(false)
+  })
+
+  // #549: search results replace the list but not its failure; Home is quiet
+  // while the sidebar is open, so the line is the only report.
+  it('keeps the error line above search results', async () => {
+    await mountFailed()
+    serveLists({ active: [row('r1')] })
+    vi.useFakeTimers()
+
+    try {
+      await wrapper.find('[data-testid="sidebar-search"]').setValue('Topic')
+      await vi.advanceTimersByTimeAsync(250)
+      await flushPromises()
+    } finally {
+      vi.useRealTimers()
+    }
+
+    expect(wrapper.find('[data-testid="sidebar-search-count"]').text()).toBe('1 match')
+    expect(useSessionStore().firstListFailed).toBe(true)
+    expect(errorLine().exists()).toBe(true)
+    expect(retryBtn().exists()).toBe(true)
+    const count = wrapper.find('[data-testid="sidebar-search-count"]').element
+    expect(
+      errorLine().element.compareDocumentPosition(count) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy()
+  })
+
+  // #549: Home reports the failure in these two layouts on the premise that
+  // the sidebar renders no error line there.
+  it.each(['collapsed', 'drawer-closed'])('renders no error line in %s', async (mode) => {
+    sidebarTest._setMode(mode)
+    await mountFailed()
+    expect(useSidebar().mode.value).toBe(mode)
+    expect(useSessionStore().firstListFailed).toBe(true)
+    expect(errorLine().exists()).toBe(false)
+  })
+
+  it('shows the error line, not "No ended sessions yet", on the Ended tab', async () => {
+    await mountFailed()
+    await showEnded()
+    expect(errorLine().exists()).toBe(true)
+    expect(retryBtn().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+  })
+
+  it('Retry lists once, shows the skeleton while it runs, then the rows', async () => {
+    await mountFailed()
+    const listSpy = vi.spyOn(useSessionStore(), 'listSessions')
+    let release
+    const gate = new Promise((resolve) => (release = resolve))
+    apiGetSessionLibrary.mockImplementation(async ({ status }) => {
+      await gate
+      const items = status === 'ended' ? [] : [row('a1')]
+
+      return { items, total: items.length, limit: 40, offset: 0 }
+    })
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(listSpy).toHaveBeenCalledTimes(1)
+    expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
+    release()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
+    expect(errorLine().exists()).toBe(false)
+  })
+
+  it('Retry that lands an empty account shows the real empty hints', async () => {
+    await mountFailed()
+    serveLists()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
+    await showEnded()
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(true)
+  })
+
+  it('a failed Retry brings the error line back, silently', async () => {
+    await mountFailed()
+    const listSpy = vi.spyOn(useSessionStore(), 'listSessions')
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(listSpy).toHaveBeenCalledTimes(1)
+    expect(errorLine().exists()).toBe(true)
+    expect(retryBtn().exists()).toBe(true)
+    expect(showError).not.toHaveBeenCalled()
+    expect(showWarn).not.toHaveBeenCalled()
+  })
+
+  it('a failed Retry hands keyboard focus back to the new Retry button', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(document.activeElement).toBe(retryBtn().element)
+  })
+
+  it('a failed Retry leaves focus alone if the learner moved it meanwhile', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    const rejects = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => rejects.push(r)))
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    const search = wrapper.find('[data-testid="sidebar-search"]').element
+    search.focus()
+
+    for (const reject of rejects) reject(new Error('offline'))
+    await flushPromises()
+    expect(errorLine().exists()).toBe(true)
+    expect(document.activeElement).toBe(search)
+  })
+
+  it('a failed Retry leaves focus alone after a pointer press elsewhere', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    wrapper = mount(Sidebar, { attachTo: document.body })
+    await flushPromises()
+    const rejects = []
+    apiGetSessionLibrary.mockImplementation(() => new Promise((_, r) => rejects.push(r)))
+    retryBtn().element.focus()
+    await retryBtn().trigger('click')
+    await flushPromises()
+    // A click on plain text: focus stays on the body, but the learner moved on.
+    document.body.dispatchEvent(new Event('pointerdown', { bubbles: true }))
+
+    for (const reject of rejects) reject(new Error('offline'))
+    await flushPromises()
+    expect(errorLine().exists()).toBe(true)
+    expect(document.activeElement).not.toBe(retryBtn().element)
+  })
+
+  it('Retry on the Ended tab says no "No ended sessions yet" while it runs', async () => {
+    await mountFailed()
+    await showEnded()
+    apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+    expect(errorLine().exists()).toBe(false)
+  })
+
+  it('the Ended tab shows the skeleton, not "No ended sessions yet", during the first list', async () => {
+    apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    await showEnded()
+    expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+  })
+
+  it('after a list loaded with rows, a failed later list keeps the rows and shows no error', async () => {
+    serveLists({ active: [row('a1')], ended: [row('e1', { ended_at: '2026-10-14T09:30:00Z' })] })
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    await failLaterList()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
+    await showEnded()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-e1"]').exists()).toBe(true)
+  })
+
+  it('after a list loaded with zero rows, a failed later list keeps the real empty hints', async () => {
+    serveLists()
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    await failLaterList()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(true)
+    await showEnded()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(true)
+  })
+
+  // The create re-lists (store, #544); here that list fails too.
+  it('a session created after a failed first list renders as a row, with the error line under it', async () => {
+    await mountFailed()
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').text()).toContain('Graphs')
+    expect(wrapper.find('[data-testid="sidebar-empty-hint"]').exists()).toBe(false)
+    // One row must not pass for the whole account, nor its local count for a total.
+    expect(errorLine().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-view-all-active"]').exists()).toBe(false)
+    await showEnded()
+    expect(errorLine().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+  })
+
+  it('a created session that was then ended shows on the Ended tab with the error line under it', async () => {
+    await mountFailed()
+    const store = useSessionStore()
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await store.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    const api = await import('@/services/sessionsApi.js')
+    vi.spyOn(api, 'endSession').mockResolvedValue({
+      ended_at: '2026-10-14T09:30:00Z',
+      summary: null,
+    })
+    await store.endSession('n1')
+    await flushPromises()
+    await showEnded()
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
+    expect(errorLine().exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-view-all-ended"]').exists()).toBe(false)
+    // The tab's count is the same local-only total.
+    expect(store.endedTotal).toBe(1)
+    expect(wrapper.find('[data-testid="sidebar-status-ended"]').text()).not.toContain('(1)')
+  })
+
+  it('hides View all while a retry of the first list runs, too', async () => {
+    await mountFailed()
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
+    await retryBtn().trigger('click')
+    await flushPromises()
+    expect(useSessionStore().listLoading).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-view-all-active"]').exists()).toBe(false)
+  })
+
+  it('a create whose re-list succeeds clears the error line and shows the account', async () => {
+    await mountFailed()
+    serveLists({ active: [row('n1', { topic: 'Graphs' }), row('a1')] })
+    apiCreateSession.mockResolvedValueOnce(row('n1', { topic: 'Graphs' }))
+    await useSessionStore().createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    await flushPromises()
+    expect(errorLine().exists()).toBe(false)
+    expect(wrapper.find('[data-testid="sidebar-row-n1"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-row-a1"]').exists()).toBe(true)
   })
 })

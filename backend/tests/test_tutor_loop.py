@@ -61,6 +61,7 @@ def _make_stream(*chunks):
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
 
 
@@ -135,9 +136,7 @@ async def test_failed_tool_dispatch_surfaces_in_events_and_record(
                 0,
                 id="tc_1",
                 name="update_topic_profile",
-                arguments=json.dumps(
-                    {"session_id": SESSION_ID, "add_mastered_concept": "joins"}
-                ),
+                arguments=json.dumps({"session_id": SESSION_ID, "add_mastered_concept": "joins"}),
             )
         ),
     )
@@ -147,20 +146,14 @@ async def test_failed_tool_dispatch_surfaces_in_events_and_record(
         AsyncMock(side_effect=[turn1, turn2]),
     )
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     done_ev = next(e for e in events if e.type == "tool_call_done")
     assert done_ev.data["status"] == "error"
     assert "evidence_type" in (done_ev.data.get("error") or "")
     assert events[-1].type == "done"
 
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == SESSION_ID)
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == SESSION_ID).one()
     persisted = json.loads(msg.tool_calls_json)
     assert persisted[0]["name"] == "update_topic_profile"
     assert persisted[0]["status"] == "failed"
@@ -168,9 +161,7 @@ async def test_failed_tool_dispatch_surfaces_in_events_and_record(
 
 
 @pytest.mark.asyncio
-async def test_max_iters_exhausted_yields_error_event(
-    db_session, session_row, ctx, monkeypatch
-):
+async def test_max_iters_exhausted_yields_error_event(db_session, session_row, ctx, monkeypatch):
     """If every iteration returns a tool call, the loop must stop after
     max_iters and yield a terminal error event instead of looping forever."""
     _disable_stub(monkeypatch)
@@ -202,9 +193,7 @@ async def test_max_iters_exhausted_yields_error_event(
         MagicMock(return_value=ToolResult(ok=True, status="ok", error=None, data={})),
     )
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
 
     assert events[-1].type == "error"
     assert events[-1].data["code"] == "max_iters_reached"
@@ -227,9 +216,7 @@ async def test_retrieved_chunks_wrapped_as_untrusted_in_tool_message(
     fake_chunks = [{"doc_id": "pdf42", "text": malicious, "page": 1, "score": 0.1}]
     monkeypatch.setattr(
         "services.retrieval_service.retrieve",
-        lambda db, ctx, args: ToolResult(
-            ok=True, status="ok", data={"chunks": fake_chunks}
-        ),
+        lambda db, ctx, args: ToolResult(ok=True, status="ok", data={"chunks": fake_chunks}),
     )
 
     captured_messages: list[list[dict]] = []
@@ -240,9 +227,7 @@ async def test_retrieved_chunks_wrapped_as_untrusted_in_tool_message(
                     0,
                     id="tc_1",
                     name="retrieve_chunks",
-                    arguments=json.dumps(
-                        {"session_id": SESSION_ID, "query": "anything", "k": 1}
-                    ),
+                    arguments=json.dumps({"session_id": SESSION_ID, "query": "anything", "k": 1}),
                 )
             ),
         ),
@@ -255,9 +240,7 @@ async def test_retrieved_chunks_wrapped_as_untrusted_in_tool_message(
 
     monkeypatch.setattr("agent.tutor.litellm.acompletion", fake_acompletion)
 
-    events = await _drain(
-        tutor.run_streaming([{"role": "user", "content": "q"}], "sys", ctx)
-    )
+    events = await _drain(tutor.run_streaming([{"role": "user", "content": "q"}], "sys", ctx))
 
     # The second LLM call sees the tool message; pull it out and inspect.
     second_call_messages = captured_messages[1]

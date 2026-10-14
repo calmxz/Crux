@@ -12,6 +12,7 @@ Default account list: docs/dev/debug-accounts.txt (gitignored).
 File format: one `email,password` per line; blank lines and `#` comments
 are ignored.
 """
+
 from __future__ import annotations
 
 import sys

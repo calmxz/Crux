@@ -30,9 +30,7 @@ def test_usage_summary_shape(client, db_session):
 
 
 def test_usage_summary_rejects_invalid_token(client, db_session):
-    r = client.get(
-        "/api/usage/summary", headers={"Authorization": "Bearer bogus"}
-    )
+    r = client.get("/api/usage/summary", headers={"Authorization": "Bearer bogus"})
     assert r.status_code == 401
 
 

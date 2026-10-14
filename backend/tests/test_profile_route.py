@@ -183,6 +183,7 @@ def test_patch_empty_body_is_422_before_if_match_guard(client, auth_headers, see
 
 def test_delete_gap_with_spaces_and_nulls_focus(client, auth_headers, seeded_session_id):
     from urllib.parse import quote
+
     tag = _etag(client, auth_headers, seeded_session_id)
     client.patch(
         f"/api/profile/{seeded_session_id}",

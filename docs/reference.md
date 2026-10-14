@@ -132,6 +132,17 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   and the registry in the same commit. `frontend/src/lib/errorCodes.js` holds
   only the codes the frontend handles; `errorCodes.test.js` fails if one is not
   in the spec block.
+- SSE events (#463): an autouse fixture in `backend/tests/conftest.py` validates
+  the `data` of every `StreamEvent` built in the suite against the `x-sse-events`
+  block of `docs/api/openapi.yaml` (jsonschema, Draft 2020-12). Every object is
+  closed with `additionalProperties: false`, so a new field goes into the block
+  in the same commit as its emitter. Test fakes are validated too; a test that
+  must build an off-spec event opts out with `@pytest.mark.sse_unchecked("reason")`.
+  A clean whole-suite run also fails if any type in the block was never built,
+  on-spec, by non-test code, so a new event type needs a test that reaches its
+  real emitter. Runs that are narrowed (paths, `-k`, `-m`, `--ignore`, or
+  anything that deselects, such as `--lf` or `--sw`), collect-only, or already
+  failing skip this check.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
@@ -224,8 +235,14 @@ Invalidation after any non-GET settles (success or failure): every cached GET
 under the write's **resource root** (first path segment, query stripped) is
 dropped, so `POST /sessions/abc/end` drops `GET /sessions/abc` and also the
 sibling lists `GET /sessions/library` and `GET /sessions?..`, which the
-bidirectional prefix rule alone would have missed. A write under `/sessions`
-leaves `/me` or `/documents` entries alone. Coarse on purpose: a 5 s cache
+bidirectional prefix rule alone would have missed. Roots whose GETs read each
+other's data are linked in `LINKED_ROOTS`. A write under `/sessions` or
+`/profile` drops both of those roots and `/review`. Every profile derives from
+sessions, `GET /sessions/:id` embeds the topic profile, and the review queue
+joins both. Without the link, a new session was missing from the combined
+profile for up to 5 s (#518). A new root derived from another one must be added there.
+A write under `/sessions` still leaves `/me` or `/documents` entries alone.
+Coarse on purpose: a 5 s cache
 gains nothing from finer rules and a stale list is a visible bug.
 Two writers bypass `request()` and call the exported `invalidateGetCache(path)`
 themselves once they settle, success or failure: `chatStreamService`
@@ -325,15 +342,175 @@ literal `'pending'`. `MessageList` keys on a real `message_id`, then
 ### Reset epoch (#414)
 
 `stores/session.js` `reset()` (sign-out) aborts the live stream first, then
-bumps `_resetEpoch`, clears `_inflight` and nulls `_latestRequestedId`. Any
+bumps `_resetEpoch`, clears `_inflight` and `_listReplays`, and nulls
+`_latestRequestedId`. Any
 async action must call `const live = _epochGuard()` before its first `await`
 and gate every later state write on `live()`: data writes, `finally` flag
-clears, and the error write (`_setError(e, live)`). Return or rethrow to the
+clears, and the error write (`_setError(e, live)`, or
+`_setError(e, live, listError)` for the sidebar list, #537). Return or rethrow to the
 caller unchanged. Without the gate, a request in flight at sign-out writes the
 previous account's data into the next one's store. Streams use the separate
 `ABANDONED` sentinel on `_streamSid` instead (`_streamSuperseded()`).
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
+
+### Sidebar session window (#522, #524, #528, #533, #534, #544)
+
+`stores/session.js` `sessions` is a window (40 active + 40 ended), not the
+corpus, and a mutation never refetches it. Four exceptions, below: the
+#528 and #533 re-lists after a status-change race, the #534 re-list when
+the tab becomes visible again, and the #544 re-list after a create made
+while the first list has failed.
+`listSessions()` replaces
+it; actions patch rows in place. `createSession` / `continueTopic` insert the
+created session locally via `_addCreated` -> `_insertCreated` (list-item
+shape, after the pinned active rows), counting it in `activeTotal` only if
+the row was not already there. "Has the window loaded?" is `sessionsLoaded`,
+never `sessions.length`: a create makes the window non-empty without loading
+it.
+
+A list snapshot can predate a local change, so every window change is
+recorded in `_listReplays` and re-applied onto the incoming rows and totals
+before the list writes them:
+- Create, end, reopen and continueTopic's prior-end are recorded on success,
+  only while a list is in flight. A create inserts only if the snapshot lacks
+  the row. An end/reopen applies only to a row in the snapshot that is still in
+  the prior state, and then moves the totals. A row already in the target state
+  was counted by the snapshot. A row outside the snapshot gives no evidence
+  either way, so its replay flags the list for a re-list (below).
+- Pin and rename are recorded from their optimistic start, because a list that
+  started before the write committed can land while it is still pending. A
+  failed write drops its entry and also rolls back any landed row it patched,
+  unless a later write has already changed that row.
+- Settled entries clear when the in-flight list settles, success or failure.
+  `reset()` clears them all. A new action that changes window rows locally must
+  record a replay, or an in-flight list will revert it.
+
+Re-list (#528): when a list lands and an end/reopen/prior-end replay found no
+row, or the same id is in both the active and the ended page (a change
+committed between the two parallel page reads), the snapshot's totals may be
+off by one. The list still writes its result, drops `listLoading` (when
+the no-race path would; only the list and `reset()` write that flag, #532), clears its
+settled replays, and runs one more fetch inside the same shared `'list'`
+promise, so `_listPending` and replay tracking cover it too. The follow-up's
+own race result is ignored (capped at one), its failure is swallowed (the
+first result stays, no `error`), and the epoch guard drops it after `reset()`.
+Creates and pin/rename never trigger it: their replays are exact. Residual
+races it cannot see are listed in `docs/decisions.md` (2026-10-14).
+
+Late reply (#533): end/reopen/continueTopic call `_statusChangeGuard()` when
+their request starts (it notes `_listsLanded`, bumped each time a list writes
+the window). On the reply, before patching, its judge returns `'move'`,
+`'skip'` or `'relist'`. With no list landed since, it is the shared totals
+rule. Once a list has landed: the landed window row alone decides when there
+is one (the open detail or the caller's row can be a stale separate copy),
+even with a later list in flight. Copies all in the target state skip.
+Otherwise `_relist()` calls `listSessions()` instead of moving the totals, or,
+with a list in flight, the totals move and that list's replay decides (#528).
+Observed copies are always patched. `_relist()` runs after
+`_trackStatusChange`, or the re-list would record that replay against itself
+and re-list again, and it waits out a list whose `_inflight` entry outlives
+`_listPending`, so it never joins a finished fetch.
+
+Visibility re-list (#534): `composables/useVisibilityRelist.js`, called by
+`Sidebar.vue`, holds one `visibilitychange` listener on `document` for all
+mounted sidebars (module-scoped count; added on the first mount, removed on
+the last unmount). When the document turns visible and the user is signed in,
+it calls the store's `relistIfStale()`. That calls `listSessions()` unless the
+window has not loaded this sign-in (`sessionsLoaded`), or a list wrote the
+window (`_listLandedAt`, set by every landing) or a throttled re-list was
+attempted (`_relistTriedAt`, so offline returns are throttled too) under 30
+seconds ago (`_claimRelistSlot`). `reset()` clears both; a negative age from
+a clock moved back counts as stale. A list still in flight is joined through
+`_inflight`. The event runs as its own task, never in the microtasks between
+a list's `finally` and its `_inflight` removal, so it cannot join a finished
+fetch.
+
+Failed first list (#544): until a list has loaded this sign-in, a failed one
+(the store's `firstListFailed`, `!sessionsLoaded && listError`) is the only
+state where the window vouches for nothing, and the only state any surface
+reports a list failure in: Home's boot error reads the same computed (#546).
+One surface reports it at a time (#549): `SidebarListError` while the
+sidebar's body is on screen (`useSidebar().isExpanded`: `expanded`,
+`drawer-open`), Home's boot error otherwise (`collapsed`, `drawer-closed`,
+where the sidebar renders no list at all). Both say `LIST_FAILED_COPY`
+(`lib/errors.js`); a start-attempt error on Home is separate and wins over
+the boot error in every mode. The sidebar shows `SidebarListError` (message +
+silent Retry) on both tabs, in place of an empty hint, under rows a create
+inserted, or above search results, and hides every
+total-derived surface (View all links, the Ended tab count) while that list
+has failed or a retry of it runs: the totals then count only local creates. A
+new surface that renders `activeTotal`, `endedTotal` or an empty state reads
+the same gate. `_addCreated` re-lists in this state through `_relist()`,
+sharing the #534 throttle via `_claimRelistSlot`. Retry and mount-time lists
+are not throttled attempts. After a load, a failed list stays silent and
+keeps the window (#534), on Home as in the sidebar, including an account that
+loaded with zero sessions.
+
+Ordering matrix. A change to the totals or replay logic is checked against
+each row, for a session inside and outside the window. In a store test, seed
+the session with `seedSession` (in `sessionStore.test.js`), which puts it in
+the window, the open detail and the search results as separate objects, like
+the app holds them:
+
+| # | Ordering, relative to an action's request and reply |
+|---|---|
+| 1 | No list starts or lands between request and reply |
+| 2 | A list is in flight at the reply (replay recorded; #528 may re-list) |
+| 3 | A list lands between request and reply, none in flight at the reply |
+| 4 | A list lands, then a later list is in flight at the reply, and that list succeeds or fails |
+| 5 | The reply arrives during a #528 follow-up |
+| 6 | `reset()` between the request and the reply, or during a re-list |
+| 7 | The reply resumes in the microtasks while a list settles (between its write, its `finally`, and its `_inflight` removal) |
+
+Row 7 has no stable ordering to set up by hand. Release the reply after 0..N
+microtasks with `it.each` (the #533 sweep test in `sessionStore.test.js`), and
+check the sweep goes red when the guarded branch is removed.
+
+### E2E sign-in against the real backend (#518)
+
+Specs that call the e2e backend sign in with `signIn(page)` from
+`frontend/e2e/support/auth.js`. It stubs GoTrue (`auth/v1/settings|token|user`)
+and signs in through the real `/login` form, but the access token it returns is
+a real RS256 JWT for a fresh random user id. So every test starts on an empty,
+not-yet-onboarded account. `node e2e/support/gen-auth-keys.js` writes a throwaway key
+pair to `frontend/e2e/.auth/` (gitignored). The e2e job serves only `jwks/`
+over `http.server` on 8787 and boots the backend with
+`SUPABASE_URL=http://e2e-auth.invalid` and
+`SUPABASE_JWKS_URL_OVERRIDE=http://127.0.0.1:8787/jwks.json`. The backend has
+no test branch: it verifies through the normal JWKS path, and
+`backend/tests/test_auth_served_jwks.py` pins that a foreign key is still a 401.
+Gotchas:
+- `ISSUER_ORIGIN` in `auth-keys.js` must equal the job's `SUPABASE_URL`.
+- Never pair `signIn` with an `addInitScript` storage wipe. It re-runs on every
+  navigation and drops the supabase-js session.
+- `VITE_SUPABASE_URL` stays unset in CI, so the client uses its placeholder
+  host, which the `**/auth/v1/**` routes still match.
+
+Local run steps are in the `playwright.config.js` header.
+
+### Card look spec (#453)
+
+`frontend/e2e/card-look.spec.js` pins the computed box (background, border
+colours and widths, corner radii, box-shadow, padding) of every card surface,
+in the light theme at 1366px, plus the 390px surfaces whose media queries
+change a card. It runs offline: GoTrue and every `/api` call are stubbed, so
+only the Vite dev server is needed (`npx playwright test e2e/card-look.spec.js`
+from `frontend/`). The expected values are literals recorded from the browser,
+never derived from the CSS. After a deliberate visual change, re-record:
+`CARD_LOOK_RECORD=1 npx playwright test e2e/card-look.spec.js` prints each
+surface's values (once two reads agree) instead of asserting. Fold them back
+into `LOOK`, keeping the shared shapes (`CARD`, `JOINED`, `LEARNER`, `strip`,
+`bare`) where they still match. A surface the refactor only moves must pass
+unchanged without re-recording. Zero-width borders read as colour `none`, so
+an unseen side colour never fails a move.
+Gotchas:
+- The session page focuses the composer after the session loads. Reading
+  before that focus lands races it and pins the `:focus-within` border; wait
+  for the focus, then blur.
+- Park the mouse after the form sign-in. Otherwise whatever lands under the
+  submit button's old spot reads in `:hover`.
+- `:focus-visible` needs real `Tab` presses; script `focus()` may not match it.
 
 ### Favicon generation
 

@@ -1,5 +1,6 @@
 """F-18: semantic_fallback_required is async (aembedding); tools.dispatch runs
 in a worker thread from the agent loop."""
+
 import asyncio
 import inspect
 
@@ -26,9 +27,7 @@ def test_fallback_uses_aembedding(monkeypatch, db_session):
 
         return R()
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: True,

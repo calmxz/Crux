@@ -49,7 +49,5 @@ def chunks_to_citations(chunks) -> list[Citation]:
             )
         )
     if dropped:
-        log.debug(
-            "citation floor dropped %d of %d chunks", dropped, dropped + len(out)
-        )
+        log.debug("citation floor dropped %d of %d chunks", dropped, dropped + len(out))
     return out

@@ -48,11 +48,12 @@
         @cancel="cancel"
       />
 
-      <!-- E-01: the form above must stay mounted regardless of store.error --
+      <!-- E-01: the form above must stay mounted regardless of any error --
            this paragraph only ever adds a message underneath it. It shows
            either a start-attempt failure (createSession/lookupTopic/
-           continueTopic rejecting) or, absent that, a boot-time list failure
-           when there are no sessions yet to show instead. -->
+           continueTopic rejecting) or, absent that, a failure of the first
+           list of this sign-in (store.firstListFailed, #546) while the
+           sidebar's list, which reports it there, is off screen (#549). -->
       <p v-if="displayError" class="error" data-testid="home-error" role="alert">
         {{ displayError }}
       </p>
@@ -65,13 +66,16 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 
 import StartTopicIntercept from '../components/start/StartTopicIntercept.vue'
+import { useSidebar } from '../composables/useSidebar.js'
 import { useStartFlow } from '../composables/useStartFlow.js'
 import { useSessionStore } from '../stores/session.js'
-import { friendlyError } from '../lib/errors.js'
+import { LIST_FAILED_COPY, friendlyError } from '../lib/errors.js'
 
 const router = useRouter()
 
 const store = useSessionStore()
+
+const { isExpanded: sidebarListOnScreen } = useSidebar()
 
 const quickTopic = ref('')
 
@@ -93,14 +97,19 @@ watch(quickTopic, () => cancel())
 
 const startLabel = computed(() => (busy.value ? 'Starting...' : 'Start'))
 
+// #537: the list's own failure, never the session page's store.error. #546:
+// shown on the sidebar's rule, so a failure after a loaded list stays silent.
+// #549: one failure, one report - the sidebar's error line while its list is
+// on screen, this line otherwise.
 const bootError = computed(() =>
-  store.error && !store.sessions.length ? friendlyError(store.error) : null,
+  store.firstListFailed && !sidebarListOnScreen.value ? LIST_FAILED_COPY : null,
 )
 
 const displayError = computed(() => startError.value || bootError.value)
 
 onMounted(() => {
-  // U-05: boot-path load - failure is handled locally (store error state), so
+  // U-05: boot-path load - failure is reported inline (bootError above, or
+  // the sidebar's error line while its list is on screen), so
   // a transient backend hiccup must not toast on Home's first mount. Silence
   // comes from { silent: true } on the getSessionLibrary calls inside
   // store.listSessions() (session.js), not from sessionsApi.listSessions.

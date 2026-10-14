@@ -74,17 +74,13 @@ def test_end_session_uses_threadpool(
     async def fake_acompletion(**kwargs):
         return llm_text("wrapped up")
 
-    monkeypatch.setattr(
-        "services.summary_service.litellm.acompletion", fake_acompletion
-    )
+    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
     r = client.post(f"/api/sessions/{SESSION_ID}/end?user_id={USER_ID}")
     assert r.status_code == 200, r.text
     assert calls_nonempty(spy)
 
 
-def test_complete_check_uses_threadpool(
-    client, db_session, seeded_session, spy, monkeypatch
-):
+def test_complete_check_uses_threadpool(client, db_session, seeded_session, spy, monkeypatch):
     ctx = ToolContext(
         db=db_session,
         session_id=SESSION_ID,
@@ -95,7 +91,8 @@ def test_complete_check_uses_threadpool(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
-            set_index=1, set_total=1,
+            set_index=1,
+            set_total=1,
             session_id=SESSION_ID,
             gap="atp",
             items=[
@@ -111,9 +108,7 @@ def test_complete_check_uses_threadpool(
     check_question_service.answer(db_session, SESSION_ID, index=0, selected_index=0)
 
     async def fake_run_streaming(messages, system_prompt, tool_ctx):
-        msg = ChatMessage(
-            session_id=SESSION_ID, role="assistant", content="Nice work"
-        )
+        msg = ChatMessage(session_id=SESSION_ID, role="assistant", content="Nice work")
         tool_ctx.db.add(msg)
         tool_ctx.db.commit()
         yield StreamEvent("done", {"message_id": str(msg.id)})
@@ -125,9 +120,7 @@ def test_complete_check_uses_threadpool(
     assert calls_nonempty(spy)
 
 
-def test_chat_stream_prepare_uses_threadpool(
-    client, db_session, seeded_session, spy, monkeypatch
-):
+def test_chat_stream_prepare_uses_threadpool(client, db_session, seeded_session, spy, monkeypatch):
     async def fake_run_streaming(messages, system_prompt, tool_ctx):
         yield StreamEvent("done", {"message_id": "1"})
 

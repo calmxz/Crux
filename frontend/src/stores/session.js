@@ -50,8 +50,16 @@ export const useSessionStore = defineStore('session', () => {
   const currentSessionId = ref(null)
   const currentSession = ref(null)
   // NOT the full corpus: a SIDEBAR_PAGE_LIMIT-sized window per status
-  // (40 active + 40 ended), refilled only by listSessions().
+  // (40 active + 40 ended), refilled by listSessions(). #522: createSession /
+  // continueTopic also insert the session they create (_insertCreated), so
+  // the active part grows one row past the page limit per create until the
+  // next listSessions(); the sidebar caps what it renders.
   const sessions = ref([])
+  // True once a listSessions() has filled the window this sign-in. A create
+  // can make `sessions` non-empty without a list fetch, so its length cannot
+  // stand in for "loaded" (Sidebar's mount-time fetch and #534's
+  // relistIfStale read this).
+  const sessionsLoaded = ref(false)
   // The sidebar's server-side search results. Owned by the store rather than
   // by Sidebar.vue because the sidebar RENDERS these row objects directly and
   // they routinely describe sessions outside the `sessions` window: every
@@ -66,14 +74,23 @@ export const useSessionStore = defineStore('session', () => {
   // activeTotal / endedTotal are a LOCAL MIRROR of the server's per-status
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
-  // and reset(). Every listSessions() call site is mount-time (HomeView,
-  // NewSessionView, Sidebar onMounted) and nothing refetches after a mutation
-  // -- deliberately, since a refetch costs a round-trip and re-sorts the
-  // sidebar under the user mid-action. So any transition a mutating action
-  // fails to mirror here persists for the life of the page.
+  // and reset(). Outside the exceptions below, every listSessions() call
+  // site is mount-time (HomeView, Sidebar onMounted) or the sidebar's Retry
+  // after a failed first list, and a mutation never triggers a refetch -- deliberately, since a refetch costs a round-trip and re-sorts
+  // the sidebar under the user mid-action. So any transition a mutating action
+  // fails to mirror here persists until the next list. The same rule is
+  // why a create inserts its row locally rather than refetching the window.
+  // Four narrow exceptions: a list fetch that lands having raced a status
+  // change re-lists exactly once (#528, see listSessions), a status change
+  // whose reply arrives after a list landed, for a session outside that
+  // window, re-lists instead of moving the totals when no other list is in
+  // flight (#533, see _statusChangeGuard), the tab becoming visible again
+  // re-lists, throttled (#534, see relistIfStale), and a create made while
+  // no list has loaded and the last one failed re-lists, throttled the same
+  // (#544, see _addCreated).
   // CONTRACT for any new action that moves a session between active and
-  // ended: it must move these too, using the shared rule documented on
-  // _observedRows() below.
+  // ended: it must move these too, judged by _statusChangeGuard() (the shared
+  // rule documented on _observedRows() below, plus #533's landed-list cases).
   const activeTotal = ref(0)
   const endedTotal = ref(0)
   const messages = ref([])
@@ -81,9 +98,23 @@ export const useSessionStore = defineStore('session', () => {
   const hasMoreMessages = ref(false)
   const loadingEarlier = ref(false)
   const loadEarlierError = ref(null)
-  const loading = ref(false)
+  // True while a sidebar list fetch has neither written its rows nor failed.
+  // Only listSessions and reset() write it.
+  const listLoading = ref(false)
   const detailLoading = ref(false)
+  // The session page's error. #537: the sidebar list never writes it (that
+  // failure goes to listError) and pin/rename never clear it.
   const error = ref(null)
+  // #537: the latest sidebar list fetch's failure; whether to show it is
+  // firstListFailed's call (#546). Cleared when a list starts, set when it
+  // fails; the #528 follow-up's failure stays silent. Only listSessions and
+  // reset() write it.
+  const listError = ref(null)
+  // #546: the one rule for showing a list failure, read by HomeView's boot
+  // error, the sidebar's error line and _addCreated's re-list. Only while no list has loaded this
+  // sign-in: once one has, a later failure keeps the window silently (#534),
+  // and rows a create inserted cannot stand in for a loaded list (#544).
+  const firstListFailed = computed(() => !sessionsLoaded.value && !!listError.value)
   const dailyCapInfo = ref(null) // { cap, used, resets_at }
   const dailyCapReached = computed(() => dailyCapInfo.value !== null)
   const costCapInfo = ref(null) // { used_usd, soft_cap_usd, hard_cap_usd, resets_at }
@@ -98,7 +129,7 @@ export const useSessionStore = defineStore('session', () => {
   // navigation (loadSession) so it never survives past its own screen.
   const duplicateReopen = ref(null) // { sessionId } | null
 
-  // Library-scoped state — never touches sidebar sessions/loading/error
+  // Library-scoped state — never touches sidebar sessions/listLoading/error
   const libraryLoading = ref(false)
 
   // In-flight-promise guard. Holds ONLY pending promises (deleted on settle),
@@ -116,6 +147,225 @@ export const useSessionStore = defineStore('session', () => {
   // previous account's data into the reset store (F-02 class). What the
   // action returns or rethrows to its caller is unchanged.
   let _resetEpoch = 0
+  // #522 / #524: local window changes a listSessions() snapshot may predate.
+  // Each entry is { apply(rows, counts), settled }; a landing list runs every
+  // entry, in order, over its incoming rows and totals before writing them.
+  // An apply() that returns true found the snapshot unjudgeable and makes the
+  // list re-list once (#528).
+  // A create, end or reopen is recorded on success only while a list is in
+  // flight (any later list starts after it committed). An optimistic pin or
+  // rename is recorded from its start, because a list started before it
+  // commits can land while it is still pending. Settled entries are dropped
+  // when the in-flight list settles, and before a #528 re-list starts; a
+  // failed pin/rename drops its own entry.
+  // reset() clears all of it. (Not the request "replay" of the SHARED TOTALS
+  // RULE below: these re-apply a local change onto a list snapshot.)
+  let _listReplays = []
+  // True from a listSessions() start until its own finally. Not
+  // _inflight.has('list'): that entry outlives the finally by a microtask, and
+  // a change recorded in that gap would wait for, and override, the next list.
+  let _listPending = false
+  // #533: bumped each time a list fetch writes the window. A status-change
+  // action notes it when its request starts, so its reply can tell whether a
+  // list landed in between.
+  let _listsLanded = 0
+  // #534: Date.now() when a list fetch last wrote the window, whatever
+  // started it (mount, #528 follow-up, #533 re-list, a visibility re-list).
+  // relistIfStale() throttles on it, and on the last throttled attempt (its
+  // own, or a create's #544 re-list), so a failing re-list (offline) is
+  // throttled too. reset() clears both.
+  let _listLandedAt = null
+  let _relistTriedAt = null
+  const RELIST_THROTTLE_MS = 30_000
+
+  // Under RELIST_THROTTLE_MS old. A negative age (the wall clock moved back)
+  // counts as stale, so a clock change cannot mute a re-list.
+  function _isRecent(at, now) {
+    return at !== null && now - at >= 0 && now - at < RELIST_THROTTLE_MS
+  }
+
+  function _untrackReplay(replay) {
+    _listReplays = _listReplays.filter((r) => r !== replay)
+  }
+
+  function _dropSettledReplays() {
+    _listReplays = _listReplays.filter((r) => !r.settled)
+  }
+
+  // An end/reopen observed on success while a list is in flight. Judged
+  // against the incoming row alone: a snapshot already in the target state
+  // counted the move itself; one in the prior state did not. A row absent from
+  // the snapshot gives no such evidence -- its totals may or may not predate
+  // the change -- so apply() returns true and listSessions re-lists once
+  // (#528). Every other replay's apply() returns nothing.
+  function _trackStatusChange(id, endedAt) {
+    if (!_listPending) return
+    _listReplays.push({
+      settled: true,
+      apply(rows, counts) {
+        const r = rows.find((s) => s.id === id)
+
+        if (!r) return true
+
+        if (Boolean(r.ended_at) === Boolean(endedAt)) return
+        r.ended_at = endedAt
+
+        if (endedAt) {
+          counts.active = Math.max(0, counts.active - 1)
+          counts.ended += 1
+        } else {
+          counts.ended = Math.max(0, counts.ended - 1)
+          counts.active += 1
+        }
+      },
+    })
+  }
+
+  // #533: end/reopen/continueTopic capture this when their request starts.
+  // The returned function decides, from a reply, what the totals need:
+  // 'move', 'skip' (already counted), or 'relist'. Call it BEFORE patching
+  // the observed copies, which would make every copy read as already moved.
+  // With no list landed since the start it is the SHARED TOTALS RULE
+  // unchanged. Once a list has landed, that list may already count the
+  // change, so:
+  //   - the landed window row alone judges when there is one: it is the
+  //     server's state as of that snapshot, while another copy (the open
+  //     detail, the caller's row) can still show the prior state. This holds
+  //     with a later list in flight too, whose totals may never land.
+  //   - with no window row, copies all in the target state still mean an
+  //     earlier action counted it.
+  //   - otherwise nothing local can tell whether the snapshot predates the
+  //     commit, so it re-lists (#528's reasoning). With a list in flight it
+  //     moves instead: the replay recorded for that list, and #528, decide.
+  function _statusChangeGuard() {
+    const landedAtStart = _listsLanded
+
+    return (id, endedAt, observed) => {
+      const inTarget = (r) => Boolean(r.ended_at) === Boolean(endedAt)
+      const listLanded = _listsLanded !== landedAtStart
+      const windowRow = listLanded && sessions.value.find((s) => s.id === id)
+
+      if (windowRow) return inTarget(windowRow) ? 'skip' : 'move'
+
+      if (observed.length > 0 && observed.every(inTarget)) return 'skip'
+
+      return listLanded && !_listPending ? 'relist' : 'move'
+    }
+  }
+
+  // #533's 'relist': one listSessions(), silent and de-duped like any other.
+  // Call it after _trackStatusChange: a re-list started first would record
+  // that replay against itself and re-list a second time. A list whose
+  // _listPending has dropped can still hold its _inflight entry for a
+  // microtask, and listSessions() would join that finished fetch, so wait it
+  // out first.
+  function _relist() {
+    const live = _epochGuard()
+    const settling = _inflight.get('list')
+    // Like the mount-time callers: a failed list keeps the landed totals.
+    const run = () => listSessions().catch(() => {})
+
+    if (!settling) {
+      run()
+
+      return
+    }
+
+    settling
+      .catch(() => {})
+      .then(() => {
+        if (live()) run()
+      })
+  }
+
+  // A created session joins the window and the active total, unless a list
+  // that landed first already holds it. #544: a create after a failed first
+  // list (nothing loaded this sign-in) also re-lists, so the created row is
+  // not left standing in for the whole account; the landing list replaces
+  // the row and the bumped total with the server's. Throttled with
+  // relistIfStale, so creates made offline (each a failing list pair, and the
+  // sidebar's error alert re-announced) cost at most one per
+  // RELIST_THROTTLE_MS. It never doubles a list: one already running has
+  // cleared listError, and a 'relist' from _statusChangeGuard means a list
+  // landed, setting sessionsLoaded. A failure leaves firstListFailed set, so
+  // the error lines stay. After a load, a failed list keeps its window
+  // (#534), so this stays out of the way.
+  function _addCreated(created) {
+    if (_insertCreated(created)) activeTotal.value += 1
+
+    if (!firstListFailed.value) return
+
+    if (_claimRelistSlot()) _relist()
+  }
+
+  // The throttle relistIfStale and _addCreated share: false while the last
+  // landing or the last throttled attempt is recent, else stamps this attempt.
+  // A Retry or a mount-time list is not a throttled attempt, so a create just
+  // after one still re-lists.
+  function _claimRelistSlot() {
+    const now = Date.now()
+
+    if (_isRecent(_listLandedAt, now) || _isRecent(_relistTriedAt, now)) return false
+    _relistTriedAt = now
+
+    return true
+  }
+
+  // The optimistic write behind renameSession / setPinned: patch every
+  // observed copy now, send `request`, roll back on failure. Every observed
+  // copy is a target -- a search row can be the only rendered copy of a
+  // session outside the loaded window. Each copy rolls back to its OWN
+  // previous value (not a shared `prev`): the window copy and the search copy
+  // can legitimately disagree, e.g. the search response is fresher. The
+  // replay also writes the value onto rows a list lands while this is
+  // pending, and a failure rolls those back too (the rows the user now sees).
+  // A copy a later write already changed is left alone.
+  async function _optimisticWrite(id, field, value, request) {
+    const live = _epochGuard()
+    const observed = _observedRows(id)
+    const prevs = observed.map((r) => r[field])
+
+    for (const r of observed) r[field] = value
+    const landed = []
+
+    const replay = {
+      settled: false,
+      apply(rows) {
+        const r = rows.find((s) => s.id === id)
+
+        if (!r) return
+        landed.push({ row: r, prev: r[field] })
+        r[field] = value
+      },
+    }
+
+    _listReplays.push(replay)
+
+    try {
+      const resp = await request()
+      replay.settled = true
+
+      if (!_listPending) _untrackReplay(replay)
+
+      return resp
+    } catch (e) {
+      _untrackReplay(replay)
+
+      if (live()) {
+        observed.forEach((r, i) => {
+          if (r[field] === value) r[field] = prevs[i]
+        })
+
+        for (const { row, prev } of landed) {
+          if (row[field] === value) row[field] = prev
+        }
+      }
+
+      // F-07: background action - rollback and rethrow, but never write the
+      // global error (it unmounts unrelated screens). Callers toast.
+      throw e
+    }
+  }
 
   function _epochGuard() {
     const epoch = _resetEpoch
@@ -160,7 +410,9 @@ export const useSessionStore = defineStore('session', () => {
   // own items array the store never sees). Together these are the ONLY
   // observations the store has of a session's active/ended state.
   //
-  // SHARED TOTALS RULE (endSession / reopenSession / continueTopic):
+  // SHARED TOTALS RULE (endSession / reopenSession / continueTopic; applied
+  // through _statusChangeGuard, which overrides it once a list has landed
+  // since the request started):
   //   move the totals unless EVERY observed copy already shows the target
   //   state -- in that case the transition was counted when it first
   //   happened. With nothing observed we cannot see the state at all, so we
@@ -186,6 +438,59 @@ export const useSessionStore = defineStore('session', () => {
     return held
   }
 
+  // The window is the server's pinned_activity active order, then ended rows.
+  // A locally created row has the latest activity, so an active one goes
+  // right after the pinned active rows and an ended one (ended while a list
+  // fetch was in flight) goes last. Returns false when `list` already holds
+  // the id.
+  function _insertWindowRow(list, row) {
+    if (list.some((s) => s.id === row.id)) return false
+    const i = row.ended_at ? -1 : list.findIndex((s) => !(s.pinned && !s.ended_at))
+
+    list.splice(i === -1 ? list.length : i, 0, row)
+
+    return true
+  }
+
+  // #522: map the POST /sessions body (SessionResponse) to the SessionListItem
+  // shape the sidebar row renders, and put it in the window. A separate object
+  // from `created` (which becomes currentSession): _observedRows treats the
+  // window row and the detail as two copies to keep in step. Returns false when
+  // the window already holds the session: only a list fetch that landed after
+  // the create committed can have put it there, and that fetch's total
+  // already counts it.
+  function _insertCreated(created) {
+    const row = {
+      id: created.id,
+      topic: created.topic,
+      created_at: created.created_at,
+      ended_at: created.ended_at ?? null,
+      pinned: !!created.pinned,
+      last_activity_at: created.created_at ?? null,
+      message_count: 0,
+      last_message_preview: null,
+      progress: null,
+      last_session_summary: null,
+    }
+
+    if (!_insertWindowRow(sessions.value, row)) return false
+
+    // When the snapshot already has it, the server copy and count win.
+    if (_listPending) {
+      _listReplays.push({
+        settled: true,
+        apply(rows, counts) {
+          if (!_insertWindowRow(rows, row)) return
+
+          if (row.ended_at) counts.ended += 1
+          else counts.active += 1
+        },
+      })
+    }
+
+    return true
+  }
+
   // Route a backend cap envelope (HTTP 429 detail or SSE error payload)
   // into the cap-banner refs. Unknown codes are a no-op.
   // Returns true when the envelope WAS a cap code, so an SSE caller knows the
@@ -200,9 +505,10 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   // `live` (from _epochGuard) skips the write for an action that outlived a
-  // reset(); the rethrow to the caller is unconditional.
-  function _setError(e, live = null) {
-    if (!live || live()) error.value = friendlyError(e)
+  // reset(); the rethrow to the caller is unconditional. `target` is the ref
+  // written: the session page's `error`, or listError for the list (#537).
+  function _setError(e, live = null, target = error) {
+    if (!live || live()) target.value = friendlyError(e)
     throw e
   }
 
@@ -226,58 +532,126 @@ export const useSessionStore = defineStore('session', () => {
     throw new StreamAbortedError('session_ended', e)
   }
 
+  // One sidebar list fetch landed into the window. Returns the merged rows and
+  // whether the snapshot raced a status change (#528): an end/reopen replay
+  // found no row to judge, or a change committed between the two parallel
+  // page reads put the same session in both (its rows de-dupe below, its
+  // totals cannot). `live` false skips every write.
+  async function _landListSnapshot(live) {
+    // Background fetch (mount-time callers, a #528/#533 re-list, or the
+    // #534 visibility re-list) — silent
+    // because a background load must never toast (U-05).
+    const [activePage, endedPage] = await Promise.all([
+      sessionsApi.getSessionLibrary(
+        { status: 'active', sort: 'pinned_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
+        { silent: true },
+      ),
+      sessionsApi.getSessionLibrary(
+        { status: 'ended', sort: 'last_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
+        { silent: true },
+      ),
+    ])
+
+    // DECISION: Promise.all is all-or-nothing -- if either page's request
+    // rejects, the other page's already-resolved items/total are discarded
+    // and sessions/activeTotal/endedTotal are left at their stale pre-call
+    // values (listSessions' catch records listError for the first fetch and
+    // swallows it for the #528 follow-up). Accepted:
+    // a half-merged window (only one status populated) is worse UX than a
+    // stale-but-consistent one, and the caller can retry.
+    const seen = new Set()
+    const merged = []
+    let raced = false
+
+    for (const item of [...activePage.items, ...endedPage.items]) {
+      if (seen.has(item.id)) {
+        raced = true
+        continue
+      }
+
+      seen.add(item.id)
+      merged.push(item)
+    }
+
+    if (!live()) return { rows: merged, raced: false }
+    const counts = { active: activePage.total, ended: endedPage.total }
+
+    // #522 / #524: re-apply local changes this snapshot may predate.
+    for (const replay of _listReplays) {
+      if (replay.apply(merged, counts)) raced = true
+    }
+
+    sessions.value = merged
+    sessionsLoaded.value = true
+    activeTotal.value = counts.active
+    endedTotal.value = counts.ended
+    _listsLanded += 1
+    _listLandedAt = Date.now()
+
+    return { rows: merged, raced }
+  }
+
+  // #534: the third exception to the no-refetch rule. The sidebar calls this
+  // when the tab becomes visible again, so a change made on another device or
+  // tab (or a totals residue, see #528) shows up without a reload. Skipped
+  // until the window has loaded this sign-in (the mount-time fetch owns the
+  // first load) and while the last landing or the last attempt is under
+  // RELIST_THROTTLE_MS old (see _isRecent). Otherwise one listSessions():
+  // silent, de-duped with any list in flight, and a failure keeps the current
+  // window.
+  function relistIfStale() {
+    if (!sessionsLoaded.value || !_claimRelistSlot()) return
+    listSessions().catch(() => {})
+  }
+
   function listSessions() {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
-      loading.value = true
-      error.value = null
+      listLoading.value = true
+      listError.value = null
+      _listPending = true
 
       try {
-        // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
-        // because a background load must never toast (U-05).
-        const [activePage, endedPage] = await Promise.all([
-          sessionsApi.getSessionLibrary(
-            { status: 'active', sort: 'pinned_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
-            { silent: true },
-          ),
-          sessionsApi.getSessionLibrary(
-            { status: 'ended', sort: 'last_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
-            { silent: true },
-          ),
-        ])
+        const { rows, raced } = await _landListSnapshot(live)
 
-        // DECISION: Promise.all is all-or-nothing -- if either page's request
-        // rejects, the other page's already-resolved items/total are discarded
-        // and sessions/activeTotal/endedTotal are left at their stale pre-call
-        // values (the catch block below only records the error). Accepted:
-        // a half-merged window (only one status populated) is worse UX than a
-        // stale-but-consistent one, and the caller can retry.
-        const seen = new Set()
-        const merged = []
+        if (!live()) return rows
 
-        for (const item of [...activePage.items, ...endedPage.items]) {
-          if (seen.has(item.id)) continue
-          seen.add(item.id)
-          merged.push(item)
+        if (!raced) return sessions.value
+        // #528: one of the three exceptions to the no-refetch rule. The snapshot's
+        // totals may predate a status change or count one session twice, and
+        // no local adjustment can tell which, so fetch one fresh list. Its
+        // own race result is ignored: at most one extra round trip. The rows
+        // above stay rendered while it runs, so the skeleton flag drops now,
+        // when the no-race path drops it too.
+        listLoading.value = false
+        // The changes just replayed committed before this fetch starts;
+        // pending pin/rename entries stay and replay onto it too.
+        _dropSettledReplays()
+        // After a reset the caller gets the fetched rows, never the old window.
+        let landed = []
+
+        try {
+          landed = (await _landListSnapshot(live)).rows
+        } catch {
+          // Silent like every list fetch, and not an error the user can act
+          // on: the triggering fetch's rows and totals stay.
         }
 
-        if (!live()) return merged
-        sessions.value = merged
-        activeTotal.value = activePage.total
-        endedTotal.value = endedPage.total
-
-        return sessions.value
+        return live() ? sessions.value : landed
       } catch (e) {
-        _setError(e, live)
+        _setError(e, live, listError)
       } finally {
-        if (live()) loading.value = false
+        if (live()) {
+          listLoading.value = false
+          _listPending = false
+          _dropSettledReplays()
+        }
       }
     })
   }
 
   async function createSession({ topic, seedMode, priorSessionId, declaredLevel } = {}) {
     const live = _epochGuard()
-    loading.value = true
     error.value = null
 
     try {
@@ -289,10 +663,12 @@ export const useSessionStore = defineStore('session', () => {
       })
 
       if (!live()) return created
+
       // A freshly created session is always active server-side; count it
-      // unconditionally even though it isn't added to the (windowed)
-      // `sessions` list here.
-      activeTotal.value += 1
+      // and show it in the sidebar window, unless a list fetch that landed
+      // first already did both.
+      _addCreated(created)
+
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
@@ -300,8 +676,6 @@ export const useSessionStore = defineStore('session', () => {
       return created
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
@@ -322,7 +696,6 @@ export const useSessionStore = defineStore('session', () => {
 
     return _shareInflight(id, async () => {
       const live = _epochGuard()
-      loading.value = true
       detailLoading.value = true
       error.value = null
       duplicateReopen.value = null
@@ -372,12 +745,9 @@ export const useSessionStore = defineStore('session', () => {
         _setError(e)
       } finally {
         // F-13: mirror the write discriminator - only the latest-requested
-        // load may clear the shared flags, else a superseded load drops the
-        // skeleton while the real target is still in flight.
-        if (live() && _latestRequestedId === id) {
-          loading.value = false
-          detailLoading.value = false
-        }
+        // load may clear the flag, else a superseded load drops the skeleton
+        // while the real target is still in flight.
+        if (live() && _latestRequestedId === id) detailLoading.value = false
       }
     })
   }
@@ -472,7 +842,7 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!id) throw new Error('no active session')
     const live = _epochGuard()
-    loading.value = true
+    const judgeTotals = _statusChangeGuard()
     error.value = null
 
     try {
@@ -480,14 +850,15 @@ export const useSessionStore = defineStore('session', () => {
 
       if (!live()) return resp
       const summaryText = resp?.summary?.text ?? ''
-      // Snapshot the observation BEFORE patching anything: once a copy's
-      // ended_at is written it reads as "already ended" and would silently
-      // swallow the totals transition below. See _observedRows for the
-      // shared rule this implements.
+      // Judge the totals BEFORE patching anything: once a copy's ended_at is
+      // written it reads as "already ended" and would silently swallow the
+      // totals transition below. See _observedRows for the shared rule and
+      // _statusChangeGuard for how a landed list changes it.
       const observed = _observedRows(id)
-      const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+      const totals = judgeTotals(id, resp.ended_at, observed)
 
       for (const r of observed) r.ended_at = resp.ended_at
+      _trackStatusChange(id, resp.ended_at)
 
       if (
         currentSession.value &&
@@ -502,10 +873,10 @@ export const useSessionStore = defineStore('session', () => {
         }
       }
 
-      if (!alreadyEnded) {
+      if (totals === 'move') {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       const summary = resp?.summary
       pendingSummary.value = {
@@ -521,8 +892,6 @@ export const useSessionStore = defineStore('session', () => {
       return resp
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
@@ -532,7 +901,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function reopenSession(sessionId) {
     const live = _epochGuard()
-    loading.value = true
+    const judgeTotals = _statusChangeGuard()
     error.value = null
     duplicateReopen.value = null
 
@@ -540,16 +909,17 @@ export const useSessionStore = defineStore('session', () => {
       const resp = await sessionsApi.reopenSession(sessionId)
 
       if (!live()) return resp
-      // Same reasoning as endSession: snapshot before patching.
+      // Same reasoning as endSession: judge before patching.
       const observed = _observedRows(sessionId)
-      const alreadyActive = observed.length > 0 && observed.every((r) => !r.ended_at)
+      const totals = judgeTotals(sessionId, null, observed)
 
       for (const r of observed) r.ended_at = null
+      _trackStatusChange(sessionId, null)
 
-      if (!alreadyActive) {
+      if (totals === 'move') {
         endedTotal.value = Math.max(0, endedTotal.value - 1)
         activeTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       return resp
     } catch (e) {
@@ -564,14 +934,12 @@ export const useSessionStore = defineStore('session', () => {
       }
 
       _setError(e)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
   async function continueTopic(prior) {
     const live = _epochGuard()
-    loading.value = true
+    const judgeTotals = _statusChangeGuard()
     error.value = null
 
     try {
@@ -590,25 +958,26 @@ export const useSessionStore = defineStore('session', () => {
       // itself rendered (e.g. an ended-tab row, or a library-page item)
       // outside the loaded window.
       const observed = _observedRows(prior.id, prior)
-      const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+      const endedAt = new Date().toISOString()
+      const totals = judgeTotals(prior.id, endedAt, observed)
 
-      if (!alreadyEnded) {
-        const endedAt = new Date().toISOString()
+      // A copy already ended keeps its own ended_at.
+      for (const r of observed) if (!r.ended_at) r.ended_at = endedAt
 
-        for (const r of observed) r.ended_at = endedAt
-      }
+      if (totals !== 'skip') _trackStatusChange(prior.id, endedAt)
 
       // The new session is always active. The prior only moves active ->
-      // ended in the totals when it was NOT already observed as ended -
+      // ended in the totals when it was NOT already counted as ended -
       // continueTopic is only ever offered on already-ended rows in the UI,
       // so in the normal case the prior is already counted in endedTotal
-      // and there is no transition to apply here.
-      activeTotal.value += 1
+      // and there is no transition to apply here. The new session is not
+      // counted again when a list fetch that landed first already holds it.
+      _addCreated(created)
 
-      if (!alreadyEnded) {
+      if (totals === 'move') {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       currentSession.value = created
       currentSessionId.value = created.id
@@ -617,60 +986,15 @@ export const useSessionStore = defineStore('session', () => {
       return created
     } catch (e) {
       _setError(e, live)
-    } finally {
-      if (live()) loading.value = false
     }
   }
 
-  async function renameSession(id, topic) {
-    const live = _epochGuard()
-    error.value = null
-    // Every observed copy is a mutation target -- a search row can be the
-    // only rendered copy of a session outside the loaded window. Each copy
-    // rolls back to its OWN previous value (not a shared `prev`): the window
-    // copy and the search copy can legitimately disagree, e.g. the search
-    // response is fresher.
-    const observed = _observedRows(id)
-    const prevs = observed.map((r) => r.topic)
-
-    for (const r of observed) r.topic = topic
-
-    try {
-      return await sessionsApi.renameSession(id, topic)
-    } catch (e) {
-      if (live()) {
-        observed.forEach((r, i) => {
-          r.topic = prevs[i]
-        })
-      }
-
-      // F-07: background action - rollback and rethrow, but never write the
-      // global error (it unmounts unrelated screens). Callers toast.
-      throw e
-    }
+  function renameSession(id, topic) {
+    return _optimisticWrite(id, 'topic', topic, () => sessionsApi.renameSession(id, topic))
   }
 
-  async function setPinned(id, pinned) {
-    const live = _epochGuard()
-    error.value = null
-    const observed = _observedRows(id)
-    const prevs = observed.map((r) => r.pinned)
-
-    for (const r of observed) r.pinned = pinned
-
-    try {
-      return await sessionsApi.setPinned(id, pinned)
-    } catch (e) {
-      if (live()) {
-        observed.forEach((r, i) => {
-          r.pinned = prevs[i]
-        })
-      }
-
-      // F-07: background action - rollback and rethrow, but never write the
-      // global error (it unmounts unrelated screens). Callers toast.
-      throw e
-    }
+  function setPinned(id, pinned) {
+    return _optimisticWrite(id, 'pinned', pinned, () => sessionsApi.setPinned(id, pinned))
   }
 
   // Batch shape: { gap, total, currentIndex, viewIndex, setIndex, setTotal, items: [
@@ -1248,10 +1572,15 @@ export const useSessionStore = defineStore('session', () => {
     abandonStream()
     _resetEpoch += 1
     _inflight.clear()
+    _listReplays = []
+    _listPending = false
+    _listLandedAt = null
+    _relistTriedAt = null
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
     sessions.value = []
+    sessionsLoaded.value = false
     searchRows.value = []
     activeTotal.value = 0
     endedTotal.value = 0
@@ -1259,12 +1588,13 @@ export const useSessionStore = defineStore('session', () => {
     hasMoreMessages.value = false
     loadingEarlier.value = false
     loadEarlierError.value = null
-    loading.value = false
+    listLoading.value = false
     detailLoading.value = false
     libraryLoading.value = false
     checkAnswering.value = false
     checkCompleting.value = false
     error.value = null
+    listError.value = null
     dailyCapInfo.value = null
     costCapInfo.value = null
     pendingSummary.value = null
@@ -1277,6 +1607,8 @@ export const useSessionStore = defineStore('session', () => {
     currentSessionId,
     currentSession,
     sessions,
+    sessionsLoaded,
+    relistIfStale,
     searchRows,
     activeTotal,
     endedTotal,
@@ -1284,9 +1616,11 @@ export const useSessionStore = defineStore('session', () => {
     hasMoreMessages,
     loadingEarlier,
     loadEarlierError,
-    loading,
+    listLoading,
     detailLoading,
     error,
+    listError,
+    firstListFailed,
     dailyCapReached,
     dailyCapInfo,
     costCapReached,

@@ -65,9 +65,11 @@ class FakeS3Client:
     def get_object(self, Bucket, Key):
         try:
             import io
+
             return {"Body": io.BytesIO(self.blobs[(Bucket, Key)])}
         except KeyError:
             import botocore.exceptions
+
             raise botocore.exceptions.ClientError(
                 {"Error": {"Code": "NoSuchKey"}}, "GetObject"
             ) from None
@@ -78,6 +80,7 @@ class FakeS3Client:
 
 def _r2(client):
     from services.object_store import R2ObjectStore
+
     return R2ObjectStore(
         endpoint_url="https://acct.r2.cloudflarestorage.com",
         access_key_id="k",
@@ -117,4 +120,5 @@ def test_get_store_returns_r2_when_configured(monkeypatch):
     monkeypatch.setattr("services.object_store.settings.r2_secret_access_key", "s")
     monkeypatch.setattr("services.object_store.settings.r2_bucket", "b")
     from services.object_store import R2ObjectStore
+
     assert isinstance(object_store.get_store(), R2ObjectStore)

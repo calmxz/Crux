@@ -21,6 +21,7 @@ def count_queries(db):
     finally:
         _sa_event.remove(bind, "before_cursor_execute", _before)
 
+
 # F-07: the queue now only scans the last REVIEW_WINDOW_DAYS days, so the
 # shared fixture timestamp must stay relative to "now" -- a hard-coded date
 # silently falls out of the window as the calendar moves.
@@ -78,9 +79,7 @@ def test_due_concept_appears_with_fields(client, db_session):
 def test_not_yet_due_concept_excluded(client, db_session):
     _seed_session(db_session)
     # correct answer just now -> streak 1 -> due in 1 day -> not due yet
-    _seed_event(
-        db_session, "s1", "osmosis", True, datetime.now(timezone.utc)
-    )
+    _seed_event(db_session, "s1", "osmosis", True, datetime.now(timezone.utc))
     r = client.get("/api/review/queue")
     assert r.json()["total"] == 0
 
@@ -126,9 +125,7 @@ def test_user_isolation(client, db_session):
 
 def test_queue_rejects_invalid_token(client, db_session):
     # conftest fake auth: a bearer token not prefixed "test-" raises 401
-    r = client.get(
-        "/api/review/queue", headers={"Authorization": "Bearer bogus"}
-    )
+    r = client.get("/api/review/queue", headers={"Authorization": "Bearer bogus"})
     assert r.status_code == 401
 
 

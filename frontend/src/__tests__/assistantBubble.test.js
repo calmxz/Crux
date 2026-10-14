@@ -187,7 +187,6 @@ describe('AssistantBubble', () => {
     expect(w.exists()).toBe(true)
     expect(w.text()).toContain('safe')
   })
-
 })
 
 const recapBatch = {

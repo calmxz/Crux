@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import HomeView from '@/views/HomeView.vue'
 import { useSessionStore } from '@/stores/session.js'
+import { LIST_FAILED_COPY } from '@/lib/errors.js'
+import { __test__ as sidebarTest } from '@/composables/useSidebar.js'
 
 const push = vi.fn()
 
@@ -14,8 +16,11 @@ vi.mock('vue-router', () => ({
 
 const apiEndSession = vi.fn()
 
+const apiGetSessionLibrary = vi.fn()
+
 vi.mock('@/services/sessionsApi.js', () => ({
   endSession: (...args) => apiEndSession(...args),
+  getSessionLibrary: (...args) => apiGetSessionLibrary(...args),
 }))
 
 const stubs = {
@@ -46,6 +51,81 @@ describe('HomeView', () => {
     setActivePinia(createPinia())
     push.mockClear()
     apiEndSession.mockReset()
+    apiGetSessionLibrary.mockReset()
+    apiGetSessionLibrary.mockResolvedValue({ items: [], total: 0 })
+    // The sidebar's layout is module state; jsdom's 1024px width is mobile,
+    // so the default is drawer-closed, where Home reports a failed list.
+    setMode('drawer-closed')
+  })
+
+  const setMode = sidebarTest._setMode
+
+  // #549: one failure, one report. The sidebar's error line reports it while
+  // the sidebar's list is on screen; otherwise Home does, with the same copy.
+  describe('#549 boot error only where the sidebar list is off screen', () => {
+    async function mountFailedFirstList() {
+      apiGetSessionLibrary.mockRejectedValue(new Error('rejected'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(useSessionStore().firstListFailed).toBe(true)
+
+      return wrapper
+    }
+
+    it.each(['expanded', 'drawer-open'])('is hidden in %s', async (mode) => {
+      setMode(mode)
+      const wrapper = await mountFailedFirstList()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+    })
+
+    it.each(['collapsed', 'drawer-closed'])('shows the list-failed copy in %s', async (mode) => {
+      setMode(mode)
+      const wrapper = await mountFailedFirstList()
+      // The literal, not LIST_FAILED_COPY: pins the words the brief asked for.
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe("Couldn't load your sessions.")
+    })
+
+    it('stays hidden in any mode when the first list loaded', async () => {
+      for (const mode of ['expanded', 'drawer-open', 'collapsed', 'drawer-closed']) {
+        setActivePinia(createPinia())
+        setMode(mode)
+        const wrapper = mountView()
+        await flushPromises()
+        expect(useSessionStore().firstListFailed).toBe(false)
+        expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+        wrapper.unmount()
+      }
+    })
+
+    it('moves with a mode switch while the failure stands', async () => {
+      setMode('collapsed')
+      const wrapper = await mountFailedFirstList()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
+
+      setMode('expanded')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+
+      setMode('collapsed')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
+    })
+
+    it.each(['expanded', 'collapsed'])(
+      'shows a start-attempt failure over it in %s',
+      async (mode) => {
+        setMode(mode)
+        const store = useSessionStore()
+        vi.spyOn(store, 'lookupTopic').mockResolvedValue({ active_match: null, ended_match: null })
+        vi.spyOn(store, 'createSession').mockRejectedValue(new Error('create failed'))
+        const wrapper = await mountFailedFirstList()
+        await wrapper.get('[data-testid="home-quick-topic"]').setValue('Recursion')
+        await wrapper.get('[data-testid="home-quick-go"]').trigger('click')
+        await flushPromises()
+        expect(store.firstListFailed).toBe(true)
+        expect(wrapper.get('[data-testid="home-error"]').text()).toBe('create failed')
+      },
+    )
   })
 
   it('calls listSessions on mount', async () => {
@@ -56,50 +136,106 @@ describe('HomeView', () => {
     expect(spy).toHaveBeenCalledWith()
   })
 
-  it('does not render bare Loading text while the store is loading', () => {
+  it('renders the start form, not bare Loading text, with no sessions', () => {
     const store = useSessionStore()
-    store.loading = true
     store.sessions = []
     const w = mountView()
     expect(w.text()).not.toContain('Loading...')
     expect(w.find('[data-testid="home-mode-quick"]').exists()).toBe(true)
   })
 
-  it('shows error from store', () => {
-    const store = useSessionStore()
-    store.error = 'list failed'
+  // #537: the boot error is the list's own failure (store.listError).
+  it('a failed first list with no rows shows the boot error', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('list failed'))
     const wrapper = mountView()
-    expect(wrapper.get('[data-testid="home-error"]').text()).toBe('list failed')
+    await flushPromises()
+    expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
   })
 
-  // F-07: a background sidebar action failure (rename/pin) writing store.error
-  // must not nuke an already-loaded Home screen -- the fatal error branch is
-  // scoped to Home's own load (no sessions yet).
-  it('keeps the mode cards mounted when a background error arrives but sessions are already loaded', () => {
+  // F-07: the fatal error branch is scoped to Home's own load (no sessions
+  // yet): a failed re-list must not nuke an already-loaded Home screen.
+  it('keeps the mode cards mounted and shows no boot error when a list fails but sessions are already loaded', async () => {
     const store = useSessionStore()
-    store.error = 'boom'
     store.sessions = [{ id: 's1' }]
+    store.sessionsLoaded = true
+    apiGetSessionLibrary.mockRejectedValue(new Error('boom'))
     const wrapper = mountView()
+    await flushPromises()
+    expect(store.listError).toBe('boom')
     expect(wrapper.find('[data-testid="home-mode-quick"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })
 
-  it('shows the fatal error branch when there are no sessions to render', () => {
+  // #546: the boot error follows the sidebar's rule (store.firstListFailed),
+  // so an account that loaded with zero sessions stays quiet on a later
+  // failure, and a create cannot vouch for a list that never loaded.
+  describe('#546 boot error only for a failed first list', () => {
+    it('stays hidden when the visibility re-list fails on a loaded empty account', async () => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+
+      try {
+        vi.setSystemTime(new Date('2026-10-14T10:00:00Z'))
+        const store = useSessionStore()
+        const wrapper = mountView()
+        await flushPromises()
+        expect(store.sessionsLoaded).toBe(true)
+        expect(store.sessions).toHaveLength(0)
+
+        apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+        vi.setSystemTime(new Date('2026-10-14T10:01:00Z'))
+        store.relistIfStale()
+        await flushPromises()
+        expect(store.listError).toBe('offline')
+        expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+      } finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('stays hidden when Home remounts offline on a loaded empty account', async () => {
+      const store = useSessionStore()
+      mountView().unmount()
+      await flushPromises()
+      expect(store.sessionsLoaded).toBe(true)
+
+      apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(store.listError).toBe('offline')
+      expect(store.sessions).toHaveLength(0)
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+    })
+
+    it('shows when the first list failed even though a create inserted a row', async () => {
+      const store = useSessionStore()
+      store.sessions = [{ id: 'new', pinned: false, ended_at: null }]
+      apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(store.sessionsLoaded).toBe(false)
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
+    })
+  })
+
+  // #537: the session page's error is not a boot error. Written after the
+  // mount's list settles, so that list cannot have cleared it.
+  it("does not show the session page's error as a boot error", async () => {
     const store = useSessionStore()
-    store.error = 'boom'
-    store.sessions = []
     const wrapper = mountView()
-    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
+    await flushPromises()
+    store.error = 'The tutor stopped responding. Please try again.'
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
   })
 
   // E-01: a boot-time list failure with zero sessions used to hide the start
   // form entirely (v-if/v-else on store.error), leaving the learner with no
   // way to start a session. The form must stay mounted regardless.
-  it('does not hide the start form when store.error is set and there are no sessions (E-01)', () => {
-    const store = useSessionStore()
-    store.error = 'boom'
-    store.sessions = []
+  it('does not hide the start form when the first list fails and there are no sessions (E-01)', async () => {
+    apiGetSessionLibrary.mockRejectedValue(new Error('boom'))
     const wrapper = mountView()
+    await flushPromises()
+    expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-quick-topic"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="home-quick-go"]').exists()).toBe(true)
   })

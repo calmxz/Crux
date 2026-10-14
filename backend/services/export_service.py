@@ -75,9 +75,7 @@ def _account(user: User) -> ExportAccount:
 def _usage(db: Session, user_id: str) -> list[ExportUsageDay]:
     counts = dict(
         db.execute(
-            select(UsageCounter.date_utc, UsageCounter.count).where(
-                UsageCounter.user_id == user_id
-            )
+            select(UsageCounter.date_utc, UsageCounter.count).where(UsageCounter.user_id == user_id)
         ).all()
     )
     costs = dict(
@@ -99,18 +97,20 @@ def _usage(db: Session, user_id: str) -> list[ExportUsageDay]:
 
 def build_export(db: Session, user_id: str) -> DataExport:
     user = db.get(User, user_id)
-    sessions = db.execute(
-        select(SessionModel)
-        .where(SessionModel.user_id == user_id)
-        .order_by(SessionModel.created_at, SessionModel.id)
-    ).scalars().all()
+    sessions = (
+        db.execute(
+            select(SessionModel)
+            .where(SessionModel.user_id == user_id)
+            .order_by(SessionModel.created_at, SessionModel.id)
+        )
+        .scalars()
+        .all()
+    )
     session_ids = select(SessionModel.id).where(SessionModel.user_id == user_id)
 
     messages: dict[str, list[ExportMessage]] = defaultdict(list)
     for m in db.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id.in_(session_ids))
-        .order_by(ChatMessage.id)
+        select(ChatMessage).where(ChatMessage.session_id.in_(session_ids)).order_by(ChatMessage.id)
     ).scalars():
         messages[m.session_id].append(
             ExportMessage(
@@ -145,9 +145,7 @@ def build_export(db: Session, user_id: str) -> DataExport:
 
     documents: dict[str, list[ExportDocument]] = defaultdict(list)
     for d in db.execute(
-        select(Document)
-        .where(Document.session_id.in_(session_ids))
-        .order_by(Document.id)
+        select(Document).where(Document.session_id.in_(session_ids)).order_by(Document.id)
     ).scalars():
         documents[d.session_id].append(
             ExportDocument(

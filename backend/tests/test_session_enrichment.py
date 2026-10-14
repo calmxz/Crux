@@ -19,20 +19,39 @@ def _seed(db):
         "confirmed_gaps": [],
         "last_session_summary": "[auto] recap of glycolysis",
     }
-    db.add(SessionModel(id="s_rich", user_id=USER_ID, topic="Glycolysis",
-                        topic_profile_json=json.dumps(prof)))
-    db.add(SessionModel(id="s_garbage", user_id=USER_ID, topic="Garbage",
-                        topic_profile_json=json.dumps({"knowledge_level": "expert"})))
+    db.add(
+        SessionModel(
+            id="s_rich", user_id=USER_ID, topic="Glycolysis", topic_profile_json=json.dumps(prof)
+        )
+    )
+    db.add(
+        SessionModel(
+            id="s_garbage",
+            user_id=USER_ID,
+            topic="Garbage",
+            topic_profile_json=json.dumps({"knowledge_level": "expert"}),
+        )
+    )
     db.add(ChatMessage(session_id="s_rich", role="user", content="hi", created_at=base))
-    db.add(ChatMessage(session_id="s_rich", role="assistant",
-                       content="glycolysis nets 2 ATP per glucose",
-                       created_at=base + timedelta(minutes=1)))
+    db.add(
+        ChatMessage(
+            session_id="s_rich",
+            role="assistant",
+            content="glycolysis nets 2 ATP per glucose",
+            created_at=base + timedelta(minutes=1),
+        )
+    )
     # Aborted-stream trailing-whitespace turn must be skipped by the preview.
-    db.add(ChatMessage(session_id="s_rich", role="assistant", content="\n  \n",
-                       created_at=base + timedelta(minutes=2)))
+    db.add(
+        ChatMessage(
+            session_id="s_rich",
+            role="assistant",
+            content="\n  \n",
+            created_at=base + timedelta(minutes=2),
+        )
+    )
     # Empty session: no messages.
-    db.add(SessionModel(id="s_empty", user_id=USER_ID, topic="Empty",
-                        topic_profile_json="{}"))
+    db.add(SessionModel(id="s_empty", user_id=USER_ID, topic="Empty", topic_profile_json="{}"))
     db.commit()
 
 

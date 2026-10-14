@@ -87,9 +87,7 @@ def test_recent_history_orders_by_id_within_a_created_at_tie(db_session, tied_se
     assert [r["content"] for r in rows] == [f"m{n:02d}" for n in range(1, WINDOW + 1)]
 
 
-def test_prepare_turn_context_orders_by_id_within_a_created_at_tie(
-    db_session, tied_session
-):
+def test_prepare_turn_context_orders_by_id_within_a_created_at_tie(db_session, tied_session):
     from routes.chat import _prepare_turn_context
 
     req = ChatRequest(session_id=tied_session.id, message="explain factoring")
@@ -97,14 +95,10 @@ def test_prepare_turn_context_orders_by_id_within_a_created_at_tie(
     db_session.expunge(sess)
 
     with capture_statements(db_session) as stmts:
-        messages, _profile, _gap_accuracy, _retrieval = _prepare_turn_context(
-            req, db_session, sess
-        )
+        messages, _profile, _gap_accuracy, _retrieval = _prepare_turn_context(req, db_session, sess)
 
     sql = " ".join(_message_select(stmts).split())
     assert "chat_messages.id DESC" in sql, sql
     # The live user message is appended after the history window.
     assert messages[-1] == {"role": "user", "content": "explain factoring"}
-    assert [m["content"] for m in messages[:-1]] == [
-        f"m{n:02d}" for n in range(1, WINDOW + 1)
-    ]
+    assert [m["content"] for m in messages[:-1]] == [f"m{n:02d}" for n in range(1, WINDOW + 1)]

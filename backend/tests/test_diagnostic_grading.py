@@ -47,7 +47,10 @@ def fresh_session_with_diagnostic_batch(db_session):
     db_session.commit()
 
     ctx = ToolContext(
-        db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0,
+        db=db_session,
+        session_id=row.id,
+        user_id=USER_ID,
+        turn_started_at=_T0,
         diagnostic_required=True,
     )
     correct_indices = [0, 1, 0]
@@ -55,7 +58,8 @@ def fresh_session_with_diagnostic_batch(db_session):
         db_session,
         ctx,
         AskCheckQuestionsArgs(
-            set_index=1, set_total=1,
+            set_index=1,
+            set_total=1,
             session_id=row.id,
             gap="warmup",
             items=[
@@ -98,14 +102,13 @@ def session_with_level_and_check_batch(db_session):
     db_session.add(row)
     db_session.commit()
 
-    ctx = ToolContext(
-        db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0
-    )
+    ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0)
     check_question_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
-            set_index=1, set_total=1,
+            set_index=1,
+            set_total=1,
             session_id=row.id,
             gap="atp",
             items=[
@@ -169,9 +172,13 @@ def test_user_set_level_not_clobbered_by_diagnostic(db, session_with_diagnostic_
 def test_answer_check_sets_level_on_diagnostic_completion(
     client, db, fresh_session_with_diagnostic_batch
 ):
-    sid, correct_indices = fresh_session_with_diagnostic_batch  # 3-item diagnostic batch, all correct
+    sid, correct_indices = (
+        fresh_session_with_diagnostic_batch  # 3-item diagnostic batch, all correct
+    )
     for i, ci in enumerate(correct_indices):
-        r = client.post(f"/api/sessions/{sid}/check/answer", json={"index": i, "selected_index": ci})
+        r = client.post(
+            f"/api/sessions/{sid}/check/answer", json={"index": i, "selected_index": ci}
+        )
         assert r.status_code == 200
     assert profile_service.load_profile(db, sid).knowledge_level == "advanced"
 
@@ -191,9 +198,13 @@ def test_skip_check_sets_level_when_final_item_resolved_via_skip(
     whole-branch review)."""
     sid, correct_indices = fresh_session_with_diagnostic_batch  # 3-item diagnostic batch
     # Answer items 0 and 1 correctly, then SKIP the final item (index 2).
-    r0 = client.post(f"/api/sessions/{sid}/check/answer", json={"index": 0, "selected_index": correct_indices[0]})
+    r0 = client.post(
+        f"/api/sessions/{sid}/check/answer", json={"index": 0, "selected_index": correct_indices[0]}
+    )
     assert r0.status_code == 200
-    r1 = client.post(f"/api/sessions/{sid}/check/answer", json={"index": 1, "selected_index": correct_indices[1]})
+    r1 = client.post(
+        f"/api/sessions/{sid}/check/answer", json={"index": 1, "selected_index": correct_indices[1]}
+    )
     assert r1.status_code == 200
     r2 = client.post(f"/api/sessions/{sid}/check/skip", json={"index": 2})
     assert r2.status_code == 200

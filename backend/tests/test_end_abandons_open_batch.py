@@ -30,7 +30,9 @@ USER_ID = "u_abandon_1"
 def seeded_session(db_session):
     db_session.add(User(id=USER_ID))
     session = SessionModel(
-        id="s_abandon_1", user_id=USER_ID, topic="bio",
+        id="s_abandon_1",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile().model_dump_json(),
     )
     db_session.add(session)
@@ -39,13 +41,31 @@ def seeded_session(db_session):
 
 
 def _open_batch(db, session_id, n=2):
-    ctx = ToolContext(db=db, session_id=session_id, user_id=USER_ID,
-                      turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
-    return check_question_service.register(db, ctx, AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=session_id, gap="g",
-        items=[{"question": f"Q{i}?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "a."} for i in range(n)]))
+    ctx = ToolContext(
+        db=db,
+        session_id=session_id,
+        user_id=USER_ID,
+        turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    return check_question_service.register(
+        db,
+        ctx,
+        AskCheckQuestionsArgs(
+            set_index=1,
+            set_total=1,
+            session_id=session_id,
+            gap="g",
+            items=[
+                {
+                    "question": f"Q{i}?",
+                    "options": ["a", "b"],
+                    "correct_index": 0,
+                    "explanation": "a.",
+                }
+                for i in range(n)
+            ],
+        ),
+    )
 
 
 def test_abandon_clears_pending_pointer(db_session, seeded_session):
@@ -98,6 +118,7 @@ def test_end_route_abandons_open_batch(
     client, db_session, seeded_session, mock_litellm, llm_text, monkeypatch
 ):
     """End-to-end: POST /end clears a dangling batch so review-gaps resume works."""
+
     async def fake_acompletion(**kwargs):
         return llm_text("wrapped up")
 

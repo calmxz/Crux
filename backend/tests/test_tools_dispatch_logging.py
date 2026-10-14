@@ -71,9 +71,7 @@ def test_unexpected_exception_returns_coarse_code_and_logs_detail(
     monkeypatch.setattr(tools.profile_service, "apply_patch", boom)
 
     with caplog.at_level(logging.WARNING, logger="agent.tools"):
-        result = tools.dispatch(
-            "update_topic_profile", {"focus_target_gap": "glycolysis"}, ctx
-        )
+        result = tools.dispatch("update_topic_profile", {"focus_target_gap": "glycolysis"}, ctx)
 
     assert result.ok is False
     assert result.status == "failed"

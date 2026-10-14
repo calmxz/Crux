@@ -104,9 +104,7 @@ def test_check_cap_hard_blocks(db_session, seed_user, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_chat_stream_returns_429_when_hard_cap_reached(
-    client, db_session, seed_user, monkeypatch
-):
+def test_chat_stream_returns_429_when_hard_cap_reached(client, db_session, seed_user, monkeypatch):
     monkeypatch.setattr(settings, "llm_stub", True)  # never reach a real LLM
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
@@ -132,15 +130,11 @@ def test_chat_stream_returns_429_when_hard_cap_reached(
     assert "resets_at" in detail
 
 
-def test_chat_rejected_when_global_ceiling_hit(
-    client, db_session, seed_user, monkeypatch
-):
+def test_chat_rejected_when_global_ceiling_hit(client, db_session, seed_user, monkeypatch):
     """B-04: even when the per-user cap has room, the optional global daily
     ceiling must independently block the turn."""
     monkeypatch.setattr(settings, "llm_stub", True)  # never reach a real LLM
-    monkeypatch.setattr(
-        "services.cost_meter.settings.global_daily_cost_cap_usd", 0.10
-    )
+    monkeypatch.setattr("services.cost_meter.settings.global_daily_cost_cap_usd", 0.10)
     db_session.add(
         DailyCostLedger(
             user_id=USER_ID,
@@ -187,13 +181,12 @@ def _make_stream(*chunks):
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
 
 
 @pytest.mark.asyncio
-async def test_tutor_records_cost_per_call(
-    db_session, seed_user, monkeypatch
-):
+async def test_tutor_records_cost_per_call(db_session, seed_user, monkeypatch):
     """run_streaming's billed acompletion call must accumulate its cost to
     the per-user daily ledger (real record_cost, real ledger row)."""
     from datetime import datetime, timezone
@@ -207,17 +200,17 @@ async def test_tutor_records_cost_per_call(
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
 
     monkeypatch.setattr(
-        tutor.litellm, "acompletion",
+        tutor.litellm,
+        "acompletion",
         AsyncMock(side_effect=[_make_stream(_content_chunk("done."))]),
     )
     # stream_chunk_builder would choke on the SimpleNamespace fakes; pin it.
     monkeypatch.setattr(
-        tutor.litellm, "stream_chunk_builder",
+        tutor.litellm,
+        "stream_chunk_builder",
         MagicMock(return_value=SimpleNamespace()),
     )
-    monkeypatch.setattr(
-        tutor.litellm, "completion_cost", lambda completion_response=None: 0.0123
-    )
+    monkeypatch.setattr(tutor.litellm, "completion_cost", lambda completion_response=None: 0.0123)
 
     ctx = ToolContext(
         db=db_session,
@@ -226,10 +219,7 @@ async def test_tutor_records_cost_per_call(
         turn_started_at=datetime.now(timezone.utc),
     )
     events = [
-        ev
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "hi"}], "sys", ctx
-        )
+        ev async for ev in tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
     ]
     deltas = "".join(e.data["text"] for e in events if e.type == "assistant_delta")
     assert deltas == "done."
@@ -237,9 +227,7 @@ async def test_tutor_records_cost_per_call(
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0123")
 
 
-def test_end_session_sets_cost_warning_header_when_soft_breached(
-    client, db_session, seed_user
-):
+def test_end_session_sets_cost_warning_header_when_soft_breached(client, db_session, seed_user):
     """I-03: soft-cap breach on end must surface an X-Cost-Warning header
     (seed_user's session has no messages, so the mechanical no_exchanges
     fallback fires and no LLM call is needed to reach the 200)."""
@@ -260,9 +248,7 @@ def test_end_session_no_header_under_soft_cap(client, db_session, seed_user):
 
 
 @pytest.mark.asyncio
-async def test_tutor_short_circuits_on_mid_turn_hard_cap(
-    db_session, seed_user, monkeypatch
-):
+async def test_tutor_short_circuits_on_mid_turn_hard_cap(db_session, seed_user, monkeypatch):
     """If `record_cost` pushes spend past `llm_hard_cap_usd` mid-loop, the
     next iteration must bail with a daily_cost_cap_reached error event
     before issuing another acompletion."""
@@ -284,13 +270,12 @@ async def test_tutor_short_circuits_on_mid_turn_hard_cap(
     )
     monkeypatch.setattr(tutor.litellm, "acompletion", acompletion)
     monkeypatch.setattr(
-        tutor.litellm, "stream_chunk_builder",
+        tutor.litellm,
+        "stream_chunk_builder",
         MagicMock(return_value=SimpleNamespace()),
     )
     # First call already pushes spend past the hard cap (1.50 > 1.00).
-    monkeypatch.setattr(
-        tutor.litellm, "completion_cost", lambda completion_response=None: 1.5000
-    )
+    monkeypatch.setattr(tutor.litellm, "completion_cost", lambda completion_response=None: 1.5000)
     monkeypatch.setattr(
         "agent.tutor.tools.dispatch",
         MagicMock(return_value=ToolResult(ok=True, status="ok", error=None, data={"chunks": []})),
@@ -303,10 +288,7 @@ async def test_tutor_short_circuits_on_mid_turn_hard_cap(
         turn_started_at=datetime.now(timezone.utc),
     )
     events = [
-        ev
-        async for ev in tutor.run_streaming(
-            [{"role": "user", "content": "hi"}], "sys", ctx
-        )
+        ev async for ev in tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
     ]
     # Exactly one LLM call should have fired; the next iter must short-circuit.
     assert acompletion.await_count == 1

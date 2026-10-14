@@ -1,18 +1,11 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Spec assumes
-// pre-auth flow (no /login gate) and SQLite backend; both removed in Phase 7.
-// Restore once auth session seeding helper + Postgres service in e2e.yml land.
-test.describe.skip('daily cap UI', () => {
-  test.beforeEach(async ({ context }) => {
+import { signIn } from './support/auth.js'
+
+test.describe('daily cap UI', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // ignore
-      }
-    })
+    await signIn(page)
   })
 
   test('429 daily_cap_reached locks the composer and shows banner', async ({ page }) => {
@@ -20,14 +13,13 @@ test.describe.skip('daily cap UI', () => {
     await page.goto('/')
     await page.getByTestId('onboarding-name').fill('Eddy')
     await page.getByTestId('onboarding-submit').click()
-    await page.getByTestId('home-new-session').click()
-    await page.getByTestId('new-topic').fill('Cap demo')
-    await page.getByTestId('new-submit').click()
+    await page.getByTestId('home-quick-topic').fill('Cap demo')
+    await page.getByTestId('home-quick-go').click()
     await expect(page).toHaveURL(/\/session\//)
 
-    // Intercept /api/chat to simulate the 429 envelope the backend returns
+    // Intercept /api/chat/stream to simulate the 429 envelope the backend returns
     // when the daily cap is reached.
-    await page.route('**/api/chat', async (route) => {
+    await page.route('**/api/chat/stream', async (route) => {
       await route.fulfill({
         status: 429,
         contentType: 'application/json',

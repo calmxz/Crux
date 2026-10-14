@@ -36,9 +36,7 @@ def test_assert_within_caps_raises_on_user_hard_cap(db_session, seeded, monkeypa
 
 
 def test_assert_within_caps_raises_on_global_ceiling(db_session, seeded, monkeypatch):
-    monkeypatch.setattr(
-        "services.cost_meter.settings.global_daily_cost_cap_usd", 0.10
-    )
+    monkeypatch.setattr("services.cost_meter.settings.global_daily_cost_cap_usd", 0.10)
     cost_meter.record_cost(db_session, USER, Decimal("0.2000"))
     db_session.commit()
     with pytest.raises(cost_meter.CostCapExceeded) as exc:

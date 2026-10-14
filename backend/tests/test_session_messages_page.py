@@ -75,10 +75,20 @@ def test_unknown_session_404(client, seeded_user):
 def test_missing_or_bad_cursor_422(client, db_session, seeded_user):
     _seed(db_session, "s_bad", 1)
     assert client.get(f"/api/sessions/s_bad/messages?user_id={USER_ID}").status_code == 422
-    assert client.get(f"/api/sessions/s_bad/messages?before=abc&user_id={USER_ID}").status_code == 422
+    assert (
+        client.get(f"/api/sessions/s_bad/messages?before=abc&user_id={USER_ID}").status_code == 422
+    )
 
 
 def test_limit_out_of_range_422(client, db_session, seeded_user):
     _seed(db_session, "s_lim", 1)
-    assert client.get(f"/api/sessions/s_lim/messages?before=99&limit=0&user_id={USER_ID}").status_code == 422
-    assert client.get(f"/api/sessions/s_lim/messages?before=99&limit=101&user_id={USER_ID}").status_code == 422
+    assert (
+        client.get(f"/api/sessions/s_lim/messages?before=99&limit=0&user_id={USER_ID}").status_code
+        == 422
+    )
+    assert (
+        client.get(
+            f"/api/sessions/s_lim/messages?before=99&limit=101&user_id={USER_ID}"
+        ).status_code
+        == 422
+    )

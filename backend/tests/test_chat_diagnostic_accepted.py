@@ -8,7 +8,9 @@ from routes.chat import _build_prompt_state
 
 def _session(topic="glycolysis"):
     return SessionModel(
-        id="s1", user_id="u1", topic=topic,
+        id="s1",
+        user_id="u1",
+        topic=topic,
         topic_profile_json=TopicProfile().model_dump_json(),
     )
 
@@ -47,8 +49,12 @@ def test_review_gaps_wins_over_accepted():
 
 def test_prompt_renders_accepted_label():
     ctx = prompts.build_dynamic_context(
-        {"topic": "t", "profile": TopicProfile(), "diagnostic_required": True,
-         "diagnostic_accepted": True}
+        {
+            "topic": "t",
+            "profile": TopicProfile(),
+            "diagnostic_required": True,
+            "diagnostic_accepted": True,
+        }
     )
     assert "DIAGNOSTIC: ACCEPTED" in ctx
 

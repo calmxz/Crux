@@ -4,10 +4,13 @@ import { defineConfig, devices } from '@playwright/test'
 // with LLM_STUB=1 (or GEMINI_API_KEY=test) so responses are deterministic.
 // The frontend dev server is managed by Playwright via webServer below.
 //
-// Local run:
-//   1) cd backend && LLM_STUB=1 uvicorn main:app --port 8000
-//      (PowerShell: $env:LLM_STUB=1; uvicorn main:app --port 8000)
-//   2) cd frontend && npm run test:e2e
+// The backend must run on Postgres + pgvector, as CI does: SQLite cannot run
+// pgvector's `<=>` vector search.
+//
+// Local run: `frontend/e2e/run-local.sh [spec...]` (bash) starts that stack
+// -- throwaway pgvector Postgres, the e2e JWKS that e2e/support/auth.js signs
+// against (#518), the stubbed backend -- runs Playwright, and stops it all.
+// Its header lists the ports it needs free.
 
 export default defineConfig({
   testDir: './e2e',

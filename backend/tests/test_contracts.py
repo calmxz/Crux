@@ -69,9 +69,7 @@ def test_update_topic_profile_args_invalid_evidence_type_rejected():
 
 def test_update_topic_profile_args_extra_fields_rejected():
     with pytest.raises(ValidationError):
-        UpdateTopicProfileArgs(
-            session_id="s1", evidence_type="declared", surprise="x"
-        )
+        UpdateTopicProfileArgs(session_id="s1", evidence_type="declared", surprise="x")
 
 
 def test_retrieve_chunks_default_k():
@@ -112,9 +110,15 @@ def test_ask_check_questions_args_set_fields_required(missing):
         AskCheckQuestionsArgs(session_id="s1", gap="atp", items=[_one_item()], **fields)
 
 
-@pytest.mark.parametrize("field,value", [
-    ("set_index", 0), ("set_index", 4), ("set_total", 0), ("set_total", 4),
-])
+@pytest.mark.parametrize(
+    "field,value",
+    [
+        ("set_index", 0),
+        ("set_index", 4),
+        ("set_total", 0),
+        ("set_total", 4),
+    ],
+)
 def test_ask_check_questions_args_set_fields_range(field, value):
     with pytest.raises(ValidationError):
         AskCheckQuestionsArgs(
@@ -284,14 +288,21 @@ def test_check_answer_response_required_fields():
 
 def test_check_answer_response_missing_field_rejected():
     with pytest.raises(ValidationError):
-        CheckAnswerResponse(correct=True, explanation="ok", correct_index=0)  # missing current_index/total/has_next/done
+        CheckAnswerResponse(
+            correct=True, explanation="ok", correct_index=0
+        )  # missing current_index/total/has_next/done
 
 
 def test_check_answer_response_extra_fields_rejected():
     with pytest.raises(ValidationError):
         CheckAnswerResponse(
-            correct=False, explanation="no", correct_index=1,
-            current_index=0, total=1, has_next=False, done=True,
+            correct=False,
+            explanation="no",
+            correct_index=1,
+            current_index=0,
+            total=1,
+            has_next=False,
+            done=True,
             surprise="x",
         )
 
@@ -409,15 +420,17 @@ def test_error_response_detail_accepts_string():
 def test_error_response_detail_accepts_coded_object_with_extras():
     from contracts import CodedErrorDetail, ErrorResponse
 
-    e = ErrorResponse.model_validate({
-        "detail": {
-            "code": "daily_cost_cap_reached",
-            "soft_cap_usd": "2.00",
-            "hard_cap_usd": "3.00",
-            "used_usd": "3.01",
-            "resets_at": "2026-01-02T00:00:00Z",
+    e = ErrorResponse.model_validate(
+        {
+            "detail": {
+                "code": "daily_cost_cap_reached",
+                "soft_cap_usd": "2.00",
+                "hard_cap_usd": "3.00",
+                "used_usd": "3.01",
+                "resets_at": "2026-01-02T00:00:00Z",
+            }
         }
-    })
+    )
     assert isinstance(e.detail, CodedErrorDetail)
     assert e.detail.code == "daily_cost_cap_reached"
     d = e.detail.model_dump()

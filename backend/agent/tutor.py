@@ -34,9 +34,7 @@ _TERMINAL_TOOLS = ("ask_check_questions", topic_suggest_service.TOOL_NAME)
 
 # #354: the topic card sits under the tutor's reply, never alone. A call made
 # before any reply text fails so the model writes the reply and calls again.
-_SUGGEST_NEEDS_PROSE = (
-    "write your reply to the learner first, then call suggest_topics"
-)
+_SUGGEST_NEEDS_PROSE = "write your reply to the learner first, then call suggest_topics"
 
 
 def _persist_assistant_message(
@@ -71,17 +69,20 @@ def _persist_partial_on_abort(ctx, accumulated_text, tool_calls, citations, aske
         return None
     try:
         msg_id = _persist_assistant_message(
-            ctx, accumulated_text, "partial",
-            tool_calls=tool_calls, citations=citations,
+            ctx,
+            accumulated_text,
+            "partial",
+            tool_calls=tool_calls,
+            citations=citations,
         )
         if asked_check:
             check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
         return msg_id
     except Exception:
         log.exception(
-            "failed to persist partial assistant message on abort "
-            "session_id=%s user_id=%s",
-            ctx.session_id, ctx.user_id,
+            "failed to persist partial assistant message on abort session_id=%s user_id=%s",
+            ctx.session_id,
+            ctx.user_id,
         )
         return None
 
@@ -107,16 +108,13 @@ def _record_partial_cost(ctx, snapshots: list[list[dict]], text: str, purpose: s
     prompt_tokens_total = 0
     for snapshot in snapshots:
         try:
-            prompt_tokens_total += litellm.token_counter(
-                model=settings.model, messages=snapshot
-            )
+            prompt_tokens_total += litellm.token_counter(model=settings.model, messages=snapshot)
         except Exception as e:
             # Local tokenization only; no credential in the exception.
-            log.warning("token_counter failed: %s", e)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+            log.warning("token_counter failed: %s", e)
     try:
-        cost = cost_meter.estimate_cancelled_cost(
-            settings.model, text, prompt_tokens_total
-        )
+        cost = cost_meter.estimate_cancelled_cost(settings.model, text, prompt_tokens_total)
     except Exception as e:
         log.warning("estimate_cancelled_cost failed: %s", e)
         cost = Decimal("0")
@@ -125,8 +123,12 @@ def _record_partial_cost(ctx, snapshots: list[list[dict]], text: str, purpose: s
     except Exception as e:
         log.warning("cost_meter.record_cost (partial) failed: %s", e)
     cost_meter.log_call(
-        ctx.db, user_id=ctx.user_id, session_id=ctx.session_id,
-        purpose=purpose, model=settings.model, cost_usd=cost,
+        ctx.db,
+        user_id=ctx.user_id,
+        session_id=ctx.session_id,
+        purpose=purpose,
+        model=settings.model,
+        cost_usd=cost,
     )
     return cost
 
@@ -172,7 +174,9 @@ async def run_streaming(
 
     full: list[dict] = [{"role": "system", "content": system_prompt}] + list(messages)
     accumulated_text = ""
-    iter_prompt_snapshots: list[list[dict]] = []  # shallow-copied prefix at each iteration start; used only on cancel/error
+    iter_prompt_snapshots: list[
+        list[dict]
+    ] = []  # shallow-copied prefix at each iteration start; used only on cancel/error
     billed_iters = 0  # iterations whose cost was metered (real or fallback)
     billed_chars = 0  # accumulated_text length at the last metering point
     tool_calls_record: list[ToolCallRecord] = []
@@ -190,9 +194,10 @@ async def run_streaming(
             cap = cost_meter.check_cap(ctx.db, ctx.user_id)
             if not cap.allowed:
                 log.warning(
-                    "hard cost cap reached mid-turn (stream) "
-                    "session_id=%s user_id=%s used=%s",
-                    ctx.session_id, ctx.user_id, cap.used,
+                    "hard cost cap reached mid-turn (stream) session_id=%s user_id=%s used=%s",
+                    ctx.session_id,
+                    ctx.user_id,
+                    cap.used,
                 )
                 _persist_partial_on_abort(
                     ctx, accumulated_text, tool_calls_record, citations, asked_check
@@ -251,9 +256,7 @@ async def run_streaming(
                 if tcs:
                     for tcd in tcs:
                         idx = getattr(tcd, "index", 0)
-                        slot = tool_frags.setdefault(
-                            idx, {"id": None, "name": None, "args": ""}
-                        )
+                        slot = tool_frags.setdefault(idx, {"id": None, "name": None, "args": ""})
                         tcd_id = getattr(tcd, "id", None)
                         if tcd_id:
                             slot["id"] = tcd_id
@@ -280,12 +283,11 @@ async def run_streaming(
                 # fall back to token math so the cap still sees real spend.
                 try:
                     pt = litellm.token_counter(model=settings.model, messages=full)
-                    cost = cost_meter.estimate_cancelled_cost(
-                        settings.model, content_buf, pt
-                    )
+                    cost = cost_meter.estimate_cancelled_cost(settings.model, content_buf, pt)
                 except Exception as e2:  # noqa: BLE001
                     # Local tokenization/cost-estimation only; no credential in the exception.
-                    log.warning("stream cost token-math fallback failed: %s", e2)  # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+                    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
+                    log.warning("stream cost token-math fallback failed: %s", e2)
                     cost = 0.0
             if cost > 0:
                 try:
@@ -378,15 +380,14 @@ async def run_streaming(
                     # is injected) and report "Profile updated" for a no-op.
                     log.warning("invalid tool args json (stream): %s", e)
                     result = ToolResult(
-                        ok=False, status="failed",
+                        ok=False,
+                        status="failed",
                         error="malformed tool arguments (invalid JSON); retry the call",
                     )
                     tool_calls_record.append(
                         ToolCallRecord(name=name, args={}, status=result.status, error=result.error)
                     )
-                    yield StreamEvent(
-                        "tool_call_start", {"id": call_id, "name": name, "args": {}}
-                    )
+                    yield StreamEvent("tool_call_start", {"id": call_id, "name": name, "args": {}})
                     yield StreamEvent(
                         "tool_call_done",
                         {"id": call_id, "status": "error", "error": result.error},
@@ -422,9 +423,7 @@ async def run_streaming(
                     )
                     result = await asyncio.shield(dispatch_task)
                 tool_calls_record.append(
-                    ToolCallRecord(
-                        name=name, args=args, status=result.status, error=result.error
-                    )
+                    ToolCallRecord(name=name, args=args, status=result.status, error=result.error)
                 )
 
                 if result.ok:
@@ -482,13 +481,8 @@ async def run_streaming(
                         citations.append(c)
                         added_any = True
                     if added_any:
-                        yield StreamEvent(
-                            "citations", [c.model_dump() for c in citations]
-                        )
-                    wrapped_chunks = [
-                        {**ch, "text": wrap_chunk(ch)}
-                        for ch in raw_chunks
-                    ]
+                        yield StreamEvent("citations", [c.model_dump() for c in citations])
+                    wrapped_chunks = [{**ch, "text": wrap_chunk(ch)} for ch in raw_chunks]
                     tool_payload = result.model_copy(
                         update={"data": {**(result.data or {}), "chunks": wrapped_chunks}}
                     )
@@ -530,9 +524,7 @@ async def run_streaming(
                 return
 
         # max_iters exhausted without a final answer.
-        _persist_partial_on_abort(
-            ctx, accumulated_text, tool_calls_record, citations, asked_check
-        )
+        _persist_partial_on_abort(ctx, accumulated_text, tool_calls_record, citations, asked_check)
         yield StreamEvent("error", {"code": MAX_ITERS_REACHED})
         return
 
@@ -549,7 +541,8 @@ async def run_streaming(
                 log.warning(
                     "in-flight tool dispatch raised while draining on cancel "
                     "session_id=%s user_id=%s",
-                    ctx.session_id, ctx.user_id,
+                    ctx.session_id,
+                    ctx.user_id,
                     exc_info=True,
                 )
 
@@ -578,9 +571,9 @@ async def run_streaming(
                 check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
         except Exception:
             log.exception(
-                "failed to persist assistant message on cancel "
-                "session_id=%s user_id=%s",
-                ctx.session_id, ctx.user_id,
+                "failed to persist assistant message on cancel session_id=%s user_id=%s",
+                ctx.session_id,
+                ctx.user_id,
             )
 
         yield StreamEvent(
@@ -598,17 +591,18 @@ async def run_streaming(
         # must surface as an error SSE, not a silent stream end that leaves the
         # client stuck in 'streaming'. Persist whatever text already streamed.
         log.exception(
-            "agent loop failed (stream); emitting error event "
-            "session_id=%s user_id=%s",
-            ctx.session_id, ctx.user_id,
+            "agent loop failed (stream); emitting error event session_id=%s user_id=%s",
+            ctx.session_id,
+            ctx.user_id,
         )
         try:
             ctx.db.rollback()  # the session may hold a failed transaction
         except Exception as rb_err:
             log.warning(
-                "rollback after agent-loop failure failed: %s "
-                "session_id=%s user_id=%s",
-                rb_err, ctx.session_id, ctx.user_id,
+                "rollback after agent-loop failure failed: %s session_id=%s user_id=%s",
+                rb_err,
+                ctx.session_id,
+                ctx.user_id,
             )
         # F-03/B-10: re-estimate the WHOLE turn (all snapshots), not just the
         # unbilled tail. Because of B-10's loop-top commit before each
@@ -640,7 +634,8 @@ async def run_streaming(
             log.exception(
                 "failed to persist assistant message after agent-loop failure "
                 "session_id=%s user_id=%s",
-                ctx.session_id, ctx.user_id,
+                ctx.session_id,
+                ctx.user_id,
             )
         yield StreamEvent(
             "error",

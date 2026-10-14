@@ -1,9 +1,10 @@
 name: E2E
 
 on:
-  # No paths filter: this job is a required branch-protection check, and a
-  # PR filtered out by paths would never trigger it, leaving the check stuck
-  # at "Expected - Waiting for status" forever.
+  # No paths filter, so e2e runs on every PR. It is advisory: not a required
+  # branch-protection check on dev or main (docs/decisions.md). If it is ever
+  # made required, keep it unfiltered: a PR skipped by a paths filter would
+  # leave the check stuck at "Expected - Waiting for status" forever.
   pull_request:
   push:
     branches: [main, dev]
@@ -17,8 +18,27 @@ jobs:
   playwright:
     name: Playwright (chromium)
     runs-on: ubuntu-latest
-    # Blocking since 2026-09-02 (Phase 6 complete; 16/16 green PR runs).
     timeout-minutes: 12
+    # Same database as production, and the same service ci.yml runs for its
+    # Postgres-only tests: SQLite cannot run pgvector's `<=>` operator, and its
+    # transaction semantics differ from Postgres.
+    env:
+      DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_e2e
+      CRUX_SKIP_DOTENV: "1"
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: crux
+          POSTGRES_PASSWORD: crux
+          POSTGRES_DB: crux_e2e
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crux -d crux_e2e"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
 
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -61,18 +81,43 @@ jobs:
             npx playwright install --with-deps chromium
           fi
 
+      - name: Migrate e2e Postgres (alembic upgrade head)
+        working-directory: backend
+        run: alembic upgrade head
+
+      # #518: no real Supabase in CI. A throwaway key pair stands in for it:
+      # the backend verifies tokens against this JWKS through its normal path,
+      # and e2e/support/auth.js signs test users' tokens with the private half.
+      # Only jwks/ is served; the private key stays on disk.
+      - name: Serve e2e JWKS
+        working-directory: frontend
+        run: |
+          node e2e/support/gen-auth-keys.js
+          nohup python -m http.server 8787 --bind 127.0.0.1 \
+            --directory e2e/.auth/jwks > jwks.log 2>&1 &
+          for i in $(seq 1 10); do
+            if curl -sf http://127.0.0.1:8787/jwks.json > /dev/null; then
+              echo "jwks ready"; exit 0
+            fi
+            sleep 1
+          done
+          echo "jwks server failed to start"; cat jwks.log; exit 1
+
       - name: Start backend (stubbed LLM)
         working-directory: backend
         env:
           LLM_STUB: '1'
-          DATABASE_URL: 'sqlite:///./e2e.db'
-          # F-61: no Supabase in CI e2e; opt out of the unconfigured-auth fail-fast.
-          AUTH_OPTIONAL: 'true'
+          # Fake issuer origin; must match ISSUER_ORIGIN in e2e/support/auth-keys.js.
+          # Nothing else switches on from SUPABASE_URL alone: the admin client
+          # also needs SUPABASE_SECRET_KEY, which stays unset.
+          SUPABASE_URL: 'http://e2e-auth.invalid'
+          SUPABASE_JWKS_URL_OVERRIDE: 'http://127.0.0.1:8787/jwks.json'
         run: |
           nohup python -m uvicorn main:app --port 8000 --host 127.0.0.1 \
             > backend.log 2>&1 &
           for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8000/health > /dev/null; then
+            # /ready probes the database; /health is liveness only.
+            if curl -sf http://127.0.0.1:8000/ready > /dev/null; then
               echo "backend ready"; exit 0
             fi
             sleep 1
@@ -98,5 +143,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
           name: backend-log
-          path: backend/backend.log
+          path: |
+            backend/backend.log
+            frontend/jwks.log
           retention-days: 7

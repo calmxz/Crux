@@ -106,9 +106,7 @@ def test_concurrent_calls_no_duplicate_rows_no_errors(tmp_path):
         t.join()
 
     db = SessionMaker()
-    rows = db.execute(
-        select(UsageCounter).where(UsageCounter.user_id == "u1")
-    ).scalars().all()
+    rows = db.execute(select(UsageCounter).where(UsageCounter.user_id == "u1")).scalars().all()
     db.close()
     engine.dispose()
 

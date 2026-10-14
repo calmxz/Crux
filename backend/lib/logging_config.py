@@ -23,15 +23,10 @@ def configure_logging() -> None:
         {
             "version": 1,
             "disable_existing_loggers": False,
-            "filters": {
-                "request_id": {"()": "lib.logging_config.RequestIdFilter"}
-            },
+            "filters": {"request_id": {"()": "lib.logging_config.RequestIdFilter"}},
             "formatters": {
                 "default": {
-                    "format": (
-                        "%(asctime)s %(levelname)s %(name)s "
-                        "[%(request_id)s] %(message)s"
-                    ),
+                    "format": ("%(asctime)s %(levelname)s %(name)s [%(request_id)s] %(message)s"),
                 }
             },
             "handlers": {

@@ -1,4 +1,4 @@
-# Context
+# Glossary
 
 Glossary for Crux in two sections, each alphabetical: the domain vocabulary, then the Card Box design vocabulary (see `DESIGN.md`).
 

@@ -61,9 +61,7 @@ def status_from_counts(
 def session_ingestion_status(db: Session, session_id: str) -> IngestionStatus | None:
     """Return aggregate ingestion status across all documents in the session."""
     return aggregate_status(
-        db.execute(
-            select(Document.status).where(Document.session_id == session_id)
-        ).scalars().all()
+        db.execute(select(Document.status).where(Document.session_id == session_id)).scalars().all()
     )
 
 
@@ -81,11 +79,15 @@ def has_ready_document(db: Session, session_id: str) -> bool:
 
 def list_document_statuses(db: Session, session_id: str) -> list[Document]:
     """Return all documents for the session ordered by creation time ascending."""
-    return db.execute(
-        select(Document)
-        .where(Document.session_id == session_id)
-        .order_by(Document.created_at.asc(), Document.id.asc())
-    ).scalars().all()
+    return (
+        db.execute(
+            select(Document)
+            .where(Document.session_id == session_id)
+            .order_by(Document.created_at.asc(), Document.id.asc())
+        )
+        .scalars()
+        .all()
+    )
 
 
 class DocumentNotFound(Exception):

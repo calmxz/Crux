@@ -1,5 +1,6 @@
 """F-35: profile lists are capped at write time; the prompt renders only the
 newest PROMPT_LIST_MAX entries per list with an older-count marker."""
+
 import json
 from datetime import datetime, timezone
 
@@ -12,8 +13,9 @@ from services import profile_service
 
 def _entries(n, prefix):
     return [
-        ConceptEntry(name=f"{prefix}-{i}", evidence_type="declared",
-                     last_event_at=datetime.now(timezone.utc))
+        ConceptEntry(
+            name=f"{prefix}-{i}", evidence_type="declared", last_event_at=datetime.now(timezone.utc)
+        )
         for i in range(n)
     ]
 
@@ -49,15 +51,15 @@ def test_cap_never_evicts_focused_gap(db_session):
     profile_service.save_profile(db_session, s.id, profile)
     saved = profile_service.load_profile(db_session, s.id)
     names = [e.name for e in saved.confirmed_gaps]
-    assert "gap-0" in names          # focus survived
-    assert "gap-1" not in names      # next-oldest evicted instead
+    assert "gap-0" in names  # focus survived
+    assert "gap-1" not in names  # next-oldest evicted instead
 
 
 def test_prompt_renders_newest_with_older_count():
     profile = TopicProfile(confirmed_gaps=_entries(prompts.PROMPT_LIST_MAX + 7, "gap"))
     out = prompts.build_dynamic_context({"profile": profile})
     line = next(ln for ln in out.splitlines() if ln.startswith("CURRENT TOPIC PROFILE:"))
-    rendered = json.loads(line[len("CURRENT TOPIC PROFILE: "):])
+    rendered = json.loads(line[len("CURRENT TOPIC PROFILE: ") :])
     assert len(rendered["confirmed_gaps"]) == prompts.PROMPT_LIST_MAX
     assert rendered["confirmed_gaps_older_count"] == 7
     # Newest entries kept.

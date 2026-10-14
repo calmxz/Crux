@@ -31,30 +31,48 @@ LEARNER_TEXT = "what does option B mean?"
 def seed_session(db_session):
     db_session.add(User(id=USER_ID))
     db_session.flush()
-    db_session.add(SessionModel(
-        id=SESSION_ID, user_id=USER_ID, topic="biology",
-        topic_profile_json=TopicProfile(knowledge_level="beginner").model_dump_json(),
-    ))
+    db_session.add(
+        SessionModel(
+            id=SESSION_ID,
+            user_id=USER_ID,
+            topic="biology",
+            topic_profile_json=TopicProfile(knowledge_level="beginner").model_dump_json(),
+        )
+    )
     db_session.commit()
 
 
 def _ctx(db, suppress=False, diagnostic=False):
     return ToolContext(
-        db=db, session_id=SESSION_ID, user_id=USER_ID,
-        turn_started_at=datetime.now(timezone.utc), suppress_check=suppress,
+        db=db,
+        session_id=SESSION_ID,
+        user_id=USER_ID,
+        turn_started_at=datetime.now(timezone.utc),
+        suppress_check=suppress,
         diagnostic_required=diagnostic,
     )
 
 
 def _register(db, set_index, set_total, gap, ctx=None):
-    res = cq.register(db, ctx or _ctx(db), AskCheckQuestionsArgs(
-        session_id=SESSION_ID, gap=gap, set_index=set_index, set_total=set_total,
-        items=[
-            {"question": f"{gap} Q{n}?", "options": ["a", "b"],
-             "correct_index": 0, "explanation": "e."}
-            for n in range(2)
-        ],
-    ))
+    res = cq.register(
+        db,
+        ctx or _ctx(db),
+        AskCheckQuestionsArgs(
+            session_id=SESSION_ID,
+            gap=gap,
+            set_index=set_index,
+            set_total=set_total,
+            items=[
+                {
+                    "question": f"{gap} Q{n}?",
+                    "options": ["a", "b"],
+                    "correct_index": 0,
+                    "explanation": "e.",
+                }
+                for n in range(2)
+            ],
+        ),
+    )
     assert res.ok, res.error
 
 
@@ -102,9 +120,7 @@ def test_stop_mid_set_grades_remaining_as_skipped_and_reacts(client, db_session,
     assert pcs.get_current_check(db_session, SESSION_ID) is None
     assert cq.get_quiz_cooldown(db_session, SESSION_ID)["gap"] == "glycolysis"
     # The synthetic summary is never persisted as a user turn.
-    assert db_session.query(ChatMessage).filter_by(
-        session_id=SESSION_ID, role="user"
-    ).count() == 0
+    assert db_session.query(ChatMessage).filter_by(session_id=SESSION_ID, role="user").count() == 0
 
 
 def test_stop_between_sets_records_where_the_learner_stopped(client, db_session, monkeypatch):
@@ -117,9 +133,7 @@ def test_stop_between_sets_records_where_the_learner_stopped(client, db_session,
     status, _body = _stop(client)
 
     assert status == 200
-    assert captured["messages"][-1]["content"] == (
-        "[check results] learner stopped at set 1 of 3."
-    )
+    assert captured["messages"][-1]["content"] == ("[check results] learner stopped at set 1 of 3.")
     db_session.expire_all()
     assert pcs.get_current_check(db_session, SESSION_ID) is None
 
@@ -179,7 +193,8 @@ def test_chat_message_mid_set_leaves_the_set_open(client, db_session, monkeypatc
     captured = _fake_tutor(monkeypatch)
 
     status, _body = _stream(
-        client, "/api/chat/stream",
+        client,
+        "/api/chat/stream",
         json={"session_id": SESSION_ID, "message": LEARNER_TEXT},
     )
 

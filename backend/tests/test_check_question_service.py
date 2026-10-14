@@ -103,28 +103,40 @@ def ctx_session_with_level(db_session):
 
 def one_item_args(gap: str, correct_index: int = 0):
     return AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
+        set_index=1,
+        set_total=1,
         session_id=SESSION_ID,
         gap=gap,
-        items=[{
-            "question": f"{gap}?",
-            "options": ["a", "b"],
-            "correct_index": correct_index,
-            "explanation": "e",
-        }],
+        items=[
+            {
+                "question": f"{gap}?",
+                "options": ["a", "b"],
+                "correct_index": correct_index,
+                "explanation": "e",
+            }
+        ],
     )
 
 
 def _batch_args(session_id):
     return AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
+        set_index=1,
+        set_total=1,
         session_id=session_id,
         gap="atp",
         items=[
-            {"question": "Q1?", "options": ["2 ATP", "36 ATP"],
-             "correct_index": 0, "explanation": "Net 2."},
-            {"question": "Q2?", "options": ["yes", "no", "maybe"],
-             "correct_index": 1, "explanation": "It is no."},
+            {
+                "question": "Q1?",
+                "options": ["2 ATP", "36 ATP"],
+                "correct_index": 0,
+                "explanation": "Net 2.",
+            },
+            {
+                "question": "Q2?",
+                "options": ["yes", "no", "maybe"],
+                "correct_index": 1,
+                "explanation": "It is no.",
+            },
         ],
     )
 
@@ -157,10 +169,11 @@ def test_register_rejects_second_batch_while_open(db, ctx, session_id):
 
 def test_register_rejects_bad_correct_index(db, ctx, session_id):
     bad = AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=session_id, gap="g",
-        items=[{"question": "q", "options": ["a", "b"],
-                "correct_index": 5, "explanation": "e"}],
+        set_index=1,
+        set_total=1,
+        session_id=session_id,
+        gap="g",
+        items=[{"question": "q", "options": ["a", "b"], "correct_index": 5, "explanation": "e"}],
     )
     res = cq.register(db, ctx, bad)
     assert res.ok is False
@@ -188,8 +201,15 @@ def test_public_view_hides_pending_reveals_answered(db, ctx, session_id):
 def test_answer_advances_and_reports_progress(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     r0 = cq.answer(db, session_id, index=0, selected_index=0)
-    assert r0 == {"correct": True, "explanation": "Net 2.", "correct_index": 0,
-                  "current_index": 1, "total": 2, "has_next": True, "done": False}
+    assert r0 == {
+        "correct": True,
+        "explanation": "Net 2.",
+        "correct_index": 0,
+        "current_index": 1,
+        "total": 2,
+        "has_next": True,
+        "done": False,
+    }
     r1 = cq.answer(db, session_id, index=1, selected_index=1)
     assert r1["correct"] is True
     assert r1["has_next"] is False
@@ -289,7 +309,9 @@ def test_register_purpose_follows_turn_state_not_live_level(db_session):
     db_session.add(s)
     db_session.commit()
     ctx = ToolContext(
-        db=db_session, session_id=s.id, user_id=USER_ID,
+        db=db_session,
+        session_id=s.id,
+        user_id=USER_ID,
         turn_started_at=_T0,
         diagnostic_required=False,  # turn-state decision (e.g. review-gaps)
     )
@@ -357,7 +379,8 @@ def test_register_takes_the_lock(db, ctx, session_id, monkeypatch):
     calls = []
     real = profile_service.lock_session_row
     monkeypatch.setattr(
-        profile_service, "lock_session_row",
+        profile_service,
+        "lock_session_row",
         lambda db_, sid: calls.append(sid) or real(db_, sid),
     )
     cq.register(db, ctx, _batch_args(session_id))
@@ -369,7 +392,8 @@ def test_attach_message_id_takes_the_lock(db, ctx, session_id, monkeypatch):
     calls = []
     real = profile_service.lock_session_row
     monkeypatch.setattr(
-        profile_service, "lock_session_row",
+        profile_service,
+        "lock_session_row",
         lambda db_, sid: calls.append(sid) or real(db_, sid),
     )
     cq.attach_message_id(db, session_id, 123)

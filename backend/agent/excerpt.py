@@ -7,6 +7,7 @@ documents), so any embedded document_excerpt tag sequence is neutralized
 before wrapping: otherwise a literal </document_excerpt> in a PDF would
 close the guard early and put the remainder of the chunk OUTSIDE it.
 """
+
 import re
 
 # Opening or closing document_excerpt tag, tolerant of case and whitespace.

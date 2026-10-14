@@ -48,21 +48,23 @@ def _learning_insights(
     week_counts: dict[date, int] = {w: 0 for w in weeks}
 
     if not session_ids:
-        return [], [
-            WeeklyMasteryPoint(week_start=w, count=0) for w in weeks
-        ]
+        return [], [WeeklyMasteryPoint(week_start=w, count=0) for w in weeks]
 
-    rows = db.execute(
-        select(LearningEvent)
-        .where(LearningEvent.session_id.in_(session_ids))
-        .where(
-            or_(
-                LearningEvent.purpose.is_(None),
-                LearningEvent.purpose != "diagnostic",
+    rows = (
+        db.execute(
+            select(LearningEvent)
+            .where(LearningEvent.session_id.in_(session_ids))
+            .where(
+                or_(
+                    LearningEvent.purpose.is_(None),
+                    LearningEvent.purpose != "diagnostic",
+                )
             )
+            .order_by(LearningEvent.created_at.asc(), LearningEvent.id.asc())
         )
-        .order_by(LearningEvent.created_at.asc(), LearningEvent.id.asc())
-    ).scalars().all()
+        .scalars()
+        .all()
+    )
 
     per: dict[str, dict] = {}
     first_correct: dict[str, datetime] = {}
@@ -157,15 +159,11 @@ def aggregate_for_user(
             entry["count"] += 1
 
         for gap in profile.confirmed_gaps or []:
-            entry = gap_counts.setdefault(
-                gap.name, {"count": 0, "first_seen_session_id": s.id}
-            )
+            entry = gap_counts.setdefault(gap.name, {"count": 0, "first_seen_session_id": s.id})
             entry["count"] += 1
 
         candidate = s.ended_at or s.created_at
-        if candidate is not None and (
-            last_active_at is None or candidate > last_active_at
-        ):
+        if candidate is not None and (last_active_at is None or candidate > last_active_at):
             last_active_at = candidate
 
     def _to_sorted_list(d: dict[str, dict]) -> list[AggregateConceptCount]:
@@ -215,9 +213,7 @@ def aggregate_for_user(
     )
     if session_ids:
         total_events = db.execute(
-            select(func.count(LearningEvent.id)).where(
-                LearningEvent.session_id.in_(session_ids)
-            )
+            select(func.count(LearningEvent.id)).where(LearningEvent.session_id.in_(session_ids))
         ).scalar_one()
     else:
         total_events = 0

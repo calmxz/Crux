@@ -42,9 +42,7 @@ def session_with_messages(db_session):
         db_session.flush()
         for i in range(n):
             role = "user" if i % 2 == 0 else "assistant"
-            db_session.add(
-                ChatMessage(session_id=session_id, role=role, content=f"msg {i}")
-            )
+            db_session.add(ChatMessage(session_id=session_id, role=role, content=f"msg {i}"))
         db_session.commit()
         db_session.refresh(session)
         return session
@@ -52,13 +50,16 @@ def session_with_messages(db_session):
     return _make
 
 
-@pytest.mark.parametrize("total,count,expected", [
-    (20, None, False),   # nothing dropped yet
-    (29, None, False),   # 9 dropped, below debounce
-    (30, None, True),    # 10 dropped, due
-    (35, 10, False),     # 15 dropped, 10 covered, 5 new -- not due
-    (40, 10, True),       # 20 dropped, 10 covered, 10 new -- due
-])
+@pytest.mark.parametrize(
+    "total,count,expected",
+    [
+        (20, None, False),  # nothing dropped yet
+        (29, None, False),  # 9 dropped, below debounce
+        (30, None, True),  # 10 dropped, due
+        (35, 10, False),  # 15 dropped, 10 covered, 5 new -- not due
+        (40, 10, True),  # 20 dropped, 10 covered, 10 new -- due
+    ],
+)
 def test_rolling_summary_due(total, count, expected):
     assert summary_service.rolling_summary_due(total, count) is expected
 
@@ -133,9 +134,7 @@ async def test_update_rolling_summary_success_records_ledger_and_timeout(
         captured.update(kwargs)
         return SimpleNamespace(
             choices=[
-                SimpleNamespace(
-                    message=SimpleNamespace(content="Earlier the learner studied X.")
-                )
+                SimpleNamespace(message=SimpleNamespace(content="Earlier the learner studied X."))
             ]
         )
 
@@ -170,9 +169,7 @@ async def test_rolling_transcript_newlines_cannot_forge_a_turn(
 
     async def _fake(**kwargs):
         captured.update(kwargs)
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))]
-        )
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
 
     monkeypatch.setattr(summary_service.litellm, "acompletion", _fake)
     monkeypatch.setattr(summary_service.litellm, "completion_cost", lambda **kwargs: 0.0)
@@ -262,9 +259,7 @@ async def test_update_rolling_summary_empty_content_still_meters_before_returnin
     monkeypatch.setattr(settings, "gemini_api_key", "real")
 
     async def _fake_empty(**kwargs):
-        return SimpleNamespace(
-            choices=[SimpleNamespace(message=SimpleNamespace(content=""))]
-        )
+        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""))])
 
     monkeypatch.setattr(summary_service.litellm, "acompletion", _fake_empty)
     monkeypatch.setattr(summary_service.litellm, "completion_cost", lambda **kwargs: 0.002)

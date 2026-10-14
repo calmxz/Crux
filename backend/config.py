@@ -6,11 +6,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 _REPO_ROOT = Path(__file__).resolve().parent.parent
 _DATA_DIR = _REPO_ROOT / "data"
 
-_ENV_FILE = (
-    None
-    if os.environ.get("CRUX_SKIP_DOTENV") == "1"
-    else str(_REPO_ROOT / ".env")
-)
+_ENV_FILE = None if os.environ.get("CRUX_SKIP_DOTENV") == "1" else str(_REPO_ROOT / ".env")
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent

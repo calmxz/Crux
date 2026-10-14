@@ -1,26 +1,22 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Spec assumes
-// pre-auth flow (no /login gate) and SQLite backend; both removed in Phase 7.
-// Restore once auth session seeding helper + Postgres service in e2e.yml land.
-test.describe.skip('onboarding to chat', () => {
-  test.beforeEach(async ({ context }) => {
+import { signIn } from './support/auth.js'
+
+// Runs against the real e2e backend (Postgres, LLM_STUB=1): onboarding writes
+// the users row, the quick start creates a session, and the stub reply is
+// read back from the persisted transcript.
+test.describe('onboarding to chat', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // Ignore SecurityErrors on isolated/about:blank pages.
-      }
-    })
+    await signIn(page)
   })
 
-  test('completes onboarding, creates fresh session, sends message, gets stub reply', async ({
+  test('completes onboarding, creates fresh session, gets stub reply, ends it from the header', async ({
     page,
   }) => {
     await page.goto('/')
 
-    // Router guard should bounce / -> /onboarding for unauth'd user.
+    // Router guard should bounce / -> /onboarding for a new user.
     await expect(page).toHaveURL(/\/onboarding$/)
     await expect(page.getByText('Welcome to Crux')).toBeVisible()
 
@@ -28,13 +24,12 @@ test.describe.skip('onboarding to chat', () => {
     await page.getByTestId('onboarding-submit').click()
 
     await expect(page).toHaveURL(/\/$/)
-    await expect(page.getByTestId('home-empty-active')).toBeVisible()
+    // A new account has no sessions yet.
+    await expect(page.getByTestId('sidebar-empty-hint')).toBeVisible()
 
-    await page.getByTestId('home-new-session').click()
-    await expect(page).toHaveURL(/\/new$/)
-
-    await page.getByTestId('new-topic').fill('Recursion')
-    await page.getByTestId('new-submit').click()
+    // The /new page was folded into Home's quick-start card.
+    await page.getByTestId('home-quick-topic').fill('Recursion')
+    await page.getByTestId('home-quick-go').click()
 
     await expect(page).toHaveURL(/\/session\//)
     await expect(page.getByTestId('session-input')).toBeVisible()
@@ -46,5 +41,26 @@ test.describe.skip('onboarding to chat', () => {
     await expect(assistant).toBeVisible()
     await expect(assistant).toContainText('[STUB:fresh]')
     await expect(assistant).toContainText('what is recursion?')
+
+    // The turn was written to Postgres: a reload reads it back from the API.
+    await page.reload()
+    await expect(page.getByTestId('msg-assistant').last()).toContainText('[STUB:fresh]')
+
+    // #525: end through the in-page header End control (the resume spec
+    // covers the sidebar row menu). Wait for the end response from before the
+    // accept click: the click resolves on dispatch, not on the async handler.
+    const sessionId = page.url().split('/session/')[1].split(/[?#]/)[0]
+
+    const endResponse = page.waitForResponse(
+      (r) => r.url().includes(`/sessions/${sessionId}/end`) && r.ok(),
+    )
+
+    await page.getByTestId('session-action-end').click()
+    await page.locator('.p-confirmdialog button.confirm-delete-strong').click()
+    await endResponse
+
+    await expect(page.getByTestId('session-summary-dialog')).toBeVisible()
+    await expect(page.getByTestId('session-ended-banner')).toBeVisible()
+    await expect(page.getByTestId('session-input')).toHaveCount(0)
   })
 })

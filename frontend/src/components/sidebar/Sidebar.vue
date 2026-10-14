@@ -10,15 +10,17 @@ import { useAuthStore } from '@/stores/auth.js'
 import { useSessionStore } from '@/stores/session.js'
 import { useUserStore } from '@/stores/user.js'
 import { useSessionGroups } from '@/composables/useSessionGroups.js'
+import { useVisibilityRelist } from '@/composables/useVisibilityRelist.js'
 import { getReviewQueue } from '@/services/reviewApi.js'
 import * as sessionsApi from '@/services/sessionsApi.js'
 import { runWhenIdle } from '@/utils/idle.js'
 import Logo from '@/components/Logo.vue'
 import SidebarSessionRow from './SidebarSessionRow.vue'
+import SidebarListError from './SidebarListError.vue'
 import SidebarSkeletonList from './SidebarSkeletonList.vue'
 import SidebarUserMenu from './SidebarUserMenu.vue'
 
-const { mode, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
+const { mode, isExpanded, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
 
 const router = useRouter()
 
@@ -34,11 +36,27 @@ const { name: userName } = storeToRefs(userStore)
 
 const sessionStore = useSessionStore()
 
-const { sessions, loading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
+// firstListFailed (#544): until a list has loaded this sign-in, a failed list
+// leaves both tabs unvouched for, so each shows an error line: in place of its
+// empty hint, or under the rows a create inserted, which must not pass for
+// the whole account. Once one has loaded, a later failure stays silent and
+// keeps the window (#534). The store owns the rule so Home's boot error reads
+// the same one (#546).
+const {
+  sessions,
+  sessionsLoaded,
+  listLoading,
+  firstListFailed,
+  activeTotal,
+  endedTotal,
+  searchRows,
+} = storeToRefs(sessionStore)
 
 const listEl = ref(null)
 
 const asideEl = ref(null)
+
+const searchInputEl = ref(null)
 
 const statusFilter = ref('active') // 'active' | 'ended'
 
@@ -236,18 +254,62 @@ const activeRendered = computed(
   () => cappedPinnedActive.value.length + cappedActiveFlat.value.length,
 )
 
+// While the first list has failed, or a retry of it runs, the totals count
+// only local creates, never a loaded total, so nothing shows them (#544).
+const totalsUnloaded = computed(
+  () => firstListFailed.value || (!sessionsLoaded.value && listLoading.value),
+)
+
 // View all is the list's closing line whenever rows are rendered. The
-// zero-rows guard stays: createSession bumps activeTotal without pushing
-// into the (windowed) `sessions` array, so a fresh account can sit at
-// activeTotal=1 with zero rendered rows. Without this guard the sidebar
-// would show "No sessions yet" and "View all 1 sessions" at once.
-const showViewAllActive = computed(() => activeRendered.value > 0)
+// zero-rows guard stays: reopenSession bumps activeTotal for a session
+// outside the (windowed) `sessions` array (e.g. reopened from the library
+// page), so the sidebar can sit at activeTotal=1 with zero rendered active
+// rows. Without this guard it would show "View all 1 sessions" under an
+// empty Active list.
+const showViewAllActive = computed(() => activeRendered.value > 0 && !totalsUnloaded.value)
 
-const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
+const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0 && !totalsUnloaded.value)
 
-const showSkeleton = computed(() => loading.value && !sessions.value.length)
+const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
 
-const showEmptyHint = computed(() => !loading.value && !searching.value && !sessions.value.length)
+// Keyed on sessionsLoaded, not on sessions.length like the Active tab's
+// showSkeleton: rows a create inserted are active, so they cannot vouch for
+// the Ended tab, and a list that has never loaded cannot yet say there are no
+// ended sessions.
+const showEndedSkeleton = computed(() => listLoading.value && !sessionsLoaded.value)
+
+// Whichever tab's error line is mounted (only one tab renders at a time).
+const listErrorEl = ref(null)
+
+// Silent like the mount-time call: the error line is the only report, and it
+// returns on its own if this attempt fails too. The line unmounts while the
+// list runs, dropping a keyboard user's focus to the body; if it comes back,
+// so does their focus, unless they have since moved it: focused something
+// else, or pressed a pointer anywhere (a click on plain text leaves focus on
+// the body too).
+async function onRetryList() {
+  const hadFocus = !!listErrorEl.value?.hasFocus()
+  let pointerPressed = false
+  const onPointer = () => (pointerPressed = true)
+
+  if (hadFocus) document.addEventListener('pointerdown', onPointer, true)
+
+  try {
+    await sessionStore.listSessions().catch(() => {})
+  } finally {
+    document.removeEventListener('pointerdown', onPointer, true)
+  }
+
+  if (!hadFocus || pointerPressed) return
+  await nextTick()
+
+  if (document.activeElement && document.activeElement !== document.body) return
+  listErrorEl.value?.focus()
+}
+
+const showEmptyHint = computed(
+  () => !listLoading.value && !searching.value && !sessions.value.length,
+)
 
 const reviewTotal = ref(0)
 
@@ -258,16 +320,22 @@ const PROFILE_ICON_PATH = 'M3 7.5 H17 V16 H3 Z M4.5 7.5 V4 H10 V7.5 M6 11 H14 M6
 
 const showEmptyActiveHint = computed(
   () =>
-    !loading.value &&
+    !listLoading.value &&
     !searching.value &&
     sessions.value.length > 0 &&
     !activeRows.value.length &&
     !pinnedActive.value.length,
 )
 
+// #534: returning to the tab re-lists once the window is stale. The sidebar
+// is the only component that renders the window's rows, so the listener
+// lives here.
+useVisibilityRelist()
+
 // Fetch only if we haven't loaded yet. HomeView also calls listSessions on mount;
-// the store de-dupes concurrent calls via _inflight, and skipping when populated
-// avoids the deep-link redundant fetch.
+// the store de-dupes concurrent calls via _inflight, and skipping once a list
+// has loaded avoids the deep-link redundant fetch. Not `sessions.length`: a
+// create inserts a row without loading the rest of the window (#522).
 onMounted(async () => {
   // Fit-to-height: measure once the list column exists (desktop or drawer) and
   // again whenever it resizes. Guarded so jsdom -- which has no
@@ -277,7 +345,7 @@ onMounted(async () => {
     listResizeObserver.observe(listEl.value)
   }
 
-  if (isAuthenticated.value && !sessions.value.length) {
+  if (isAuthenticated.value && !sessionStore.sessionsLoaded) {
     await sessionStore.listSessions().catch(() => {})
   }
 
@@ -309,8 +377,6 @@ watch(
   },
 )
 
-const isExpanded = computed(() => mode.value === 'expanded' || mode.value === 'drawer-open')
-
 const showDrawerClose = computed(() => !isDesktop.value && mode.value === 'drawer-open')
 
 const isRail = computed(() => isDesktop.value && !isExpanded.value)
@@ -335,7 +401,7 @@ watch(isExpanded, (expanded) => {
 async function onRailSearch() {
   toggleDesktop()
   await nextTick()
-  asideEl.value?.querySelector('[data-testid="sidebar-search"]')?.focus()
+  searchInputEl.value?.focus()
 }
 
 function onNewSession() {
@@ -633,6 +699,7 @@ async function onSignOut() {
         <path d="M13 13 L17.5 17.5" />
       </svg>
       <input
+        ref="searchInputEl"
         v-model="searchQuery"
         type="search"
         class="sb-search-input"
@@ -659,7 +726,7 @@ async function onSignOut() {
         @click="statusFilter = t.key"
       >
         {{ t.label }}
-        <span v-if="t.key === 'ended' && endedTotal" class="sb-section-count"
+        <span v-if="t.key === 'ended' && endedTotal && !totalsUnloaded" class="sb-section-count"
           >({{ endedTotal }})</span
         >
       </button>
@@ -671,6 +738,8 @@ async function onSignOut() {
     <nav ref="listEl" class="sb-list-wrap" aria-label="Sessions" :aria-hidden="isRail || null">
       <template v-if="isExpanded">
         <template v-if="searching">
+          <!-- #549: results stand in for the list, not for its failure. -->
+          <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
           <p
             class="sb-search-count label"
             data-testid="sidebar-search-count"
@@ -762,7 +831,8 @@ async function onSignOut() {
                     />
                   </ul>
                 </div>
-                <p v-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
+                <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
+                <p v-else-if="showEmptyHint" class="sb-empty-hint" data-testid="sidebar-empty-hint">
                   No sessions yet. Click + New session above.
                 </p>
                 <p
@@ -796,13 +866,13 @@ async function onSignOut() {
                 state="ended"
               />
             </ul>
-            <p
-              v-if="!cappedEndedRows.length"
-              class="sb-empty-hint"
-              data-testid="sidebar-ended-empty"
-            >
-              No ended sessions yet.
-            </p>
+            <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
+            <template v-else-if="!cappedEndedRows.length">
+              <SidebarSkeletonList v-if="showEndedSkeleton" :count="3" />
+              <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
+                No ended sessions yet.
+              </p>
+            </template>
             <RouterLink
               v-if="showViewAllEnded"
               class="sb-view-all"

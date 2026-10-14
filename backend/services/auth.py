@@ -7,6 +7,7 @@ unknown `kid`, JWKS is refetched once before failing.
 For tests that don't want to hit Supabase, override the `current_user_id`
 dependency on `app.dependency_overrides`.
 """
+
 from __future__ import annotations
 
 import threading
@@ -35,10 +36,7 @@ def expected_issuer() -> str:
 
 
 def _jwks_cache_stale(now: float) -> bool:
-    return (
-        _JWKS_CACHE["client"] is None
-        or now - _JWKS_CACHE["fetched_at"] > _JWKS_TTL_SECONDS
-    )
+    return _JWKS_CACHE["client"] is None or now - _JWKS_CACHE["fetched_at"] > _JWKS_TTL_SECONDS
 
 
 def _new_jwks_client() -> PyJWKClient:
@@ -134,9 +132,7 @@ def verify_supabase_jwt(token: str) -> str:
     payload = _decode_token(token)
     sub = payload.get("sub")
     if not sub:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token"
-        )
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid_token")
     return sub
 
 

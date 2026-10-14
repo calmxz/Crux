@@ -62,7 +62,9 @@ def test_chat_stream_logs_timing_when_enabled(client, caplog, monkeypatch, seede
     assert "prepare_ms=" in joined and "first_token_ms=" in joined
 
 
-def test_chat_stream_logs_nothing_when_disabled(client, caplog, monkeypatch, seeded_session_fixture):
+def test_chat_stream_logs_nothing_when_disabled(
+    client, caplog, monkeypatch, seeded_session_fixture
+):
     monkeypatch.setattr(settings, "llm_stub", True)
     with caplog.at_level(logging.INFO, logger="routes.chat"):
         status, body = _post_stream(client, message="hi")
@@ -80,7 +82,9 @@ def test_end_session_logs_timing_when_enabled(client, caplog, monkeypatch, seede
     assert "end_session timing total_ms=" in joined
 
 
-def test_end_session_logs_nothing_when_disabled(client, caplog, monkeypatch, seeded_session_fixture):
+def test_end_session_logs_nothing_when_disabled(
+    client, caplog, monkeypatch, seeded_session_fixture
+):
     monkeypatch.setattr(settings, "llm_stub", True)
     with caplog.at_level(logging.INFO, logger="routes.sessions"):
         r = client.post(f"/api/sessions/{SESSION_ID}/end", headers=AUTH_HEADERS)
@@ -89,7 +93,9 @@ def test_end_session_logs_nothing_when_disabled(client, caplog, monkeypatch, see
     assert "end_session timing total_ms=" not in joined
 
 
-def test_end_session_logs_timing_on_already_ended(client, caplog, monkeypatch, seeded_session_fixture):
+def test_end_session_logs_timing_on_already_ended(
+    client, caplog, monkeypatch, seeded_session_fixture
+):
     """The timing log lives in a finally, so the already-ended early return
     still emits it."""
     monkeypatch.setattr(settings, "debug_timing", True)

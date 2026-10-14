@@ -46,6 +46,9 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
+      - name: Format check (ruff)
+        run: ruff format --check .
+
       - name: Validate OpenAPI spec
         working-directory: .
         run: python -m openapi_spec_validator docs/api/openapi.yaml
@@ -66,8 +69,9 @@ jobs:
 
       - name: Test
         env:
-          # Only the pgvector integration module reads this; everything else
-          # stays on SQLite so the suite is unchanged apart from un-skipping it.
+          # Only the Postgres modules (test_pgvector_retrieval.py,
+          # test_llm_characterisation_pg.py) read this; everything else stays
+          # on SQLite so the suite is unchanged apart from un-skipping them.
           TEST_DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_test
         run: pytest -v --cov-report=xml
 
@@ -101,6 +105,9 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Format check
+        run: npm run format:check
+
       - name: Unit tests + coverage
         run: npm run test:unit:coverage
 
@@ -114,6 +121,55 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  # #453: the card refactor's safety net (#454-#458) as a required check. The
+  # advisory e2e job also runs this spec, but cannot block a merge. The spec is
+  # offline (GoTrue and /api stubbed), so it needs only the Vite dev server that
+  # playwright.config.js starts: no backend, no Postgres.
+  card-look:
+    name: Card look (Playwright)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Cache Playwright browsers
+        id: playwright-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('frontend/package-lock.json') }}
+
+      - name: Install Playwright browsers
+        run: |
+          if [ "${{ steps.playwright-cache.outputs.cache-hit }}" = "true" ]; then
+            npx playwright install-deps chromium
+          else
+            npx playwright install --with-deps chromium
+          fi
+
+      - name: Card look spec
+        run: npx playwright test e2e/card-look.spec.js
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: card-look-report
+          path: frontend/playwright-report/
+          retention-days: 7
 
   security:
     name: Security (SAST + deps + secrets + images)

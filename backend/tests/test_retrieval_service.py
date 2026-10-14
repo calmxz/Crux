@@ -55,9 +55,7 @@ def mock_embed(monkeypatch):
             input = [input]
         return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.embedding", fake_embedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.embedding", fake_embedding)
 
 
 def _stub_query(monkeypatch, hits: list[pgvector_store.RetrievedChunk]):
@@ -113,13 +111,9 @@ def test_retrieve_requests_configured_dimension(session, ctx, db_session, monkey
         captured["dimensions"] = kw.get("dimensions")
         if isinstance(input, str):
             input = [input]
-        return SimpleNamespace(
-            data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input]
-        )
+        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.embedding", fake_embedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.embedding", fake_embedding)
     _seed_ready_doc(db_session)
     _stub_query(monkeypatch, [])
     retrieval_service.retrieve(
@@ -236,12 +230,8 @@ def test_semantic_fallback_true_above_threshold(db_session, monkeypatch):
     async def fake_aembedding(**kw):
         return _fake_embedding_resp([1.0, 0.0, 0.0])  # sim = 1.0
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is True
     assert vec == [1.0, 0.0, 0.0]
 
@@ -259,12 +249,8 @@ def test_semantic_fallback_false_below_threshold(db_session, monkeypatch):
     async def fake_aembedding(**kw):
         return _fake_embedding_resp([0.0, 1.0, 0.0])  # sim = 0.0
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec == [0.0, 1.0, 0.0]
 
@@ -274,9 +260,7 @@ def test_semantic_fallback_false_without_ready_docs(db_session, monkeypatch):
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: False,
     )
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
 
@@ -288,9 +272,7 @@ def test_semantic_fallback_false_on_sqlite_centroid_guard(db_session, monkeypatc
         lambda db, sid: True,
     )
     assert retrieval_service._session_centroid(db_session, "s1") is None
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
 
@@ -309,9 +291,7 @@ def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch):
         raise RuntimeError("embedding down")
 
     monkeypatch.setattr("services.retrieval_service.litellm.aembedding", boom)
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
 
@@ -320,9 +300,7 @@ def test_semantic_fallback_false_in_stub_mode(db_session, monkeypatch):
     from config import settings
 
     monkeypatch.setattr(settings, "llm_stub", True)
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
 
@@ -347,9 +325,7 @@ def test_retrieve_meters_embedding_spend(session, ctx, mock_embed, db_session, m
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0005")
-    row = db_session.execute(
-        select(LlmCallLog).where(LlmCallLog.user_id == USER_ID)
-    ).scalar_one()
+    row = db_session.execute(select(LlmCallLog).where(LlmCallLog.user_id == USER_ID)).scalar_one()
     assert row.purpose == "embedding"
 
 
@@ -364,19 +340,16 @@ def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch):
         "services.retrieval_service._session_centroid",
         lambda db, sid: [1.0, 0.0, 0.0],
     )
+
     async def fake_aembedding(**kw):
         return _fake_embedding_resp([1.0, 0.0, 0.0])  # sim = 1.0
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
     monkeypatch.setattr(
         retrieval_service.cost_meter.litellm, "completion_cost", lambda **kw: 0.0005
     )
     asyncio.run(
-        retrieval_service.semantic_fallback_required(
-            db_session, "s1", "q", user_id="u_fallback"
-        )
+        retrieval_service.semantic_fallback_required(db_session, "s1", "q", user_id="u_fallback")
     )
     assert cost_meter.current_spend(db_session, "u_fallback") == Decimal("0.0005")
 
@@ -391,12 +364,11 @@ def test_semantic_fallback_does_not_meter_without_user_id(db_session, monkeypatc
         "services.retrieval_service._session_centroid",
         lambda db, sid: [1.0, 0.0, 0.0],
     )
+
     async def fake_aembedding(**kw):
         return _fake_embedding_resp([1.0, 0.0, 0.0])
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
     called = {"n": 0}
 
     def _boom_meter(*a, **kw):
@@ -404,9 +376,7 @@ def test_semantic_fallback_does_not_meter_without_user_id(db_session, monkeypatc
         raise AssertionError("metering must not run without user_id")
 
     monkeypatch.setattr(retrieval_service.cost_meter, "meter_embedding_response", _boom_meter)
-    result, vec = asyncio.run(
-        retrieval_service.semantic_fallback_required(db_session, "s1", "q")
-    )
+    result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is True
     assert vec == [1.0, 0.0, 0.0]
     assert called["n"] == 0
@@ -424,9 +394,7 @@ def test_embedding_calls_pass_timeout(session, ctx, db_session, monkeypatch):
         return SimpleNamespace(data=[{"embedding": [0.1] * 8}])
 
     monkeypatch.setattr(retrieval_service.litellm, "embedding", _fake_embedding)
-    monkeypatch.setattr(
-        retrieval_service.cost_meter.litellm, "completion_cost", lambda **kw: 0.0
-    )
+    monkeypatch.setattr(retrieval_service.cost_meter.litellm, "completion_cost", lambda **kw: 0.0)
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
@@ -475,9 +443,7 @@ def test_prefetch_for_prompt_returns_chunks_and_meters(session, db_session, monk
         }
     ]
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0005")
-    row = db_session.execute(
-        select(LlmCallLog).where(LlmCallLog.user_id == USER_ID)
-    ).scalar_one()
+    row = db_session.execute(select(LlmCallLog).where(LlmCallLog.user_id == USER_ID)).scalar_one()
     assert row.purpose == "embedding"
 
 
@@ -556,9 +522,7 @@ def test_semantic_fallback_appends_metered_cost_to_holder(db_session, monkeypatc
     async def fake_aembedding(**kw):
         return _fake_embedding_resp([1.0, 0.0, 0.0])
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", fake_aembedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
     monkeypatch.setattr(
         retrieval_service.cost_meter.litellm, "completion_cost", lambda **kw: 0.0005
     )
@@ -590,9 +554,7 @@ def test_semantic_fallback_calls_pass_timeout(db_session, monkeypatch):
         captured.update(kw)
         return _fake_embedding_resp([1.0, 0.0, 0.0])
 
-    monkeypatch.setattr(
-        "services.retrieval_service.litellm.aembedding", _fake_aembedding
-    )
+    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", _fake_aembedding)
     asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert captured["timeout"] == settings.embedding_timeout_s
 
@@ -689,14 +651,10 @@ def test_session_centroid_materialises_and_does_not_commit(db_session, monkeypat
 
     computed = [0.5] * settings.embedding_dim
     monkeypatch.setattr("services.retrieval_service._is_postgres", lambda db: True)
-    monkeypatch.setattr(
-        "services.retrieval_service._compute_centroid", lambda db, sid: computed
-    )
+    monkeypatch.setattr("services.retrieval_service._compute_centroid", lambda db, sid: computed)
 
     commits: list[int] = []
-    monkeypatch.setattr(
-        type(db_session), "commit", lambda self: commits.append(1)
-    )
+    monkeypatch.setattr(type(db_session), "commit", lambda self: commits.append(1))
 
     assert retrieval_service._session_centroid(db_session, "s_cent2") == computed
     assert commits == []

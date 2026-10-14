@@ -1,5 +1,6 @@
 """S2: the hidden follow-up turn after a resolved batch must count against
 the daily message cap, and cap exhaustion must never block grading."""
+
 from datetime import datetime, timezone
 
 import pytest
@@ -26,18 +27,32 @@ def resolved_batch_session(db_session):
     """
     db_session.add(User(id=USER_ID))
     session = SessionModel(
-        id="s_cap_resolved", user_id=USER_ID, topic="bio",
+        id="s_cap_resolved",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile().model_dump_json(),
     )
     db_session.add(session)
     db_session.commit()
-    ctx = ToolContext(db=db_session, session_id=session.id, user_id=USER_ID,
-                      turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
-    check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=session.id, gap="atp",
-        items=[{"question": "Q1?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "a."}]))
+    ctx = ToolContext(
+        db=db_session,
+        session_id=session.id,
+        user_id=USER_ID,
+        turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    check_question_service.register(
+        db_session,
+        ctx,
+        AskCheckQuestionsArgs(
+            set_index=1,
+            set_total=1,
+            session_id=session.id,
+            gap="atp",
+            items=[
+                {"question": "Q1?", "options": ["a", "b"], "correct_index": 0, "explanation": "a."}
+            ],
+        ),
+    )
     check_question_service.answer(db_session, session.id, index=0, selected_index=1)
     return session.id, USER_ID
 
@@ -47,20 +62,33 @@ def open_batch_session(db_session):
     """Session with a still-open (not fully answered) pending check batch."""
     db_session.add(User(id=USER_ID))
     session = SessionModel(
-        id="s_cap_open", user_id=USER_ID, topic="bio",
+        id="s_cap_open",
+        user_id=USER_ID,
+        topic="bio",
         topic_profile_json=TopicProfile().model_dump_json(),
     )
     db_session.add(session)
     db_session.commit()
-    ctx = ToolContext(db=db_session, session_id=session.id, user_id=USER_ID,
-                      turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc))
-    check_question_service.register(db_session, ctx, AskCheckQuestionsArgs(
-        set_index=1, set_total=1,
-        session_id=session.id, gap="atp",
-        items=[{"question": "Q1?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "a."},
-               {"question": "Q2?", "options": ["a", "b"],
-                "correct_index": 0, "explanation": "a."}]))
+    ctx = ToolContext(
+        db=db_session,
+        session_id=session.id,
+        user_id=USER_ID,
+        turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
+    )
+    check_question_service.register(
+        db_session,
+        ctx,
+        AskCheckQuestionsArgs(
+            set_index=1,
+            set_total=1,
+            session_id=session.id,
+            gap="atp",
+            items=[
+                {"question": "Q1?", "options": ["a", "b"], "correct_index": 0, "explanation": "a."},
+                {"question": "Q2?", "options": ["a", "b"], "correct_index": 0, "explanation": "a."},
+            ],
+        ),
+    )
     return session.id, USER_ID
 
 
@@ -84,12 +112,14 @@ def _rate_limit_count(db, user_id):
 def _make_fake_run_streaming(session_id):
     """Fake run_streaming: persists one assistant message (owns persistence like
     the real tutor) and yields a done event. Mirrors test_check_complete_route.py."""
+
     async def fake(messages, system_prompt, ctx):
         msg = ChatMessage(session_id=session_id, role="assistant", content="Great job!")
         ctx.db.add(msg)
         ctx.db.commit()
         yield StreamEvent("assistant_delta", {"text": "Great job!"})
         yield StreamEvent("done", {"message_id": str(msg.id)})
+
     return fake
 
 
@@ -102,7 +132,9 @@ def test_followup_increments_daily_counter(client, db_session, resolved_batch_se
     assert _rate_limit_count(db_session, user_id) == before + 1
 
 
-def test_cap_hit_skips_followup_but_batch_still_clears(client, db_session, resolved_batch_session, monkeypatch):
+def test_cap_hit_skips_followup_but_batch_still_clears(
+    client, db_session, resolved_batch_session, monkeypatch
+):
     sid, user_id = resolved_batch_session
     monkeypatch.setattr("agent.tutor.run_streaming", _make_fake_run_streaming(sid))
     _exhaust_cap(db_session, user_id)

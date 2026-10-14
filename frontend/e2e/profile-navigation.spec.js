@@ -1,18 +1,13 @@
 import { test, expect } from '@playwright/test'
 
-// TODO(phase-8): rebuild e2e harness for Phase 7 auth + Postgres. Spec assumes
-// pre-auth flow (no /login gate) and SQLite backend; both removed in Phase 7.
-// Restore once auth session seeding helper + Postgres service in e2e.yml land.
-test.describe.skip('profile navigation', () => {
-  test.beforeEach(async ({ context }) => {
+import { signIn } from './support/auth.js'
+
+// Runs against the real e2e backend (Postgres). The combined profile is reached
+// from the sidebar, and a session's own profile from the topic in its header.
+test.describe('profile navigation', () => {
+  test.beforeEach(async ({ context, page }) => {
     await context.clearCookies()
-    await context.addInitScript(() => {
-      try {
-        localStorage.clear()
-      } catch {
-        // ignore
-      }
-    })
+    await signIn(page)
   })
 
   test('home -> combined profile -> back; session -> session profile', async ({ page }) => {
@@ -22,27 +17,50 @@ test.describe.skip('profile navigation', () => {
     await expect(page).toHaveURL(/\/$/)
 
     // Home -> Combined profile
-    await page.getByTestId('home-profile-link').click()
+    await page.getByTestId('sidebar-profile').first().click()
     await expect(page).toHaveURL(/\/profile$/)
-    await expect(page.getByTestId('agg-learning')).toBeVisible()
+    await expect(page.getByTestId('aggregate-profile')).toBeVisible()
+    await expect(page.getByTestId('aprof-lede')).toContainText(
+      'What the tutor knows about you, topic by topic.',
+    )
 
     // Empty state on first run.
-    await expect(page.getByTestId('agg-empty')).toBeVisible()
-    await page.getByTestId('back-button').click()
+    await expect(page.getByTestId('aprof-empty')).toBeVisible()
+    await page.goBack()
     await expect(page).toHaveURL(/\/$/)
 
     // Create a session and visit its per-session profile.
-    await page.getByTestId('home-new-session').click()
-    await page.getByTestId('new-topic').fill('Recursion')
-    await page.getByTestId('new-submit').click()
+    await page.getByTestId('home-quick-topic').fill('Recursion')
+    await page.getByTestId('home-quick-go').click()
     await expect(page).toHaveURL(/\/session\//)
 
     const sessionId = page.url().split('/session/')[1].split(/[?#]/)[0]
 
-    await page.getByTestId('session-profile-link').click()
+    await page.getByTestId('session-topic-link').click()
     await expect(page).toHaveURL(new RegExp(`/session/${sessionId}/profile$`))
     await expect(page.getByTestId('session-profile')).toBeVisible()
     await expect(page.getByTestId('sprof-mastered')).toBeVisible()
     await expect(page.getByTestId('sprof-gaps')).toBeVisible()
+  })
+
+  // #518: the session write must drop the combined profile cached on the
+  // first visit (5s GET cache), or the new topic is missing from it.
+  test('a session started just after viewing the profile shows on it', async ({ page }) => {
+    await page.goto('/')
+    await page.getByTestId('onboarding-name').fill('Eddy')
+    await page.getByTestId('onboarding-submit').click()
+    await expect(page).toHaveURL(/\/$/)
+
+    await page.getByTestId('sidebar-profile').first().click()
+    await expect(page.getByTestId('aprof-empty')).toBeVisible()
+    await page.goBack()
+
+    await page.getByTestId('home-quick-topic').fill('Recursion')
+    await page.getByTestId('home-quick-go').click()
+    await expect(page).toHaveURL(/\/session\//)
+
+    await page.getByTestId('sidebar-profile').first().click()
+    await expect(page.getByTestId('aprof-topic-card')).toHaveCount(1)
+    await expect(page.getByTestId('aprof-empty')).toHaveCount(0)
   })
 })

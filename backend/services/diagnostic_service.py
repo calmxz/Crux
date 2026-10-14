@@ -1,4 +1,5 @@
 """Deterministic knowledge-level assignment from a diagnostic check batch."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

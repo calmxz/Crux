@@ -80,8 +80,11 @@ def _make_fake_run_streaming_asking():
             ctx.db,
             ctx,
             AskCheckQuestionsArgs(
-                set_index=1, set_total=1,
-                session_id=ctx.session_id, gap="linear_algebra", items=ASK_ITEMS
+                set_index=1,
+                set_total=1,
+                session_id=ctx.session_id,
+                gap="linear_algebra",
+                items=ASK_ITEMS,
             ),
         )
         assert result.ok
@@ -105,7 +108,13 @@ def _make_fake_run_streaming_asking():
         data = result.data or {}
         yield StreamEvent(
             "check_question",
-            {"gap": data.get("gap"), "items": data.get("items", []), "total": data.get("total", 0)},
+            {
+                "gap": data.get("gap"),
+                "items": data.get("items", []),
+                "total": data.get("total", 0),
+                "set_index": data.get("set_index"),
+                "set_total": data.get("set_total"),
+            },
         )
         yield StreamEvent("done", {"message_id": str(msg.id)})
 
@@ -214,9 +223,7 @@ def _content_chunk(token):
 def _tool_chunk_ask(call_id):
     fn = SimpleNamespace()
     fn.name = "ask_check_questions"
-    fn.arguments = json.dumps(
-        {"session_id": SESSION_ID, "gap": "new_gap", "items": ASK_ITEMS}
-    )
+    fn.arguments = json.dumps({"session_id": SESSION_ID, "gap": "new_gap", "items": ASK_ITEMS})
     frag = SimpleNamespace()
     frag.index = 0
     frag.id = call_id
@@ -229,13 +236,12 @@ def _make_stream(*chunks):
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
 
 
 @pytest.mark.asyncio
-async def test_failed_ask_does_not_clobber_prior_batch_message_id(
-    db_session, monkeypatch
-):
+async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, monkeypatch):
     """Gate correctness: a FAILED ask_check_questions must NOT attach the
     current message's id to an already-open pending_check.
 
@@ -273,7 +279,8 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(
         db_session,
         prior_ctx,
         AskCheckQuestionsArgs(
-            set_index=1, set_total=1,
+            set_index=1,
+            set_total=1,
             session_id=SESSION_ID,
             gap="prior_gap",
             items=[

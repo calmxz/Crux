@@ -56,12 +56,16 @@ async def generate_and_persist(
     force-skips any open check batch and writes it in a single commit
     (F-31, F-33). The summary merges onto a freshly re-read profile so
     concurrent writes during the LLM call survive (F-11)."""
-    messages = db.execute(
-        select(ChatMessage)
-        .where(ChatMessage.session_id == session.id)
-        .order_by(ChatMessage.id.desc())
-        .limit(30)
-    ).scalars().all()
+    messages = (
+        db.execute(
+            select(ChatMessage)
+            .where(ChatMessage.session_id == session.id)
+            .order_by(ChatMessage.id.desc())
+            .limit(30)
+        )
+        .scalars()
+        .all()
+    )
     messages = list(reversed(messages))  # chronological order for the transcript
 
     profile = profile_service.load_profile(db, session.id)
@@ -192,13 +196,17 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
         # rows strictly older than the last-ROLLING_WINDOW prompt window.
         n_dropped = total - ROLLING_WINDOW
         fetch = min(n_dropped, ROLLING_TRANSCRIPT_MAX)
-        dropped = db.execute(
-            select(ChatMessage)
-            .where(ChatMessage.session_id == session_id)
-            .order_by(ChatMessage.id.desc())
-            .offset(ROLLING_WINDOW)
-            .limit(fetch)
-        ).scalars().all()
+        dropped = (
+            db.execute(
+                select(ChatMessage)
+                .where(ChatMessage.session_id == session_id)
+                .order_by(ChatMessage.id.desc())
+                .offset(ROLLING_WINDOW)
+                .limit(fetch)
+            )
+            .scalars()
+            .all()
+        )
         dropped = list(reversed(dropped))  # chronological
 
         if settings.llm_stub_enabled:
@@ -208,12 +216,13 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
                 # F-03: capped users skip the rolling summary entirely; count
                 # stays untouched so the next uncapped trigger retries.
                 return None
-            transcript = "\n".join(
-                f"{m.role}: {_flatten(m.content)[:500]}" for m in dropped
-            )
+            transcript = "\n".join(f"{m.role}: {_flatten(m.content)[:500]}" for m in dropped)
             rolling_messages = [
                 {"role": "system", "content": ROLLING_SYSTEM},
-                {"role": "user", "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}"},
+                {
+                    "role": "user",
+                    "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}",
+                },
             ]
             resp = await litellm.acompletion(
                 model=settings.model,

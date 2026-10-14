@@ -78,13 +78,14 @@ def test_retrieval_gate_uses_any_ready_not_latest(db_session, monkeypatch):
     from services import retrieval_service
 
     _seed_session(db_session)
-    _add_doc(db_session, "ready")    # older
+    _add_doc(db_session, "ready")  # older
     _add_doc(db_session, "pending")  # newer - previously masked the ready one
 
     captured = {}
 
     def fake_embedding(model, input, **_):
         from types import SimpleNamespace
+
         data_item = {"embedding": [0.1] * 8}
         return SimpleNamespace(data=[data_item])
 
@@ -93,9 +94,7 @@ def test_retrieval_gate_uses_any_ready_not_latest(db_session, monkeypatch):
         return []
 
     monkeypatch.setattr("services.retrieval_service.litellm.embedding", fake_embedding)
-    monkeypatch.setattr(
-        "services.retrieval_service.pgvector_store.query_chunks", fake_query_chunks
-    )
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query_chunks)
 
     ctx = ToolContext(
         db=db_session,
@@ -167,9 +166,7 @@ def test_delete_is_atomic_rollback_keeps_chunks(db_session, monkeypatch, seeded_
     db_session.rollback()
     # F-28: the chunk delete must not have been committed on its own.
     assert (
-        db_session.query(ChunkEmbedding)
-        .filter_by(document_id=seeded_doc_with_chunks.id)
-        .count()
+        db_session.query(ChunkEmbedding).filter_by(document_id=seeded_doc_with_chunks.id).count()
         > 0
     )
 
@@ -316,10 +313,7 @@ def test_aggregate_status_treats_processing_as_in_flight():
 def test_status_from_counts_treats_processing_as_in_flight(
     total, pending, ready, processing, expected
 ):
-    assert (
-        documents_service.status_from_counts(total, pending, ready, processing)
-        == expected
-    )
+    assert documents_service.status_from_counts(total, pending, ready, processing) == expected
 
 
 def test_delete_document_invalidates_session_chunk_centroid(db_session, monkeypatch, tmp_path):
@@ -367,9 +361,7 @@ def _kw_index(db, session_id):
     return json.loads(db.get(SessionModel, session_id).kw_index_json or "[]")
 
 
-def test_delete_document_rebuilds_keyword_index_from_survivors(
-    db_session, monkeypatch, tmp_path
-):
+def test_delete_document_rebuilds_keyword_index_from_survivors(db_session, monkeypatch, tmp_path):
     """#430: a deleted file's stems must leave the session keyword index, or
     chat's lexical gate keeps forcing retrieval for a file that is gone."""
     from lib import keyword_index
@@ -387,7 +379,9 @@ def test_delete_document_rebuilds_keyword_index_from_survivors(
     _add_doc_with_text(db_session, "s1", "wip.pdf", ["volcano"], status="pending")
     sess = db_session.get(SessionModel, "s1")
     sess.kw_index_json = json.dumps(
-        sorted(keyword_index.build_from_text("photosynthesis chlorophyll mitochondria router packets"))
+        sorted(
+            keyword_index.build_from_text("photosynthesis chlorophyll mitochondria router packets")
+        )
     )
     db_session.commit()
 

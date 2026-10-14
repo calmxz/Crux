@@ -46,16 +46,24 @@ def test_get_me_learner_preference_defaults(client):
 def test_patch_me_roundtrip(client):
     resp = client.patch(
         "/api/me",
-        json={"display_name": "Ada", "feedback_pref": "direct_answers",
-              "check_ins": "only_when_asked", "reply_length": "brief",
-              "onboarding_complete": True},
+        json={
+            "display_name": "Ada",
+            "feedback_pref": "direct_answers",
+            "check_ins": "only_when_asked",
+            "reply_length": "brief",
+            "onboarding_complete": True,
+        },
         headers=H,
     )
     assert resp.status_code == 200
     body = resp.json()
-    assert body == {"display_name": "Ada", "feedback_pref": "direct_answers",
-                    "check_ins": "only_when_asked", "reply_length": "brief",
-                    "onboarding_complete": True}
+    assert body == {
+        "display_name": "Ada",
+        "feedback_pref": "direct_answers",
+        "check_ins": "only_when_asked",
+        "reply_length": "brief",
+        "onboarding_complete": True,
+    }
     again = client.get("/api/me", headers=H)
     assert again.json()["onboarding_complete"] is True
     assert again.json()["check_ins"] == "only_when_asked"
@@ -139,15 +147,23 @@ def _seed_user(db, user_id: str, store) -> dict:
     doc = Document(session_id=sid, filename=f"{user_id}.pdf", status="ready")
     db.add(doc)
     db.flush()
-    db.add(ChunkEmbedding(
-        session_id=sid, document_id=doc.id, chunk_index=0, page=1,
-        chunk_text="c", embedding=[0.0] * settings.embedding_dim,
-    ))
+    db.add(
+        ChunkEmbedding(
+            session_id=sid,
+            document_id=doc.id,
+            chunk_index=0,
+            page=1,
+            chunk_text="c",
+            embedding=[0.0] * settings.embedding_dim,
+        )
+    )
     db.add(UsageCounter(user_id=user_id, date_utc="2026-09-23", count=3))
-    db.add(DailyCostLedger(user_id=user_id, date_utc="2026-09-23",
-                           cost_usd=Decimal("0.0100")))
-    db.add(LlmCallLog(user_id=user_id, session_id=sid, purpose="chat",
-                      model="m", cost_usd=Decimal("0.0010")))
+    db.add(DailyCostLedger(user_id=user_id, date_utc="2026-09-23", cost_usd=Decimal("0.0100")))
+    db.add(
+        LlmCallLog(
+            user_id=user_id, session_id=sid, purpose="chat", model="m", cost_usd=Decimal("0.0010")
+        )
+    )
     db.commit()
     key = key_for(doc.id, doc.filename)
     store.put(key, b"%PDF-fake")
@@ -176,24 +192,35 @@ def _counts(db, user_id: str) -> dict:
 
     return {
         "users": n(select(func.count()).select_from(User).where(User.id == user_id)),
-        "sessions": n(select(func.count()).select_from(Session)
-                      .where(Session.user_id == user_id)),
-        "messages": n(select(func.count()).select_from(ChatMessage)
-                      .where(ChatMessage.session_id.in_(sids))),
-        "events": n(select(func.count()).select_from(LearningEvent)
-                    .where(LearningEvent.session_id.in_(sids))),
-        "documents": n(select(func.count()).select_from(Document)
-                       .where(Document.session_id.in_(sids))),
-        "chunks": n(select(func.count()).select_from(ChunkEmbedding)
-                    .where(ChunkEmbedding.session_id == f"s-{user_id}")),
-        "usage": n(select(func.count()).select_from(UsageCounter)
-                   .where(UsageCounter.user_id == user_id)),
-        "cost": n(select(func.count()).select_from(DailyCostLedger)
-                  .where(DailyCostLedger.user_id == user_id)),
-        "llm_log": n(select(func.count()).select_from(LlmCallLog)
-                     .where(LlmCallLog.user_id == user_id)),
+        "sessions": n(select(func.count()).select_from(Session).where(Session.user_id == user_id)),
+        "messages": n(
+            select(func.count()).select_from(ChatMessage).where(ChatMessage.session_id.in_(sids))
+        ),
+        "events": n(
+            select(func.count())
+            .select_from(LearningEvent)
+            .where(LearningEvent.session_id.in_(sids))
+        ),
+        "documents": n(
+            select(func.count()).select_from(Document).where(Document.session_id.in_(sids))
+        ),
+        "chunks": n(
+            select(func.count())
+            .select_from(ChunkEmbedding)
+            .where(ChunkEmbedding.session_id == f"s-{user_id}")
+        ),
+        "usage": n(
+            select(func.count()).select_from(UsageCounter).where(UsageCounter.user_id == user_id)
+        ),
+        "cost": n(
+            select(func.count())
+            .select_from(DailyCostLedger)
+            .where(DailyCostLedger.user_id == user_id)
+        ),
+        "llm_log": n(
+            select(func.count()).select_from(LlmCallLog).where(LlmCallLog.user_id == user_id)
+        ),
     }
-
 
 
 @pytest.fixture
@@ -221,9 +248,7 @@ def admin(monkeypatch):
     return state
 
 
-def test_delete_me_503_when_admin_not_configured_touches_nothing(
-    client, db_session, store, admin
-):
+def test_delete_me_503_when_admin_not_configured_touches_nothing(client, db_session, store, admin):
     admin["configured"] = False
     seeded = _seed_user(db_session, VICTIM, store)
     before = _counts(db_session, VICTIM)
@@ -239,9 +264,7 @@ def test_delete_me_503_when_admin_not_configured_touches_nothing(
     assert admin["deleted"] == []
 
 
-def test_delete_me_removes_all_caller_rows_and_objects_only(
-    client, db_session, store, admin
-):
+def test_delete_me_removes_all_caller_rows_and_objects_only(client, db_session, store, admin):
     from services.object_store import ObjectNotFound
 
     victim = _seed_user(db_session, VICTIM, store)
@@ -260,9 +283,7 @@ def test_delete_me_removes_all_caller_rows_and_objects_only(
     assert admin["deleted"] == [VICTIM]
 
 
-def test_delete_me_503_names_auth_step_when_admin_call_fails(
-    client, db_session, store, admin
-):
+def test_delete_me_503_names_auth_step_when_admin_call_fails(client, db_session, store, admin):
     from services.object_store import ObjectNotFound
 
     admin["fail"] = True

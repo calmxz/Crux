@@ -60,12 +60,8 @@ def test_insert_chunks_is_idempotent(db_session):
         (0, 1, "alpha", [0.1] * dim),
         (1, 1, "beta", [0.2] * dim),
     ]
-    n1 = pgvector_store.insert_chunks(
-        db_session, session_id="s1", document_id=1, rows=rows
-    )
-    n2 = pgvector_store.insert_chunks(
-        db_session, session_id="s1", document_id=1, rows=rows
-    )
+    n1 = pgvector_store.insert_chunks(db_session, session_id="s1", document_id=1, rows=rows)
+    n2 = pgvector_store.insert_chunks(db_session, session_id="s1", document_id=1, rows=rows)
     assert n1 == 2
     assert n2 == 0
 
@@ -116,16 +112,18 @@ def test_query_chunks_filters_to_ready_documents(db_session, monkeypatch):
 
     monkeypatch.setattr(db_session, "execute", spy)
     pgvector_store.query_chunks(db_session, "s1", [0.0] * 3, k=5)
-    sql = str(captured["stmt"].compile(dialect=postgresql.dialect(), compile_kwargs={"literal_binds": False}))
+    sql = str(
+        captured["stmt"].compile(
+            dialect=postgresql.dialect(), compile_kwargs={"literal_binds": False}
+        )
+    )
     assert "documents.status" in sql
 
 
 # --- F-10: HNSW filtered-scan tuning on the search transaction -------------
 
 
-def test_query_chunks_sets_hnsw_params_before_select_on_postgres(
-    db_session, monkeypatch
-):
+def test_query_chunks_sets_hnsw_params_before_select_on_postgres(db_session, monkeypatch):
     """F-10: pgvector's HNSW index under-fetches when a post-filter (doc
     status = ready) discards candidates. `ef_search` widens the candidate
     list and `iterative_scan = strict_order` lets pgvector re-scan until k

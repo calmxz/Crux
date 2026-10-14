@@ -26,6 +26,7 @@ from services.cost_meter import CapStatus
 # Streaming chunk builders (copied verbatim from test_tutor_stream.py)
 # ---------------------------------------------------------------------------
 
+
 def _content_chunk(token: str) -> SimpleNamespace:
     """A streamed chunk carrying a single text token."""
     delta = SimpleNamespace(content=token, tool_calls=None)
@@ -58,9 +59,11 @@ def _tool_chunk(*fragments) -> SimpleNamespace:
 
 def _make_stream(*chunks):
     """Return a fresh async-generator instance yielding the given chunks."""
+
     async def _gen():
         for c in chunks:
             yield c
+
     return _gen()
 
 
@@ -118,6 +121,7 @@ def _insert_session(db_session, session_id=SESSION_ID, user_id=USER_ID):
 # Tests
 # ---------------------------------------------------------------------------
 
+
 @pytest.mark.asyncio
 async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
     """ask_check_questions dispatch -> check_question event emitted, turn terminates.
@@ -141,7 +145,9 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
                 arguments=json.dumps(
                     {
                         "session_id": SESSION_ID,
-                        "set_index": 1, "set_total": 1, "gap": "linear_algebra",
+                        "set_index": 1,
+                        "set_total": 1,
+                        "gap": "linear_algebra",
                         "items": [
                             {
                                 "question": "Inputs?",
@@ -187,16 +193,10 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
     # turn must have terminated before turn2 — SHOULD-NOT-APPEAR never streamed
     for e in events:
         text = e.data.get("text", "") if isinstance(e.data, dict) else ""
-        assert "SHOULD-NOT-APPEAR" not in text, (
-            f"turn2 content leaked into stream: {e}"
-        )
+        assert "SHOULD-NOT-APPEAR" not in text, f"turn2 content leaked into stream: {e}"
 
     # assistant message must be persisted with status=complete
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == SESSION_ID)
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == SESSION_ID).one()
     assert msg.status == "complete"
     assert msg.role == "assistant"
 
@@ -223,7 +223,9 @@ async def test_stream_check_question_event_shape(monkeypatch, db_session):
                 arguments=json.dumps(
                     {
                         "session_id": sid,
-                        "set_index": 1, "set_total": 1, "gap": "derivatives",
+                        "set_index": 1,
+                        "set_total": 1,
+                        "gap": "derivatives",
                         "items": [
                             {
                                 "question": "What is d/dx x^2?",
@@ -350,9 +352,7 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
     event_types = [e.type for e in collected]
     assert event_types in ([], ["cancelled"])
     # Either way, the generator must have persisted a cancelled message.
-    msgs = db_session.query(ChatMessage).filter(
-        ChatMessage.session_id == sid
-    ).all()
+    msgs = db_session.query(ChatMessage).filter(ChatMessage.session_id == sid).all()
     assert any(m.status == "cancelled" for m in msgs), (
         "Expected a ChatMessage with status='cancelled' after the cancel branch ran"
     )
@@ -391,7 +391,9 @@ async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_sessi
                 arguments=json.dumps(
                     {
                         "session_id": sid,
-                        "set_index": 1, "set_total": 1, "gap": "chain rule",
+                        "set_index": 1,
+                        "set_total": 1,
+                        "gap": "chain rule",
                         "items": [
                             {
                                 "question": "What is d/dx f(g(x))?",
@@ -430,11 +432,7 @@ async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_sessi
     )
 
     # persisted record lists both calls, patch first:
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == sid)
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == sid).one()
     names = [tc["name"] for tc in json.loads(msg.tool_calls_json)]
     assert names == ["update_topic_profile", "ask_check_questions"], names
 
@@ -465,7 +463,13 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
                 id="tc_ask1",
                 name="ask_check_questions",
                 arguments=json.dumps(
-                    {"session_id": sid, "set_index": 1, "set_total": 1, "gap": "first_gap", "items": [item]}
+                    {
+                        "session_id": sid,
+                        "set_index": 1,
+                        "set_total": 1,
+                        "gap": "first_gap",
+                        "items": [item],
+                    }
                 ),
             ),
             _tool_fragment(
@@ -473,7 +477,13 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
                 id="tc_ask2",
                 name="ask_check_questions",
                 arguments=json.dumps(
-                    {"session_id": sid, "set_index": 1, "set_total": 1, "gap": "second_gap", "items": [item]}
+                    {
+                        "session_id": sid,
+                        "set_index": 1,
+                        "set_total": 1,
+                        "gap": "second_gap",
+                        "items": [item],
+                    }
                 ),
             ),
         ),
@@ -498,14 +508,9 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
 
     # persisted record lists only the first ask -- the second was dropped
     # before dispatch, so only one batch was ever registered.
-    msg = (
-        db_session.query(ChatMessage)
-        .filter(ChatMessage.session_id == sid)
-        .one()
-    )
+    msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == sid).one()
     names = [tc["name"] for tc in json.loads(msg.tool_calls_json)]
     assert names == ["ask_check_questions"], names
 
     pc = check_question_service.get_pending_check(db_session, sid)
     assert pc is not None and pc.get("gap") == "first_gap"
-

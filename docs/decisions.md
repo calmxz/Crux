@@ -3,6 +3,191 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - The card-look spec is a required check of its own (#453)
+
+#453's spec is the card refactor's only check that a move keeps the look,
+but it ran only in the advisory e2e job, so a refactor PR could merge red.
+It now also runs as `Card look (Playwright)` in `ci.yml`, required on `dev`.
+
+- **A separate job, not a step in `Frontend (Vitest + lint)`.** It names the
+  failure, reruns alone, and leaves the frontend job's time unchanged; the
+  cost is one more required-check entry. The spec is offline, so the job needs
+  no backend or Postgres.
+- **The e2e job stays advisory** (2026-09-23). Making it required would gate
+  every PR on the whole Postgres-backed suite and its flakes.
+- **Re-recording is the other loophole.** A pure move never touches `LOOK`,
+  so #454-#457 each carry the acceptance line "passes with no change to
+  `LOOK`; any re-recorded value is listed in the PR with a reason".
+- Admin merges (`--admin`) still bypass it; it makes a red run visible as a
+  blocked merge, not impossible. Revisit after #458: keep as a standing
+  guard or drop the required entry.
+
+## 2026-10-14 - A failed first list has one report, placed by sidebar layout (#549)
+
+Home's boot error and the sidebar's error line were both `role="alert"`, so
+on desktop-expanded one failure announced twice, again on every failed Retry,
+and Home's `friendlyError(listError)` copy under the topic form read as if
+the topic was rejected. Now Home's boot error shows only when the sidebar's
+list is off screen (rail or closed drawer) and both say "Couldn't load your
+sessions." Rejected in triage: removing Home's boot error (the sidebar is not
+always on screen), keeping both with fixed copy (still two announcements),
+and dropping Home's `role="alert"` (mobile would announce nothing). One call
+beyond the brief, made by the maintainer after review: the sidebar's error
+line also shows above search results, which used to replace it, so a search
+typed after the failure left no surface reporting it.
+
+## 2026-10-14 - Home's boot error follows the sidebar's first-list-failed rule (#546)
+
+Home's boot error and the sidebar's error line both read the store's
+`firstListFailed` (`!sessionsLoaded && listError`), replacing Home's
+`listError && !sessions.length`. So an account that loaded with zero sessions
+stays quiet on Home when a later list fails (the #534 visibility re-list, or
+Home's own unthrottled mount-time list), as the sidebar already did. The one
+change in the other direction: when the first list failed and a create
+inserted a row, Home now shows its error too, since a created row cannot
+vouch for the account any more than it does in the sidebar (#544).
+
+## 2026-10-14 - A failed first list shows an error line, not an empty account (#544)
+
+Until a list has loaded this sign-in (`sessionsLoaded`), a failed list
+(`listError`) puts "Couldn't load your sessions." and a silent Retry on both
+sidebar tabs, and hides the View all links and the Ended tab's count while
+that list has failed or a retry of it runs (the totals then count only local
+creates); after a load, a failure stays silent (#534). Two calls beyond the
+brief, made by the maintainer after review: the line also shows under rows
+a create inserted (the brief had it replace only an empty state, so one
+created row passed for the whole account, and nothing re-listed), and a
+create or continue-topic in that state re-lists (store `_addCreated`; the
+brief excluded store changes). That is the fourth exception to the
+no-refetch rule. It shares the #534 throttle, so creates made offline add at
+most one failing list (and one re-announced error alert) per 30 seconds, and
+it cannot double a list already running or a #533 re-list. Retry and the
+mount-time list are not throttled attempts (Retry is the learner's own
+request), so a create just after one still re-lists. A create inside the
+window starts no list and schedules none; the error line's Retry covers it. Also accepted: the Ended tab
+shows the skeleton while a never-loaded list runs (it used to say "No ended
+sessions yet" during the first load). Retry unmounts the line while it runs; on a
+failed retry focus returns to Retry unless the learner focused something else
+or pressed a pointer meanwhile. On success focus is left on the body.
+Rejected for now: keeping the line mounted (busy) through the retry instead of
+the skeleton, which would avoid the focus loss but departs from the brief.
+
+## 2026-10-14 - Re-list the sidebar when the tab becomes visible, throttled (#534)
+
+The third exception to the no-refetch rule (after #528's re-list of a raced
+list and #533's re-list on a late reply), and the first not caused by a
+status change. Until now the
+sidebar window and its totals were fetched only at mount, so a change made on
+another device or tab never showed before a reload, and a totals residue from
+#528 lasted for the life of the page. Now, when the document goes from hidden
+to visible, the sidebar calls `listSessions()` once. That reuses the replay,
+epoch guard, silence, in-flight de-dupe and the #528 re-list unchanged. It is
+skipped when signed out, before the window has loaded this sign-in (the
+mount-time fetch owns the first load), and when any list landed, or a
+visibility re-list was attempted, under 30 seconds ago. Counting attempts
+keeps a tab returned to while offline from fetching on every switch; the
+cost is that the first return after reconnecting can wait out the rest of
+those 30 seconds. So tab
+switching starts at most one list fetch per 30 seconds; that list can still
+bring its own #528 follow-up or a #533 re-list, as any list can. A failure
+keeps the current window.
+
+Rejected: polling and live push (Supabase Realtime, SSE, WebSockets), for
+running cost; a re-fetch on window `focus` alone or on network reconnect. The
+listener lives with the sidebar, the only component that renders the window's
+rows (other views look rows up or check whether it is empty), and a module-scoped count keeps it to
+one listener however many sidebars mount. A failed first load is not retried
+on return: the brief leaves the first load to the mount-time fetch.
+
+A visibility re-list writes only the list's own `listError` (#537, below), so
+a tab switch neither wipes an error the session page is showing nor puts a
+failed re-list (returning to the tab offline) in the page's error line. Also
+accepted: the re-list sets `listLoading`, so while it runs an account with no
+sessions shows the sidebar skeleton instead of its empty state, and one with
+only ended sessions hides its no-active-sessions hint. Rows stay on screen.
+
+## 2026-10-14 - The sidebar list has its own error (#537)
+
+The session store had one `error` slot shared by the session page and the
+sidebar list. A list fetch cleared it on start and wrote its failure into it,
+so a list could wipe a session-page error (a stream error, the duplicate-reopen
+link, `SESSION_ENDED_COPY`) or put its own failure in the page's banner; and
+pin/rename cleared it on start though their failures never write it (callers
+toast). Now `listSessions` writes only `listError` (cleared on start, set on
+failure, epoch-guarded, cleared by `reset()`; the #528 follow-up stays silent),
+and pin/rename leave `error` alone. HomeView's boot error reads `listError`.
+Side effect, accepted: Home's mount-time list used to wipe a session-page
+`error` left over from navigation; it no longer does, so that error stays until
+the next action that clears it (normally the next `loadSession`). Nothing on
+Home renders `error`, so this is invisible unless a session page is shown
+without a fresh load. Left alone on purpose: end/reopen/continueTopic/create/load still clear and set
+`error`; who owns the session page's errors is a separate decision.
+
+## 2026-10-14 - One re-list after a list that raced a status change (#528)
+
+The session store's rule is that a mutation never refetches the sidebar list:
+local changes are mirrored, and changes made while a list is in flight are
+replayed onto its snapshot (#522 / #524). Two races defeat replay. An end,
+reopen or continueTopic prior-end on a session outside the loaded window has
+no snapshot row to judge, and a change committing between the parallel
+active and ended page reads can put one session in both pages. Neither snapshot
+says whether its totals predate the change, so no local adjustment can be
+right; only a fresh list can. So a landing list that sees either case fetches
+one more list. Only those triggers, because they are the cases where the
+snapshot gives no evidence; creates and pin/rename replay exactly. Capped at
+one so a busy account cannot loop: the follow-up's own race result is
+ignored, and a follow-up that fails leaves the first result. A list with no
+race costs exactly what it did. Refetch-always was rejected: a round trip and
+a re-sort after every action.
+
+Known residue, accepted: a race inside the follow-up itself (an out-of-window
+change during it, or a second straddle) is not re-listed again. (A change that
+commits while a list is in flight but whose response arrives after the list
+lands is not recorded as a replay; #533 handles it on the action side, below.)
+The opposite straddle order (the page that would gain the session is read
+first, so it is in neither page) is invisible to the snapshot when the change
+came from another tab or device. A local one is caught by its replay, with
+one gap: the page losing the session is read before the commit (row still
+there, still counted), the gaining page after it (counted, but the row falls
+past its first 40). No duplicate shows, the replay sees the row in its prior
+state and moves the totals, and the session is counted in both. Also
+accepted: a status-change reply that resumes in the microtasks between a
+list's write and its `finally` takes the in-flight path, and the `finally`
+drops its replay unapplied. That needs two network responses to settle in one
+microtask drain, which per-response fetch tasks should not produce. All of
+these leave the totals off by one until the next list; the real
+fix is server-side (both pages and totals from one transaction), which #528
+ruled out of scope. The re-list when the tab becomes visible (#534, above)
+heals all of them, including the cross-device cases, the next time the
+learner returns to the tab at least 30 seconds after the last list.
+
+Late reply (#533): an end, reopen or prior-end notes how many lists have
+landed when its request starts. If one landed before the reply, that list may
+already count the change. When the session has a row in it, that row alone
+decides: the #533 brief assumed every observed copy would match it, but the
+open session's detail is a separate object that still shows the prior state,
+so judging all copies counted the change twice. The row decides even while a
+later list is in flight, because that list may fail and never land its totals.
+With no row (and no copy already in the target state), the action does not
+move the totals and calls `listSessions()` once instead; re-listing beats a
+local guess for the same reason as #528. If another list is in flight at that
+point, the action moves the totals and that list's recorded replay and #528
+decide. Accepted until the next list: a failed re-list keeps landed
+totals that may predate the change, and a failed in-flight list keeps a move
+that may double-count it (accepted, see #540).
+
+## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
+
+#463 asked for `check_question.set_index` / `set_total` to become nullable,
+because the tutor reads them with `data.get`. We made them required integers
+1..3 instead, and made `citations[].text` a required string (it was optional
+and nullable). The only producers always send these: `AskCheckQuestionsArgs`
+requires both set fields (1..3) and the `Citation` model requires `text`. A
+spec looser than the emitter lets a regression that drops the field pass the
+suite; a strict one fails it before merge. Nothing on the wire changes. The
+frontend keeps its `?? null` on set fields, which reloaded pre-set batches
+(`CheckBatch`, a different schema) still need.
+
 ## 2026-10-03 - Anti-slop Oxlint plugin adopted, partly (#470)
 
 Vendored dmmulroy/anti-slop into `frontend/.oxlint/anti-slop/` (the
@@ -515,8 +700,8 @@ one stream pump shared by chat and the check follow-ups.
   #423 (no behaviour change); #441 moves their writes to `active_session`
   together with the read-only profile page.
 
-  **Amended 2026-10-01 (B7):** `_to_response` is #468 (rename only, no
-  behaviour change).
+  **Amended 2026-10-01 (B7):** `_to_response` is #468 (rename, and the
+  session helper reads the profile off its row; no behaviour change).
 
 ## 2026-09-27 - The check lifecycle is one module that owns its commit (#417, #418, #419, #420)
 

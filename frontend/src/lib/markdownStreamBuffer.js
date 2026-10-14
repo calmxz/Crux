@@ -166,10 +166,7 @@ export function splitSafePrefixIncremental(text, state) {
 
   const cut = Math.max(0, lastNonDelimiterIndex(text) + 1 - base)
 
-  const { safe: tailSafe, deferred, stableCursor } = scanSafePrefix(
-    text.slice(base),
-    cut,
-  )
+  const { safe: tailSafe, deferred, stableCursor } = scanSafePrefix(text.slice(base), cut)
 
   state.lastText = text
   state.anchor = base + stableCursor

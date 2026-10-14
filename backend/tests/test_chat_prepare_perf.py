@@ -168,9 +168,7 @@ def test_prepare_turn_budget_doc_bearing_semantic_fallback(db_session, seeded_se
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "")
 
-    db_session.add(
-        Document(session_id=seeded_session.id, filename="notes.pdf", status="ready")
-    )
+    db_session.add(Document(session_id=seeded_session.id, filename="notes.pdf", status="ready"))
     # Populated but disjoint from the "explain factoring" query issued by
     # _run_prepare below, so keyword_index.match_required is False (lexical
     # gate misses) and semantic_fallback_required is actually invoked.

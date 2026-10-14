@@ -77,7 +77,10 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
     try:
         resp, query_vec = _embed_query(args.query)
         cost_meter.meter_embedding_response(
-            db, resp, user_id=ctx.user_id, session_id=ctx.session_id,
+            db,
+            resp,
+            user_id=ctx.user_id,
+            session_id=ctx.session_id,
             texts=[args.query],
         )
         hits = pgvector_store.query_chunks(
@@ -103,9 +106,7 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
     ]
 
     if not chunks:
-        return ToolResult(
-            ok=True, status="no_results", error=None, data={"chunks": []}
-        )
+        return ToolResult(ok=True, status="no_results", error=None, data={"chunks": []})
     return ToolResult(ok=True, status="ok", data={"chunks": chunks})
 
 
@@ -116,9 +117,9 @@ def _is_postgres(db: Session) -> bool:
 def _compute_centroid(db: Session, session_id: str) -> list[float] | None:
     """avg() over every chunk embedding of the session. Postgres-only."""
     centroid = db.execute(
-        select(
-            func.avg(ChunkEmbedding.embedding, type_=Vector(settings.embedding_dim))
-        ).where(ChunkEmbedding.session_id == session_id)
+        select(func.avg(ChunkEmbedding.embedding, type_=Vector(settings.embedding_dim))).where(
+            ChunkEmbedding.session_id == session_id
+        )
     ).scalar()
     if centroid is None:
         return None
@@ -151,9 +152,7 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     if centroid is None:
         return None
     db.execute(
-        update(SessionModel)
-        .where(SessionModel.id == session_id)
-        .values(chunk_centroid=centroid)
+        update(SessionModel).where(SessionModel.id == session_id).values(chunk_centroid=centroid)
     )
     db.flush()
     return centroid
@@ -169,7 +168,11 @@ def _cosine_similarity(a: list[float], b: list[float]) -> float:
 
 
 async def prefetch_for_prompt(
-    db: Session, session_id: str, user_id: str, query: str, k: int = 5,
+    db: Session,
+    session_id: str,
+    user_id: str,
+    query: str,
+    k: int = 5,
     query_vec: list | None = None,
     cost_holder: list | None = None,
 ) -> list[dict] | None:
@@ -195,7 +198,11 @@ async def prefetch_for_prompt(
         if query_vec is None:
             resp, query_vec = await _aembed_query(query)
             cost = cost_meter.meter_embedding_response(
-                db, resp, user_id=user_id, session_id=session_id, texts=[query],
+                db,
+                resp,
+                user_id=user_id,
+                session_id=session_id,
+                texts=[query],
             )
             if cost_holder is not None:
                 cost_holder.append(cost)
@@ -219,7 +226,11 @@ async def prefetch_for_prompt(
 
 
 async def semantic_fallback_required(
-    db: Session, session_id: str, query: str, *, user_id: str | None = None,
+    db: Session,
+    session_id: str,
+    query: str,
+    *,
+    user_id: str | None = None,
     cost_holder: list | None = None,
 ) -> tuple[bool, list[float] | None]:
     """Escalate the OPTIONAL lexical gate when the query is semantically
@@ -254,7 +265,11 @@ async def semantic_fallback_required(
         resp, query_vec = await _aembed_query(query)
         if user_id is not None:
             cost = cost_meter.meter_embedding_response(
-                db, resp, user_id=user_id, session_id=session_id, texts=[query],
+                db,
+                resp,
+                user_id=user_id,
+                session_id=session_id,
+                texts=[query],
             )
             if cost_holder is not None:
                 cost_holder.append(cost)

@@ -7,9 +7,14 @@ export default mergeConfig(
   defineConfig({
     test: {
       environment: 'jsdom',
+      // One jsdom per worker instead of per file; vm contexts keep per-file isolation.
+      pool: 'vmThreads',
       exclude: [...configDefaults.exclude, 'e2e/**'],
       root: fileURLToPath(new URL('./', import.meta.url)),
       setupFiles: ['./src/__tests__/setup.js'],
+      // Reset every mock (implementations and unconsumed *Once queues) before
+      // each test, so one test's leftover responses never feed the next.
+      mockReset: true,
       coverage: {
         provider: 'v8',
         reporter: ['text', 'html'],

@@ -55,6 +55,10 @@ export function useSidebar() {
     return desktopExpanded.value ? 'expanded' : 'collapsed'
   })
 
+  // The sidebar's body (search, session list) is on screen. The rail and the
+  // closed drawer render none of it.
+  const isExpanded = computed(() => mode.value === 'expanded' || mode.value === 'drawer-open')
+
   function toggleDesktop() {
     desktopExpanded.value = !desktopExpanded.value
     _persist(desktopExpanded.value)
@@ -67,7 +71,6 @@ export function useSidebar() {
   function closeDrawer() {
     drawerOpen.value = false
   }
-
 
   onMounted(() => {
     if (typeof window === 'undefined') return
@@ -89,6 +92,7 @@ export function useSidebar() {
 
   return {
     mode,
+    isExpanded,
     isDesktop,
     desktopExpanded,
     drawerOpen,
@@ -106,5 +110,18 @@ export const __test__ = {
   },
   _setExpanded(v) {
     desktopExpanded.value = v
+  },
+  // Seeds the state that `mode` reads, one mode at a time. The window width
+  // moves too, so a resize event re-reads the same layout.
+  _setMode(m) {
+    const desktop = m === 'expanded' || m === 'collapsed'
+    viewport.value = desktop ? BREAKPOINT : BREAKPOINT - 1
+    Object.defineProperty(window, 'innerWidth', {
+      configurable: true,
+      writable: true,
+      value: viewport.value,
+    })
+    desktopExpanded.value = m !== 'collapsed'
+    drawerOpen.value = m === 'drawer-open'
   },
 }

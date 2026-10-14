@@ -13,9 +13,7 @@ def test_stub_fresh_marker_no_summary():
 
 
 def test_stub_resumed_marker_when_summary_present():
-    system_prompt = (
-        "rules\n\nLAST_SESSION_SUMMARY: Learner explored base cases and tail recursion."
-    )
+    system_prompt = "rules\n\nLAST_SESSION_SUMMARY: Learner explored base cases and tail recursion."
     messages = [{"role": "user", "content": "continue please"}]
     out = stub_response(messages, system_prompt)
     assert out.startswith("[STUB:resumed:")

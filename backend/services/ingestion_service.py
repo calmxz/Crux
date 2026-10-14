@@ -103,9 +103,7 @@ _STAGE_ERRORS = {
 }
 
 
-def _load_blob(
-    store: "object_store.ObjectStore", document_id: int, filename: str
-) -> bytes:
+def _load_blob(store: "object_store.ObjectStore", document_id: int, filename: str) -> bytes:
     """F-02: takes plain identifiers, not the ORM instance -- run() closes its
     session before calling this, so `doc` is detached and every attribute read
     would emit a refresh SELECT on a session that holds no connection."""
@@ -162,9 +160,7 @@ def _existing_chunk_indexes(db, document_id: int) -> set[int]:
     return {
         idx
         for (idx,) in db.execute(
-            select(ChunkEmbedding.chunk_index).where(
-                ChunkEmbedding.document_id == document_id
-            )
+            select(ChunkEmbedding.chunk_index).where(ChunkEmbedding.document_id == document_id)
         )
     }
 
@@ -211,7 +207,10 @@ def _embed_and_store(db, doc, chunks, *, user_id: str | None) -> int:
         # gate itself runs at the top of the loop above, before each batch's
         # litellm.embedding call (audit B-01).
         cost_meter.meter_embedding_response(
-            db, resp, user_id=user_id, session_id=doc.session_id,
+            db,
+            resp,
+            user_id=user_id,
+            session_id=doc.session_id,
             texts=[c.text for c in batch],
         )
         db.commit()
@@ -239,7 +238,9 @@ def run(document_id: int) -> None:
         ).scalar_one_or_none()
         log.info(
             "ingestion start document_id=%s session_id=%s filename=%s",
-            document_id, session_id, filename,
+            document_id,
+            session_id,
+            filename,
         )
         # F-02: release the pooled connection for the slow, memory-heavy part
         # (blob load, extraction, chunking). A SQLAlchemy 2.x Session is
@@ -267,9 +268,7 @@ def run(document_id: int) -> None:
 
             doc = db.get(Document, document_id)
             if doc is None:
-                log.warning(
-                    "ingestion run: document %s vanished during extraction", document_id
-                )
+                log.warning("ingestion run: document %s vanished during extraction", document_id)
                 return
             doc.page_count = page_count
 
@@ -299,7 +298,9 @@ def run(document_id: int) -> None:
 
             log.info(
                 "ingestion done document_id=%s session_id=%s chunks=%s",
-                document_id, session_id, len(chunks),
+                document_id,
+                session_id,
+                len(chunks),
             )
             doc.status = "ready"
             doc.error = None
@@ -310,7 +311,8 @@ def run(document_id: int) -> None:
             db.rollback()
             log.warning(
                 "ingestion stopped: chunk cap reached document_id=%s session_id=%s",
-                document_id, session_id,
+                document_id,
+                session_id,
                 extra={"doc_id": document_id},
             )
             doc = db.get(Document, document_id)
@@ -322,9 +324,10 @@ def run(document_id: int) -> None:
         except cost_meter.CostCapExceeded:
             db.rollback()
             log.warning(
-                "ingestion stopped: cost cap reached "
-                "document_id=%s session_id=%s error=%s",
-                document_id, session_id, "cost_cap_exceeded",
+                "ingestion stopped: cost cap reached document_id=%s session_id=%s error=%s",
+                document_id,
+                session_id,
+                "cost_cap_exceeded",
                 extra={"doc_id": document_id},
             )
             # Per-batch commits mean any batches embedded before the breach
@@ -340,7 +343,10 @@ def run(document_id: int) -> None:
             db.rollback()
             log.error(
                 "ingestion failed document_id=%s session_id=%s stage=%s error=%s",
-                document_id, session_id, stage, e,
+                document_id,
+                session_id,
+                stage,
+                e,
                 extra={"err_type": type(e).__name__, "doc_id": document_id},
                 exc_info=settings.env != "prod",
             )
