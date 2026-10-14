@@ -20,6 +20,10 @@ A test fake records each call, and the test asserts on that record. A fake that 
 
 When a diff adds a writer to existing shared state (a store ref, a module-level variable), find every reader of that state and confirm each reader's assumption still holds: "non-empty means loaded", "this total mirrors these rows", "only X ever sets this". A reader that infers something from the state's shape breaks silently when a new writer changes that shape. (#522: a create that inserted sidebar rows broke a `sessions.length` "loaded" check and an `activeTotal` count; both reached review.)
 
+## Fixes reach every sibling path
+
+When a diff adds a guard or fixes a case on one path, find the parallel paths that do the same job (the other copies an action patches, the success and failure branches, the replayed and the live write) and confirm each one gets the same treatment or has a stated reason not to. (#524: a rollback guard went onto rows a list had landed but not onto the observed copies one loop above; the bug-hunt review caught it.)
+
 ## New patterns get a reference entry
 
 A diff that introduces a convention other code must follow (a guard, a sentinel, a dedupe rule) adds or updates its section in `docs/reference.md` in the same PR.
