@@ -29,7 +29,8 @@ first, so it is in neither page) is invisible to the snapshot when the change
 came from another tab or device; a local one is caught by its replay. All of
 these leave the totals off by one until the next mount-time list; the real
 fix is server-side (both pages and totals from one transaction), which #528
-ruled out of scope.
+ruled out of scope. Tracked instead: the late reply as #533, and a re-list on
+tab focus (#534), which also heals the cross-device cases.
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
