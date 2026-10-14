@@ -32,6 +32,10 @@ When a diff adds a writer to existing shared state (a store ref, a module-level 
 
 When a diff adds a guard or fixes a case on one path, find the parallel paths that do the same job (the other copies an action patches, the success and failure branches, the replayed and the live write) and confirm each one gets the same treatment or has a stated reason not to. (#524: a rollback guard went onto rows a list had landed but not onto the observed copies one loop above; the bug-hunt review caught it.)
 
+## Session totals changes walk the ordering matrix
+
+A diff that changes how `stores/session.js` moves `activeTotal` / `endedTotal`, or what a landing list replays, is checked against every row of the ordering matrix in `docs/reference.md` ("Sidebar session window"). For each row, name the totals once everything settles, or the residue entry in `docs/decisions.md` that accepts them. Its store tests seed sessions with `seedSession`, which holds a session in every copy the store reads. A test that seeds only the window row is testing a state the app never holds. (#533: the brief called the in-window case "already exact" and the test seeded only the window row, so the open session's separate copy double-counted. The first review fix then missed the "landed, then a later list in flight" row. Both reached review.)
+
 ## A new await re-checks what follows it
 
 When a diff adds an `await` inside an async store action, everything after it is checked as if a `reset()` or an overlapping action ran during that wait: each state write, the `finally`, and the value returned to the caller (the epoch contract covers returns too). A shared ref written in a `finally` must not clear a value an action started since has set. (#528: a follow-up fetch returned the reset store to its caller, and the list's `finally` cleared `loading` for a newer action; both passed the two-axis review and reached the bug-hunt review.)
