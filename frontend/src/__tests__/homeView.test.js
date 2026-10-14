@@ -4,6 +4,8 @@ import { createPinia, setActivePinia } from 'pinia'
 
 import HomeView from '@/views/HomeView.vue'
 import { useSessionStore } from '@/stores/session.js'
+import { LIST_FAILED_COPY } from '@/lib/errors.js'
+import { __test__ as sidebarTest } from '@/composables/useSidebar.js'
 
 const push = vi.fn()
 
@@ -51,6 +53,79 @@ describe('HomeView', () => {
     apiEndSession.mockReset()
     apiGetSessionLibrary.mockReset()
     apiGetSessionLibrary.mockResolvedValue({ items: [], total: 0 })
+    // The sidebar's layout is module state; jsdom's 1024px width is mobile,
+    // so the default is drawer-closed, where Home reports a failed list.
+    setMode('drawer-closed')
+  })
+
+  const setMode = sidebarTest._setMode
+
+  // #549: one failure, one report. The sidebar's error line reports it while
+  // the sidebar's list is on screen; otherwise Home does, with the same copy.
+  describe('#549 boot error only where the sidebar list is off screen', () => {
+    async function mountFailedFirstList() {
+      apiGetSessionLibrary.mockRejectedValue(new Error('rejected'))
+      const wrapper = mountView()
+      await flushPromises()
+      expect(useSessionStore().firstListFailed).toBe(true)
+
+      return wrapper
+    }
+
+    it.each(['expanded', 'drawer-open'])('is hidden in %s', async (mode) => {
+      setMode(mode)
+      const wrapper = await mountFailedFirstList()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+    })
+
+    it.each(['collapsed', 'drawer-closed'])('shows the list-failed copy in %s', async (mode) => {
+      setMode(mode)
+      const wrapper = await mountFailedFirstList()
+      // The literal, not LIST_FAILED_COPY: pins the words the brief asked for.
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe("Couldn't load your sessions.")
+    })
+
+    it('stays hidden in any mode when the first list loaded', async () => {
+      for (const mode of ['expanded', 'drawer-open', 'collapsed', 'drawer-closed']) {
+        setActivePinia(createPinia())
+        setMode(mode)
+        const wrapper = mountView()
+        await flushPromises()
+        expect(useSessionStore().firstListFailed).toBe(false)
+        expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+        wrapper.unmount()
+      }
+    })
+
+    it('moves with a mode switch while the failure stands', async () => {
+      setMode('collapsed')
+      const wrapper = await mountFailedFirstList()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(true)
+
+      setMode('expanded')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="home-error"]').exists()).toBe(false)
+
+      setMode('collapsed')
+      await flushPromises()
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
+    })
+
+    it.each(['expanded', 'collapsed'])(
+      'shows a start-attempt failure over it in %s',
+      async (mode) => {
+        setMode(mode)
+        const store = useSessionStore()
+        vi.spyOn(store, 'lookupTopic').mockResolvedValue({ active_match: null, ended_match: null })
+        vi.spyOn(store, 'createSession').mockRejectedValue(new Error('create failed'))
+        const wrapper = await mountFailedFirstList()
+        await wrapper.get('[data-testid="home-quick-topic"]').setValue('Recursion')
+        await wrapper.get('[data-testid="home-quick-go"]').trigger('click')
+        await flushPromises()
+        expect(store.firstListFailed).toBe(true)
+        expect(wrapper.get('[data-testid="home-error"]').text()).toBe('create failed')
+      },
+    )
   })
 
   it('calls listSessions on mount', async () => {
@@ -74,7 +149,7 @@ describe('HomeView', () => {
     apiGetSessionLibrary.mockRejectedValue(new Error('list failed'))
     const wrapper = mountView()
     await flushPromises()
-    expect(wrapper.get('[data-testid="home-error"]').text()).toBe('list failed')
+    expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
   })
 
   // F-07: the fatal error branch is scoped to Home's own load (no sessions
@@ -138,7 +213,7 @@ describe('HomeView', () => {
       const wrapper = mountView()
       await flushPromises()
       expect(store.sessionsLoaded).toBe(false)
-      expect(wrapper.get('[data-testid="home-error"]').text()).toBe('offline')
+      expect(wrapper.get('[data-testid="home-error"]').text()).toBe(LIST_FAILED_COPY)
     })
   })
 

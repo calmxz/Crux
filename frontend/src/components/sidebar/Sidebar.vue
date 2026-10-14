@@ -20,7 +20,7 @@ import SidebarListError from './SidebarListError.vue'
 import SidebarSkeletonList from './SidebarSkeletonList.vue'
 import SidebarUserMenu from './SidebarUserMenu.vue'
 
-const { mode, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
+const { mode, isExpanded, isDesktop, drawerOpen, toggleDesktop, closeDrawer } = useSidebar()
 
 const router = useRouter()
 
@@ -376,8 +376,6 @@ watch(
     target?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   },
 )
-
-const isExpanded = computed(() => mode.value === 'expanded' || mode.value === 'drawer-open')
 
 const showDrawerClose = computed(() => !isDesktop.value && mode.value === 'drawer-open')
 
@@ -740,6 +738,8 @@ async function onSignOut() {
     <nav ref="listEl" class="sb-list-wrap" aria-label="Sessions" :aria-hidden="isRail || null">
       <template v-if="isExpanded">
         <template v-if="searching">
+          <!-- #549: results stand in for the list, not for its failure. -->
+          <SidebarListError v-if="firstListFailed" ref="listErrorEl" @retry="onRetryList" />
           <p
             class="sb-search-count label"
             data-testid="sidebar-search-count"

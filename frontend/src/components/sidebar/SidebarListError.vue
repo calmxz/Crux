@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 
+import { LIST_FAILED_COPY } from '../../lib/errors.js'
+
 defineEmits(['retry'])
 
 const retryEl = ref(null)
@@ -13,11 +15,11 @@ defineExpose({
 
 <template>
   <!-- #544: shown when no list has loaded this sign-in and the latest one
-       failed: in place of a tab's empty hint, or under the rows a create
-       inserted. Same shape as the session page's error line: the message,
+       failed: in place of a tab's empty hint, under the rows a create
+       inserted, or above search results (#549). Same shape as the session page's error line: the message,
        then a written Retry. -->
   <div class="sb-list-error" role="alert" data-testid="sidebar-list-error">
-    <p class="sb-list-error-msg">Couldn't load your sessions.</p>
+    <p class="sb-list-error-msg">{{ LIST_FAILED_COPY }}</p>
     <button
       ref="retryEl"
       type="button"

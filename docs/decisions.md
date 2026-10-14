@@ -3,6 +3,20 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - A failed first list has one report, placed by sidebar layout (#549)
+
+Home's boot error and the sidebar's error line were both `role="alert"`, so
+on desktop-expanded one failure announced twice, again on every failed Retry,
+and Home's `friendlyError(listError)` copy under the topic form read as if
+the topic was rejected. Now Home's boot error shows only when the sidebar's
+list is off screen (rail or closed drawer) and both say "Couldn't load your
+sessions." Rejected in triage: removing Home's boot error (the sidebar is not
+always on screen), keeping both with fixed copy (still two announcements),
+and dropping Home's `role="alert"` (mobile would announce nothing). One call
+beyond the brief, made by the maintainer after review: the sidebar's error
+line also shows above search results, which used to replace it, so a search
+typed after the failure left no surface reporting it.
+
 ## 2026-10-14 - Home's boot error follows the sidebar's first-list-failed rule (#546)
 
 Home's boot error and the sidebar's error line both read the store's
