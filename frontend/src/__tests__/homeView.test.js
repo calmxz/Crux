@@ -58,7 +58,7 @@ describe('HomeView', () => {
 
   it('does not render bare Loading text while the store is loading', () => {
     const store = useSessionStore()
-    store.loading = true
+    store.listLoading = true
     store.sessions = []
     const w = mountView()
     expect(w.text()).not.toContain('Loading...')

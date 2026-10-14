@@ -34,7 +34,7 @@ const { name: userName } = storeToRefs(userStore)
 
 const sessionStore = useSessionStore()
 
-const { sessions, loading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
+const { sessions, listLoading, activeTotal, endedTotal, searchRows } = storeToRefs(sessionStore)
 
 const listEl = ref(null)
 
@@ -246,9 +246,11 @@ const showViewAllActive = computed(() => activeRendered.value > 0)
 
 const showViewAllEnded = computed(() => cappedEndedRows.value.length > 0)
 
-const showSkeleton = computed(() => loading.value && !sessions.value.length)
+const showSkeleton = computed(() => listLoading.value && !sessions.value.length)
 
-const showEmptyHint = computed(() => !loading.value && !searching.value && !sessions.value.length)
+const showEmptyHint = computed(
+  () => !listLoading.value && !searching.value && !sessions.value.length,
+)
 
 const reviewTotal = ref(0)
 
@@ -259,7 +261,7 @@ const PROFILE_ICON_PATH = 'M3 7.5 H17 V16 H3 Z M4.5 7.5 V4 H10 V7.5 M6 11 H14 M6
 
 const showEmptyActiveHint = computed(
   () =>
-    !loading.value &&
+    !listLoading.value &&
     !searching.value &&
     sessions.value.length > 0 &&
     !activeRows.value.length &&
