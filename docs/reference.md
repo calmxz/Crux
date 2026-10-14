@@ -393,13 +393,18 @@ first result stays, no `error`), and the epoch guard drops it after `reset()`.
 Creates and pin/rename never trigger it: their replays are exact. Residual
 races it cannot see are listed in `docs/decisions.md` (2026-10-14).
 
-Late-reply re-list (#533): end/reopen/continueTopic note `_listsLanded` (bumped
-each time a list writes the window) when their request starts. If the count
-moved by the reply, no list is in flight, the totals rule would move the
-totals, and the session has no row in `sessions`, `_relistIfLandedWithout`
-skips the move and calls `listSessions()` (fire-and-forget) instead. Observed
-copies are still patched. It runs after `_trackStatusChange`, or the re-list
-would record that replay against itself and re-list again.
+Late reply (#533): end/reopen/continueTopic call `_statusChangeGuard()` when
+their request starts (it notes `_listsLanded`, bumped each time a list writes
+the window). On the reply, before patching, its judge returns `'move'`,
+`'skip'` or `'relist'`. With no list landed since, or one still in flight, it
+is the shared totals rule. Once a list has landed: the landed window row alone
+decides when there is one (the open detail or the caller's row can be a stale
+separate copy), copies all in the target state skip, and otherwise `_relist()`
+calls `listSessions()` instead of moving the totals. Observed copies are always
+patched. `_relist()` runs after `_trackStatusChange`, or the re-list would
+record that replay against itself and re-list again, and it waits out a list
+whose `_inflight` entry outlives `_listPending`, so it never joins a finished
+fetch.
 
 ### E2E sign-in against the real backend (#518)
 

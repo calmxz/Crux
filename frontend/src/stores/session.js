@@ -83,7 +83,7 @@ export const useSessionStore = defineStore('session', () => {
   // change re-lists exactly once (#528, see listSessions), and a status change
   // whose reply arrives after a list landed, for a session outside that
   // window, re-lists instead of moving the totals (#533, see
-  // _relistIfLandedWithout).
+  // _statusChangeGuard).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, using the shared rule documented on
   // _observedRows() below.
@@ -191,23 +191,54 @@ export const useSessionStore = defineStore('session', () => {
     })
   }
 
-  // #533: called by an end/reopen/continueTopic reply in place of moving the
-  // totals. A list that landed after the request started may already count
-  // the change. With the session in that window the SHARED TOTALS RULE judges
-  // it from the landed row; without it nothing can, so fetch one fresh list
-  // (silent, epoch-guarded, de-duped) instead. A list still in flight keeps
-  // the #528 path: the replay just recorded for it decides. Returns true when
-  // it re-listed, and the caller then leaves the totals alone. Call it after
-  // _trackStatusChange: a re-list started first would record that replay
-  // against itself and re-list a second time.
-  function _relistIfLandedWithout(id, landedAtStart) {
-    if (_listPending || _listsLanded === landedAtStart) return false
+  // #533: end/reopen/continueTopic capture this when their request starts.
+  // The returned function decides, from a reply, what the totals need:
+  // 'move', 'skip' (already counted), or 'relist'. Call it BEFORE patching
+  // the observed copies, which would make every copy read as already moved.
+  // With no list landed since the start, or one still in flight (its replay
+  // and #528 decide), it is the SHARED TOTALS RULE unchanged. Once a list
+  // has landed, that list may already count the change, so:
+  //   - the landed window row alone judges when there is one: it is the
+  //     server's state as of that snapshot, while another copy (the open
+  //     detail, the caller's row) can still show the prior state.
+  //   - with no window row, copies all in the target state still mean an
+  //     earlier action counted it; otherwise nothing local can tell whether
+  //     the snapshot predates the commit, so it re-lists (#528's reasoning).
+  function _statusChangeGuard() {
+    const landedAtStart = _listsLanded
 
-    if (sessions.value.some((s) => s.id === id)) return false
+    return (id, endedAt, observed) => {
+      const inTarget = (r) => Boolean(r.ended_at) === Boolean(endedAt)
+      const listLanded = !_listPending && _listsLanded !== landedAtStart
+      const windowRow = listLanded && sessions.value.find((s) => s.id === id)
+
+      if (windowRow) return inTarget(windowRow) ? 'skip' : 'move'
+
+      if (observed.length > 0 && observed.every(inTarget)) return 'skip'
+
+      return listLanded ? 'relist' : 'move'
+    }
+  }
+
+  // #533's 'relist': one listSessions(), silent and de-duped like any other.
+  // Call it after _trackStatusChange: a re-list started first would record
+  // that replay against itself and re-list a second time. A list whose
+  // _listPending has dropped can still hold its _inflight entry for a
+  // microtask, and listSessions() would join that finished fetch, so wait it
+  // out first.
+  function _relist() {
+    const live = _epochGuard()
+    const settling = _inflight.get('list')
     // Like the mount-time callers: a failed list keeps the landed totals.
-    listSessions().catch(() => {})
+    const run = () => listSessions().catch(() => {})
 
-    return true
+    if (!settling) return run()
+
+    settling
+      .catch(() => {})
+      .then(() => {
+        if (live()) run()
+      })
   }
 
   // The optimistic write behind renameSession / setPinned: patch every
@@ -499,7 +530,7 @@ export const useSessionStore = defineStore('session', () => {
         if (!live()) return rows
 
         if (!raced) return sessions.value
-        // #528: the one exception to the no-refetch rule. The snapshot's
+        // #528: one of the two exceptions to the no-refetch rule. The snapshot's
         // totals may predate a status change or count one session twice, and
         // no local adjustment can tell which, so fetch one fresh list. Its
         // own race result is ignored: at most one extra round trip. The rows
@@ -724,7 +755,7 @@ export const useSessionStore = defineStore('session', () => {
 
     if (!id) throw new Error('no active session')
     const live = _epochGuard()
-    const landedAtStart = _listsLanded
+    const judgeTotals = _statusChangeGuard()
     error.value = null
 
     try {
@@ -732,12 +763,12 @@ export const useSessionStore = defineStore('session', () => {
 
       if (!live()) return resp
       const summaryText = resp?.summary?.text ?? ''
-      // Snapshot the observation BEFORE patching anything: once a copy's
-      // ended_at is written it reads as "already ended" and would silently
-      // swallow the totals transition below. See _observedRows for the
-      // shared rule this implements.
+      // Judge the totals BEFORE patching anything: once a copy's ended_at is
+      // written it reads as "already ended" and would silently swallow the
+      // totals transition below. See _observedRows for the shared rule and
+      // _statusChangeGuard for how a landed list changes it.
       const observed = _observedRows(id)
-      const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+      const totals = judgeTotals(id, resp.ended_at, observed)
 
       for (const r of observed) r.ended_at = resp.ended_at
       _trackStatusChange(id, resp.ended_at)
@@ -755,10 +786,10 @@ export const useSessionStore = defineStore('session', () => {
         }
       }
 
-      if (!alreadyEnded && !_relistIfLandedWithout(id, landedAtStart)) {
+      if (totals === 'move') {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       const summary = resp?.summary
       pendingSummary.value = {
@@ -783,7 +814,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function reopenSession(sessionId) {
     const live = _epochGuard()
-    const landedAtStart = _listsLanded
+    const judgeTotals = _statusChangeGuard()
     error.value = null
     duplicateReopen.value = null
 
@@ -791,17 +822,17 @@ export const useSessionStore = defineStore('session', () => {
       const resp = await sessionsApi.reopenSession(sessionId)
 
       if (!live()) return resp
-      // Same reasoning as endSession: snapshot before patching.
+      // Same reasoning as endSession: judge before patching.
       const observed = _observedRows(sessionId)
-      const alreadyActive = observed.length > 0 && observed.every((r) => !r.ended_at)
+      const totals = judgeTotals(sessionId, null, observed)
 
       for (const r of observed) r.ended_at = null
       _trackStatusChange(sessionId, null)
 
-      if (!alreadyActive && !_relistIfLandedWithout(sessionId, landedAtStart)) {
+      if (totals === 'move') {
         endedTotal.value = Math.max(0, endedTotal.value - 1)
         activeTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       return resp
     } catch (e) {
@@ -821,7 +852,7 @@ export const useSessionStore = defineStore('session', () => {
 
   async function continueTopic(prior) {
     const live = _epochGuard()
-    const landedAtStart = _listsLanded
+    const judgeTotals = _statusChangeGuard()
     error.value = null
 
     try {
@@ -840,27 +871,26 @@ export const useSessionStore = defineStore('session', () => {
       // itself rendered (e.g. an ended-tab row, or a library-page item)
       // outside the loaded window.
       const observed = _observedRows(prior.id, prior)
-      const alreadyEnded = observed.length > 0 && observed.every((r) => r.ended_at)
+      const endedAt = new Date().toISOString()
+      const totals = judgeTotals(prior.id, endedAt, observed)
 
-      if (!alreadyEnded) {
-        const endedAt = new Date().toISOString()
+      // A copy already ended keeps its own ended_at.
+      for (const r of observed) if (!r.ended_at) r.ended_at = endedAt
 
-        for (const r of observed) r.ended_at = endedAt
-        _trackStatusChange(prior.id, endedAt)
-      }
+      if (totals !== 'skip') _trackStatusChange(prior.id, endedAt)
 
       // The new session is always active. The prior only moves active ->
-      // ended in the totals when it was NOT already observed as ended -
+      // ended in the totals when it was NOT already counted as ended -
       // continueTopic is only ever offered on already-ended rows in the UI,
       // so in the normal case the prior is already counted in endedTotal
       // and there is no transition to apply here. The new session is not
       // counted again when a list fetch that landed first already holds it.
       if (_insertCreated(created)) activeTotal.value += 1
 
-      if (!alreadyEnded && !_relistIfLandedWithout(prior.id, landedAtStart)) {
+      if (totals === 'move') {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
-      }
+      } else if (totals === 'relist') _relist()
 
       currentSession.value = created
       currentSessionId.value = created.id

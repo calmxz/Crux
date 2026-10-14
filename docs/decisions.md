@@ -33,13 +33,15 @@ ruled out of scope. Tracked instead: a re-list on tab focus (#534), which also
 heals the cross-device cases.
 
 Late reply (#533): an end, reopen or prior-end notes how many lists have
-landed when its request starts. If one landed before the reply and the session
-has no row in it, the action does not move the totals (that list may already
-count the change) and calls `listSessions()` once instead. In the window, the
-landed row already tells the totals rule what to do; with a list still in
-flight, its recorded replay and #528 decide. Re-listing beats a local guess
-for the same reason as #528: nothing local says whether the snapshot predates
-the commit.
+landed when its request starts. If one landed before the reply, that list may
+already count the change. When the session has a row in it, that row alone
+decides: the #533 brief assumed every observed copy would match it, but the
+open session's detail is a separate object that still shows the prior state,
+so judging all copies counted the change twice. With no row (and no copy
+already in the target state), the action does not move the totals and calls
+`listSessions()` once instead; re-listing beats a local guess for the same
+reason as #528. With a list still in flight, its recorded replay and #528
+decide.
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 

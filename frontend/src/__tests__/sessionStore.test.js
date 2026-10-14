@@ -895,6 +895,56 @@ describe('session store', () => {
       expect(s.endedTotal).toBe(1)
     })
 
+    it('ending the open session inside the landed window counts it once', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      // The open detail is its own object, still active when the list lands.
+      s.currentSession = row()
+      await replyAfterLanding(
+        () => s.endSession('s1'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row({ id: 'a' })], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.currentSession.ended_at).toBe(ENDED_AT)
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('a landed window row still in the prior state moves the totals once', async () => {
+      const end = deferred()
+      sessionsApi.endSession.mockReturnValueOnce(end.promise)
+      const s = useSessionStore()
+      s.currentSession = row()
+      // The snapshot predates the end: 's1' is still active and counted so.
+      await replyAfterLanding(
+        () => s.endSession('s1'),
+        () => end.resolve({ ended_at: ENDED_AT, summary: null }),
+        [[row()], [], { active: 1, ended: 0 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it("continueTopic's prior inside the landed window, shown ended there, is not counted again", async () => {
+      const create = deferred()
+      sessionsApi.createSession.mockReturnValueOnce(create.promise)
+      const s = useSessionStore()
+      // The caller's own copy still shows the prior active.
+      const prior = row({ id: 'p' })
+      await replyAfterLanding(
+        () => s.continueTopic(prior),
+        () => create.resolve({ id: 'new', topic: 'T', ended_at: null }),
+        [[row({ id: 'new' })], [row({ id: 'p', ended_at: ENDED_AT })], { active: 1, ended: 1 }],
+      )
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(prior.ended_at).toBeTruthy()
+      expect(s.activeTotal).toBe(1)
+      expect(s.endedTotal).toBe(1)
+    })
+
     it('an end with no list landed since its start makes no extra fetch', async () => {
       sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
       const s = useSessionStore()
