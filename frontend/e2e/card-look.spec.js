@@ -59,12 +59,19 @@ const ALERT = 'rgb(184, 53, 44)'
 
 const LINK = 'rgb(29, 79, 196)'
 
+// The four border colours always move together.
+function edges(color) {
+  return {
+    borderTopColor: color,
+    borderRightColor: color,
+    borderBottomColor: color,
+    borderLeftColor: color,
+  }
+}
+
 const CARD = {
   backgroundColor: 'rgb(255, 255, 255)',
-  borderTopColor: EDGE,
-  borderRightColor: EDGE,
-  borderBottomColor: EDGE,
-  borderLeftColor: EDGE,
+  ...edges(EDGE),
   borderTopWidth: '1px',
   borderRightWidth: '1px',
   borderBottomWidth: '1px',
@@ -84,10 +91,7 @@ const LEARNER_EDGE = 'rgb(185, 205, 245)'
 const LEARNER = {
   ...CARD,
   backgroundColor: 'rgb(219, 230, 251)',
-  borderTopColor: LEARNER_EDGE,
-  borderRightColor: LEARNER_EDGE,
-  borderBottomColor: LEARNER_EDGE,
-  borderLeftColor: LEARNER_EDGE,
+  ...edges(LEARNER_EDGE),
 }
 
 // Notice strip: coloured 3px top edge, square top corners, no drop.
@@ -107,10 +111,7 @@ function strip(tab, padding) {
 function bare(color, textDecorationLine, fontSize) {
   return {
     backgroundColor: 'rgba(0, 0, 0, 0)',
-    borderTopColor: color,
-    borderRightColor: color,
-    borderBottomColor: color,
-    borderLeftColor: color,
+    ...edges(color),
     borderTopWidth: '0px',
     borderRightWidth: '0px',
     borderBottomWidth: '0px',
@@ -153,10 +154,7 @@ const LOOK = {
   learnerTurn: { ...LEARNER, padding: BUBBLE_PAD },
   composer: {
     ...CARD,
-    borderTopColor: 'rgb(118, 124, 134)',
-    borderRightColor: 'rgb(118, 124, 134)',
-    borderBottomColor: 'rgb(118, 124, 134)',
-    borderLeftColor: 'rgb(118, 124, 134)',
+    ...edges('rgb(118, 124, 134)'),
     padding: '8.8px 14.4px',
   },
   cueCard: { ...JOINED, padding: '6.4px 11.2px' },
@@ -171,6 +169,8 @@ const LOOK = {
   // Recall
   recallSheet: { ...JOINED, padding: '16px' },
   recallCard: { ...LEARNER, padding: '10px 12px' },
+  // Focus adds only an outline; this pins that the box does not change, in
+  // particular that base.css's :focus-visible radius does not win.
   recallCardFocused: { ...LEARNER, padding: '10px 12px' },
   // Settings and Account
   settingsPanel: { ...JOINED, padding: '24px 32px 32px' },
@@ -186,8 +186,28 @@ const LOOK = {
   sidebarCurrentRow: { ...CARD, padding: '0px' },
   // 390px
   authCoverMobile: { ...CARD, boxShadow: AUTH_LIFT, padding: '24px' },
+  recallSheetMobile: { ...JOINED, padding: '12px' },
   recallCardMobile: { ...LEARNER, padding: '10px 12px' },
   cueCardMobile: { ...JOINED, padding: '6.4px 11.2px' },
+  // Edge lines top and bottom only, the lift instead of the drop. The side
+  // colours are the text colour, since those borders have no width.
+  cueDrawerMobile: {
+    backgroundColor: 'rgb(255, 255, 255)',
+    borderTopColor: EDGE,
+    borderRightColor: 'rgb(27, 27, 26)',
+    borderBottomColor: EDGE,
+    borderLeftColor: 'rgb(27, 27, 26)',
+    borderTopWidth: '1px',
+    borderRightWidth: '0px',
+    borderBottomWidth: '1px',
+    borderLeftWidth: '0px',
+    borderTopLeftRadius: '0px',
+    borderTopRightRadius: '0px',
+    borderBottomRightRadius: '6px',
+    borderBottomLeftRadius: '6px',
+    boxShadow: 'rgba(0, 0, 0, 0.25) 0px 12px 24px -12px',
+    padding: '8px 16px',
+  },
 }
 
 function readLook(locator, props) {
@@ -311,6 +331,19 @@ const LIBRARY_ITEM = {
   progress: { focus_target_gap: 'ATP yield per glucose', level: 'intermediate', mastered_count: 1 },
 }
 
+const REVIEW_QUEUE = {
+  items: [
+    {
+      concept: 'glycolysis net yield',
+      source_session_id: SESSION_ID,
+      source_topic: 'Cellular respiration',
+      due_at: NOW,
+      streak: 1,
+    },
+  ],
+  total: 1,
+}
+
 // --- Stubs ----------------------------------------------------------------
 
 function json(route, body, status = 200) {
@@ -393,10 +426,10 @@ function baseApi() {
   }
 }
 
-// Signs in through the real form so supabase-js persists the session itself,
-// then parks the mouse where it hovers nothing: a pointer left over the
+// Unlike e2e/support/auth.js's signIn, needs no backend. Signs in through the
+// real form so supabase-js persists the session itself, then parks the mouse where it hovers nothing: a pointer left over the
 // submit button's spot would put whatever lands there next in :hover.
-async function signIn(page, api) {
+async function signInOffline(page, api) {
   await stubAuth(page)
   await stubApi(page, api)
   await page.goto('/login')
@@ -415,6 +448,22 @@ async function openSession(page) {
   const input = page.getByTestId('session-input')
   await expect(input).toBeFocused()
   await input.blur()
+}
+
+// Real Tab presses, so Chromium's :focus-visible heuristic matches the way a
+// keyboard user sees it (script focus() may not).
+async function tabTo(page, locator) {
+  for (let i = 0; i < 40; i++) {
+    await page.keyboard.press('Tab')
+
+    if (await locator.evaluate((el) => el === document.activeElement)) {
+      expect(await locator.evaluate((el) => el.matches(':focus-visible'))).toBe(true)
+
+      return
+    }
+  }
+
+  throw new Error('Tab never reached the element')
 }
 
 // --- Tests ----------------------------------------------------------------
@@ -453,7 +502,7 @@ test.describe('card look at desktop', () => {
     api['/sessions/lookup'] = {
       active_match: { session_id: SESSION_ID, title: 'Cellular respiration' },
     }
-    await signIn(page, api)
+    await signInOffline(page, api)
 
     await expectLook(
       'homeCover',
@@ -467,7 +516,7 @@ test.describe('card look at desktop', () => {
 
   test('library: row, focus chip, empty state, error line and Retry', async ({ page }) => {
     const api = baseApi()
-    await signIn(page, api)
+    await signInOffline(page, api)
 
     await page.goto('/sessions')
     const row = page.getByTestId(`library-card-${SESSION_ID}`)
@@ -496,7 +545,7 @@ test.describe('card look at desktop', () => {
       ],
       pending_check: PENDING_CHECK,
     })
-    await signIn(page, api)
+    await signInOffline(page, api)
     await openSession(page)
 
     await expectLook('checkCard', page.getByTestId('check-card'))
@@ -510,7 +559,7 @@ test.describe('card look at desktop', () => {
   test('session: ended card', async ({ page }) => {
     const api = baseApi()
     api[`/sessions/${SESSION_ID}`] = makeSession({ ended_at: NOW })
-    await signIn(page, api)
+    await signInOffline(page, api)
 
     await page.goto(`/session/${SESSION_ID}`)
     await expectLook('sessionEnded', page.getByTestId('session-ended-banner'))
@@ -533,7 +582,7 @@ test.describe('card look at desktop', () => {
         }),
       ],
     })
-    await signIn(page, api)
+    await signInOffline(page, api)
     await openSession(page)
 
     await expectLook('topicSuggest', page.getByTestId('topic-suggest-card'))
@@ -544,7 +593,7 @@ test.describe('card look at desktop', () => {
     const api = baseApi()
     api[`/sessions/${SESSION_ID}`] = makeSession({ messages: [], topic_profile: profile })
     api[`/profile/${SESSION_ID}`] = { profile, etag: 'e2e-etag', recent_learning_events: [] }
-    await signIn(page, api)
+    await signInOffline(page, api)
     await openSession(page)
 
     await expectLook('levelPicker', page.getByTestId('diagnostic-consent-card'))
@@ -568,7 +617,7 @@ test.describe('card look at desktop', () => {
         },
       },
     ]
-    await signIn(page, api)
+    await signInOffline(page, api)
     await openSession(page)
 
     await expectLook('referenceBanner', page.getByTestId('reference-status'))
@@ -590,19 +639,8 @@ test.describe('card look at desktop', () => {
 
   test('recall: joined sheet, concept card at rest and keyboard-focused', async ({ page }) => {
     const api = baseApi()
-    api['/review/queue'] = {
-      items: [
-        {
-          concept: 'glycolysis net yield',
-          source_session_id: SESSION_ID,
-          source_topic: 'Cellular respiration',
-          due_at: NOW,
-          streak: 1,
-        },
-      ],
-      total: 1,
-    }
-    await signIn(page, api)
+    api['/review/queue'] = REVIEW_QUEUE
+    await signInOffline(page, api)
     await page.goto('/recall')
 
     const card = page.getByTestId('recall-card')
@@ -614,7 +652,7 @@ test.describe('card look at desktop', () => {
   })
 
   test('settings and account: the sheet panels', async ({ page }) => {
-    await signIn(page, baseApi())
+    await signInOffline(page, baseApi())
 
     await page.goto('/settings/learning')
     await expectLook('settingsPanel', page.getByRole('tabpanel'))
@@ -626,7 +664,7 @@ test.describe('card look at desktop', () => {
   test('session profile: divider body, section card, conflict notice', async ({ page }) => {
     const api = baseApi()
     api[`PATCH /profile/${SESSION_ID}`] = () => [412, { detail: 'etag mismatch' }]
-    await signIn(page, api)
+    await signInOffline(page, api)
     await page.goto(`/session/${SESSION_ID}/profile`)
 
     await expectLook('profileDivider', page.getByTestId('sprof-level').locator('> div'))
@@ -663,7 +701,7 @@ test.describe('card look at desktop', () => {
       weekly_mastery: [],
       concept_accuracy: [],
     }
-    await signIn(page, api)
+    await signInOffline(page, api)
     await page.goto('/profile')
 
     const topic = page.getByTestId('aprof-topic-card')
@@ -688,45 +726,27 @@ test.describe('card look at 390px', () => {
 
   test('recall concept card', async ({ page }) => {
     const api = baseApi()
-    api['/review/queue'] = {
-      items: [
-        {
-          concept: 'glycolysis net yield',
-          source_session_id: SESSION_ID,
-          source_topic: 'Cellular respiration',
-          due_at: NOW,
-          streak: 1,
-        },
-      ],
-      total: 1,
-    }
-    await signIn(page, api)
+    api['/review/queue'] = REVIEW_QUEUE
+    await signInOffline(page, api)
     await page.goto('/recall')
+    // The sheet's padding is what this width's media query changes.
+    await expectLook(
+      'recallSheetMobile',
+      page.getByTestId('recall-divider').first().locator('> div'),
+    )
     await expectLook('recallCardMobile', page.getByTestId('recall-card'))
   })
 
-  test('cue card', async ({ page }) => {
-    await signIn(page, baseApi())
+  test('cue card and its drawer', async ({ page }) => {
+    await signInOffline(page, baseApi())
     await openSession(page)
-    // Below 900px the cue body is a collapsed strip until disclosed.
+    // Below 900px the cue body is a collapsed strip; disclosed, it becomes a
+    // drawer card hanging below the strip.
     await page.getByTestId('cue-disclosure').click()
     await page.mouse.move(MOBILE.width - 1, MOBILE.height - 1)
-    await expectLook('cueCardMobile', page.getByTestId('cue-focus').locator('..'))
+    const cueCard = page.getByTestId('cue-focus').locator('..')
+    await expectLook('cueCardMobile', cueCard)
+    // cue card -> its section -> the cue body
+    await expectLook('cueDrawerMobile', cueCard.locator('../..'))
   })
 })
-
-// Real Tab presses, so Chromium's :focus-visible heuristic matches the way a
-// keyboard user sees it (script focus() may not).
-async function tabTo(page, locator) {
-  for (let i = 0; i < 40; i++) {
-    await page.keyboard.press('Tab')
-
-    if (await locator.evaluate((el) => el === document.activeElement)) {
-      expect(await locator.evaluate((el) => el.matches(':focus-visible'))).toBe(true)
-
-      return
-    }
-  }
-
-  throw new Error('Tab never reached the element')
-}
