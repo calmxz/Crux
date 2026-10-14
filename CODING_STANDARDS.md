@@ -24,6 +24,10 @@ When a diff adds a writer to existing shared state (a store ref, a module-level 
 
 When a diff adds a guard or fixes a case on one path, find the parallel paths that do the same job (the other copies an action patches, the success and failure branches, the replayed and the live write) and confirm each one gets the same treatment or has a stated reason not to. (#524: a rollback guard went onto rows a list had landed but not onto the observed copies one loop above; the bug-hunt review caught it.)
 
+## A new await re-checks what follows it
+
+When a diff adds an `await` inside an async store action, everything after it is checked as if a `reset()` or an overlapping action ran during that wait: each state write, the `finally`, and the value returned to the caller (the epoch contract covers returns too). A shared ref written in a `finally` must not clear a value an action started since has set. (#528: a follow-up fetch returned the reset store to its caller, and the list's `finally` cleared `loading` for a newer action; both passed the two-axis review and reached the bug-hunt review.)
+
 ## New patterns get a reference entry
 
 A diff that introduces a convention other code must follow (a guard, a sentinel, a dedupe rule) adds or updates its section in `docs/reference.md` in the same PR.
