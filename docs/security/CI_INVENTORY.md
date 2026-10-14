@@ -64,7 +64,7 @@ refactor reintroducing the finding will fail CI deterministically.
 
 ---
 
-## Branch protection — current state (verified 2026-09-23 via `gh api`)
+## Branch protection — current state (verified 2026-10-14 via `gh api`)
 
 Branch model:
 - `dev` = staging (PRs land here first)
@@ -72,7 +72,7 @@ Branch model:
 
 | Setting | `dev` | `main` |
 |---|---|---|
-| Required checks | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)` | same plus `Analyze (python)` |
+| Required checks | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Card look (Playwright)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)` | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)`, `Analyze (python)` |
 | Required approving reviews | 1 (solo maintainer merges with `--admin`) | none |
 | Include administrators (enforce_admins) | OFF | OFF |
 | Require signed commits | OFF | ON |
@@ -81,7 +81,8 @@ Branch model:
 Deviations from the Phase 6 plan, recorded in `docs/decisions.md` (2026-09-23):
 `dev` requires one review instead of zero, `enforce_admins` is off on both,
 `Playwright (chromium)` is not a required check, and `Analyze (python)` is
-required on `main` only.
+required on `main` only. `Card look (Playwright)` (2026-10-14) is required on
+`dev` only, as the card refactor's gate (`docs/decisions.md`, 2026-10-14).
 
 CodeQL: the `Analyze (*)` checks come from `.github/workflows/codeql.yml`
 (advanced setup). GitHub's code-scanning *default setup* is `not-configured`.

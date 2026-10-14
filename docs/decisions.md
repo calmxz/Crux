@@ -3,6 +3,25 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - The card-look spec is a required check of its own (#453)
+
+#453's spec is the card refactor's only check that a move keeps the look,
+but it ran only in the advisory e2e job, so a refactor PR could merge red.
+It now also runs as `Card look (Playwright)` in `ci.yml`, required on `dev`.
+
+- **A separate job, not a step in `Frontend (Vitest + lint)`.** It names the
+  failure, reruns alone, and leaves the frontend job's time unchanged; the
+  cost is one more required-check entry. The spec is offline, so the job needs
+  no backend or Postgres.
+- **The e2e job stays advisory** (2026-09-23). Making it required would gate
+  every PR on the whole Postgres-backed suite and its flakes.
+- **Re-recording is the other loophole.** A pure move never touches `LOOK`,
+  so #454-#457 each carry the acceptance line "passes with no change to
+  `LOOK`; any re-recorded value is listed in the PR with a reason".
+- Admin merges (`--admin`) still bypass it; it makes a red run visible as a
+  blocked merge, not impossible. Revisit after #458: keep as a standing
+  guard or drop the required entry.
+
 ## 2026-10-14 - A failed first list has one report, placed by sidebar layout (#549)
 
 Home's boot error and the sidebar's error line were both `role="alert"`, so

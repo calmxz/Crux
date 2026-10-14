@@ -489,6 +489,29 @@ Gotchas:
 
 Local run steps are in the `playwright.config.js` header.
 
+### Card look spec (#453)
+
+`frontend/e2e/card-look.spec.js` pins the computed box (background, border
+colours and widths, corner radii, box-shadow, padding) of every card surface,
+in the light theme at 1366px, plus the 390px surfaces whose media queries
+change a card. It runs offline: GoTrue and every `/api` call are stubbed, so
+only the Vite dev server is needed (`npx playwright test e2e/card-look.spec.js`
+from `frontend/`). The expected values are literals recorded from the browser,
+never derived from the CSS. After a deliberate visual change, re-record:
+`CARD_LOOK_RECORD=1 npx playwright test e2e/card-look.spec.js` prints each
+surface's values (once two reads agree) instead of asserting. Fold them back
+into `LOOK`, keeping the shared shapes (`CARD`, `JOINED`, `LEARNER`, `strip`,
+`bare`) where they still match. A surface the refactor only moves must pass
+unchanged without re-recording. Zero-width borders read as colour `none`, so
+an unseen side colour never fails a move.
+Gotchas:
+- The session page focuses the composer after the session loads. Reading
+  before that focus lands races it and pins the `:focus-within` border; wait
+  for the focus, then blur.
+- Park the mouse after the form sign-in. Otherwise whatever lands under the
+  submit button's old spot reads in `:hover`.
+- `:focus-visible` needs real `Tab` presses; script `focus()` may not match it.
+
 ### Favicon generation
 
 `frontend/scripts/gen-favicon.py` regenerates `frontend/public/favicon.ico` from the
