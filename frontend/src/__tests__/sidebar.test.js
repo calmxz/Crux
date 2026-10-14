@@ -2512,6 +2512,20 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     expect(wrapper.find('[data-testid="sidebar-empty-active"]').exists()).toBe(false)
   })
 
+  // #549: Home reports the failure in these two layouts on the premise that
+  // the sidebar renders no error line there.
+  it.each([
+    ['collapsed', 1400],
+    ['drawer-closed', 800],
+  ])('renders no error line in %s', async (mode, width) => {
+    setViewport(width)
+    sidebarTest._setExpanded(mode !== 'collapsed')
+    await mountFailed()
+    expect(useSidebar().mode.value).toBe(mode)
+    expect(useSessionStore().firstListFailed).toBe(true)
+    expect(errorLine().exists()).toBe(false)
+  })
+
   it('shows the error line, not "No ended sessions yet", on the Ended tab', async () => {
     await mountFailed()
     await showEnded()

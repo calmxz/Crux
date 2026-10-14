@@ -1,6 +1,8 @@
 <script setup>
 import { ref } from 'vue'
 
+import { LIST_FAILED_COPY } from '../../lib/errors.js'
+
 defineEmits(['retry'])
 
 const retryEl = ref(null)
@@ -17,7 +19,7 @@ defineExpose({
        inserted. Same shape as the session page's error line: the message,
        then a written Retry. -->
   <div class="sb-list-error" role="alert" data-testid="sidebar-list-error">
-    <p class="sb-list-error-msg">Couldn't load your sessions.</p>
+    <p class="sb-list-error-msg">{{ LIST_FAILED_COPY }}</p>
     <button
       ref="retryEl"
       type="button"

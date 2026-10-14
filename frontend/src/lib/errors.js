@@ -21,6 +21,10 @@ const THROTTLED_COPY = 'Too many requests - wait a moment and retry.'
 // Shared with the session store's own 409 handling so the two cannot drift.
 export const SESSION_ENDED_COPY = 'This session was ended elsewhere. Reopen it to continue.'
 
+// A failed first list (#549): the sidebar's error line and Home's boot error
+// report it one at a time, in the same words.
+export const LIST_FAILED_COPY = "Couldn't load your sessions."
+
 // Last resort for an SSE `error` event with neither a known code nor a message.
 export const GENERIC_STREAM_ERROR_COPY = 'The tutor hit a problem. Please try again.'
 
