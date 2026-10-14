@@ -945,27 +945,37 @@ describe('session store', () => {
       expect(s.endedTotal).toBe(1)
     })
 
-    it('a landed window row judges even while a later list is in flight', async () => {
-      const end = deferred()
-      sessionsApi.endSession.mockReturnValueOnce(end.promise)
-      const s = useSessionStore()
-      s.currentSession = row()
-      const land = queuePages()
-      const listing = s.listSessions()
-      const ending = s.endSession('s1')
-      land([row({ id: 'a' })], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
-      await listing
-      // A second list starts and fails after the reply: its totals never land.
-      sessionsApi.getSessionLibrary
-        .mockRejectedValueOnce(new Error('network'))
-        .mockRejectedValueOnce(new Error('network'))
-      const relisting = s.listSessions().catch(() => {})
-      end.resolve({ ended_at: ENDED_AT, summary: null })
-      await ending
-      await relisting
-      expect(s.activeTotal).toBe(1)
-      expect(s.endedTotal).toBe(1)
-    })
+    // A second list is pending when the reply arrives and then fails, so its
+    // totals never land: the landed window row alone must judge.
+    it.each([
+      ['already counted, skips', row({ ended_at: ENDED_AT }), { active: 1, ended: 1 }, [1, 1]],
+      ['in the prior state, moves', row(), { active: 2, ended: 0 }, [1, 1]],
+    ])(
+      'a landed window row %s even while a later list is in flight',
+      async (_, landedRow, totals, [active, ended]) => {
+        const end = deferred()
+        sessionsApi.endSession.mockReturnValueOnce(end.promise)
+        const s = useSessionStore()
+        s.currentSession = row()
+        const land = queuePages()
+        const listing = s.listSessions()
+        const ending = s.endSession('s1')
+        const [onActive, onEnded] = landedRow.ended_at ? [[], [landedRow]] : [[landedRow], []]
+        land([row({ id: 'a' }), ...onActive], onEnded, totals)
+        await listing
+        const second = deferred()
+        sessionsApi.getSessionLibrary
+          .mockReturnValueOnce(second.promise)
+          .mockReturnValueOnce(second.promise)
+        const relisting = s.listSessions().catch(() => {})
+        end.resolve({ ended_at: ENDED_AT, summary: null })
+        await ending
+        second.reject(new Error('network'))
+        await relisting
+        expect(s.activeTotal).toBe(active)
+        expect(s.endedTotal).toBe(ended)
+      },
+    )
 
     // Releases the reply at each microtask offset after the pages resolve, so
     // one run lands it while the list's _inflight entry outlives _listPending.

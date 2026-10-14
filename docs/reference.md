@@ -402,11 +402,10 @@ is one (the open detail or the caller's row can be a stale separate copy),
 even with a later list in flight. Copies all in the target state skip.
 Otherwise `_relist()` calls `listSessions()` instead of moving the totals, or,
 with a list in flight, the totals move and that list's replay decides (#528).
-Observed copies are always
-patched. `_relist()` runs after `_trackStatusChange`, or the re-list would
-record that replay against itself and re-list again, and it waits out a list
-whose `_inflight` entry outlives `_listPending`, so it never joins a finished
-fetch.
+Observed copies are always patched. `_relist()` runs after
+`_trackStatusChange`, or the re-list would record that replay against itself
+and re-list again, and it waits out a list whose `_inflight` entry outlives
+`_listPending`, so it never joins a finished fetch.
 
 ### E2E sign-in against the real backend (#518)
 

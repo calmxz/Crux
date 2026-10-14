@@ -82,8 +82,8 @@ export const useSessionStore = defineStore('session', () => {
   // Two narrow exceptions: a list fetch that lands having raced a status
   // change re-lists exactly once (#528, see listSessions), and a status change
   // whose reply arrives after a list landed, for a session outside that
-  // window, re-lists instead of moving the totals (#533, see
-  // _statusChangeGuard).
+  // window, re-lists instead of moving the totals when no other list is in
+  // flight (#533, see _statusChangeGuard).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, judged by _statusChangeGuard() (the shared
   // rule documented on _observedRows() below, plus #533's landed-list cases).

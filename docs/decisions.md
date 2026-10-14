@@ -37,12 +37,15 @@ landed when its request starts. If one landed before the reply, that list may
 already count the change. When the session has a row in it, that row alone
 decides: the #533 brief assumed every observed copy would match it, but the
 open session's detail is a separate object that still shows the prior state,
-so judging all copies counted the change twice. With no row (and no copy
-already in the target state), the action does not move the totals and calls
-`listSessions()` once instead; re-listing beats a local guess for the same
-reason as #528. With a list still in flight, its recorded replay and #528
-decide. Accepted, as for the #528 follow-up: a failed re-list keeps the landed
-totals, which may predate the change, until the next mount-time list.
+so judging all copies counted the change twice. The row decides even while a
+later list is in flight, because that list may fail and never land its totals.
+With no row (and no copy already in the target state), the action does not
+move the totals and calls `listSessions()` once instead; re-listing beats a
+local guess for the same reason as #528. If another list is in flight at that
+point, the action moves the totals and that list's recorded replay and #528
+decide. Accepted until the next mount-time list: a failed re-list keeps landed
+totals that may predate the change, and a failed in-flight list keeps a move
+that may double-count it (tracked in #540).
 
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
