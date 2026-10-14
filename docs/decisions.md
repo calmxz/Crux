@@ -25,7 +25,8 @@ change during it, or a second straddle) is not re-listed again, and a change
 that commits while a list is in flight but whose response arrives after the
 list lands is not recorded as a replay at all, so the trigger never sees it.
 The opposite straddle order (the page that would gain the session is read
-first, so it is in neither page) is invisible to the snapshot too. All of
+first, so it is in neither page) is invisible to the snapshot when the change
+came from another tab or device; a local one is caught by its replay. All of
 these leave the totals off by one until the next mount-time list; the real
 fix is server-side (both pages and totals from one transaction), which #528
 ruled out of scope.

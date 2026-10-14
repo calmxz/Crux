@@ -476,14 +476,17 @@ export const useSessionStore = defineStore('session', () => {
         // no local adjustment can tell which, so fetch one fresh list. Its
         // own race result is ignored: at most one extra round trip. The rows
         // above stay rendered while it runs, so the skeleton flag drops now.
-        // A mutation started after this owns `loading`; the finally must not
-        // clear it.
+        // Clearing here is when the no-race path clears it too. The finally
+        // must not clear it again a round trip later, over a mutation the
+        // user started on the rendered rows. (`loading` is one flag shared by
+        // every action; overlapping actions clearing each other is older.)
         loading.value = false
         loadingDropped = true
         // The changes just replayed committed before this fetch starts;
         // pending pin/rename entries stay and replay onto it too.
         _dropSettledReplays()
-        let landed = rows
+        // After a reset the caller gets the fetched rows, never the old window.
+        let landed = []
 
         try {
           landed = (await _landListSnapshot(live)).rows
