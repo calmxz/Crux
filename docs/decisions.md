@@ -3,6 +3,23 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-14 - One re-list after a list that raced a status change (#528)
+
+The session store's rule is that a mutation never refetches the sidebar list:
+local changes are mirrored, and changes made while a list is in flight are
+replayed onto its snapshot (#522 / #524). Two races defeat replay. An end,
+reopen or continueTopic prior-end on a session outside the loaded window has
+no snapshot row to judge, and a change committing between the parallel
+active and ended page reads puts one session in both pages. Neither snapshot
+says whether its totals predate the change, so no local adjustment can be
+right; only a fresh list can. So a landing list that sees either case fetches
+one more list. Only those triggers, because they are the cases where the
+snapshot gives no evidence; creates and pin/rename replay exactly. Capped at
+one so a busy account cannot loop: the follow-up's own race result is
+ignored, and a follow-up that fails leaves the first result. A list with no
+race costs exactly what it did. Refetch-always was rejected: a round trip and
+a re-sort after every action.
+
 ## 2026-10-12 - Stream-event spec matches what is sent, not what might be (#463)
 
 #463 asked for `check_question.set_index` / `set_total` to become nullable,

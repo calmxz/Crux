@@ -74,11 +74,13 @@ export const useSessionStore = defineStore('session', () => {
   // counts. They are NOT derived from `sessions` (which is only a window) and
   // they are reconciled with the server in exactly two places: listSessions()
   // and reset(). Every listSessions() call site is mount-time (HomeView,
-  // NewSessionView, Sidebar onMounted) and nothing refetches after a mutation
+  // NewSessionView, Sidebar onMounted) and a mutation never triggers a refetch
   // -- deliberately, since a refetch costs a round-trip and re-sorts the
   // sidebar under the user mid-action. So any transition a mutating action
   // fails to mirror here persists for the life of the page. The same rule is
   // why a create inserts its row locally rather than refetching the window.
+  // One narrow exception (#528): a list fetch that lands having raced a status
+  // change re-lists exactly once (see listSessions).
   // CONTRACT for any new action that moves a session between active and
   // ended: it must move these too, using the shared rule documented on
   // _observedRows() below.
@@ -146,9 +148,10 @@ export const useSessionStore = defineStore('session', () => {
 
   // An end/reopen observed on success while a list is in flight. Judged
   // against the incoming row alone: a snapshot already in the target state
-  // counted the move itself; one in the prior state did not. Unlike the
-  // SHARED TOTALS RULE's nothing-observed case, a row absent from the snapshot
-  // needs nothing: the snapshot's totals are the server's, not a local mirror.
+  // counted the move itself; one in the prior state did not. A row absent from
+  // the snapshot gives no such evidence -- its totals may or may not predate
+  // the change -- so apply() returns true and listSessions re-lists once
+  // (#528). Every other replay's apply() returns nothing.
   function _trackStatusChange(id, endedAt) {
     if (!_listPending) return
     _listReplays.push({
@@ -156,7 +159,9 @@ export const useSessionStore = defineStore('session', () => {
       apply(rows, counts) {
         const r = rows.find((s) => s.id === id)
 
-        if (!r || Boolean(r.ended_at) === Boolean(endedAt)) return
+        if (!r) return true
+
+        if (Boolean(r.ended_at) === Boolean(endedAt)) return
         r.ended_at = endedAt
 
         if (endedAt) {
@@ -389,6 +394,61 @@ export const useSessionStore = defineStore('session', () => {
     throw new StreamAbortedError('session_ended', e)
   }
 
+  // One sidebar list fetch landed into the window. Returns the merged rows and
+  // whether the snapshot raced a status change (#528): an end/reopen replay
+  // found no row to judge, or a change committed between the two parallel
+  // page reads put the same session in both (its rows de-dupe below, its
+  // totals cannot). `live` false skips every write.
+  async function _landListSnapshot(live) {
+    // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
+    // because a background load must never toast (U-05).
+    const [activePage, endedPage] = await Promise.all([
+      sessionsApi.getSessionLibrary(
+        { status: 'active', sort: 'pinned_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
+        { silent: true },
+      ),
+      sessionsApi.getSessionLibrary(
+        { status: 'ended', sort: 'last_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
+        { silent: true },
+      ),
+    ])
+
+    // DECISION: Promise.all is all-or-nothing -- if either page's request
+    // rejects, the other page's already-resolved items/total are discarded
+    // and sessions/activeTotal/endedTotal are left at their stale pre-call
+    // values (the catch block below only records the error). Accepted:
+    // a half-merged window (only one status populated) is worse UX than a
+    // stale-but-consistent one, and the caller can retry.
+    const seen = new Set()
+    const merged = []
+    let raced = false
+
+    for (const item of [...activePage.items, ...endedPage.items]) {
+      if (seen.has(item.id)) {
+        raced = true
+        continue
+      }
+
+      seen.add(item.id)
+      merged.push(item)
+    }
+
+    if (!live()) return { rows: merged, raced: false }
+    const counts = { active: activePage.total, ended: endedPage.total }
+
+    // #522 / #524: re-apply local changes this snapshot may predate.
+    for (const replay of _listReplays) {
+      if (replay.apply(merged, counts)) raced = true
+    }
+
+    sessions.value = merged
+    sessionsLoaded.value = true
+    activeTotal.value = counts.active
+    endedTotal.value = counts.ended
+
+    return { rows: merged, raced }
+  }
+
   function listSessions() {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
@@ -397,44 +457,25 @@ export const useSessionStore = defineStore('session', () => {
       _listPending = true
 
       try {
-        // Boot-path fire-and-forget (HomeView + Sidebar onMounted) — silent
-        // because a background load must never toast (U-05).
-        const [activePage, endedPage] = await Promise.all([
-          sessionsApi.getSessionLibrary(
-            { status: 'active', sort: 'pinned_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
-            { silent: true },
-          ),
-          sessionsApi.getSessionLibrary(
-            { status: 'ended', sort: 'last_activity', limit: SIDEBAR_PAGE_LIMIT, offset: 0 },
-            { silent: true },
-          ),
-        ])
+        const { rows, raced } = await _landListSnapshot(live)
 
-        // DECISION: Promise.all is all-or-nothing -- if either page's request
-        // rejects, the other page's already-resolved items/total are discarded
-        // and sessions/activeTotal/endedTotal are left at their stale pre-call
-        // values (the catch block below only records the error). Accepted:
-        // a half-merged window (only one status populated) is worse UX than a
-        // stale-but-consistent one, and the caller can retry.
-        const seen = new Set()
-        const merged = []
+        if (!raced || !live()) return rows
+        // #528: the one exception to the no-refetch rule. The snapshot's
+        // totals may predate a status change or count one session twice, and
+        // no local adjustment can tell which, so fetch one fresh list. Its
+        // own race result is ignored: at most one extra round trip. The rows
+        // above stay rendered while it runs, so the skeleton flag drops now.
+        loading.value = false
+        // The changes just replayed committed before this fetch starts;
+        // pending pin/rename entries stay and replay onto it too.
+        _listReplays = _listReplays.filter((r) => !r.settled)
 
-        for (const item of [...activePage.items, ...endedPage.items]) {
-          if (seen.has(item.id)) continue
-          seen.add(item.id)
-          merged.push(item)
+        try {
+          await _landListSnapshot(live)
+        } catch {
+          // Silent like every list fetch, and not an error the user can act
+          // on: the triggering fetch's rows and totals stay.
         }
-
-        if (!live()) return merged
-        const counts = { active: activePage.total, ended: endedPage.total }
-
-        // #522 / #524: re-apply local changes this snapshot may predate.
-        for (const replay of _listReplays) replay.apply(merged, counts)
-
-        sessions.value = merged
-        sessionsLoaded.value = true
-        activeTotal.value = counts.active
-        endedTotal.value = counts.ended
 
         return sessions.value
       } catch (e) {

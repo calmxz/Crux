@@ -353,10 +353,11 @@ previous account's data into the next one's store. Streams use the separate
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
 
-### Sidebar session window (#522, #524)
+### Sidebar session window (#522, #524, #528)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
-corpus, and nothing refetches it after a mutation. `listSessions()` replaces
+corpus, and a mutation never refetches it (one exception, below).
+`listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
 pinned active rows), counting it in `activeTotal` only if the row was not
@@ -370,7 +371,8 @@ before the list writes them:
   only while a list is in flight. A create inserts only if the snapshot lacks
   the row. An end/reopen applies only to a row in the snapshot that is still in
   the prior state, and then moves the totals. A row already in the target state
-  was counted by the snapshot, and a row outside the snapshot needs nothing.
+  was counted by the snapshot. A row outside the snapshot gives no evidence
+  either way, so its replay flags the list for a re-list (below).
 - Pin and rename are recorded from their optimistic start, because a list that
   started before the write committed can land while it is still pending. A
   failed write drops its entry and also rolls back any landed row it patched,
@@ -378,6 +380,16 @@ before the list writes them:
 - Settled entries clear when the in-flight list settles, success or failure.
   `reset()` clears them all. A new action that changes window rows locally must
   record a replay, or an in-flight list will revert it.
+
+Re-list (#528): when a list lands and an end/reopen/prior-end replay found no
+row, or the same id is in both the active and the ended page (a change
+committed between the two parallel page reads), the snapshot's totals may be
+off by one. The list still writes its result, drops `loading`, clears its
+settled replays, and runs one more fetch inside the same shared `'list'`
+promise, so `_listPending` and replay tracking cover it too. The follow-up's
+own race result is ignored (capped at one), its failure is swallowed (the
+first result stays, no `error`), and the epoch guard drops it after `reset()`.
+Creates and pin/rename never trigger it: their replays are exact.
 
 ### E2E sign-in against the real backend (#518)
 

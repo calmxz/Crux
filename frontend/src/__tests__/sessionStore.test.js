@@ -483,17 +483,20 @@ describe('session store', () => {
       expect(s.currentSession.topic).toBe('C')
     })
 
-    it('a row outside the snapshot needs nothing: no insert, totals stay the snapshot', async () => {
+    it('a row outside the snapshot is not inserted, and the #528 follow-up sets the totals', async () => {
       sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
       const s = useSessionStore()
       s.sessions = [row()]
       s.activeTotal = 1
       const land = startList(s)
       await s.endSession('s1')
+      sessionsApi.getSessionLibrary
+        .mockResolvedValueOnce({ items: [row({ id: 'other' })], total: 4 })
+        .mockResolvedValueOnce({ items: [], total: 3 })
       await land([row({ id: 'other' })], [], { active: 5, ended: 2 })
       expect(s.sessions.map((r) => r.id)).toEqual(['other'])
-      expect(s.activeTotal).toBe(5)
-      expect(s.endedTotal).toBe(2)
+      expect(s.activeTotal).toBe(4)
+      expect(s.endedTotal).toBe(3)
     })
 
     it('tracking clears when the list settles: a later list is authoritative', async () => {
@@ -546,6 +549,164 @@ describe('session store', () => {
       expect(s.sessions[0]).toMatchObject({ pinned: false, ended_at: null })
       expect(s.activeTotal).toBe(1)
       expect(s.endedTotal).toBe(0)
+    })
+  })
+
+  describe('#528 a list that raced a status change re-lists once', () => {
+    const row = (over = {}) => ({ id: 's1', topic: 'T', pinned: false, ended_at: null, ...over })
+    const ENDED_AT = '2026-10-14T01:00:00Z'
+
+    // Queues one list fetch's two pages as pending; the returned function
+    // resolves them with the given snapshot.
+    function queuePages() {
+      let resolveActive, resolveEnded
+      sessionsApi.getSessionLibrary
+        .mockReturnValueOnce(new Promise((r) => (resolveActive = r)))
+        .mockReturnValueOnce(new Promise((r) => (resolveEnded = r)))
+
+      return (active, ended = [], totals = {}) => {
+        resolveActive({ items: active, total: totals.active ?? active.length })
+        resolveEnded({ items: ended, total: totals.ended ?? ended.length })
+      }
+    }
+
+    it('an end outside the window makes exactly one more list fetch, whose totals win', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      // Opened from the library: observed only as the open session.
+      s.currentSession = row({ id: 'lib' })
+      const land = queuePages()
+      const listing = s.listSessions()
+      await s.endSession('lib')
+      const landFollowUp = queuePages()
+      // The snapshot predates the end: 'lib' is still counted active.
+      land([row()], [], { active: 3, ended: 1 })
+      landFollowUp([row()], [], { active: 2, ended: 2 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(getSessionLibrary.mock.calls[2][1]).toEqual({ silent: true })
+      expect(s.sessions.map((r) => r.id)).toEqual(['s1'])
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(2)
+    })
+
+    it("continueTopic's prior-end outside the window also re-lists", async () => {
+      sessionsApi.createSession.mockResolvedValueOnce({ id: 'new', topic: 'T', ended_at: null })
+      const s = useSessionStore()
+      const land = queuePages()
+      const listing = s.listSessions()
+      // A library-page item the store never held, shown active.
+      await s.continueTopic(row({ id: 'lib' }))
+      const landFollowUp = queuePages()
+      land([row()], [], { active: 2, ended: 0 })
+      landFollowUp([row({ id: 'new' }), row()], [row({ id: 'lib', ended_at: ENDED_AT })])
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.activeTotal).toBe(2)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('the same id in both pages makes exactly one more list fetch, whose totals win', async () => {
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      landFollowUp([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.sessions).toHaveLength(1)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('a list with no trigger makes no extra fetch', async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.sessions = [row()]
+      const land = queuePages()
+      const listing = s.listSessions()
+      // An end whose row IS in the snapshot is replayed exactly.
+      await s.endSession('s1')
+      land([row()], [], { active: 1, ended: 0 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(1)
+    })
+
+    it('creates and pins on rows outside the snapshot never re-list', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce({ id: 'new', topic: 'T', ended_at: null })
+      sessionsApi.setPinned.mockResolvedValueOnce({})
+      const s = useSessionStore()
+      s.sessions = [row({ id: 'gone' })]
+      const land = queuePages()
+      const listing = s.listSessions()
+      await s.createSession({ topic: 'T', seedMode: 'fresh' })
+      await s.setPinned('gone', true)
+      land([row()], [], { active: 1, ended: 0 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(2)
+    })
+
+    it('a follow-up whose own snapshot matches a trigger does not fetch again', async () => {
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      landFollowUp([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await listing
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+    })
+
+    it("a failed follow-up leaves the triggering fetch's rows and totals and surfaces nothing", async () => {
+      sessionsApi.endSession.mockResolvedValueOnce({ ended_at: ENDED_AT, summary: null })
+      const s = useSessionStore()
+      s.currentSession = row({ id: 'lib' })
+      const land = queuePages()
+      const listing = s.listSessions()
+      await s.endSession('lib')
+      sessionsApi.getSessionLibrary
+        .mockRejectedValueOnce(new Error('network'))
+        .mockRejectedValueOnce(new Error('network'))
+      land([row()], [], { active: 3, ended: 1 })
+      await expect(listing).resolves.toEqual([row()])
+      expect(getSessionLibrary).toHaveBeenCalledTimes(4)
+      expect(s.sessions.map((r) => r.id)).toEqual(['s1'])
+      expect(s.activeTotal).toBe(3)
+      expect(s.endedTotal).toBe(1)
+      expect(s.error).toBeNull()
+      expect(s.loading).toBe(false)
+    })
+
+    it('reset() while the follow-up is pending: its late result writes nothing', async () => {
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
+      s.reset()
+      landFollowUp([row({ id: 'prev-account' })], [], { active: 7, ended: 7 })
+      await listing
+      expect(s.sessions).toEqual([])
+      expect(s.sessionsLoaded).toBe(false)
+      expect(s.activeTotal).toBe(0)
+      expect(s.endedTotal).toBe(0)
+    })
+
+    it('drops the loading flag once the triggering fetch has written its rows', async () => {
+      const s = useSessionStore()
+      const land = queuePages()
+      const landFollowUp = queuePages()
+      const listing = s.listSessions()
+      land([row()], [row({ ended_at: ENDED_AT })], { active: 1, ended: 1 })
+      await vi.waitFor(() => expect(getSessionLibrary).toHaveBeenCalledTimes(4))
+      expect(s.sessions).toHaveLength(1)
+      expect(s.loading).toBe(false)
+      landFollowUp([], [row({ ended_at: ENDED_AT })], { active: 0, ended: 1 })
+      await listing
     })
   })
 
@@ -853,7 +1014,11 @@ describe('listSessions via library endpoint', () => {
     getSessionLibrary
       .mockResolvedValueOnce({ items: [{ id: 'x' }], total: 1, limit: 20, offset: 0 })
       .mockResolvedValueOnce({ items: [{ id: 'x' }, { id: 'e1' }], total: 2, limit: 20, offset: 0 })
+      // #528: the straddle re-lists once; the follow-up straddles too.
+      .mockResolvedValueOnce({ items: [{ id: 'x' }], total: 1, limit: 20, offset: 0 })
+      .mockResolvedValueOnce({ items: [{ id: 'x' }, { id: 'e1' }], total: 2, limit: 20, offset: 0 })
     await store.listSessions()
+    expect(getSessionLibrary).toHaveBeenCalledTimes(4)
     expect(store.sessions.map((s) => s.id)).toEqual(['x', 'e1'])
   })
 
