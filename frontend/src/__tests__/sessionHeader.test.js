@@ -1,5 +1,5 @@
-import { enableAutoUnmount, flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { flushPromises, mount, RouterLinkStub } from '@vue/test-utils'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { ref } from 'vue'
 
 import SessionHeader from '../components/chat/SessionHeader.vue'
@@ -34,8 +34,6 @@ const mountHeader = (props = {}) =>
     attachTo: document.body,
     global: { stubs: { RouterLink: RouterLinkStub } },
   })
-
-enableAutoUnmount(afterEach)
 
 describe('SessionHeader', () => {
   beforeEach(() => {

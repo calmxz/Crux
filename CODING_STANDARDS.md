@@ -6,6 +6,10 @@ Judgement calls for the reviewer. Mechanical rules (formatting, lint, banned pat
 
 When a diff renames, moves, or changes the behaviour of a symbol, every comment that names or describes it is updated in the same diff. Check comments near the change and comments elsewhere that mention the old name. (Stale comments reached review on #400, #443, #459.)
 
+## Invariant comments hold on every exit
+
+A comment that states an invariant ("only X writes this", "true while Y") is checked against every way out of the code it describes: success, failure, early return, and `reset()`. Name the exit that would break it, or confirm none does. A comment copied from an issue's invariant line is held to the code, not to the issue. (#532: "true exactly while a list runs" missed the re-list and `reset()`; its rewrite missed the failure path; each reached a later review.)
+
 ## One idiom per concern
 
 A concern that already has a helper or documented pattern uses it; a diff adds no second way. Before accepting a hand-rolled guard, check `docs/reference.md` for an existing pattern. Example: async actions in `stores/session.js` gate writes with `_epochGuard()` / `live()` and report errors through `_setError(e, live)` (see "Reset epoch (#414)"), never with an inline epoch comparison.
@@ -15,6 +19,10 @@ When a diff repeats the same guard by hand in three or more places, flag it as a
 ## Fakes prove what ran
 
 A test fake records each call, and the test asserts on that record. A fake that only raises on an unexpected call proves nothing when the code under test catches broad exceptions: the tutor, the summaries and the metering paths turn the raise into a fallback, and the test stays green. Where a test claims to pin which input was used (which text was billed, which prompt was sent), the fake's return depends on that input; a constant return cannot tell two inputs apart. (Both reached review on #410.)
+
+## Every test can go red
+
+For each test the diff adds or edits, name the product-code line whose breakage would turn it red. A test with no such line is vacuous: it sets state the component never reads, or asserts something true whatever the code does. Fix it or delete it. A rename that touches a test re-asks this, since renaming can leave a test pointing at nothing. (#532: a HomeView test set the sidebar list flag, which HomeView never reads; it passed the two-axis review and the bug-hunt review caught it.)
 
 ## New writers check every reader
 
