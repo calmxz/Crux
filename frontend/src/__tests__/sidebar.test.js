@@ -2572,8 +2572,18 @@ describe('Sidebar.vue — failed first list (#544)', () => {
     apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
     await retryBtn().trigger('click')
     await flushPromises()
+    expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
     expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
     expect(errorLine().exists()).toBe(false)
+  })
+
+  it('the Ended tab shows the skeleton, not "No ended sessions yet", during the first list', async () => {
+    apiGetSessionLibrary.mockImplementation(() => new Promise(() => {}))
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    await showEnded()
+    expect(wrapper.find('.sb-skel-list').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="sidebar-ended-empty"]').exists()).toBe(false)
   })
 
   it('after a list loaded with rows, a failed later list keeps the rows and shows no error', async () => {

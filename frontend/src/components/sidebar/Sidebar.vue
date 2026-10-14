@@ -261,6 +261,12 @@ const showActiveListError = computed(() => listFailed.value && !activeRendered.v
 
 const showEndedListError = computed(() => listFailed.value && !cappedEndedRows.value.length)
 
+// Keyed on sessionsLoaded, not on sessions.length like the Active tab's
+// showSkeleton: rows a create inserted are active, so they cannot vouch for
+// the Ended tab, and a list that has never loaded cannot yet say there are no
+// ended sessions.
+const showEndedSkeleton = computed(() => listLoading.value && !sessionsLoaded.value)
+
 // Silent like the mount-time call: the error line is the only report, and it
 // returns on its own if this attempt fails too.
 function onRetryList() {
@@ -826,9 +832,7 @@ async function onSignOut() {
               />
             </ul>
             <SidebarListError v-else-if="showEndedListError" @retry="onRetryList" />
-            <!-- The Active tab's skeleton rule: a list that has never loaded
-                 cannot yet say there are no ended sessions. -->
-            <SidebarSkeletonList v-else-if="listLoading && !sessionsLoaded" :count="3" />
+            <SidebarSkeletonList v-else-if="showEndedSkeleton" :count="3" />
             <p v-else class="sb-empty-hint" data-testid="sidebar-ended-empty">
               No ended sessions yet.
             </p>
