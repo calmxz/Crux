@@ -52,9 +52,13 @@ export const useSessionStore = defineStore('session', () => {
   // NOT the full corpus: a SIDEBAR_PAGE_LIMIT-sized window per status
   // (40 active + 40 ended), refilled by listSessions(). #522: createSession /
   // continueTopic also insert the session they create (_insertCreated), so
-  // the active part may briefly hold one row past the page limit; the
-  // sidebar caps what it renders.
+  // the active part grows one row past the page limit per create until the
+  // next listSessions(); the sidebar caps what it renders.
   const sessions = ref([])
+  // True once a listSessions() has filled the window this sign-in. A create
+  // can make `sessions` non-empty without a list fetch, so its length cannot
+  // stand in for "loaded" (Sidebar's mount-time fetch reads this).
+  const sessionsLoaded = ref(false)
   // The sidebar's server-side search results. Owned by the store rather than
   // by Sidebar.vue because the sidebar RENDERS these row objects directly and
   // they routinely describe sessions outside the `sessions` window: every
@@ -120,12 +124,11 @@ export const useSessionStore = defineStore('session', () => {
   // previous account's data into the reset store (F-02 class). What the
   // action returns or rethrows to its caller is unchanged.
   let _resetEpoch = 0
-  // #522: rows _insertCreated added, tagged with a sequence number so a
-  // listSessions() that started before a create and resolves after it can
-  // re-apply the row its (older) snapshot lacks. Entries the server has seen
-  // by the time a list starts are dropped when that list lands.
-  let _createSeq = 0
-  let _localCreates = [] // { seq, row }
+  // #522: rows _insertCreated added while a listSessions() was in flight. That
+  // list's snapshot may predate them, so it re-applies them when it lands and
+  // then clears this. A create with no list in flight is not tracked: any
+  // later list starts after the create committed and already has it.
+  let _createdDuringList = []
 
   function _epochGuard() {
     const epoch = _resetEpoch
@@ -213,7 +216,10 @@ export const useSessionStore = defineStore('session', () => {
   // #522: map the POST /sessions body (SessionResponse) to the SessionListItem
   // shape the sidebar row renders, and put it in the window. A separate object
   // from `created` (which becomes currentSession): _observedRows treats the
-  // window row and the detail as two copies to keep in step.
+  // window row and the detail as two copies to keep in step. Returns false when
+  // the window already holds the session: only a list fetch that landed after
+  // the create committed can have put it there, and that fetch's total
+  // already counts it.
   function _insertCreated(created) {
     const row = {
       id: created.id,
@@ -228,7 +234,11 @@ export const useSessionStore = defineStore('session', () => {
       last_session_summary: null,
     }
 
-    if (_insertWindowRow(sessions.value, row)) _localCreates.push({ seq: ++_createSeq, row })
+    if (!_insertWindowRow(sessions.value, row)) return false
+
+    if (_inflight.has('list')) _createdDuringList.push(row)
+
+    return true
   }
 
   // Route a backend cap envelope (HTTP 429 detail or SSE error payload)
@@ -274,7 +284,6 @@ export const useSessionStore = defineStore('session', () => {
   function listSessions() {
     return _shareInflight('list', async () => {
       const live = _epochGuard()
-      const startSeq = _createSeq
       loading.value = true
       error.value = null
 
@@ -311,12 +320,10 @@ export const useSessionStore = defineStore('session', () => {
         let activeCount = activePage.total
         let endedCount = endedPage.total
 
-        // #522: a session created while this fetch was in flight is missing
-        // from its snapshot (rows and totals alike); re-apply it. Creates from
-        // before the fetch started are in the snapshot, so the server wins.
-        _localCreates = _localCreates.filter((c) => c.seq > startSeq)
-
-        for (const { row } of _localCreates) {
+        // #522: a session created while this fetch was in flight may be
+        // missing from its snapshot (rows and totals alike); re-apply it. When
+        // the snapshot already has it, the server copy and count win.
+        for (const row of _createdDuringList) {
           if (!_insertWindowRow(merged, row)) continue
 
           if (row.ended_at) endedCount += 1
@@ -324,6 +331,7 @@ export const useSessionStore = defineStore('session', () => {
         }
 
         sessions.value = merged
+        sessionsLoaded.value = true
         activeTotal.value = activeCount
         endedTotal.value = endedCount
 
@@ -331,7 +339,10 @@ export const useSessionStore = defineStore('session', () => {
       } catch (e) {
         _setError(e, live)
       } finally {
-        if (live()) loading.value = false
+        if (live()) {
+          loading.value = false
+          _createdDuringList = []
+        }
       }
     })
   }
@@ -350,10 +361,12 @@ export const useSessionStore = defineStore('session', () => {
       })
 
       if (!live()) return created
+
       // A freshly created session is always active server-side; count it
-      // unconditionally and show it in the sidebar window.
-      activeTotal.value += 1
-      _insertCreated(created)
+      // and show it in the sidebar window, unless a list fetch that landed
+      // first already did both.
+      if (_insertCreated(created)) activeTotal.value += 1
+
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
@@ -663,15 +676,15 @@ export const useSessionStore = defineStore('session', () => {
       // ended in the totals when it was NOT already observed as ended -
       // continueTopic is only ever offered on already-ended rows in the UI,
       // so in the normal case the prior is already counted in endedTotal
-      // and there is no transition to apply here.
-      activeTotal.value += 1
+      // and there is no transition to apply here. The new session is not
+      // counted again when a list fetch that landed first already holds it.
+      if (_insertCreated(created)) activeTotal.value += 1
 
       if (!alreadyEnded) {
         activeTotal.value = Math.max(0, activeTotal.value - 1)
         endedTotal.value += 1
       }
 
-      _insertCreated(created)
       currentSession.value = created
       currentSessionId.value = created.id
       messages.value = []
@@ -1310,11 +1323,12 @@ export const useSessionStore = defineStore('session', () => {
     abandonStream()
     _resetEpoch += 1
     _inflight.clear()
-    _localCreates = []
+    _createdDuringList = []
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
     sessions.value = []
+    sessionsLoaded.value = false
     searchRows.value = []
     activeTotal.value = 0
     endedTotal.value = 0
@@ -1340,6 +1354,7 @@ export const useSessionStore = defineStore('session', () => {
     currentSessionId,
     currentSession,
     sessions,
+    sessionsLoaded,
     searchRows,
     activeTotal,
     endedTotal,

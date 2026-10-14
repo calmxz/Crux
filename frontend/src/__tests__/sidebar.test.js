@@ -1567,15 +1567,36 @@ describe('Sidebar.vue — mount fetch', () => {
     expect(listSpy).toHaveBeenCalled()
   })
 
-  it('skips list fetch when sessions already populated', async () => {
+  it('skips list fetch when a list has already loaded', async () => {
     const auth = useAuthStore()
     auth.session = { user: { id: 'u-1' }, access_token: 't' }
     const store = useSessionStore()
     store.sessions = [{ id: 'a1', topic: 'X', created_at: '2026-05-20T10:00:00Z', ended_at: null }]
+    store.sessionsLoaded = true
     const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
     wrapper = mount(Sidebar)
     await flushPromises()
     expect(listSpy).not.toHaveBeenCalled()
+  })
+
+  // #522: a create inserts a row without loading the window, so a non-empty
+  // `sessions` must not stand in for "loaded".
+  it('still fetches when the only rows came from a create', async () => {
+    const auth = useAuthStore()
+    auth.session = { user: { id: 'u-1' }, access_token: 't' }
+    const store = useSessionStore()
+    apiCreateSession.mockResolvedValueOnce({
+      id: 'n1',
+      topic: 'Graphs',
+      created_at: '2026-05-20T10:00:00Z',
+      ended_at: null,
+      pinned: false,
+    })
+    await store.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+    const listSpy = vi.spyOn(store, 'listSessions').mockResolvedValue([])
+    wrapper = mount(Sidebar)
+    await flushPromises()
+    expect(listSpy).toHaveBeenCalled()
   })
 
   it('skips list fetch when unauthenticated', async () => {

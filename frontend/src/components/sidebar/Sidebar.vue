@@ -267,8 +267,9 @@ const showEmptyActiveHint = computed(
 )
 
 // Fetch only if we haven't loaded yet. HomeView also calls listSessions on mount;
-// the store de-dupes concurrent calls via _inflight, and skipping when populated
-// avoids the deep-link redundant fetch.
+// the store de-dupes concurrent calls via _inflight, and skipping once a list
+// has loaded avoids the deep-link redundant fetch. Not `sessions.length`: a
+// create inserts a row without loading the rest of the window (#522).
 onMounted(async () => {
   // Fit-to-height: measure once the list column exists (desktop or drawer) and
   // again whenever it resizes. Guarded so jsdom -- which has no
@@ -278,7 +279,7 @@ onMounted(async () => {
     listResizeObserver.observe(listEl.value)
   }
 
-  if (isAuthenticated.value && !sessions.value.length) {
+  if (isAuthenticated.value && !sessionStore.sessionsLoaded) {
     await sessionStore.listSessions().catch(() => {})
   }
 

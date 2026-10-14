@@ -241,12 +241,28 @@ describe('session store', () => {
       expect(s.endedTotal).toBe(2)
     })
 
-    it('does not duplicate a row whose id is already in the window', async () => {
+    it('does not duplicate or recount a row whose id is already in the window', async () => {
       sessionsApi.createSession.mockResolvedValueOnce(created())
       const s = useSessionStore()
+      // A list that landed after the create committed: its row and total
+      // already include the session.
       s.sessions = [{ id: 'new', topic: 'Graphs', pinned: false, ended_at: null }]
+      s.activeTotal = 1
       await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
       expect(s.sessions.filter((r) => r.id === 'new')).toHaveLength(1)
+      expect(s.activeTotal).toBe(1)
+    })
+
+    it('sessionsLoaded tracks a landed list, not a create, and reset() clears it', async () => {
+      sessionsApi.createSession.mockResolvedValueOnce(created())
+      const s = useSessionStore()
+      await s.createSession({ topic: 'Graphs', seedMode: 'fresh' })
+      expect(s.sessionsLoaded).toBe(false)
+      sessionsApi.getSessionLibrary.mockResolvedValue({ items: [], total: 0, limit: 40, offset: 0 })
+      await s.listSessions()
+      expect(s.sessionsLoaded).toBe(true)
+      s.reset()
+      expect(s.sessionsLoaded).toBe(false)
     })
 
     it('does not insert when the create resolves after reset()', async () => {

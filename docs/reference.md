@@ -342,7 +342,7 @@ literal `'pending'`. `MessageList` keys on a real `message_id`, then
 ### Reset epoch (#414)
 
 `stores/session.js` `reset()` (sign-out) aborts the live stream first, then
-bumps `_resetEpoch`, clears `_inflight` and `_localCreates`, and nulls
+bumps `_resetEpoch`, clears `_inflight` and `_createdDuringList`, and nulls
 `_latestRequestedId`. Any
 async action must call `const live = _epochGuard()` before its first `await`
 and gate every later state write on `live()`: data writes, `finally` flag
@@ -359,12 +359,15 @@ only if it is still the same promise.
 corpus, and nothing refetches it after a mutation. `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
-pinned active rows). Each insert is tagged with `_createSeq` in
-`_localCreates`, and a `listSessions()` re-applies, and counts into the totals,
-any create newer than its own start: its snapshot predates that session. For
-older creates the server result wins. A new action that adds rows to the
-window locally must go through `_insertCreated` (or the same tracking), or an
-in-flight list fetch will drop the row.
+pinned active rows), counting it in `activeTotal` only if the row was not
+already there. A create that lands while a `listSessions()` is in flight is
+recorded in `_createdDuringList`; that list re-applies it (and counts it) if
+its snapshot lacks it, then clears the record. A new action that adds rows to
+the window locally must go through `_insertCreated`, or an in-flight list fetch
+will drop the row. "Has the window loaded?" is `sessionsLoaded`, never
+`sessions.length`: a create makes the window non-empty without loading it.
+Known gap: other mutations (end, pin, rename) made during an in-flight list
+are still overwritten by its older snapshot.
 
 ### E2E sign-in against the real backend (#518)
 
