@@ -342,7 +342,7 @@ literal `'pending'`. `MessageList` keys on a real `message_id`, then
 ### Reset epoch (#414)
 
 `stores/session.js` `reset()` (sign-out) aborts the live stream first, then
-bumps `_resetEpoch`, clears `_inflight` and `_createdDuringList`, and nulls
+bumps `_resetEpoch`, clears `_inflight` and `_listReplays`, and nulls
 `_latestRequestedId`. Any
 async action must call `const live = _epochGuard()` before its first `await`
 and gate every later state write on `live()`: data writes, `finally` flag
@@ -353,21 +353,31 @@ previous account's data into the next one's store. Streams use the separate
 Shared-promise dedupe goes through `_shareInflight`, which deletes an entry
 only if it is still the same promise.
 
-### Sidebar session window (#522)
+### Sidebar session window (#522, #524)
 
 `stores/session.js` `sessions` is a window (40 active + 40 ended), not the
 corpus, and nothing refetches it after a mutation. `listSessions()` replaces
 it; actions patch rows in place. `createSession` / `continueTopic` insert the
 created session locally via `_insertCreated` (list-item shape, after the
 pinned active rows), counting it in `activeTotal` only if the row was not
-already there. A create that lands while a `listSessions()` is in flight is
-recorded in `_createdDuringList`; that list re-applies it (and counts it) if
-its snapshot lacks it, then clears the record. A new action that adds rows to
-the window locally must go through `_insertCreated`, or an in-flight list fetch
-will drop the row. "Has the window loaded?" is `sessionsLoaded`, never
+already there. "Has the window loaded?" is `sessionsLoaded`, never
 `sessions.length`: a create makes the window non-empty without loading it.
-Known gap: other mutations (end, pin, rename) made during an in-flight list
-are still overwritten by its older snapshot.
+
+A list snapshot can predate a local change, so every window change is
+recorded in `_listReplays` and re-applied onto the incoming rows and totals
+before the list writes them:
+- Create, end, reopen and continueTopic's prior-end are recorded on success,
+  only while a list is in flight. A create inserts only if the snapshot lacks
+  the row. An end/reopen applies only to a row in the snapshot that is still in
+  the prior state, and then moves the totals. A row already in the target state
+  was counted by the snapshot, and a row outside the snapshot needs nothing.
+- Pin and rename are recorded from their optimistic start, because a list that
+  started before the write committed can land while it is still pending. A
+  failed write drops its entry and also rolls back any landed row it patched,
+  unless a later write has already changed that row.
+- Settled entries clear when the in-flight list settles, success or failure.
+  `reset()` clears them all. A new action that changes window rows locally must
+  record a replay, or an in-flight list will revert it.
 
 ### E2E sign-in against the real backend (#518)
 

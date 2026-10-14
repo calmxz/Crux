@@ -11,7 +11,7 @@ test.describe('onboarding to chat', () => {
     await signIn(page)
   })
 
-  test('completes onboarding, creates fresh session, sends message, gets stub reply', async ({
+  test('completes onboarding, creates fresh session, gets stub reply, ends it from the header', async ({
     page,
   }) => {
     await page.goto('/')
@@ -45,5 +45,22 @@ test.describe('onboarding to chat', () => {
     // The turn was written to Postgres: a reload reads it back from the API.
     await page.reload()
     await expect(page.getByTestId('msg-assistant').last()).toContainText('[STUB:fresh]')
+
+    // #525: end through the in-page header End control (the resume spec
+    // covers the sidebar row menu). Wait for the end response from before the
+    // accept click: the click resolves on dispatch, not on the async handler.
+    const sessionId = page.url().split('/session/')[1].split(/[?#]/)[0]
+
+    const endResponse = page.waitForResponse(
+      (r) => r.url().includes(`/sessions/${sessionId}/end`) && r.ok(),
+    )
+
+    await page.getByTestId('session-action-end').click()
+    await page.locator('.p-confirmdialog button.confirm-delete-strong').click()
+    await endResponse
+
+    await expect(page.getByTestId('session-summary-dialog')).toBeVisible()
+    await expect(page.getByTestId('session-ended-banner')).toBeVisible()
+    await expect(page.getByTestId('session-input')).toHaveCount(0)
   })
 })
