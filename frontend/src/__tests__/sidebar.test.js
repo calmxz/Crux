@@ -1725,6 +1725,22 @@ describe('Sidebar.vue — re-list when the tab becomes visible', () => {
     expect(lists()).toBe(4)
   })
 
+  it('throttles a failed re-list from its attempt', async () => {
+    signIn()
+    await mountSidebar()
+    apiGetSessionLibrary.mockRejectedValue(new Error('offline'))
+    vi.setSystemTime(new Date('2026-10-14T10:05:00Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    // Still offline, 10s later: no new request.
+    vi.setSystemTime(new Date('2026-10-14T10:05:10Z'))
+    await showTab()
+    expect(lists()).toBe(2)
+    vi.setSystemTime(new Date('2026-10-14T10:05:30Z'))
+    await showTab()
+    expect(lists()).toBe(3)
+  })
+
   it('treats a wall clock moved backwards as stale', async () => {
     signIn()
     await mountSidebar()

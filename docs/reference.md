@@ -414,9 +414,11 @@ Visibility re-list (#534): `composables/useVisibilityRelist.js`, called by
 mounted sidebars (module-scoped count; added on the first mount, removed on
 the last unmount). When the document turns visible and the user is signed in,
 it calls the store's `relistIfStale()`. That calls `listSessions()` unless the
-window has not loaded this sign-in (`sessionsLoaded`) or a list wrote the
-window under 30 seconds ago (`_listLandedAt`, set by every landing, cleared by
-`reset()`; a negative age from a clock moved back counts as stale). A list still in flight is joined through `_inflight`. The event
+window has not loaded this sign-in (`sessionsLoaded`), or a list wrote the
+window (`_listLandedAt`, set by every landing) or a visibility re-list was
+attempted (`_relistTriedAt`, so offline returns are throttled too) under 30
+seconds ago. `reset()` clears both; a negative age from a clock moved back
+counts as stale. A list still in flight is joined through `_inflight`. The event
 runs as its own task, never in the microtasks between a list's `finally` and
 its `_inflight` removal, so it cannot join a finished fetch.
 

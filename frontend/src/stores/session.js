@@ -158,8 +158,10 @@ export const useSessionStore = defineStore('session', () => {
   let _listsLanded = 0
   // #534: Date.now() when a list fetch last wrote the window, whatever
   // started it (mount, #528 follow-up, #533 re-list, a visibility re-list).
-  // relistIfStale() throttles on it. reset() clears it.
+  // relistIfStale() throttles on it, and on its own last attempt, so a failing
+  // re-list (offline) is throttled too. reset() clears both.
   let _listLandedAt = null
+  let _relistTriedAt = null
   const RELIST_THROTTLE_MS = 30_000
 
   function _untrackReplay(replay) {
@@ -540,15 +542,18 @@ export const useSessionStore = defineStore('session', () => {
   // when the tab becomes visible again, so a change made on another device or
   // tab (or a totals residue, see #528) shows up without a reload. Skipped
   // until the window has loaded this sign-in (the mount-time fetch owns the
-  // first load) and while the last landing is under RELIST_THROTTLE_MS old.
-  // Otherwise one listSessions(): silent, de-duped with any list in flight,
-  // and a failure keeps the current window. A negative age (the wall clock
-  // moved back) counts as stale, so a clock change cannot mute it.
+  // first load) and while the last landing or the last attempt is under
+  // RELIST_THROTTLE_MS old. Otherwise one listSessions(): silent, de-duped
+  // with any list in flight, and a failure keeps the current window. A
+  // negative age (the wall clock moved back) counts as stale, so a clock
+  // change cannot mute it.
   function relistIfStale() {
     if (!sessionsLoaded.value) return
-    const age = Date.now() - _listLandedAt
+    const now = Date.now()
+    const recent = (at) => at !== null && now - at >= 0 && now - at < RELIST_THROTTLE_MS
 
-    if (age >= 0 && age < RELIST_THROTTLE_MS) return
+    if (recent(_listLandedAt) || recent(_relistTriedAt)) return
+    _relistTriedAt = now
     listSessions().catch(() => {})
   }
 
@@ -1523,6 +1528,7 @@ export const useSessionStore = defineStore('session', () => {
     _listReplays = []
     _listPending = false
     _listLandedAt = null
+    _relistTriedAt = null
     _latestRequestedId = null
     currentSessionId.value = null
     currentSession.value = null
