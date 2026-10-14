@@ -16,15 +16,17 @@ epoch guard, silence, in-flight de-dupe and the #528 re-list unchanged. It is
 skipped when signed out, before the window has loaded this sign-in (the
 mount-time fetch owns the first load), and when any list landed, or a
 visibility re-list was attempted, under 30 seconds ago. Counting attempts
-keeps a tab returned to while offline from fetching on every switch. So tab
+keeps a tab returned to while offline from fetching on every switch; the
+cost is that the first return after reconnecting can wait out the rest of
+those 30 seconds. So tab
 switching starts at most one list fetch per 30 seconds; that list can still
 bring its own #528 follow-up or a #533 re-list, as any list can. A failure
 keeps the current window.
 
 Rejected: polling and live push (Supabase Realtime, SSE, WebSockets), for
 running cost; a re-fetch on window `focus` alone or on network reconnect. The
-listener lives with the sidebar, the only component that renders the window
-(other views only look rows up in it), and a module-scoped count keeps it to
+listener lives with the sidebar, the only component that renders the window's
+rows (other views look rows up or check whether it is empty), and a module-scoped count keeps it to
 one listener however many sidebars mount. A failed first load is not retried
 on return: the brief leaves the first load to the mount-time fetch.
 

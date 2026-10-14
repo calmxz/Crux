@@ -270,7 +270,8 @@ const showEmptyActiveHint = computed(
 )
 
 // #534: returning to the tab re-lists once the window is stale. The sidebar
-// is the only component that renders the window, so the listener lives here.
+// is the only component that renders the window's rows, so the listener
+// lives here.
 useVisibilityRelist()
 
 // Fetch only if we haven't loaded yet. HomeView also calls listSessions on mount;
