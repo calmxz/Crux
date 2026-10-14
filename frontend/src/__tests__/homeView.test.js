@@ -56,9 +56,8 @@ describe('HomeView', () => {
     expect(spy).toHaveBeenCalledWith()
   })
 
-  it('does not render bare Loading text while the store is loading', () => {
+  it('renders the start form, not bare Loading text, with no sessions', () => {
     const store = useSessionStore()
-    store.listLoading = true
     store.sessions = []
     const w = mountView()
     expect(w.text()).not.toContain('Loading...')

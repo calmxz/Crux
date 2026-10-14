@@ -6,11 +6,17 @@
 // on individual stub methods.
 
 import { ReadableStream } from 'node:stream/web'
-import { vi, beforeEach } from 'vitest'
+import { enableAutoUnmount } from '@vue/test-utils'
+import { vi, beforeEach, afterEach } from 'vitest'
 
 // The vmThreads pool runs each file in a vm context that does not inherit
 // Node's web-stream globals, and jsdom provides none. SSE tests need it.
 globalThis.ReadableStream ??= ReadableStream
+
+// Unmount every mounted wrapper after each test, so a component's deferred
+// work (idle timers, watchers) cannot run after mockReset has cleared the next
+// test's mocks. Call it here only: a second call throws.
+enableAutoUnmount(afterEach)
 
 const authStub = {
   getSession: vi.fn().mockResolvedValue({ data: { session: null }, error: null }),
