@@ -91,7 +91,8 @@ export const useSessionStore = defineStore('session', () => {
   const hasMoreMessages = ref(false)
   const loadingEarlier = ref(false)
   const loadEarlierError = ref(null)
-  // True exactly while a sidebar list fetch runs; listSessions alone writes it.
+  // True while a sidebar list fetch has not yet written its rows. Only
+  // listSessions and reset() write it.
   const listLoading = ref(false)
   const detailLoading = ref(false)
   const error = ref(null)

@@ -1144,7 +1144,7 @@ describe('session store', () => {
     expect(store.error).toBeNull()
   })
 
-  it('superseded load settling first does not clear loading flags', async () => {
+  it('superseded load settling first does not clear detailLoading', async () => {
     const store = useSessionStore()
     let resolveB, resolveC
     sessionsApi.getSession
@@ -2123,7 +2123,9 @@ describe('session store - late results after reset()', () => {
     const oldEnded = deferred()
     getSessionLibrary.mockReturnValueOnce(oldActive.promise).mockReturnValueOnce(oldEnded.promise)
     const stale = s.listSessions()
+    expect(s.listLoading).toBe(true)
     s.reset()
+    expect(s.listLoading).toBe(false)
 
     const newActive = deferred()
     const newEnded = deferred()
