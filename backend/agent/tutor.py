@@ -174,7 +174,7 @@ async def run_streaming(
         yield StreamEvent("citations", [c.model_dump() for c in citations])
 
     try:
-        for _i in range(max_iters):
+        for _ in range(max_iters):
             # B-10 (structural): close the transaction this turn's earlier
             # reads opened so the pooled connection (and, on the Supabase
             # transaction pooler, its pinned backend) returns to the pool for
