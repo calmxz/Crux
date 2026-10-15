@@ -1,6 +1,6 @@
 """The Check: its Sets, their grading, and their commit (#420).
 
-Vocabulary (Check, Set, Item, Close, Recap, Diagnostic): CONTEXT.md.
+Vocabulary (Check, Set, Item, Close, Recap, Diagnostic): GLOSSARY.md.
 
 A CHECK is 1..3 Sets, one Set per turn. Three Session columns are private to
 this module, as is ChatMessage.check_batch_json (the frozen Recap):
@@ -29,7 +29,8 @@ this module, as is ChatMessage.check_batch_json (the frozen Recap):
   score of the closed Sets; the level is graded once over all Sets.
 - quiz_cooldown_json: the last closed Set's misses, for the prompt.
 
-Transactions. Every action takes the session row lock and commits itself,
+Transactions. Every action that gets past argument validation takes the
+session row lock and commits itself,
 releasing the lock on every return path, early exits included. A conflict
 commits, then raises CheckError. Nothing releases by rollback: register and
 stamp_message_id run inside the tutor turn, whose flushed cost-ledger writes
@@ -168,7 +169,7 @@ def _public_view(pc: dict | None) -> dict | None:
 def load_session_learning_events(db: Session, session_id: str) -> list[LearningEvent]:
     """All LearningEvents for a session, oldest first. Loaded once per detail
     render so recap_for_message can match in memory instead of issuing one
-    SELECT per Item (the former N+1)."""
+    SELECT per Item."""
     return list(
         db.execute(
             select(LearningEvent)
@@ -278,6 +279,10 @@ def _write_current_check(row: SessionModel, cc: dict | None) -> None:
     row.current_check_json = json.dumps(cc) if cc is not None else None
 
 
+def _write_cooldown(row: SessionModel, cooldown: dict | None) -> None:
+    row.quiz_cooldown_json = json.dumps(cooldown) if cooldown is not None else None
+
+
 def _freeze_recap(db: Session, pc: dict) -> None:
     """Freeze the Set's public view onto its asking message. No-op when the
     Set was never stamped or the message is gone (read-time rebuild covers)."""
@@ -337,11 +342,17 @@ def _skip_remaining(pc: dict) -> None:
     pc["current_index"] = len(pc.get("items", []))
 
 
-def _open_set_for_click(row: SessionModel) -> dict:
-    """The open Set an answer or skip resolves. Rechecks ended_at under the
-    lock: a click queued behind a session end must not write to it."""
+def _require_live(row: SessionModel) -> None:
+    """Recheck ended_at under the lock. A learner action queued behind a
+    session end's claim must not write to it: the end's abandon runs only
+    after its summary call, so the Set can still be open here."""
     if row.ended_at is not None:
         raise CheckError(SESSION_ENDED)
+
+
+def _open_set_for_click(row: SessionModel) -> dict:
+    """The open Set an answer or skip resolves."""
+    _require_live(row)
     pc = open_set(row)
     if pc is None:
         raise _conflict("no open check-question batch")
@@ -500,7 +511,7 @@ def _build_cooldown(pc: dict) -> dict | None:
 def _close_with_cooldown(db: Session, row: SessionModel, pc: dict, *, ends_check: bool):
     cooldown = _build_cooldown(pc)
     _close(db, row, pc, ends_check=ends_check)
-    row.quiz_cooldown_json = json.dumps(cooldown) if cooldown is not None else None
+    _write_cooldown(row, cooldown)
     return cooldown
 
 
@@ -701,6 +712,7 @@ def complete(db: Session, session_id: str) -> tuple[str, dict | None]:
     Set. B-02: a concurrent second call re-reads no resolved Set after this
     commit and gets no_resolved_batch."""
     with _locked(db, session_id) as row:
+        _require_live(row)
         pc = open_set(row)
         if pc is None or not _is_done(pc):
             raise CheckError(NO_RESOLVED_BATCH)
@@ -720,6 +732,7 @@ def stop(db: Session, session_id: str) -> tuple[str, dict | None]:
     ones. Raises no_open_check when no Check is in progress, or when the
     open Set is fully answered (that Set is complete()'s to Close)."""
     with _locked(db, session_id) as row:
+        _require_live(row)
         pc = open_set(row)
         if pc is None:
             cc = current_check(row)

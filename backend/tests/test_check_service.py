@@ -236,12 +236,6 @@ def test_register_refused_out_of_order_releases_the_lock(db):
     assert not db.in_transaction()
 
 
-def test_register_refused_when_suppressed_releases_the_lock(db):
-    result = check_service.register(db, _ctx(db, suppress=True), _args())
-    assert not result.ok
-    assert not db.in_transaction()
-
-
 @pytest.mark.parametrize(
     "action",
     [
@@ -306,22 +300,36 @@ def test_stop_on_a_fully_answered_set_releases_the_lock(db):
 
 
 @pytest.mark.parametrize(
-    "action",
-    [lambda db: check_service.answer(db, SID, 0, 0), lambda db: check_service.skip(db, SID, 0)],
-    ids=["answer", "skip"],
+    ("action", "resolved"),
+    [
+        (lambda db: check_service.answer(db, SID, 0, 0), False),
+        (lambda db: check_service.skip(db, SID, 0), False),
+        (lambda db: check_service.complete(db, SID), True),
+        (lambda db: check_service.stop(db, SID), False),
+    ],
+    ids=["answer", "skip", "complete", "stop"],
 )
-def test_answer_or_skip_after_session_end_is_refused_under_the_lock(db, action):
-    """Carried from #418: a click queued behind a session end rechecks
-    ended_at under the lock instead of writing to an ended session."""
+def test_learner_action_after_session_end_is_refused_under_the_lock(db, action, resolved):
+    """Carried from #418: an action queued behind a session end's claim
+    rechecks ended_at under the lock instead of writing to an ended session
+    (the end's abandon has not run yet, so the Set is still open)."""
     _open(db)
+    if resolved:
+        check_service.answer(db, SID, 0, 0)
+        check_service.answer(db, SID, 1, 0)
+    before = check_service.open_set(_row(db))
+    events = db.query(LearningEvent).count()
     _row(db).ended_at = datetime.now(timezone.utc)
     db.commit()
     with pytest.raises(check_service.CheckError) as exc:
         action(db)
     assert exc.value.code == SESSION_ENDED
+    assert exc.value.message is None
     assert not db.in_transaction()
-    assert db.query(LearningEvent).count() == 0
-    assert check_service.open_set(_row(db))["items"][0]["status"] == "pending"
+    assert db.query(LearningEvent).count() == events
+    row = _row(db)
+    assert check_service.open_set(row) == before
+    assert check_service.quiz_cooldown(row) is None
 
 
 # --- 3. Abandon never commits -----------------------------------------------

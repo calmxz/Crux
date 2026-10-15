@@ -288,9 +288,8 @@ def _load_messages(
     window = list(db.execute(q.order_by(ChatMessage.id.desc()).limit(limit + 1)).scalars().all())
     has_more = len(window) > limit
     rows = list(reversed(window[:limit]))
-    # Preload LearningEvents once iff some message may need reconstruction
-    # (no frozen Recap and not the open message). Avoids the
-    # former per-item N+1 entirely; skipped when every batch is persisted.
+    # Preload LearningEvents once iff some message's Recap must be rebuilt
+    # (not frozen, and not the open Set's message).
     needs_events = any(
         not check_service.recap_is_frozen(m) and m.id != open_message_id for m in rows
     )
@@ -713,7 +712,7 @@ def update_session(
 
 
 def _check_409(e: check_service.CheckError) -> HTTPException:
-    """A refused Check action as today's 409 (C-14: the status is route-owned).
+    """A refused Check action as a 409 (C-14: the status is route-owned).
     Only check_conflict carries a message."""
     detail = {"code": e.code}
     if e.message is not None:
@@ -781,10 +780,10 @@ def _recent_history(db: Session, session_id: str) -> list[dict]:
 def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     """F-11: the entire synchronous segment of complete_check.
 
-    Guard/lock/claim order is load-bearing and unchanged. lock_session_row's
-    FOR UPDATE and every statement below run on the same Session and the same
-    connection, so running the whole segment in one worker thread is
-    equivalent to running it inline. Returns
+    check_service.complete() claims the Set under the row lock and commits
+    before the LLM stream starts (B-02). Every statement below runs on the
+    same Session and connection, so running the whole segment in one worker
+    thread is equivalent to running it inline. Returns
     (allowed, messages, system_prompt, ctx); on `allowed is False` the caller
     emits the daily-cap skip stream and nothing else.
     """
@@ -794,9 +793,6 @@ def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     if row.ended_at is not None:
         raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
 
-    # B-02: complete() claims the Set under the session row lock and commits,
-    # so a concurrent second call re-reads no resolved Set and 409s, well
-    # before the LLM stream starts.
     try:
         summary, cooldown = check_service.complete(db, session_id)
     except check_service.CheckError as e:
@@ -807,10 +803,7 @@ def _complete_check_prepare(session_id: str, user_id: str, db: Session):
 def _stop_check_prepare(session_id: str, user_id: str, db: Session):
     """F-11: synchronous segment of stop_check (#340 Stop button).
 
-    stop() claims the Check under the session row lock and commits before
-    returning, so a double click's loser re-reads no Check in progress and
-    409s, well before any LLM stream starts (same shape as B-02 for
-    /check/complete)."""
+    stop() commits before the LLM stream starts (B-02)."""
     row = db.get(SessionModel, session_id)
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")

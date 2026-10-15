@@ -277,7 +277,7 @@ def test_is_done_true_after_last(db, ctx, session_id):
     assert cq._is_done(cq.open_set(db.get(SessionModel, session_id))) is True
 
 
-def test_build_results_summary_mentions_misses_and_skips(db, ctx, session_id):
+def test_results_summary_mentions_misses_and_skips(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.answer(db, session_id, index=0, selected_index=1)  # wrong
     cq.skip(db, session_id, index=1)

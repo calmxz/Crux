@@ -112,6 +112,17 @@ Activity stats are snapshotted once per transaction, and the holder's stays
 open, so each poll must run `SELECT pg_stat_clear_snapshot()` first or the
 waiters never appear.
 
+### Check module owns its transaction (#420)
+
+`services/check_service.py` is the only code that reads or writes
+`pending_check_json`, `current_check_json`, `quiz_cooldown_json` and
+`ChatMessage.check_batch_json`; everything else goes through its row reads.
+Its actions commit themselves, on early exits and `CheckError` too, and
+never release the lock by rollback (the tutor turn's flushed cost-ledger
+writes must survive). `abandon_in_caller_transaction` is the exception: it
+joins the session end's single commit. So a caller never commits after an
+action, and must commit after abandon.
+
 ### Liveness vs readiness (G-07)
 
 `/health` and `/healthz` are liveness-only and must keep returning 200 while the
