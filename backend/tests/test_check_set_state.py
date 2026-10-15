@@ -59,7 +59,7 @@ def ctx_fresh_session(db_session):
 
     F-59: purpose now comes from ctx.diagnostic_required (the turn's prepared
     decision), not a live re-read of knowledge_level, so this fixture sets the
-    flag explicitly to mirror what _build_prompt_state would have decided."""
+    flag explicitly to mirror what prompt_state.assemble would have decided."""
     db_session.add(User(id=USER_ID))
     db_session.flush()
     row = SessionModel(

@@ -14,7 +14,6 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from agent import context_budget, prompts, tutor
-from agent.excerpt import wrap_chunk
 from agent.types import ToolContext
 from config import settings
 from contracts import ChatRequest
@@ -31,11 +30,9 @@ from lib.error_codes import (
     SESSION_ENDED,
 )
 from services import (
-    check_service,
     cost_meter,
     documents_service,
-    learning_event_service,
-    profile_service,
+    prompt_state,
     rate_limit,
     retrieval_service,
     summary_service,
@@ -60,68 +57,6 @@ async def _rolling_summary_task(session_id: str) -> None:
         log.warning("rolling summary task failed: %s", e)
     finally:
         db.close()
-
-
-def _build_prompt_state(
-    *,
-    session: SessionModel,
-    profile,
-    ingestion_status,
-    retrieval_required: bool,
-    review_gaps: bool,
-    review_gap: str | None = None,
-    diagnostic_accepted: bool = False,
-    pending_check,
-    quiz_cooldown,
-    gap_accuracy: dict | None = None,
-    prefetched_chunks=None,
-    learner_prefs: dict | None = None,
-) -> dict:
-    """Build the prompt_state dict consumed by prompts.build_system_prompt.
-
-    Pure function (no DB access) so it can be unit-tested directly.
-    """
-    prompt_state = {
-        "topic": session.topic,
-        "profile": profile,
-        "ingestion_status": ingestion_status,
-        "retrieval_required": retrieval_required,
-        "diagnostic_required": profile.knowledge_level is None,
-        "seed_mode": None,
-        "last_session_summary": profile.last_session_summary,
-        "rolling_summary": getattr(session, "rolling_summary", None),
-        "pending_check": pending_check,
-        "current_check": check_service.current_check(session),
-        "quiz_cooldown": quiz_cooldown,
-        "gap_accuracy": gap_accuracy or {},
-        "learner_prefs": learner_prefs or {},
-        # #354: gates the once-per-session topic card.
-        "topic_suggest_state": getattr(session, "topic_suggest_state", None),
-    }
-    if diagnostic_accepted and profile.knowledge_level is None:
-        prompt_state["diagnostic_accepted"] = True
-    if review_gaps:
-        gaps = profile_service.concept_names(profile.confirmed_gaps)
-        mastered = [
-            c for c in profile_service.concept_names(profile.mastered_concepts) if c not in gaps
-        ]
-        pool = gaps + mastered
-        if pool:
-            if review_gap in pool:
-                target = review_gap
-            else:
-                # Requested review_gap isn't in the pool (e.g. resolved/renamed
-                # since the queue was fetched): fall back to the first
-                # confirmed gap, deliberately preferring gaps over mastered
-                # retention concepts as the substitute target.
-                target = gaps[0] if gaps else pool[0]
-            prompt_state["review_gaps_target"] = target
-            prompt_state["review_gaps_retention"] = target in mastered
-            prompt_state["diagnostic_required"] = False
-            prompt_state["diagnostic_accepted"] = False
-    if prefetched_chunks:
-        prompt_state["prefetched_excerpts"] = [wrap_chunk(ch) for ch in prefetched_chunks]
-    return prompt_state
 
 
 def _turn_reserve() -> Decimal:
@@ -285,11 +220,17 @@ def _prepare_turn_guards(
     return session, ingestion_status, learner_prefs
 
 
-def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
-    """Synchronous history/profile/lexical-gate segment of _prepare_turn.
+def _prepare_turn_context(
+    req: ChatRequest,
+    db: Session,
+    session: SessionModel,
+    ingestion_status,
+    learner_prefs: dict,
+):
+    """Synchronous history/prompt-inputs/lexical-gate segment of _prepare_turn.
 
     F-11: split out so the caller can run it via run_in_threadpool. Returns
-    (messages, profile, gap_accuracy, retrieval_required).
+    (messages, session_inputs, retrieval_required).
     """
     history = (
         db.execute(
@@ -313,17 +254,11 @@ def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
     ]
     messages.append({"role": "user", "content": req.message})
 
-    profile = profile_service.profile_from_row(session)
-
-    # D1.2: per-gap accuracy, best-effort. Only run when there is something
-    # to enrich (confirmed_gaps non-empty) to keep the no-gaps path inside
-    # the P3.1 budget; a failure here must never kill the turn.
-    gap_accuracy: dict[str, dict] = {}
-    if profile.confirmed_gaps:
-        try:
-            gap_accuracy = learning_event_service.gap_accuracy(db, req.session_id)
-        except Exception as e:  # noqa: BLE001 - best-effort prompt enrichment
-            log.warning("gap_accuracy failed; continuing without it: %s", e)
+    # The guard SELECTs already loaded the prefs (#356) and ingestion counts,
+    # so only gap accuracy can cost a statement here.
+    session_inputs = prompt_state.gather_session_inputs(
+        db, session, learner_prefs=learner_prefs, ingestion_status=ingestion_status
+    )
 
     retrieval_required = keyword_index.match_required(
         req.message, json.loads(session.kw_index_json or "[]")
@@ -335,7 +270,7 @@ def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
     # one. `session` was already expunged by the guards and everything read
     # afterwards is a plain local, so commit-expiry costs no refresh SELECT.
     db.commit()
-    return messages, profile, gap_accuracy, retrieval_required
+    return messages, session_inputs, retrieval_required
 
 
 def _persist_user_turn(req: ChatRequest, db: Session) -> None:
@@ -373,8 +308,8 @@ async def _prepare_turn_after_guards(
     # the user's message: persist it, then re-raise. Happy path pays no extra
     # statement.
     try:
-        messages, profile, gap_accuracy, retrieval_required = await run_in_threadpool(
-            _prepare_turn_context, req, db, session
+        messages, session_inputs, retrieval_required = await run_in_threadpool(
+            _prepare_turn_context, req, db, session, ingestion_status, learner_prefs
         )
         query_vec = None
         if not retrieval_required:
@@ -395,21 +330,17 @@ async def _prepare_turn_after_guards(
                 query_vec=query_vec,
             )
 
-        prompt_state = _build_prompt_state(
-            session=session,
-            profile=profile,
-            ingestion_status=ingestion_status,
-            retrieval_required=retrieval_required,
-            review_gaps=getattr(req, "review_gaps", False),
-            review_gap=getattr(req, "review_gap", None),
-            diagnostic_accepted=getattr(req, "diagnostic_accepted", False),
-            pending_check=check_service.open_set(session),
-            quiz_cooldown=check_service.quiz_cooldown(session),
-            gap_accuracy=gap_accuracy,
-            prefetched_chunks=prefetched_chunks,
-            learner_prefs=learner_prefs,
+        state = prompt_state.assemble(
+            session_inputs,
+            prompt_state.TurnInputs(
+                retrieval_required=retrieval_required,
+                review_gaps=bool(req.review_gaps),
+                review_gap=req.review_gap,
+                diagnostic_accepted=bool(req.diagnostic_accepted),
+                prefetched_chunks=prefetched_chunks,
+            ),
         )
-        system_prompt = prompts.build_system_prompt(prompt_state)
+        system_prompt = prompts.build_system_prompt(state)
     except Exception:
         await run_in_threadpool(_persist_user_turn_after_failure, req, db)
         raise
@@ -424,7 +355,7 @@ async def _prepare_turn_after_guards(
         session_id=req.session_id,
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
-        diagnostic_required=bool(prompt_state.get("diagnostic_required", False)),
+        diagnostic_required=state.diagnostic_required,
         # G-11: floor applies to the surfaced citations only; the prefetched
         # chunks themselves already went into the prompt above, unfiltered.
         prefetched_citations=(

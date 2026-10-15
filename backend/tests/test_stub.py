@@ -10,6 +10,7 @@ from agent._stub import stub_response
 from config import settings
 from lib import error_codes
 from services import llm
+from tests.prompt_state_factory import make_prompt_state
 
 
 def test_stub_fresh_marker_no_summary():
@@ -95,7 +96,9 @@ async def _stream_text(system_prompt: str, user: str) -> tuple[str, list[str], o
 
 
 async def test_stub_provider_streams_resumed_marker_from_a_rendered_prompt(no_litellm):
-    system_prompt = prompts.build_system_prompt({"last_session_summary": "covered joins"})
+    system_prompt = prompts.build_system_prompt(
+        make_prompt_state(last_session_summary="covered joins")
+    )
 
     text, tokens, ps = await _stream_text(system_prompt, "continue please")
 
@@ -111,7 +114,7 @@ async def test_stub_provider_streams_resumed_marker_from_a_rendered_prompt(no_li
 
 
 async def test_stub_provider_streams_fresh_marker_without_a_summary(no_litellm):
-    system_prompt = prompts.build_system_prompt({})
+    system_prompt = prompts.build_system_prompt(make_prompt_state())
 
     text, _, _ = await _stream_text(system_prompt, "what is recursion?")
 
@@ -149,7 +152,7 @@ def test_get_returns_the_stub_whenever_stub_mode_is_on(monkeypatch):
 
 
 def test_summary_label_renders_the_line_the_stub_reads():
-    ctx = prompts.build_dynamic_context({"last_session_summary": "x"})
+    ctx = prompts.build_dynamic_context(make_prompt_state(last_session_summary="x"))
     assert (
         f"\n{prompts.LAST_SESSION_SUMMARY_LABEL}: <untrusted_summary>x</untrusted_summary>\n" in ctx
     )
@@ -167,7 +170,7 @@ async def test_stub_stream_skips_the_cost_gate(db_session, monkeypatch, no_litel
     db_session.commit()
     meter = llm.Meter("u-capped", "s1", "chat")
     messages = [
-        {"role": "system", "content": prompts.build_system_prompt({})},
+        {"role": "system", "content": prompts.build_system_prompt(make_prompt_state())},
         {"role": "user", "content": "hi"},
     ]
 

@@ -105,9 +105,7 @@ def _stub_retrieval(monkeypatch, *, semantic, chunks):
     async def fake_prefetch(db, session_id, user_id, query, query_vec=None, **kw):
         return chunks
 
-    monkeypatch.setattr(
-        chat_route.retrieval_service, "semantic_fallback_required", fake_semantic
-    )
+    monkeypatch.setattr(chat_route.retrieval_service, "semantic_fallback_required", fake_semantic)
     monkeypatch.setattr(chat_route.retrieval_service, "prefetch_for_prompt", fake_prefetch)
 
 

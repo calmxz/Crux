@@ -109,31 +109,18 @@ def _seed_session() -> tuple[str, str]:
     return user_id, session_id
 
 
-def _build_prompt_state_and_system_prompt(db, session_id: str) -> tuple[dict, str]:
+def _build_prompt_state_and_system_prompt(db, session_id: str):
     """Load the seeded profile/cooldown/gap_accuracy and assemble the system
-    prompt the same way routes/chat.py._prepare_turn does."""
+    prompt through the same prompt_state path as routes/chat.py._prepare_turn."""
     from agent import prompts
     from db.models import Session as SessionModel
-    from services import check_service, learning_event_service, profile_service
+    from services import prompt_state
 
-    session = db.get(SessionModel, session_id)
-    profile = profile_service.load_profile(db, session_id)
-    quiz_cooldown = check_service.quiz_cooldown(session)
-    gap_accuracy = learning_event_service.gap_accuracy(db, session_id)
-
-    prompt_state = {
-        "topic": session.topic,
-        "profile": profile,
-        "ingestion_status": None,
-        "retrieval_required": False,
-        "seed_mode": None,
-        "last_session_summary": None,
-        "rolling_summary": None,
-        "quiz_cooldown": quiz_cooldown,
-        "gap_accuracy": gap_accuracy,
-    }
-    system_prompt = prompts.build_system_prompt(prompt_state)
-    return prompt_state, system_prompt
+    state = prompt_state.assemble(
+        prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+        prompt_state.TurnInputs(retrieval_required=False),
+    )
+    return state, prompts.build_system_prompt(state)
 
 
 async def _collect_reply(tutor, messages, system_prompt, ctx) -> str:

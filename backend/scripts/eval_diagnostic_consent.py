@@ -99,21 +99,13 @@ async def _run_turn(db, session_id: str, user_id: str, messages: list[dict]):
     from agent import prompts, tutor
     from agent.types import ToolContext
     from db.models import Session as SessionModel
-    from routes.chat import _build_prompt_state
-    from services import profile_service
+    from services import prompt_state
 
-    session = db.get(SessionModel, session_id)
-    profile = profile_service.load_profile(db, session_id)
-    prompt_state = _build_prompt_state(
-        session=session,
-        profile=profile,
-        ingestion_status=None,
-        retrieval_required=False,
-        review_gaps=False,
-        pending_check=None,
-        quiz_cooldown=None,
+    state = prompt_state.assemble(
+        prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+        prompt_state.TurnInputs(retrieval_required=False),
     )
-    system_prompt = prompts.build_system_prompt(prompt_state)
+    system_prompt = prompts.build_system_prompt(state)
     ctx = ToolContext(
         db=db,
         session_id=session_id,
