@@ -503,8 +503,9 @@ class LlmStream:
     """One streamed completion: `async with llm.get().stream(...) as s`.
 
     Entering runs the gate. Iterating yields TextDelta events; `s.text` and
-    `s.tool_calls` are complete once the iteration ends. Leaving the block
-    settles exactly once, and `s.cost` holds what was settled:
+    `s.tool_calls` are complete once the iteration ends. Each attempt settles
+    exactly once; leaving the block settles the last one, and `s.cost` then
+    holds the total settled across attempts. The last attempt settles:
 
     - normal end: the provider's price of the built response (token math if
       pricing fails);
@@ -546,6 +547,7 @@ class LlmStream:
         self._attempt_open = False
         self._finished = False
         self._provider_error: Exception | None = None
+        self._retry_cost = Decimal("0")  # settled by attempts before the last
         self.cost: Decimal | None = None
 
     @property
@@ -589,11 +591,18 @@ class LlmStream:
                     # The vendor accepted this attempt before it failed, so it
                     # processed the prompt: settle that (the thread finishes
                     # even if this await is cancelled), and release the response.
-                    await run_in_threadpool(
-                        _settle, self._meter, self._provider.chat_model, ps.estimate(), {}
-                    )
-                    await _close_quietly(ps)
+                    try:
+                        await run_in_threadpool(self._settle_attempt, ps)
+                    finally:
+                        await _close_quietly(ps)
             await asyncio.sleep(_backoff(i))
+
+    def _settle_attempt(self, ps: ProviderStream) -> None:
+        """Settle a failed, retried attempt's estimate. Tokenizes the prompt,
+        so it runs on a worker thread."""
+        cost = ps.estimate()
+        self._retry_cost += cost
+        _settle(self._meter, self._provider.chat_model, cost, {})
 
     def _exit_cost(self) -> tuple[Decimal, dict]:
         ps = self._ps
@@ -615,7 +624,7 @@ class LlmStream:
         # synchronous write, so the spend is on record whatever happens next.
         cost, usage = self._exit_cost()
         _settle(self._meter, self._provider.chat_model, cost, usage)
-        self.cost = cost
+        self.cost = cost + self._retry_cost
         try:
             if self._gen is not None:
                 await self._gen.aclose()

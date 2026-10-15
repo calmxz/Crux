@@ -132,17 +132,19 @@ tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
 refusal raises `CostCapExceeded` before the block runs), then
 `async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
 (`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete
-once iteration ends; `s.cost` is set when the block exits and stays readable
-after a cancel. The exit settles once, synchronously, before any await: the
-provider's price on a normal end (token math if pricing fails), an estimate
-of the prompt plus the output received (text and tool-call arguments) on
-cancel or on the caller's generator closing, and on a provider error the
-estimate too, unless the request was refused on open by anything but a
-`Timeout` ($0). Retry (429, 503, 500, connection) happens only while no chunk
-has arrived; an attempt that opened and then failed settles its prompt
-estimate before the retry, and its response is closed. The tutor keeps the stream it is inside in
-`inflight`, so its cancel event reports the cut-short call's estimate, or $0
-for a cancel during tool dispatch.
+once iteration ends; `s.cost` is set when the block exits (the total settled
+across attempts) and stays readable after a cancel. The exit settles the last
+attempt once, synchronously, before any await: the provider's price on a
+normal end (token math if pricing fails), an estimate of the prompt plus the
+output received (text and tool-call arguments) on cancel or on the caller's
+generator closing, and on a provider error the estimate too, unless the
+request was refused on open by anything but a `Timeout` ($0). Retry (429,
+503, 500, connection) happens only while no chunk has arrived; an attempt
+that opened and then failed settles its prompt estimate on a worker thread
+before the retry, and its response is closed. The tutor keeps the stream it
+is inside in `inflight` until its iteration finishes, so its cancel event
+reports what the cut-short call settled, or $0 for a cancel during tool
+dispatch or while a finished stream closes.
 
 Tests: the `fake_llm` fixture (conftest) installs `FakeLlmProvider` under the
 real shell; script it with `replies` (str or exception per `complete`

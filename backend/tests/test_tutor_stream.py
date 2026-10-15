@@ -340,6 +340,44 @@ async def test_cancel_during_tool_dispatch_reports_no_inflight_cost(
 
 
 @pytest.mark.asyncio
+async def test_cancel_while_a_finished_stream_closes_reports_no_inflight_cost(
+    db_session, user, fake_llm, monkeypatch
+):
+    """The stream finished and settled its real price; a cancel landing while
+    its exit closes the response cut nothing short."""
+    from tests.conftest import _FakeProviderStream
+
+    fake_llm.streams = [["complete answer"]]
+    fake_llm.cost = Decimal("0.0020")
+    fake_llm.partial_cost = Decimal("0.5")
+    closing = asyncio.Event()
+
+    async def parked_close(self):
+        closing.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(_FakeProviderStream, "aclose", parked_close)
+    received = []
+
+    async def _consume():
+        async for ev in tutor.run_streaming(
+            [{"role": "user", "content": "go"}], "sys", _ctx(db_session, "s_close")
+        ):
+            received.append(ev)
+
+    task = asyncio.create_task(_consume())
+    await asyncio.wait_for(closing.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.gather(task)
+
+    cancelled = next(e for e in received if e.type == "cancelled")
+    assert Decimal(cancelled.data["estimated_cost_usd"]) == Decimal("0")
+    assert fake_llm.estimates == []
+    assert cost_meter.current_spend(db_session, "u1") == Decimal("0.0020")
+
+
+@pytest.mark.asyncio
 async def test_malformed_tool_args_yield_error_not_dispatch(db_session, fake_llm, monkeypatch):
     """F-20a: a truncated/garbled streamed tool-args blob must fail loudly
     instead of dispatching {} (which would validate -- session_id is
