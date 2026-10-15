@@ -11,7 +11,8 @@ order anything.
 State is seeded as raw JSON on the session row (shapes documented in
 services/check_question_service.py and services/pending_check_store.py), not
 through service functions, so this file survives the check-module refactor
-(#419, #420). Case 4 is the only call into a service by name.
+(#419, #420). test_message_id_stamp_and_answer_both_land is the only test
+that calls a service by name (attach_message_id).
 
 **Opt-in**: skipped unless `TEST_DATABASE_URL` is set, same as
 test_pgvector_retrieval.py (CI sets it and runs `alembic upgrade head`
@@ -273,6 +274,17 @@ def _events(Session, sid: str) -> list[LearningEvent]:
         )
 
 
+def _xfail_if_recap_overwritten(recap: dict) -> None:
+    """Lock bug found by this file, reported on #418: the answer route writes
+    the Recap after its commit, outside the row lock, so a Close (Stop or
+    session end) that freezes the Recap in that gap is overwritten with the
+    pre-Close Set, still showing a "pending" Item. A frozen Recap never has
+    one. Only that signature xfails; every other assertion stays red.
+    #419 removes the write and this guard."""
+    if any(it["status"] == "pending" for it in recap["items"]):
+        pytest.xfail("#419: unlocked Recap write after the answer commit overwrote the Close")
+
+
 def test_two_answers_on_one_set_serialize(app_on_postgres, hold, pool):
     Session, uid, sid, msg_id = app_on_postgres
     _seed_set(Session, sid, [_item(0), _item(1), _item(2)], message_id=msg_id)
@@ -332,15 +344,6 @@ def test_double_complete_lets_one_follow_up_through(app_on_postgres, hold, pool)
     assert follow_ups == 1
 
 
-# Lock bug found here, reported on #418: the answer route writes the Recap
-# after its commit, outside the row lock, so a Stop that closes the Set in
-# that gap has its frozen Recap overwritten with the pre-Stop "pending" item.
-# Roughly half of runs hit it. #419 removes that write and this marker.
-@pytest.mark.xfail(
-    strict=False,
-    raises=AssertionError,
-    reason="#419: unlocked Recap write after the answer commit can overwrite Stop's frozen Recap",
-)
 def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool):
     Session, uid, sid, msg_id = app_on_postgres
     _seed_set(Session, sid, [_item(0), _item(1)], message_id=msg_id)
@@ -362,18 +365,20 @@ def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool):
 
     pc, cc, _, _ = _row(Session, sid)
     assert pc is None and cc is None
-    recap = _recap(Session, msg_id)
     events = _events(Session, sid)
     if ra.status_code == 200:
         # (a) the answer landed first; Stop skipped the rest.
-        assert [it["status"] for it in recap["items"]] == ["answered", "skipped"]
         assert [(e.question, e.correct) for e in events] == [("Q0?", True)]
+        expected = ["answered", "skipped"]
     else:
         # (b) Stop landed first; the answer found no open set.
         assert ra.status_code == 409
         assert _code(ra) == CHECK_CONFLICT
-        assert [it["status"] for it in recap["items"]] == ["skipped", "skipped"]
         assert events == []
+        expected = ["skipped", "skipped"]
+    recap = _recap(Session, msg_id)
+    _xfail_if_recap_overwritten(recap)
+    assert [it["status"] for it in recap["items"]] == expected
     skipped = {it["question"] for it in recap["items"] if it["status"] == "skipped"}
     assert not any(e.question in skipped for e in events)
 
@@ -433,26 +438,26 @@ def test_session_end_racing_a_diagnostic_answer(app_on_postgres, hold, pool):
     )
     lock.wait_for_waiters(2)
     lock.release()
-    re_, ra = end.result(JOIN_TIMEOUT_S), answer.result(JOIN_TIMEOUT_S)
+    end_resp, ra = end.result(JOIN_TIMEOUT_S), answer.result(JOIN_TIMEOUT_S)
 
-    assert re_.status_code == 200
+    assert end_resp.status_code == 200
     pc, cc, profile, ended_at = _row(Session, sid)
     assert ended_at is not None
     assert pc is None and cc is None
     assert profile.last_session_summary
-    recap = _recap(Session, msg_id)
-    assert recap["items"][0]["status"] == "answered"
-    assert recap["items"][2]["status"] == "skipped"
 
     events = _events(Session, sid)
     if ra.status_code == 200:
         # The answer landed: its event exists and the forced grade counts it
         # (2 of 3 correct).
         assert [e.question for e in events] == ["Q0?", "Q1?"]
-        assert recap["items"][1]["status"] == "answered"
         assert profile.knowledge_level == "intermediate"
+        expected = ["answered", "answered", "skipped"]
     else:
         assert ra.status_code == 409
         assert [e.question for e in events] == ["Q0?"]
-        assert recap["items"][1]["status"] == "skipped"
         assert profile.knowledge_level == "beginner"
+        expected = ["answered", "skipped", "skipped"]
+    recap = _recap(Session, msg_id)
+    _xfail_if_recap_overwritten(recap)
+    assert [it["status"] for it in recap["items"]] == expected

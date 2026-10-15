@@ -94,6 +94,22 @@ must finish (draining the producer, releasing the B-05 reserve) runs inside
 pump in `routes/sessions.py`, and `_prepare_turn`'s release-on-failure. Drain
 before release, in one shield, because both touch the same `Session`.
 
+### Proving a row lock in a test (#418)
+
+SQLite ignores `with_for_update`, so a lock is only provable on Postgres
+(`backend/tests/test_check_locks_pg.py`, run via `backend/scripts/pg_tests.sh`).
+The pattern: the test holds `SELECT ... FOR UPDATE` on the session row on a
+connection of its own, fires real routes on worker threads (one `TestClient`
+each, a fresh `Session` per request), and polls until the expected number of
+request backends show `wait_event_type = 'Lock'` in `pg_stat_activity` before
+committing. Request connections carry an `application_name` so the poll counts
+only them. Reaching the waiter count proves each request blocked; a live
+thread does not, and sleeps prove nothing.
+
+Activity stats are snapshotted once per transaction, and the holder's stays
+open, so each poll must run `SELECT pg_stat_clear_snapshot()` first or the
+waiters never appear.
+
 ### Liveness vs readiness (G-07)
 
 `/health` and `/healthz` are liveness-only and must keep returning 200 while the
