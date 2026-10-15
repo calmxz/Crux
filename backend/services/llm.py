@@ -1,4 +1,4 @@
-"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4 and 3/4).
+"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4 to 4/4).
 
 A shell that owns the cost gate, retry and settlement, around a swappable
 provider that owns the vendor call and its pricing. Callers never pass a DB
@@ -45,6 +45,7 @@ import sqlalchemy.exc
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
+from agent import _stub
 from config import settings
 from db.database import SessionLocal
 from lib.llm_errors import CallRefused, LlmUnavailable
@@ -59,6 +60,7 @@ __all__ = [
     "LlmStream",
     "LlmUnavailable",
     "Meter",
+    "StubProvider",
     "TextDelta",
     "ToolCall",
     "get",
@@ -368,6 +370,63 @@ class _LiteLlmStream:
         close = getattr(self._resp, "aclose", None)
         if close is not None:
             await close()
+
+
+class StubProvider:
+    """Stub mode (`settings.llm_stub_enabled`): never touches the network.
+    The tutor's stream echoes the learner deterministically (agent/_stub.py)
+    with no tool calls at cost 0; completions and embeddings raise
+    LlmUnavailable, and each caller falls back as it would without a model."""
+
+    chat_model = "stub"
+    embedding_model = "stub"
+
+    async def complete(self, messages, *, temperature, timeout) -> Completion:
+        raise LlmUnavailable()
+
+    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+        system_prompt = next(
+            (m.get("content") or "" for m in messages if m.get("role") == "system"), ""
+        )
+        return _StubStream(_stub.chunk_text(_stub.stub_response(messages, system_prompt)))
+
+    def embed(self, texts) -> Embedding:
+        raise LlmUnavailable()
+
+    async def aembed(self, texts) -> Embedding:
+        raise LlmUnavailable()
+
+    def completion_prompt_cost(self, messages) -> Decimal:
+        return Decimal("0")
+
+    def embedding_prompt_cost(self, texts) -> Decimal:
+        return Decimal("0")
+
+
+class _StubStream:
+    def __init__(self, tokens: list[str]):
+        self._tokens = tokens
+        self.received = False
+        self.text = ""
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        return []
+
+    async def __aiter__(self):
+        for token in self._tokens:
+            self.received = True
+            self.text += token
+            yield token
+
+    def priced(self) -> tuple[Decimal, dict]:
+        return Decimal("0"), {}
+
+    def estimate(self) -> Decimal:
+        return Decimal("0")
+
+    async def aclose(self) -> None:
+        return None
 
 
 def _gate(meter: Meter) -> None:
@@ -739,5 +798,8 @@ _provider: Provider | None = None
 
 def get() -> Llm:
     """The active adapter. Resolved per call, not once at startup, so a
-    per-test settings toggle (and part 4's stub check) takes effect."""
+    per-test settings toggle takes effect. Stub mode wins over any installed
+    provider; this is the only reader of `llm_stub_enabled` (#413)."""
+    if settings.llm_stub_enabled:
+        return Llm(StubProvider())
     return Llm(_provider or LiteLlmProvider())

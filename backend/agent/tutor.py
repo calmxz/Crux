@@ -12,7 +12,6 @@ from decimal import Decimal
 from typing import AsyncIterator
 
 from agent import context_budget, tools
-from agent._stub import stub_response
 from agent.excerpt import wrap_chunk
 from agent.stream_events import StreamEvent
 from agent.types import ToolContext
@@ -115,21 +114,6 @@ async def _drain_dispatch(dispatch_task: asyncio.Task | None, ctx) -> None:
         )
 
 
-def _chunk_text(text: str, parts: int = 3) -> list[str]:
-    """Split text into ~`parts` word-boundary chunks for stub streaming."""
-    words = text.split(" ")
-    if len(words) <= 1:
-        return [text]
-    parts = max(1, min(parts, len(words)))
-    size = -(-len(words) // parts)  # ceil division
-    out: list[str] = []
-    for i in range(0, len(words), size):
-        group = words[i : i + size]
-        sep = " " if (i + size) < len(words) else ""
-        out.append(" ".join(group) + sep)
-    return out
-
-
 async def run_streaming(
     messages: list[dict],
     system_prompt: str,
@@ -143,18 +127,6 @@ async def run_streaming(
     the adapter's: each call settles once on its own exit, so no path here
     records cost.
     """
-    # Stub mode: deterministic, no LLM, no tools, no cost. Chunked so the UI
-    # still exercises the delta path.
-    if settings.llm_stub_enabled:
-        text = stub_response(messages, system_prompt)
-        accumulated_text = ""
-        for piece in _chunk_text(text):
-            accumulated_text += piece
-            yield StreamEvent("assistant_delta", {"text": piece})
-        msg_id = _persist_assistant_message(ctx, accumulated_text, "complete")
-        yield StreamEvent("done", {"message_id": str(msg_id)})
-        return
-
     full: list[dict] = [{"role": "system", "content": system_prompt}] + list(messages)
     accumulated_text = ""
     meter = llm.Meter(
@@ -198,11 +170,11 @@ async def run_streaming(
                     # Finished, so a cancel landing in the exit's close cut
                     # nothing short (the exit settles its real price).
                     inflight = None
-            except cost_meter.CostCapExceeded as refused:
-                # The adapter's gate refused this call (user cap or global
-                # ceiling); the model was not called.
+            except llm.CallRefused as refused:
+                # The adapter refused this call (user cap, global ceiling, or
+                # no provider can serve it); the model was not called.
                 log.warning(
-                    "cost cap reached mid-turn (stream) code=%s session_id=%s user_id=%s",
+                    "llm call refused mid-turn (stream) code=%s session_id=%s user_id=%s",
                     refused.code,
                     ctx.session_id,
                     ctx.user_id,

@@ -1,17 +1,22 @@
-"""Deterministic LLM stub used in e2e and offline dev.
+"""Deterministic tutor reply for stub mode, used in e2e and offline dev.
 
-Activated when settings.llm_stub_enabled is True. Bypasses LiteLLM and tools
-entirely so tests do not depend on network or model availability.
+The stub provider (services/llm.py StubProvider) streams this text in place
+of a model reply, so tests do not depend on network or model availability.
 
 Output format is a stable, parseable marker the e2e suite asserts against:
 - "[STUB:fresh] Echo: <last_user_message>"        when no prior-session summary
 - "[STUB:resumed:<hash8>] Echo: <last_user_msg>"  when summary present
+
+The summary is read from the rendered system prompt on purpose: the e2e
+`[STUB:resumed:` assertion proves the summary reached the assembled prompt.
 """
 
 import hashlib
 import re
 
-_SUMMARY_LINE = re.compile(r"^LAST_SESSION_SUMMARY:(.*)$", re.MULTILINE)
+from agent.prompts import LAST_SESSION_SUMMARY_LABEL
+
+_SUMMARY_LINE = re.compile(rf"^{re.escape(LAST_SESSION_SUMMARY_LABEL)}:(.*)$", re.MULTILINE)
 
 
 def _last_user_message(messages: list[dict]) -> str:
@@ -40,3 +45,19 @@ def stub_response(messages: list[dict], system_prompt: str) -> str:
         digest = hashlib.sha256(summary.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         return f"[STUB:resumed:{digest}] Echo: {last_user}"
     return f"[STUB:fresh] Echo: {last_user}"
+
+
+def chunk_text(text: str, parts: int = 3) -> list[str]:
+    """Split text into ~`parts` word-boundary chunks, so stub streaming still
+    exercises the delta path."""
+    words = text.split(" ")
+    if len(words) <= 1:
+        return [text]
+    parts = max(1, min(parts, len(words)))
+    size = -(-len(words) // parts)  # ceil division
+    out: list[str] = []
+    for i in range(0, len(words), size):
+        group = words[i : i + size]
+        sep = " " if (i + size) < len(words) else ""
+        out.append(" ".join(group) + sep)
+    return out

@@ -44,3 +44,5 @@ INVALID_VALUE = "invalid_value"
 # Tutor stream (SSE `error` event).
 MAX_ITERS_REACHED = "max_iters_reached"
 LLM_FAILED = "llm_failed"
+# The adapter's provider refuses the call (stub mode, #413). Not a cap code.
+LLM_UNAVAILABLE = "llm_unavailable"

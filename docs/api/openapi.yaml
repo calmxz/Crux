@@ -2387,3 +2387,7 @@ x-error-codes:
   llm_failed:
     sse: true
     when: The LLM call failed mid-turn; the partial reply is kept.
+  llm_unavailable:
+    sse: true
+    via: tool_call_done.error
+    when: No LLM provider can serve the call (stub mode refuses completions and embeddings), mid-turn (SSE) or on a retrieve_chunks embedding (tool_call_done.error).

@@ -18,7 +18,7 @@ from config import settings
 from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
 from db.models import Session as SessionModel
-from services import cost_meter, documents_service, llm, pgvector_store
+from services import documents_service, llm, pgvector_store
 
 log = logging.getLogger(__name__)
 
@@ -75,10 +75,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
         hits = pgvector_store.query_chunks(
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
-    except cost_meter.CostCapExceeded as e:
-        # A tool result, not an exception, so the turn does not fail: the
-        # model sees the refusal, and if the turn continues the tutor's next
-        # call is refused by the adapter gate with the cap event. A turn
+    except llm.CallRefused as e:
+        # A cap or stub-mode refusal (#413) is a tool result, not an
+        # exception, so the turn does not fail: the model sees the refusal,
+        # and if the turn continues the tutor's next call is refused by the
+        # adapter gate with the cap event. A turn
         # ended by a bundled terminal tool (a check or topic card) ends
         # without one; the route's admission gate refuses the next turn.
         return ToolResult(ok=False, status="failed", error=e.code)
@@ -229,8 +230,6 @@ async def semantic_fallback_required(
     never ran) so a caller that goes on to call prefetch_for_prompt can hand
     it back in and skip a second, identical embed for the same query (B-09).
     """
-    if settings.llm_stub_enabled:
-        return False, None
     try:
         if not documents_service.has_ready_document(db, session_id):
             return False, None
