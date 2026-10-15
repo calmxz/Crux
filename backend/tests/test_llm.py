@@ -7,14 +7,16 @@ test_llm_characterisation_pg.py.
 """
 
 import logging
+import threading
 from decimal import Decimal
 
 import litellm
 import pytest
+import sqlalchemy.exc
 from sqlalchemy import select
 
 from config import settings
-from db.models import LlmCallLog, User
+from db.models import DailyCostLedger, LlmCallLog, User
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
 from services import cost_meter, llm
 
@@ -172,24 +174,32 @@ async def test_failed_settlement_keeps_the_call_log_and_retries_the_ledger(
     fake_llm.replies = ["kept"]
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.WARNING, logger="services.llm"):
+    with caplog.at_level(logging.INFO, logger="services.llm"):
         result = await _complete()
 
-    # The request returns at once; the receipt is kept, the ledger deferred.
-    assert result.text == "kept"
-    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
-    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0")
-    [deferred] = [r for r in caplog.records if r.name == "services.llm"]
-    assert deferred.levelno == logging.WARNING
-    assert (deferred.user_id, deferred.cost_usd, deferred.call_logged) == (USER_ID, "0.002", True)
+        # The request returns at once; the receipt is kept, the ledger deferred.
+        assert result.text == "kept"
+        assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+        assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0")
+        [deferred] = [r for r in caplog.records if r.name == "services.llm"]
+        # Error level: the record that survives if the retry never runs.
+        assert deferred.levelno == logging.ERROR
+        assert deferred.getMessage() == "llm settlement deferred: lock timeout"
+        assert (deferred.user_id, deferred.cost_usd, deferred.call_logged) == (
+            USER_ID,
+            "0.002",
+            True,
+        )
 
-    [(delay, fn, args)] = scheduled
-    assert delay == llm.SETTLE_RETRY_DELAY_S
-    fn(*args)
+        [(delay, fn, args)] = scheduled
+        assert delay == llm.SETTLE_RETRY_DELAY_S
+        fn(*args)
 
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
     assert len(_log_rows(db_session)) == 1  # the retry adds no second receipt
     assert calls == [(USER_ID, Decimal("0.002"))] * 2
+    landed = [r for r in caplog.records if r.name == "services.llm"][-1]
+    assert (landed.levelno, landed.getMessage()) == (logging.INFO, "llm deferred settlement landed")
 
 
 async def test_failed_retry_logs_at_error_with_the_receipt_kept(
@@ -207,10 +217,82 @@ async def test_failed_retry_logs_at_error_with_the_receipt_kept(
 
     assert result.text == "kept"
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
-    [record] = [r for r in caplog.records if r.name == "services.llm"]
-    assert record.getMessage() == "llm settlement failed: ledger down"
+    records = [r for r in caplog.records if r.name == "services.llm"]
+    assert [r.getMessage() for r in records] == [
+        "llm settlement deferred: ledger down",
+        "llm settlement failed: ledger down",
+    ]
+    record = records[-1]
     assert (record.user_id, record.session_id, record.purpose) == (USER_ID, SESSION_ID, "summary")
     assert (record.cost_usd, record.call_logged) == ("0.002", True)
+
+
+def _ledger_down_once(monkeypatch, exc):
+    real = cost_meter.record_cost
+    calls = []
+
+    def record_cost(*args, **kwargs):
+        calls.append(kwargs.get("date_utc"))
+        if len(calls) == 1:
+            raise exc
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(cost_meter, "record_cost", record_cost)
+    return calls
+
+
+async def test_full_retry_capacity_logs_the_spend_unsettled(
+    db_session, user, fake_llm, monkeypatch, caplog
+):
+    _ledger_down_once(monkeypatch, RuntimeError("lock timeout"))
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append(fn))
+    monkeypatch.setattr(llm, "_retry_slots", threading.BoundedSemaphore(1))
+    llm._retry_slots.acquire()  # another retry already waiting
+    fake_llm.cost = Decimal("0.002")
+
+    with caplog.at_level(logging.ERROR, logger="services.llm"):
+        await _complete()
+
+    assert scheduled == []
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert record.getMessage().startswith("llm settlement failed: retry capacity full")
+    assert record.cost_usd == "0.002"
+
+
+async def test_pool_timeout_leaves_the_receipt_to_the_retry(
+    db_session, user, fake_llm, monkeypatch
+):
+    _ledger_down_once(monkeypatch, sqlalchemy.exc.TimeoutError("pool full"))
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
+    fake_llm.cost = Decimal("0.002")
+
+    await _complete()
+
+    assert _log_rows(db_session) == []  # no second checkout on the request path
+    [(fn, args)] = scheduled
+    fn(*args)
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+
+
+async def test_retry_books_to_the_day_the_call_was_settled(db_session, user, fake_llm, monkeypatch):
+    calls = _ledger_down_once(monkeypatch, RuntimeError("lock timeout"))
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
+    monkeypatch.setattr(cost_meter, "_today_utc", lambda: "2026-10-14")
+    fake_llm.cost = Decimal("0.002")
+
+    await _complete()
+    monkeypatch.setattr(cost_meter, "_today_utc", lambda: "2026-10-15")  # past midnight
+    [(fn, args)] = scheduled
+    fn(*args)
+
+    assert calls == [None, "2026-10-14"]
+    row = db_session.execute(select(DailyCostLedger)).scalar_one()
+    assert (row.date_utc, Decimal(str(row.cost_usd))) == ("2026-10-14", Decimal("0.0020"))
 
 
 async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(

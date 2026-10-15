@@ -4,6 +4,7 @@ import os
 # into the test process. Do not move below the imports.
 os.environ["CRUX_SKIP_DOTENV"] = "1"
 
+import threading
 from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -160,6 +161,11 @@ def _inline_settle_retry(monkeypatch):
     from services import llm
 
     monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *args: fn(*args))
+    # Fresh slots, so a test that captures a retry and never runs it cannot
+    # starve the next test's retries.
+    monkeypatch.setattr(
+        llm, "_retry_slots", threading.BoundedSemaphore(llm.SETTLE_RETRY_MAX_IN_FLIGHT)
+    )
 
 
 @pytest.fixture

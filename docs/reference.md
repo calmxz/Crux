@@ -98,24 +98,32 @@ it without importing the adapter.
 Caller rule: never hold an uncommitted ledger write (`record_cost`,
 `reserve_cost`, `adjust_cost`) in your session across an adapter call. The
 settlement upserts the same row; on Postgres it waits at most
-`SETTLE_LOCK_TIMEOUT` (5 s), then defers the ledger write: the LlmCallLog
-row is committed on its own (it never waits on the ledger row), a warning
-`llm settlement deferred` is logged, and the ledger write is retried once
-on a background thread after `SETTLE_RETRY_DELAY_S`, waiting up to
-`SETTLE_RETRY_LOCK_TIMEOUT` (30 s). Only if that retry fails too is the
-spend missing from the ledger: `llm settlement failed` at error level, with
-`call_logged` saying whether the receipt row exists. So any ledger write
-still commits before the next slow step, not just before adapter calls (a
-deferred write leaves the cap undercounting until it lands): the tutor
-commits each iteration's `record_cost` before tool dispatch, and the
-retrieve tool commits its embedding metering before a bundled sibling call
-can spend its own retry window. The adapter's gate and settlement each take
-their own pooled connection, so callers commit before the call (as every
-moved call site does) instead of holding an idle one.
+`SETTLE_LOCK_TIMEOUT` (5 s), then defers the ledger write (`_defer_ledger`):
 
-Tests: an autouse conftest fixture replaces `llm._schedule` so the retry
-runs inline; a test that needs to observe the deferred state captures it
-instead (`test_llm.py`, `test_llm_characterisation_pg.py`).
+- The LlmCallLog row is committed on its own (it never waits on the ledger
+  row), except after a pool timeout, when the retry writes it instead of
+  queueing a second checkout on the request path.
+- `llm settlement deferred` logs at error level with the reconciliation
+  fields (`call_logged`, `date_utc`). It is the record that survives if the
+  retry never runs, e.g. a restart within the delay.
+- One retry runs on a daemon thread after `SETTLE_RETRY_DELAY_S`, waits up to
+  `SETTLE_RETRY_LOCK_TIMEOUT` (30 s), and books to the day the call was
+  settled, not the day it runs. It logs `llm deferred settlement landed`
+  (info) or `llm settlement failed` (error).
+- At most `SETTLE_RETRY_MAX_IN_FLIGHT` (2) retries wait per process, since
+  each holds a pooled connection; past that the spend is logged as
+  `llm settlement failed: retry capacity full`.
+- A connection lost mid-COMMIT can leave the first write committed; the
+  retry then counts it twice, the accepted (overcounting) direction.
+
+Reconcile from the logs: a deferral with no matching `landed` line is spend
+missing from the ledger. Until a deferred write lands the cap undercounts, so
+any ledger write still commits before the next slow step, not just before
+adapter calls: the tutor commits each iteration's `record_cost` before tool
+dispatch, and the retrieve tool commits its embedding metering before a
+bundled sibling call can spend its own retry window. The adapter's gate and
+settlement each take their own pooled connection, so callers commit before
+the call (as every moved call site does) instead of holding an idle one.
 
 Tests: the `fake_llm` fixture (conftest) installs `FakeLlmProvider` under the
 real shell; script it with `replies` (str or exception per `complete`
@@ -124,7 +132,10 @@ binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits
 the caller's pending writes; isolation is only provable on Postgres. A
 Postgres test must bind `llm.session_factory` to its own sessionmaker (see
-`adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`).
+`adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`). An autouse
+conftest fixture runs the deferred retry inline (it replaces `llm._schedule`)
+and gives each test fresh retry slots; a test that needs to observe the
+deferred state captures the scheduled call instead (`test_llm.py`).
 
 ### Stream cleanup must be shielded (#421)
 

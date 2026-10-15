@@ -78,15 +78,18 @@ def current_spend(db: Session, user_id: str) -> Decimal:
     return _to_decimal(total)
 
 
-def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
+def _upsert_delta(
+    db: Session, user_id: str, delta: Decimal, date_utc: str | None = None
+) -> Decimal:
     """One atomic INSERT .. ON CONFLICT DO UPDATE .. RETURNING against today's
-    ledger row; returns the post-write total. `delta` may be negative.
+    ledger row (or `date_utc`'s); returns the post-write total. `delta` may be
+    negative.
 
     Shared by record_cost / reserve_cost / adjust_cost so all three serialize
     on the same row the same way (F-17).
     """
     ins = dialect_insert(db)(DailyCostLedger).values(
-        user_id=user_id, date_utc=_today_utc(), cost_usd=delta
+        user_id=user_id, date_utc=date_utc or _today_utc(), cost_usd=delta
     )
     stmt = ins.on_conflict_do_update(
         index_elements=["user_id", "date_utc"],
@@ -99,8 +102,9 @@ def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
     return _to_decimal(db.execute(stmt).scalar_one())
 
 
-def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
-    """Atomically add `cost_usd` to today's ledger row for `user_id` and
+def record_cost(db: Session, user_id: str, cost_usd, *, date_utc: str | None = None) -> Decimal:
+    """Atomically add `cost_usd` to today's ledger row for `user_id` (or the
+    `date_utc` row, for a deferred write booked to the day it was spent) and
     return the new total (F-17: INSERT .. ON CONFLICT DO UPDATE, so two
     concurrent writers serialize on the row instead of read-modify-writing
     a stale total). Safe to call with 0 (no-op write avoided). Flushes into
@@ -109,7 +113,7 @@ def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
     cost = _quantize(_to_decimal(cost_usd))
     if cost <= _ZERO:
         return current_spend(db, user_id)
-    return _upsert_delta(db, user_id, cost)
+    return _upsert_delta(db, user_id, cost, date_utc)
 
 
 def reserve_cost(db: Session, user_id: str, amount) -> Decimal:

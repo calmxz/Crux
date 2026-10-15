@@ -372,7 +372,7 @@ def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
 
         worker = threading.Thread(target=call)
         started = time.monotonic()
-        with caplog.at_level(logging.WARNING, logger="services.llm"):
+        with caplog.at_level(logging.ERROR, logger="services.llm"):
             worker.start()
             worker.join(timeout=10)
         elapsed = time.monotonic() - started

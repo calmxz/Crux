@@ -12,9 +12,9 @@ session:
   writes the ledger upsert and the LlmCallLog row and commits, so spend is
   permanent whatever the caller's transaction does next. It never raises. If
   that fails, the LlmCallLog row is written on its own and the ledger write
-  is retried once off the request path; only if the retry fails too is the
-  spend missing from the ledger, logged at error level with what
-  reconciliation needs.
+  is retried once off the request path (see _defer_ledger). Every deferral
+  logs at error level with what reconciliation needs, so spend whose retry
+  never lands (a failed retry, a restart before it runs) is always on record.
 - Failed attempts: a Timeout settles the provider's prompt-token estimate (a
   non-streamed call has no output to add); a 429, 503, 500 or connection
   error settles $0, since the provider never processed the prompt.
@@ -38,6 +38,7 @@ from decimal import Decimal
 from typing import Protocol, TypeVar
 
 import litellm
+import sqlalchemy.exc
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
@@ -75,6 +76,11 @@ SETTLE_LOCK_TIMEOUT = "5s"
 # the row lock.
 SETTLE_RETRY_DELAY_S = 5.0
 SETTLE_RETRY_LOCK_TIMEOUT = "30s"
+# Each waiting retry holds a pooled connection. At most this many wait at once
+# per process; past that the spend is logged as unsettled rather than letting
+# a stuck ledger row starve the request pool.
+SETTLE_RETRY_MAX_IN_FLIGHT = 2
+_retry_slots = threading.BoundedSemaphore(SETTLE_RETRY_MAX_IN_FLIGHT)
 
 _RETRYABLE: tuple[type[BaseException], ...] = (
     litellm.APIConnectionError,
@@ -287,28 +293,57 @@ def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
 def _defer_ledger(
     meter: Meter, model: str, cost: Decimal, usage: dict, reconciliation: dict, exc: Exception
 ) -> None:
-    """The settlement rolled back whole. Keep the LlmCallLog row now (it
-    never waits on the ledger row lock), then retry the ledger write once in
-    the background, so a held lock delays the spend instead of losing it."""
-    try:
-        with session_factory() as db:
-            logged = _log_call(db, meter, model, cost, usage)
-            db.commit()
-    except Exception:  # noqa: BLE001 - recorded below via call_logged
-        logged = False
-    reconciliation = {**reconciliation, "call_logged": logged}
-    log.warning("llm settlement deferred: %s", exc, extra=reconciliation)
-    _schedule(SETTLE_RETRY_DELAY_S, _retry_ledger, meter.user_id, cost, reconciliation)
+    """The settlement failed. Keep the LlmCallLog row now (it never waits on
+    the ledger row lock), then retry the ledger write once in the background,
+    booked to today's row as of now, so a held lock delays the spend instead
+    of losing it.
+
+    The deferral itself logs at error level: it is the reconciliation record
+    if the retry never lands (a restart before it runs, or it fails too).
+    "llm deferred settlement landed" at info level closes it. Normally the
+    failed settlement rolled back whole; a connection lost mid-COMMIT can leave
+    it committed, and then the retry counts the spend twice -- the safe
+    direction, since an overcount only shortens the user's own budget."""
+    day = cost_meter._today_utc()
+    logged = False
+    # A pool timeout means no connection is free: don't queue a second
+    # checkout on the request path; the retry writes the row instead.
+    if not isinstance(exc, sqlalchemy.exc.TimeoutError):
+        try:
+            with session_factory() as db:
+                logged = _log_call(db, meter, model, cost, usage)
+                db.commit()
+        except Exception:  # noqa: BLE001 - the retry writes the row instead
+            logged = False
+    reconciliation = {**reconciliation, "call_logged": logged, "date_utc": day}
+    if not _retry_slots.acquire(blocking=False):
+        log.error(
+            "llm settlement failed: retry capacity full, first error: %s", exc, extra=reconciliation
+        )
+        return
+    log.error("llm settlement deferred: %s", exc, extra=reconciliation)
+    _schedule(SETTLE_RETRY_DELAY_S, _retry_ledger, meter, model, cost, usage, reconciliation)
 
 
-def _retry_ledger(user_id: str, cost: Decimal, reconciliation: dict) -> None:
+def _retry_ledger(
+    meter: Meter, model: str, cost: Decimal, usage: dict, reconciliation: dict
+) -> None:
     try:
         with session_factory() as db:
             _lock_timeout(db, SETTLE_RETRY_LOCK_TIMEOUT)
-            cost_meter.record_cost(db, user_id, cost)
+            cost_meter.record_cost(db, meter.user_id, cost, date_utc=reconciliation["date_utc"])
+            if not reconciliation["call_logged"]:
+                reconciliation = {
+                    **reconciliation,
+                    "call_logged": _log_call(db, meter, model, cost, usage),
+                }
             db.commit()
     except Exception as e:  # noqa: BLE001 - background thread; nothing to raise into
         log.error("llm settlement failed: %s", e, extra=reconciliation)
+        return
+    finally:
+        _retry_slots.release()
+    log.info("llm deferred settlement landed", extra=reconciliation)
 
 
 def _failed_attempt(exc: Exception, *, retry_timeout: bool) -> tuple[bool, bool]:
