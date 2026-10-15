@@ -120,7 +120,6 @@ def test_prepare_turn_failure_keeps_embedding_spend_once(client, db_session, mon
     embedding, db.rollback() in the except arm must not discard that real
     vendor cost. The adapter settled it in its own transaction, so the
     failure path records nothing itself and the spend lands exactly once."""
-    monkeypatch.setattr(settings, "llm_stub", True)
 
     from decimal import Decimal
 

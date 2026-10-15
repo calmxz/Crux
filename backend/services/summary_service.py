@@ -78,7 +78,7 @@ async def generate_and_persist(
     )
 
     summary: str
-    if settings.llm_stub_enabled or not messages or not allow_llm:
+    if not messages or not allow_llm:
         # F-32: an empty transcript has nothing to summarize -- never pay for
         # an LLM call, never persist hallucinated prose about it. F-03: a
         # rate-limited end must not spend either.
@@ -103,6 +103,9 @@ async def generate_and_persist(
             )
             content = completion.text.strip()
             summary = content if content else fallback
+        except llm.LlmUnavailable:
+            # Stub mode: no provider; the mechanical summary, quietly.
+            summary = fallback
         except Exception as e:
             # Includes CallRefused: a breached cap (F-03) still ends the
             # session, with the mechanical summary.
@@ -189,34 +192,35 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
         )
         dropped = list(reversed(dropped))  # chronological
 
-        if settings.llm_stub_enabled:
-            summary = _mechanical_rolling(dropped)
-        else:
-            transcript = "\n".join(f"{m.role}: {_flatten(m.content)[:500]}" for m in dropped)
-            rolling_messages = [
-                {"role": "system", "content": ROLLING_SYSTEM},
-                {
-                    "role": "user",
-                    "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}",
-                },
-            ]
-            meter = llm.Meter(
-                user_id=session.user_id, session_id=session.id, purpose="rolling_summary"
+        transcript = "\n".join(f"{m.role}: {_flatten(m.content)[:500]}" for m in dropped)
+        rolling_messages = [
+            {"role": "system", "content": ROLLING_SYSTEM},
+            {
+                "role": "user",
+                "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}",
+            },
+        ]
+        # Built before the commit below expires the loaded rows.
+        mechanical = _mechanical_rolling(dropped)
+        meter = llm.Meter(user_id=session.user_id, session_id=session.id, purpose="rolling_summary")
+        # Release the pooled connection for the call (reads only so far);
+        # the adapter takes its own for the gate and the settlement.
+        db.commit()
+        try:
+            completion = await llm.get().complete(
+                rolling_messages,
+                meter=meter,
+                temperature=settings.summary_temperature,
+                timeout=settings.summary_timeout_s,
             )
-            # Release the pooled connection for the call (reads only so far);
-            # the adapter takes its own for the gate and the settlement.
-            db.commit()
-            try:
-                completion = await llm.get().complete(
-                    rolling_messages,
-                    meter=meter,
-                    temperature=settings.summary_temperature,
-                    timeout=settings.summary_timeout_s,
-                )
-            except llm.CallRefused:
-                # F-03: capped users skip the rolling summary entirely; count
-                # stays untouched so the next uncapped trigger retries.
-                return None
+        except llm.LlmUnavailable:
+            # Stub mode: no provider, so the mechanical summary is written.
+            summary = mechanical
+        except llm.CallRefused:
+            # F-03: capped users skip the rolling summary entirely; count
+            # stays untouched so the next uncapped trigger retries.
+            return None
+        else:
             # An empty reply was still paid for; the adapter settled it.
             content = completion.text.strip()
             if not content:

@@ -205,8 +205,8 @@ def test_session_id_mismatch_returns_failed(session, ctx, mock_embed, db_session
 @pytest.fixture(autouse=True)
 def _stub_off(monkeypatch):
     # settings loads .env; a developer's gemini_api_key=test would flip
-    # llm_stub_enabled and short-circuit the fallback. Pin it off for this
-    # module (the stub-mode test re-enables it explicitly).
+    # llm_stub_enabled, and the stub provider refuses the fallback's embed.
+    # Pin it off for this module (the stub-mode tests re-enable it).
     from config import settings
 
     monkeypatch.setattr(settings, "llm_stub", False)
@@ -610,3 +610,54 @@ def test_prefetch_holds_no_db_transaction_during_the_embedding(
     fake_llm.aembed = spy
     asyncio.run(retrieval_service.prefetch_for_prompt(db_session, SESSION_ID, USER_ID, "q"))
     assert seen == [False]
+
+
+# --- stub mode (#413): a refused embedding keeps today's no-model output ------
+
+
+@pytest.fixture
+def stub_on(monkeypatch):
+    from config import settings
+
+    monkeypatch.setattr(settings, "llm_stub", True)
+
+    def refuse(**_kw):
+        raise AssertionError("stub mode called litellm")
+
+    monkeypatch.setattr(litellm, "embedding", refuse)
+    monkeypatch.setattr(litellm, "aembedding", refuse)
+
+
+def test_stub_mode_semantic_fallback_with_ready_doc_stays_optional(
+    session, db_session, monkeypatch, caplog, stub_on
+):
+    _seed_ready_doc(db_session)
+    monkeypatch.setattr(retrieval_service, "_session_centroid", lambda db, sid: [1.0, 0.0])
+    with caplog.at_level("WARNING"):
+        result = asyncio.run(
+            retrieval_service.semantic_fallback_required(
+                db_session, SESSION_ID, "q", user_id=USER_ID
+            )
+        )
+    assert result == (False, None)
+    assert "semantic fallback check failed" not in caplog.text
+
+
+def test_stub_mode_prefetch_with_ready_doc_returns_none(session, db_session, caplog, stub_on):
+    _seed_ready_doc(db_session)
+    with caplog.at_level("WARNING"):
+        result = asyncio.run(
+            retrieval_service.prefetch_for_prompt(db_session, SESSION_ID, USER_ID, "q")
+        )
+    assert result is None
+    assert "prefetch_for_prompt failed" not in caplog.text
+
+
+def test_stub_mode_retrieve_reports_the_refusal_code(session, ctx, db_session, stub_on):
+    from lib.error_codes import LLM_UNAVAILABLE
+
+    _seed_ready_doc(db_session)
+    result = retrieval_service.retrieve(
+        db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="q", k=5)
+    )
+    assert (result.ok, result.status, result.error) == (False, "failed", LLM_UNAVAILABLE)

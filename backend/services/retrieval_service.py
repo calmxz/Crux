@@ -18,7 +18,7 @@ from config import settings
 from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
 from db.models import Session as SessionModel
-from services import cost_meter, documents_service, llm, pgvector_store
+from services import documents_service, llm, pgvector_store
 
 log = logging.getLogger(__name__)
 
@@ -75,12 +75,13 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
         hits = pgvector_store.query_chunks(
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
-    except cost_meter.CostCapExceeded as e:
-        # A tool result, not an exception, so the turn does not fail: the
-        # model sees the refusal, and if the turn continues the tutor's next
-        # call is refused by the adapter gate with the cap event. A turn
-        # ended by a bundled terminal tool (a check or topic card) ends
-        # without one; the route's admission gate refuses the next turn.
+    except llm.CallRefused as e:
+        # A refusal is a tool result, not an exception, so the turn does not
+        # fail: the model sees the code. On a cap, if the turn continues the
+        # tutor's next call is refused by the adapter gate with the cap
+        # event; a turn ended by a bundled terminal tool (a check or topic
+        # card) ends without one, and the route's admission gate refuses the
+        # next turn. A stub-mode refusal (llm_unavailable, #413) caps nothing.
         return ToolResult(ok=False, status="failed", error=e.code)
     except Exception as e:
         log.error(
@@ -192,6 +193,8 @@ async def prefetch_for_prompt(
         hits = pgvector_store.query_chunks(
             db, session_id=session_id, query_embedding=query_vec, k=k
         )
+    except llm.LlmUnavailable:
+        return None  # stub mode (#413): no model, so no retrieval; not a failure
     except Exception as e:
         log.warning("prefetch_for_prompt failed; falling back to advisory flag: %s", e)
         return None
@@ -229,8 +232,6 @@ async def semantic_fallback_required(
     never ran) so a caller that goes on to call prefetch_for_prompt can hand
     it back in and skip a second, identical embed for the same query (B-09).
     """
-    if settings.llm_stub_enabled:
-        return False, None
     try:
         if not documents_service.has_ready_document(db, session_id):
             return False, None
@@ -245,6 +246,8 @@ async def semantic_fallback_required(
         # identical embed (2x cost + one extra round-trip on every
         # fallback-required turn otherwise).
         return sim >= settings.retrieval_fallback_threshold, list(query_vec)
+    except llm.LlmUnavailable:
+        return False, None  # stub mode (#413): no model, so no escalation
     except Exception as e:
         log.warning("semantic fallback check failed; keeping OPTIONAL: %s", e)
         return False, None

@@ -46,9 +46,8 @@ def _ctx(db_session, session_id="s1"):
 
 
 @pytest.fixture(autouse=True)
-def _real_loop(monkeypatch, fake_llm):
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
+def _real_loop(fake_llm):
+    """Every test runs the real loop against the scripted fake."""
 
 
 @pytest.fixture

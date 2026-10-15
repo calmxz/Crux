@@ -22,7 +22,6 @@ import pytest
 
 from agent import tutor
 from agent.types import ToolContext
-from config import settings
 from contracts import ToolResult, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
@@ -34,12 +33,6 @@ USER_ID = "u1"
 
 async def _drain(agen):
     return [ev async for ev in agen]
-
-
-@pytest.fixture(autouse=True)
-def _disable_stub(monkeypatch):
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
 
 
 @pytest.fixture

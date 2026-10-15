@@ -29,8 +29,6 @@ def _ctx(db, s):
 
 def test_max_iters_persists_partial(db_session, monkeypatch, fake_llm):
     s = _mk_session(db_session)
-    monkeypatch.setattr(tutor.settings, "llm_stub", False)
-    monkeypatch.setattr(tutor.settings, "gemini_api_key", "real")
     # One text token then one tool call: never a final answer, so the loop
     # exhausts max_iters.
     patch = {"add_confirmed_gap": "x", "evidence_type": "declared"}

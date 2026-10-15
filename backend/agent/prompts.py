@@ -17,6 +17,9 @@ from agent.excerpt import wrap_untrusted
 from contracts import TopicProfile
 
 _SUMMARY_TAG = "untrusted_summary"
+# The dynamic-context line carrying the prior session's summary. The stub
+# provider (agent/_stub.py) finds the summary by this label (#413).
+LAST_SESSION_SUMMARY_LABEL = "LAST_SESSION_SUMMARY"
 
 IMMUTABLE_RULES = """You are Crux's tutor AI.
 Your job is to help the learner understand their study material. Ask clarifying
@@ -491,7 +494,7 @@ def build_dynamic_context(state: dict) -> str:
         f"RETRIEVAL: {retrieval_label}\n"
         f"DIAGNOSTIC: {diagnostic_label}\n"
         f"SEED_MODE: {seed_mode}\n"
-        f"LAST_SESSION_SUMMARY: {last_session_summary}\n"
+        f"{LAST_SESSION_SUMMARY_LABEL}: {last_session_summary}\n"
         f"ROLLING_SUMMARY: {rolling_summary}\n"
         f"PENDING_CHECK: {pc_label}\n"
         f"GAP_ACCURACY: {_gap_accuracy_label(profile_dict, state.get('gap_accuracy') or {})}\n"

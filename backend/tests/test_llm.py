@@ -786,6 +786,8 @@ async def test_litellm_stream_estimate_counts_tool_call_arguments(litellm_stream
 
 
 def test_get_resolves_the_provider_per_call(monkeypatch):
+    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
+    monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(llm, "_provider", None)
     assert isinstance(llm.get().provider, llm.LiteLlmProvider)
 

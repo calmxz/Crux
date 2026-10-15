@@ -32,6 +32,7 @@ from lib import chunking, keyword_index
 from services import (
     cost_meter,
     ingestion_service,
+    llm,
     pgvector_store,
     profile_service,
     summary_service,
@@ -746,17 +747,16 @@ def test_ingestion_capped_user_stops_at_next_batch(
     assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
 
 
-def test_stub_mode_ingestion_still_embeds_and_meters(
+def test_stub_mode_ingestion_refuses_without_touching_the_network(
     db_session, ingest_doc, fake_litellm, monkeypatch
 ):
     monkeypatch.setattr(settings, "llm_stub", True)
-    fake_litellm.costs = [0.0005]
 
-    ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(1), user_id=USER_ID)
+    # #413: the stub provider refuses embeddings, so run() fails the
+    # document. #435 replaces this with deterministic fake vectors.
+    with pytest.raises(llm.LlmUnavailable):
+        ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(1), user_id=USER_ID)
 
-    # #413 changes this: stub mode does not gate embeddings today, so the
-    # provider is called and billed. After #413 the stub provider returns
-    # fake vectors at cost 0 without touching the network.
-    assert fake_litellm.embedding_calls == [["chunk 0"]]
-    assert _ledger(db_session) == Decimal("0.0005")
-    assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))]
+    assert fake_litellm.embedding_calls == []
+    assert _ledger(db_session) == Decimal("0")
+    assert _log_rows(db_session) == []

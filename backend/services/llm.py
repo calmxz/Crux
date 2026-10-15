@@ -1,4 +1,4 @@
-"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4 and 3/4).
+"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4 to 4/4).
 
 A shell that owns the cost gate, retry and settlement, around a swappable
 provider that owns the vendor call and its pricing. Callers never pass a DB
@@ -7,7 +7,12 @@ session:
 - Gate: before every call, cost_meter.assert_within_caps (user cap plus the
   global ceiling) runs in the adapter's own short session. A refusal raises
   CostCapExceeded; a failing spend read propagates. Either way the model is
-  not called. A Meter without a user skips the gate and the ledger.
+  not called. A Meter without a user skips the gate and the ledger, and so
+  does the stub provider, which never spends.
+- Providers: LiteLlmProvider in production; StubProvider whenever stub mode
+  is on (get() is the only reader of settings.llm_stub_enabled). The stub
+  refuses completions and embeddings with LlmUnavailable, a CallRefused that
+  is not a cap; callers fall back as they would without a model.
 - Settlement: after each attempt that cost something, one short session
   writes the ledger upsert and the LlmCallLog row and commits, so spend is
   permanent whatever the caller's transaction does next. It never raises. If
@@ -45,6 +50,7 @@ import sqlalchemy.exc
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
+from agent import _stub
 from config import settings
 from db.database import SessionLocal
 from lib.llm_errors import CallRefused, LlmUnavailable
@@ -59,6 +65,7 @@ __all__ = [
     "LlmStream",
     "LlmUnavailable",
     "Meter",
+    "StubProvider",
     "TextDelta",
     "ToolCall",
     "get",
@@ -370,8 +377,81 @@ class _LiteLlmStream:
             await close()
 
 
-def _gate(meter: Meter) -> None:
-    if meter.user_id is None:
+class StubProvider:
+    """Stub mode (`settings.llm_stub_enabled`): never touches the network.
+    The tutor's stream echoes the learner deterministically (agent/_stub.py)
+    with no tool calls at cost 0; completions and embeddings raise
+    LlmUnavailable, and each caller falls back as it would without a model."""
+
+    chat_model = "stub"
+    embedding_model = "stub"
+
+    async def complete(self, messages, *, temperature, timeout) -> Completion:
+        raise LlmUnavailable()
+
+    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+        system_prompt = next(
+            (m.get("content") or "" for m in messages if m.get("role") == "system"), ""
+        )
+        return _StubStream(_chunk_text(_stub.stub_response(messages, system_prompt)))
+
+    def embed(self, texts) -> Embedding:
+        raise LlmUnavailable()
+
+    async def aembed(self, texts) -> Embedding:
+        raise LlmUnavailable()
+
+    def completion_prompt_cost(self, messages) -> Decimal:
+        return Decimal("0")
+
+    def embedding_prompt_cost(self, texts) -> Decimal:
+        return Decimal("0")
+
+
+def _chunk_text(text: str, parts: int = 3) -> list[str]:
+    """Split text into ~`parts` word-boundary chunks, so stub streaming still
+    exercises the delta path."""
+    words = text.split(" ")
+    if len(words) <= 1:
+        return [text]
+    parts = max(1, min(parts, len(words)))
+    size = -(-len(words) // parts)  # ceil division
+    out: list[str] = []
+    for i in range(0, len(words), size):
+        group = words[i : i + size]
+        sep = " " if (i + size) < len(words) else ""
+        out.append(" ".join(group) + sep)
+    return out
+
+
+class _StubStream:
+    def __init__(self, tokens: list[str]):
+        self._tokens = tokens
+        self.received = False
+        self.text = ""
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        return []
+
+    async def __aiter__(self):
+        for token in self._tokens:
+            self.received = True
+            self.text += token
+            yield token
+
+    def priced(self) -> tuple[Decimal, dict]:
+        return Decimal("0"), {}
+
+    def estimate(self) -> Decimal:
+        return Decimal("0")
+
+    async def aclose(self) -> None:
+        return None
+
+
+def _gate(meter: Meter, provider: Provider) -> None:
+    if meter.user_id is None or isinstance(provider, StubProvider):
         return
     with session_factory() as db:
         cost_meter.assert_within_caps(db, meter.user_id)
@@ -558,7 +638,7 @@ class LlmStream:
         return self._ps.tool_calls if self._ps is not None else []
 
     async def __aenter__(self) -> "LlmStream":
-        await run_in_threadpool(_gate, self._meter)
+        await run_in_threadpool(_gate, self._meter, self._provider)
         return self
 
     def __aiter__(self) -> AsyncIterator[TextDelta]:
@@ -694,7 +774,7 @@ class Llm:
     async def complete(
         self, messages: list[dict], *, meter: Meter, temperature: float, timeout: float
     ) -> Completion:
-        await run_in_threadpool(_gate, meter)
+        await run_in_threadpool(_gate, meter, self.provider)
         model = self.provider.chat_model
         result = await self._run_async(
             lambda: self.provider.complete(messages, temperature=temperature, timeout=timeout),
@@ -707,7 +787,7 @@ class Llm:
         return result
 
     def embed(self, texts: list[str], *, meter: Meter) -> Embedding:
-        _gate(meter)
+        _gate(meter, self.provider)
         model = self.provider.embedding_model
         result = self._run_sync(
             lambda: self.provider.embed(texts),
@@ -720,7 +800,7 @@ class Llm:
         return result
 
     async def aembed(self, texts: list[str], *, meter: Meter) -> Embedding:
-        await run_in_threadpool(_gate, meter)
+        await run_in_threadpool(_gate, meter, self.provider)
         model = self.provider.embedding_model
         result = await self._run_async(
             lambda: self.provider.aembed(texts),
@@ -739,5 +819,8 @@ _provider: Provider | None = None
 
 def get() -> Llm:
     """The active adapter. Resolved per call, not once at startup, so a
-    per-test settings toggle (and part 4's stub check) takes effect."""
+    per-test settings toggle takes effect. Stub mode wins over any installed
+    provider; this is the only reader of `llm_stub_enabled` (#413)."""
+    if settings.llm_stub_enabled:
+        return Llm(StubProvider())
     return Llm(_provider or LiteLlmProvider())

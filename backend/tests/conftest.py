@@ -421,9 +421,16 @@ class FakeLlmProvider:
 def fake_llm(monkeypatch):
     """Install a FakeLlmProvider behind the real adapter shell. Retries do
     not sleep. The adapter's session factory is already bound to the test
-    engine by db_session."""
+    engine by db_session.
+
+    Stub mode wins over an installed provider (#413), and the test env's
+    "test" key turns it on, so this pins it off; a test that wants the stub
+    sets `settings.llm_stub = True` after."""
+    from config import settings
     from services import llm
 
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "fake-llm-key")
     provider = FakeLlmProvider()
     monkeypatch.setattr(llm, "_provider", provider)
     monkeypatch.setattr(llm.time, "sleep", lambda _s: None)

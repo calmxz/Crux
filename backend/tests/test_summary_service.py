@@ -390,3 +390,23 @@ def test_summary_holds_no_db_transaction_during_the_llm_call(
     fake_llm.complete = spy
     asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
     assert seen == [False]
+
+
+@pytest.mark.parametrize("capped", [False, True])
+def test_stub_mode_summary_is_mechanical_and_quiet(
+    session_with_messages, db_session, monkeypatch, caplog, capped
+):
+    # #413: the stub refuses completions; the session still ends with the
+    # mechanical summary, without a "summary LLM failed" warning per end.
+    monkeypatch.setattr(settings, "llm_stub", True)
+    if capped:
+        cost_meter.record_cost(
+            db_session, session_with_messages.user_id, Decimal(str(settings.llm_hard_cap_usd))
+        )
+        db_session.commit()
+    with caplog.at_level("WARNING"):
+        summary = asyncio.run(
+            summary_service.generate_and_persist(db_session, session_with_messages)
+        )
+    assert summary.startswith("[auto]")
+    assert "summary LLM failed" not in caplog.text

@@ -257,3 +257,19 @@ async def test_rolling_summary_holds_no_db_transaction_during_the_llm_call(
     fake_llm.complete = spy
     await summary_service.update_rolling_summary(db_session, s.id)
     assert seen == [False]
+
+
+async def test_stub_mode_capped_user_still_gets_the_mechanical_summary(
+    db_session, session_with_messages, monkeypatch
+):
+    # #413: stub mode writes the mechanical summary whatever the spend; None
+    # is the cap reaction of a real provider, not the stub's.
+    s = session_with_messages(n=31)
+    monkeypatch.setattr(settings, "llm_stub", True)
+    cost_meter.record_cost(db_session, s.user_id, Decimal(str(settings.llm_hard_cap_usd)))
+    db_session.commit()
+    result = await summary_service.update_rolling_summary(db_session, s.id)
+    assert result is not None and result.startswith("[auto-rolling]")
+    db_session.refresh(s)
+    assert s.rolling_summary == result
+    assert s.rolling_summary_count == 11
