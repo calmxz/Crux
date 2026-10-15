@@ -1,4 +1,4 @@
-"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4).
+"""The LLM adapter (B3, docs/decisions.md 2026-09-27; llm-adapter 2/4 and 3/4).
 
 A shell that owns the cost gate, retry and settlement, around a swappable
 provider that owns the vendor call and its pricing. Callers never pass a DB
@@ -21,6 +21,9 @@ session:
 - Retry: 429, 503, 500 and connection errors retry with backoff
   (llm_retry_attempts, llm_retry_base_delay_s). Timeout retries for
   embeddings only, never completions.
+- Streams (stream(), the tutor): the gate runs on entering the block, retry
+  only before any chunk arrives, and the block's exit settles once -- see
+  LlmStream for the per-exit rule.
 
 Invariant for callers: no uncommitted ledger write in the caller's session
 across a call. Settlement upserts the same ledger row and would wait on it;
@@ -32,7 +35,7 @@ import asyncio
 import logging
 import threading
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
 from typing import Protocol, TypeVar
@@ -53,8 +56,11 @@ __all__ = [
     "Embedding",
     "LiteLlmProvider",
     "Llm",
+    "LlmStream",
     "LlmUnavailable",
     "Meter",
+    "TextDelta",
+    "ToolCall",
     "get",
 ]
 
@@ -67,9 +73,9 @@ T = TypeVar("T")
 session_factory = SessionLocal
 
 # Settlement waits at most this long for the ledger row lock, then defers the
-# ledger write. Every ledger writer commits straight after its write (the
-# tutor after each iteration's record_cost, the retrieve tool after its
-# embedding metering), so a legitimate wait is a single short transaction.
+# ledger write. Every LLM spend settles through this adapter in a short
+# transaction of its own, and the chat route's turn reservation is published by
+# its admission commit, so a legitimate wait is a single short transaction.
 SETTLE_LOCK_TIMEOUT = "5s"
 # The deferred ledger write runs once, this long after the failed settlement,
 # on a background thread; no request waits on it, so it may wait longer for
@@ -113,6 +119,44 @@ class Embedding:
     usage: dict = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class TextDelta:
+    text: str
+
+
+@dataclass(frozen=True)
+class ToolCall:
+    """One assembled tool call. `arguments` is the raw JSON string the model
+    streamed; the caller parses it (and handles a malformed one)."""
+
+    id: str | None
+    name: str | None
+    arguments: str
+
+
+class ProviderStream(Protocol):
+    """One open streamed completion, as the provider hands it to the shell.
+
+    Iterating yields text tokens. `received` turns true on the first chunk of
+    any kind; `text` and `tool_calls` accumulate as chunks arrive."""
+
+    received: bool
+    text: str
+
+    @property
+    def tool_calls(self) -> list[ToolCall]: ...
+
+    def __aiter__(self) -> AsyncIterator[str]: ...
+
+    def priced(self) -> tuple[Decimal, dict]:
+        """(cost, usage) of the finished stream. Never raises."""
+
+    def estimate(self) -> Decimal:
+        """Prompt plus the text received so far, by token math. Never raises."""
+
+    async def aclose(self) -> None: ...
+
+
 class Provider(Protocol):
     """The vendor call and its pricing. Never touches the database."""
 
@@ -128,6 +172,17 @@ class Provider(Protocol):
         self, messages: list[dict], *, temperature: float, timeout: float
     ) -> Completion:
         """One non-streamed chat completion, priced."""
+
+    async def stream(
+        self,
+        messages: list[dict],
+        *,
+        tools: list[dict] | None,
+        tool_choice: str | None,
+        temperature: float,
+        timeout: float,
+    ) -> ProviderStream:
+        """Open one streamed chat completion."""
 
     def embed(self, texts: list[str]) -> Embedding:
         """One embedding batch, priced."""
@@ -193,6 +248,20 @@ class LiteLlmProvider:
             log.warning("completion token-math estimate failed: %s", e)
             return Decimal("0")
 
+    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+        kwargs = {}
+        if tools is not None:
+            kwargs = {"tools": tools, "tool_choice": tool_choice}
+        resp = await litellm.acompletion(
+            model=settings.model,
+            temperature=temperature,
+            messages=messages,
+            stream=True,
+            timeout=timeout,
+            **kwargs,
+        )
+        return _LiteLlmStream(self, resp, messages)
+
     def _embedding(self, resp, texts: list[str]) -> Embedding:
         vectors = [d["embedding"] if isinstance(d, dict) else d.embedding for d in resp.data]
         return Embedding(
@@ -230,6 +299,69 @@ class LiteLlmProvider:
         except Exception as e:  # noqa: BLE001
             log.warning("embedding prompt estimate failed: %s", e)
             return Decimal("0")
+
+
+class _LiteLlmStream:
+    """litellm's streamed chunks, reduced to text tokens plus assembled tool
+    calls. Pricing reads the kept chunks back through stream_chunk_builder."""
+
+    def __init__(self, provider: LiteLlmProvider, resp, messages: list[dict]):
+        self._provider = provider
+        self._resp = resp
+        self._messages = messages
+        self._chunks: list = []
+        self._frags: dict[int, dict] = {}
+        self.received = False
+        self.text = ""
+
+    async def __aiter__(self):
+        async for chunk in self._resp:
+            self.received = True
+            self._chunks.append(chunk)
+            delta = chunk.choices[0].delta
+            for tcd in getattr(delta, "tool_calls", None) or []:
+                slot = self._frags.setdefault(
+                    getattr(tcd, "index", 0), {"id": None, "name": None, "args": ""}
+                )
+                if getattr(tcd, "id", None):
+                    slot["id"] = tcd.id
+                fn = getattr(tcd, "function", None)
+                if fn is not None:
+                    if getattr(fn, "name", None):
+                        slot["name"] = fn.name
+                    if getattr(fn, "arguments", None):
+                        slot["args"] += fn.arguments
+            token = getattr(delta, "content", None)
+            if token:
+                self.text += token
+                yield token
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        return [
+            ToolCall(id=s["id"], name=s["name"], arguments=s["args"])
+            for _, s in sorted(self._frags.items())
+        ]
+
+    def priced(self) -> tuple[Decimal, dict]:
+        try:
+            built = litellm.stream_chunk_builder(self._chunks, messages=self._messages)
+        except Exception as e:  # noqa: BLE001 - pricing must not fail the call
+            log.warning("stream_chunk_builder failed: %s", e)
+            return self.estimate(), {}
+        # F-19: a pricing-table gap falls back to token math, never $0.
+        return (
+            self._provider._completion_cost(built, self._messages, self.text),
+            cost_meter.extract_usage(built),
+        )
+
+    def estimate(self) -> Decimal:
+        return self._provider._token_math(self._messages, self.text)
+
+    async def aclose(self) -> None:
+        close = getattr(self._resp, "aclose", None)
+        if close is not None:
+            await close()
 
 
 def _gate(meter: Meter) -> None:
@@ -357,9 +489,142 @@ def _backoff(i: int) -> float:
     return max(0.0, settings.llm_retry_base_delay_s) * (2**i)
 
 
+class LlmStream:
+    """One streamed completion: `async with llm.get().stream(...) as s`.
+
+    Entering runs the gate. Iterating yields TextDelta events; `s.text` and
+    `s.tool_calls` are complete once the iteration ends. Leaving the block
+    settles exactly once, and `s.cost` holds what was settled:
+
+    - normal end: the provider's price of the built response (token math if
+      pricing fails);
+    - a provider error: an estimate of the prompt plus the text received if
+      any chunk arrived or the error was a Timeout, otherwise $0;
+    - any other exit (cancellation, the caller's generator closed, an error in
+      the caller's block): always the estimate.
+
+    A 429, 503, 500 or connection error before any chunk arrives retries with
+    backoff; a failed attempt with nothing received costs nothing. Timeout is
+    never retried.
+    """
+
+    def __init__(
+        self,
+        provider: Provider,
+        messages: list[dict],
+        *,
+        meter: Meter,
+        tools: list[dict] | None,
+        tool_choice: str | None,
+        temperature: float,
+        timeout: float,
+    ):
+        self._provider = provider
+        self._messages = messages
+        self._meter = meter
+        self._open_kwargs = {
+            "tools": tools,
+            "tool_choice": tool_choice,
+            "temperature": temperature,
+            "timeout": timeout,
+        }
+        self._ps: ProviderStream | None = None
+        self._gen: AsyncGenerator[TextDelta, None] | None = None
+        self._started = False
+        self._finished = False
+        self._provider_error: Exception | None = None
+        self.cost: Decimal | None = None
+
+    @property
+    def text(self) -> str:
+        return self._ps.text if self._ps is not None else ""
+
+    @property
+    def tool_calls(self) -> list[ToolCall]:
+        return self._ps.tool_calls if self._ps is not None else []
+
+    async def __aenter__(self) -> "LlmStream":
+        await run_in_threadpool(_gate, self._meter)
+        return self
+
+    def __aiter__(self) -> AsyncIterator[TextDelta]:
+        self._gen = self._events()
+        return self._gen
+
+    async def _events(self) -> AsyncGenerator[TextDelta, None]:
+        self._started = True
+        attempts = max(0, settings.llm_retry_attempts)
+        for i in range(attempts + 1):
+            try:
+                self._ps = await self._provider.stream(self._messages, **self._open_kwargs)
+                async for token in self._ps:
+                    yield TextDelta(token)
+                self._finished = True
+                return
+            except Exception as e:
+                received = self._ps is not None and self._ps.received
+                retry, _ = _failed_attempt(e, retry_timeout=False)
+                if received or not retry or i == attempts:
+                    self._provider_error = e
+                    raise
+                self._ps = None
+            await asyncio.sleep(_backoff(i))
+
+    def _exit_cost(self) -> tuple[Decimal, dict]:
+        ps = self._ps
+        if self._finished and ps is not None:
+            return ps.priced()
+        if not self._started:
+            return Decimal("0"), {}
+        err = self._provider_error
+        if err is not None and not (
+            isinstance(err, litellm.Timeout) or (ps is not None and ps.received)
+        ):
+            return Decimal("0"), {}
+        if ps is None:
+            # The request went out but no stream object came back yet.
+            return self._provider.completion_prompt_cost(self._messages), {}
+        return ps.estimate(), {}
+
+    async def __aexit__(self, exc_type, exc, tb) -> bool:
+        # Settle before any await: a second cancellation cannot interrupt a
+        # synchronous write, so the spend is on record whatever happens next.
+        cost, usage = self._exit_cost()
+        _settle(self._meter, self._provider.chat_model, cost, usage)
+        self.cost = cost
+        try:
+            if self._gen is not None:
+                await self._gen.aclose()
+            if self._ps is not None:
+                await self._ps.aclose()
+        except Exception as e:  # noqa: BLE001 - closing never masks the exit
+            log.warning("closing the llm stream failed: %s", e)
+        return False
+
+
 class Llm:
     def __init__(self, provider: Provider):
         self.provider = provider
+
+    def stream(
+        self,
+        messages: list[dict],
+        *,
+        meter: Meter,
+        tools: list[dict] | None = None,
+        tool_choice: str | None = None,
+        temperature: float,
+        timeout: float,
+    ) -> LlmStream:
+        return LlmStream(
+            self.provider,
+            messages,
+            meter=meter,
+            tools=tools,
+            tool_choice=tool_choice,
+            temperature=temperature,
+            timeout=timeout,
+        )
 
     def _run_sync(
         self,

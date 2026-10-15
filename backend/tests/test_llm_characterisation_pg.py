@@ -119,10 +119,15 @@ def seeded(engine):
 
 
 @pytest.fixture
-def app_on_postgres(seeded):
+def app_on_postgres(seeded, monkeypatch):
     """The real app on a Postgres session, authenticated as the seeded user.
-    Yields the seeded (Session, uid, sid)."""
+    The LLM adapter's gate and settlement open their own sessions on the same
+    database (#412: the tutor's spend settles there). Yields the seeded
+    (Session, uid, sid)."""
+    from services import llm
+
     Session, uid, _ = seeded
+    monkeypatch.setattr(llm, "session_factory", Session)
 
     def override_get_db():
         db = Session()
@@ -396,3 +401,60 @@ def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
     with Session() as db:
         assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
         assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+
+
+# ---------------------------------------------------------------------------
+# #412: the tutor streams through the adapter
+# ---------------------------------------------------------------------------
+
+
+async def test_tool_turn_with_retrieve_settles_every_call_without_lock_waits(
+    adapter_on_postgres, fake_llm, monkeypatch, caplog
+):
+    """The tutor holds no ledger write across tool dispatch, so the retrieve
+    tool's embedding settles at once: chat, embedding and chat each land on
+    the ledger, and no settlement is deferred behind a held row lock."""
+    from datetime import datetime, timezone
+
+    from agent import tutor
+    from agent.types import ToolContext
+    from db.models import Document
+    from tests.conftest import tool_call
+
+    Session, uid, sid = adapter_on_postgres
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
+    with Session() as db:
+        db.add(Document(session_id=sid, filename="ref.txt", status="ready"))
+        db.commit()
+    fake_llm.streams = [
+        ["Let me look. ", tool_call("retrieve_chunks", {"session_id": sid, "query": "joins"})],
+        ["Here it is."],
+    ]
+
+    try:
+        with Session() as db:
+            ctx = ToolContext(
+                db=db, session_id=sid, user_id=uid, turn_started_at=datetime.now(timezone.utc)
+            )
+            events = [
+                ev
+                async for ev in tutor.run_streaming(
+                    [{"role": "user", "content": "explain joins"}], "sys", ctx
+                )
+            ]
+
+        assert events[-1].type == "done"
+        assert fake_llm.embed_calls == [["joins"]]
+        with Session() as db:
+            assert cost_meter.current_spend(db, uid) == Decimal("0.0015")
+            assert sorted(_call_log(db, uid)) == [
+                ("chat", Decimal("0.0005")),
+                ("chat", Decimal("0.0005")),
+                ("embedding", Decimal("0.0005")),
+            ]
+        assert not [r for r in caplog.records if "settlement" in r.getMessage()]
+    finally:
+        with Session() as db:
+            db.execute(delete(Document).where(Document.session_id == sid))
+            db.commit()

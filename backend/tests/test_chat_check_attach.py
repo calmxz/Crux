@@ -13,9 +13,6 @@ fix; when that route was deleted they were migrated:
 
 import json
 from datetime import datetime, timezone
-from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -27,7 +24,7 @@ from contracts import AskCheckQuestionsArgs, ToolCallRecord, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
 from services import check_service
-from services.cost_meter import CapStatus
+from tests.conftest import tool_call
 
 # ---------------------------------------------------------------------------
 # Shared constants
@@ -215,33 +212,10 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
 # ---------------------------------------------------------------------------
 
 
-def _content_chunk(token):
-    delta = SimpleNamespace(content=token, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _tool_chunk_ask(call_id):
-    fn = SimpleNamespace()
-    fn.name = "ask_check_questions"
-    fn.arguments = json.dumps({"session_id": SESSION_ID, "gap": "new_gap", "items": ASK_ITEMS})
-    frag = SimpleNamespace()
-    frag.index = 0
-    frag.id = call_id
-    frag.function = fn
-    delta = SimpleNamespace(content=None, tool_calls=[frag])
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _make_stream(*chunks):
-    async def _gen():
-        for c in chunks:
-            yield c
-
-    return _gen()
-
-
 @pytest.mark.asyncio
-async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, monkeypatch):
+async def test_failed_ask_does_not_clobber_prior_batch_message_id(
+    db_session, monkeypatch, fake_llm
+):
     """Gate correctness: a FAILED ask_check_questions must NOT attach the
     current message's id to an already-open pending_check.
 
@@ -252,20 +226,6 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
     """
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
-    cap = CapStatus(
-        allowed=True,
-        used=Decimal("0.0"),
-        soft_breached=False,
-        urgent_breached=False,
-        soft_cap=Decimal("2.0"),
-        urgent_cap=Decimal("2.70"),
-        hard_cap=Decimal("3.0"),
-    )
-    monkeypatch.setattr("agent.tutor.cost_meter.check_cap", MagicMock(return_value=cap))
-    monkeypatch.setattr(
-        "agent.tutor.litellm.stream_chunk_builder", MagicMock(return_value=SimpleNamespace())
-    )
-    monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.0))
 
     # 1. Manually register a batch to simulate a prior open batch, stamped
     #    with a known sentinel message_id.
@@ -301,12 +261,11 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
 
     # 2. Stream a turn whose ask fails (batch already open), then finishes
     #    with plain text.
-    turn1 = _make_stream(_tool_chunk_ask("tc_fail"))
-    turn2 = _make_stream(_content_chunk("Please answer the open question first."))
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[turn1, turn2]),
-    )
+    ask_args = {"session_id": SESSION_ID, "gap": "new_gap", "items": ASK_ITEMS}
+    fake_llm.streams = [
+        [tool_call("ask_check_questions", ask_args, id="tc_fail")],
+        ["Please answer the open question first."],
+    ]
 
     ctx = ToolContext(
         db=db_session,

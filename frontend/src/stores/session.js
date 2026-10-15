@@ -1378,11 +1378,16 @@ export const useSessionStore = defineStore('session', () => {
   }
 
   // F-14: the backend persists already-streamed text on a mid-turn cost-cap
-  // or max_iters abort (status 'partial'); a generic agent-loop failure
-  // still persists it too, but as status 'error'. Mirror that split here so
-  // the live view matches what a reload of the same session will show
-  // instead of discarding the text the learner already watched stream.
-  const PARTIAL_ABORT_CODES = new Set(['daily_cost_cap_reached', 'max_iters_reached'])
+  // (user cap or global ceiling, #412) or max_iters abort (status 'partial');
+  // a generic agent-loop failure still persists it too, but as status
+  // 'error'. Mirror that split here so the live view matches what a reload
+  // of the same session will show instead of discarding the text the
+  // learner already watched stream.
+  const PARTIAL_ABORT_CODES = new Set([
+    'daily_cost_cap_reached',
+    'global_cost_cap_reached',
+    'max_iters_reached',
+  ])
 
   // E-03: the single "retain whatever already streamed, then clear" step.
   // Shared by the SSE `error` event (which carries a code) and the generic

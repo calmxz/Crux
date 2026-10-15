@@ -392,37 +392,3 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
         # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.warning("embedding token-math fallback failed: %s", e)
         return Decimal("0")
-
-
-def meter_embedding_response(
-    db: Session,
-    resp,
-    *,
-    user_id: str,
-    session_id,
-    texts: list[str],
-    purpose: str = "embedding",
-) -> Decimal:
-    """Record an embedding call on the capped ledger and the analytics log
-    (F-19). Never raises: metering must not fail the calling feature.
-
-    Returns the metered cost (Decimal("0") if metering failed outright), so
-    callers can re-record real vendor spend after a later transaction
-    rollback (F-27).
-    """
-    try:
-        cost = embedding_cost(settings.embedding_model, resp, texts)
-        record_cost(db, user_id, cost)
-        log_call(
-            db,
-            user_id=user_id,
-            session_id=session_id,
-            purpose=purpose,
-            model=settings.embedding_model,
-            cost_usd=cost,
-            **extract_usage(resp),
-        )
-        return cost
-    except Exception as e:  # noqa: BLE001
-        log.warning("embedding metering failed: %s", e)
-        return _ZERO
