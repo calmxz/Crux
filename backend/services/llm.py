@@ -10,8 +10,11 @@ session:
   not called. A Meter without a user skips the gate and the ledger.
 - Settlement: after each attempt that cost something, one short session
   writes the ledger upsert and the LlmCallLog row and commits, so spend is
-  permanent whatever the caller's transaction does next. It never raises: a
-  failure is logged at error level with what reconciliation needs.
+  permanent whatever the caller's transaction does next. It never raises. If
+  that fails, the LlmCallLog row is written on its own and the ledger write
+  is retried once off the request path; only if the retry fails too is the
+  spend missing from the ledger, logged at error level with what
+  reconciliation needs.
 - Failed attempts: a Timeout settles the provider's prompt-token estimate (a
   non-streamed call has no output to add); a 429, 503, 500 or connection
   error settles $0, since the provider never processed the prompt.
@@ -21,12 +24,13 @@ session:
 
 Invariant for callers: no uncommitted ledger write in the caller's session
 across a call. Settlement upserts the same ledger row and would wait on it;
-lock_timeout (SETTLE_LOCK_TIMEOUT) bounds that wait, then the settlement is
-logged and dropped instead of hanging.
+lock_timeout (SETTLE_LOCK_TIMEOUT) bounds that wait, then the ledger write
+is deferred to the retry instead of hanging the request.
 """
 
 import asyncio
 import logging
+import threading
 import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -61,11 +65,16 @@ T = TypeVar("T")
 # test engine.
 session_factory = SessionLocal
 
-# Settlement waits at most this long for the ledger row lock, then logs and
-# drops the settlement. Every ledger writer commits straight after its write
-# (the tutor after each iteration's record_cost, the retrieve tool after its
+# Settlement waits at most this long for the ledger row lock, then defers the
+# ledger write. Every ledger writer commits straight after its write (the
+# tutor after each iteration's record_cost, the retrieve tool after its
 # embedding metering), so a legitimate wait is a single short transaction.
 SETTLE_LOCK_TIMEOUT = "5s"
+# The deferred ledger write runs once, this long after the failed settlement,
+# on a background thread; no request waits on it, so it may wait longer for
+# the row lock.
+SETTLE_RETRY_DELAY_S = 5.0
+SETTLE_RETRY_LOCK_TIMEOUT = "30s"
 
 _RETRYABLE: tuple[type[BaseException], ...] = (
     litellm.APIConnectionError,
@@ -102,22 +111,29 @@ class Provider(Protocol):
     """The vendor call and its pricing. Never touches the database."""
 
     @property
-    def chat_model(self) -> str: ...
+    def chat_model(self) -> str:
+        """Model name recorded on completion call log rows."""
 
     @property
-    def embedding_model(self) -> str: ...
+    def embedding_model(self) -> str:
+        """Model name recorded on embedding call log rows."""
 
     async def complete(
         self, messages: list[dict], *, temperature: float, timeout: float
-    ) -> Completion: ...
+    ) -> Completion:
+        """One non-streamed chat completion, priced."""
 
-    def embed(self, texts: list[str]) -> Embedding: ...
+    def embed(self, texts: list[str]) -> Embedding:
+        """One embedding batch, priced."""
 
-    async def aembed(self, texts: list[str]) -> Embedding: ...
+    async def aembed(self, texts: list[str]) -> Embedding:
+        """Async form of embed."""
 
-    def completion_prompt_cost(self, messages: list[dict]) -> Decimal: ...
+    def completion_prompt_cost(self, messages: list[dict]) -> Decimal:
+        """Estimated prompt cost of a completion. Never raises."""
 
-    def embedding_prompt_cost(self, texts: list[str]) -> Decimal: ...
+    def embedding_prompt_cost(self, texts: list[str]) -> Decimal:
+        """Estimated prompt cost of an embedding batch. Never raises."""
 
 
 def _to_decimal(v) -> Decimal:
@@ -166,6 +182,8 @@ class LiteLlmProvider:
             pt = litellm.token_counter(model=settings.model, messages=messages)
             return cost_meter.estimate_cancelled_cost(settings.model, content, pt)
         except Exception as e:  # noqa: BLE001 - an estimate must not raise
+            # Local tokenization only; no credential in the exception.
+            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
             log.warning("completion token-math estimate failed: %s", e)
             return Decimal("0")
 
@@ -215,6 +233,32 @@ def _gate(meter: Meter) -> None:
         cost_meter.assert_within_caps(db, meter.user_id)
 
 
+def _lock_timeout(db, timeout: str) -> None:
+    if db.get_bind().dialect.name == "postgresql":
+        # SET LOCAL via set_config: bind-safe, scoped to this transaction.
+        db.execute(select(func.set_config("lock_timeout", timeout, True)))
+
+
+def _log_call(db, meter: Meter, model: str, cost: Decimal, usage: dict) -> bool:
+    return cost_meter.log_call(
+        db,
+        user_id=meter.user_id,
+        session_id=meter.session_id,
+        purpose=meter.purpose,
+        model=model,
+        cost_usd=cost,
+        **usage,
+    )
+
+
+def _schedule(delay: float, fn: Callable[..., None], *args) -> None:
+    """Run fn(*args) once after `delay` seconds on a daemon thread. Tests
+    replace this to run the retry inline."""
+    timer = threading.Timer(delay, fn, args)
+    timer.daemon = True
+    timer.start()
+
+
 def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
     if meter.user_id is None or cost <= 0:
         return
@@ -228,26 +272,43 @@ def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
     }
     try:
         with session_factory() as db:
-            if db.get_bind().dialect.name == "postgresql":
-                # SET LOCAL via set_config: bind-safe, scoped to this transaction.
-                db.execute(select(func.set_config("lock_timeout", SETTLE_LOCK_TIMEOUT, True)))
+            _lock_timeout(db, SETTLE_LOCK_TIMEOUT)
             cost_meter.record_cost(db, meter.user_id, cost)
-            logged = cost_meter.log_call(
-                db,
-                user_id=meter.user_id,
-                session_id=meter.session_id,
-                purpose=meter.purpose,
-                model=model,
-                cost_usd=cost,
-                **usage,
-            )
+            logged = _log_call(db, meter, model, cost, usage)
             db.commit()
     except Exception as e:  # noqa: BLE001 - settlement never fails the call
-        log.error("llm settlement failed: %s", e, extra=reconciliation)
+        _defer_ledger(meter, model, cost, usage, reconciliation, e)
         return
     if not logged:
         # The ledger committed; only the attribution row was lost.
         log.error("llm call log row lost", extra=reconciliation)
+
+
+def _defer_ledger(
+    meter: Meter, model: str, cost: Decimal, usage: dict, reconciliation: dict, exc: Exception
+) -> None:
+    """The settlement rolled back whole. Keep the LlmCallLog row now (it
+    never waits on the ledger row lock), then retry the ledger write once in
+    the background, so a held lock delays the spend instead of losing it."""
+    try:
+        with session_factory() as db:
+            logged = _log_call(db, meter, model, cost, usage)
+            db.commit()
+    except Exception:  # noqa: BLE001 - recorded below via call_logged
+        logged = False
+    reconciliation = {**reconciliation, "call_logged": logged}
+    log.warning("llm settlement deferred: %s", exc, extra=reconciliation)
+    _schedule(SETTLE_RETRY_DELAY_S, _retry_ledger, meter.user_id, cost, reconciliation)
+
+
+def _retry_ledger(user_id: str, cost: Decimal, reconciliation: dict) -> None:
+    try:
+        with session_factory() as db:
+            _lock_timeout(db, SETTLE_RETRY_LOCK_TIMEOUT)
+            cost_meter.record_cost(db, user_id, cost)
+            db.commit()
+    except Exception as e:  # noqa: BLE001 - background thread; nothing to raise into
+        log.error("llm settlement failed: %s", e, extra=reconciliation)
 
 
 def _failed_attempt(exc: Exception, *, retry_timeout: bool) -> tuple[bool, bool]:

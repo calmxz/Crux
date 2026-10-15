@@ -340,12 +340,13 @@ async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
         assert db.execute(select(ChatMessage).where(ChatMessage.session_id == sid)).first() is None
 
 
-def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
+def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
     adapter_on_postgres, caplog, monkeypatch
 ):
     """A caller holding an uncommitted ledger write across a call violates the
     adapter's invariant. Settlement waits on that row lock only until
-    lock_timeout, then logs and returns the result instead of hanging."""
+    lock_timeout, keeps the LlmCallLog row, and returns the result instead of
+    hanging; the deferred ledger write lands once the lock is released."""
     import logging
     import threading
     import time
@@ -355,6 +356,8 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
     Session, uid, sid = adapter_on_postgres
     # Shorter than the production value to keep the test quick.
     monkeypatch.setattr(llm, "SETTLE_LOCK_TIMEOUT", "1s")
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
 
     with Session() as caller:
         cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row
@@ -369,21 +372,27 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
 
         worker = threading.Thread(target=call)
         started = time.monotonic()
-        with caplog.at_level(logging.ERROR, logger="services.llm"):
+        with caplog.at_level(logging.WARNING, logger="services.llm"):
             worker.start()
             worker.join(timeout=10)
         elapsed = time.monotonic() - started
         hung = worker.is_alive()
+        with Session() as db:
+            # Committed while the caller still holds the ledger row.
+            assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
         caller.rollback()  # releases the lock, so a hung worker can finish
         worker.join(timeout=10)
 
     assert not hung, f"settlement hung for {elapsed:.1f}s"
-    result = outcome["result"]
-    assert len(result.vectors) == 1
+    assert len(outcome["result"].vectors) == 1
     [record] = [r for r in caplog.records if r.name == "services.llm"]
     assert (record.user_id, record.purpose, record.cost_usd) == (uid, "embedding", "0.0005")
     with Session() as db:
-        # The violated invariant costs the settlement; the log line is the
-        # reconciliation record.
         assert cost_meter.current_spend(db, uid) == Decimal("0")
-        assert _call_log(db, uid) == []
+
+    [(fn, args)] = scheduled
+    fn(*args)  # the background retry, now that the row is free
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]

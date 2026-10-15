@@ -154,7 +154,45 @@ def test_no_user_skips_gate_and_ledger(db_session, fake_llm, monkeypatch):
 # --- settlement --------------------------------------------------------------
 
 
-async def test_settlement_failure_logs_and_returns_the_result(
+async def test_failed_settlement_keeps_the_call_log_and_retries_the_ledger(
+    db_session, user, fake_llm, monkeypatch, caplog
+):
+    real_record_cost = cost_meter.record_cost
+    calls = []
+
+    def ledger_busy_once(*args, **kwargs):
+        calls.append(args[1:])
+        if len(calls) == 1:
+            raise RuntimeError("lock timeout")
+        return real_record_cost(*args, **kwargs)
+
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((delay, fn, a)))
+    monkeypatch.setattr(cost_meter, "record_cost", ledger_busy_once)
+    fake_llm.replies = ["kept"]
+    fake_llm.cost = Decimal("0.002")
+
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
+        result = await _complete()
+
+    # The request returns at once; the receipt is kept, the ledger deferred.
+    assert result.text == "kept"
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0")
+    [deferred] = [r for r in caplog.records if r.name == "services.llm"]
+    assert deferred.levelno == logging.WARNING
+    assert (deferred.user_id, deferred.cost_usd, deferred.call_logged) == (USER_ID, "0.002", True)
+
+    [(delay, fn, args)] = scheduled
+    assert delay == llm.SETTLE_RETRY_DELAY_S
+    fn(*args)
+
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
+    assert len(_log_rows(db_session)) == 1  # the retry adds no second receipt
+    assert calls == [(USER_ID, Decimal("0.002"))] * 2
+
+
+async def test_failed_retry_logs_at_error_with_the_receipt_kept(
     db_session, user, fake_llm, monkeypatch, caplog
 ):
     def ledger_down(*args, **kwargs):
@@ -168,11 +206,11 @@ async def test_settlement_failure_logs_and_returns_the_result(
         result = await _complete()
 
     assert result.text == "kept"
-    assert _log_rows(db_session) == []
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
     [record] = [r for r in caplog.records if r.name == "services.llm"]
-    assert record.levelno == logging.ERROR
+    assert record.getMessage() == "llm settlement failed: ledger down"
     assert (record.user_id, record.session_id, record.purpose) == (USER_ID, SESSION_ID, "summary")
-    assert record.cost_usd == "0.002"
+    assert (record.cost_usd, record.call_logged) == ("0.002", True)
 
 
 async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(

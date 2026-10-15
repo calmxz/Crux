@@ -152,6 +152,16 @@ def pytest_sessionfinish(session, exitstatus):
         session.exitstatus = pytest.ExitCode.TESTS_FAILED
 
 
+@pytest.fixture(autouse=True)
+def _inline_settle_retry(monkeypatch):
+    """The adapter retries a failed ledger write on a background timer. Run it
+    inline instead, so a test sees its outcome and leaves no thread behind
+    to touch a closed engine."""
+    from services import llm
+
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *args: fn(*args))
+
+
 @pytest.fixture
 def db_session(monkeypatch):
     engine = create_engine(

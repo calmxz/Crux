@@ -580,7 +580,8 @@ async def test_generate_and_persist_record_cost_failure_keeps_summary(
     assert summary == "Covered joins."
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
-    assert _log_rows(db_session) == []
+    # The receipt row is kept even though the ledger write failed.
+    assert _log_rows(db_session) == [("summary", Decimal("0.0020"))]
 
 
 async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded, fake_litellm):
@@ -617,7 +618,8 @@ async def test_update_rolling_summary_record_cost_failure_keeps_summary(
     session = db_session.get(SessionModel, SESSION_ID)
     assert session.rolling_summary == result
     assert session.rolling_summary_count == 11
-    assert _log_rows(db_session) == []
+    # The receipt row is kept even though the ledger write failed.
+    assert _log_rows(db_session) == [("rolling_summary", Decimal("0.0020"))]
 
 
 # ---------------------------------------------------------------------------
