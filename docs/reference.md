@@ -123,6 +123,12 @@ writes must survive). `abandon_in_caller_transaction` is the exception: it
 joins the session end's single commit. So a caller never commits after an
 action, and must commit after abandon.
 
+Ending a session takes two transactions. `_claim_end` commits `ended_at`
+first. Abandon runs in the second, after the multi-second summary LLM call.
+An `ended_at` check made before taking the row lock can pass, and the Set can
+still be open, in the window between the two. That is why every Check action,
+`register` included, rechecks `ended_at` under the lock.
+
 ### Liveness vs readiness (G-07)
 
 `/health` and `/healthz` are liveness-only and must keep returning 200 while the
