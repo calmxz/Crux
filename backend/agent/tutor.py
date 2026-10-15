@@ -195,6 +195,9 @@ async def run_streaming(
                     async for ev in stream:
                         accumulated_text += ev.text
                         yield StreamEvent("assistant_delta", {"text": ev.text})
+                    # Finished, so a cancel landing in the exit's close cut
+                    # nothing short (the exit settles its real price).
+                    inflight = None
             except cost_meter.CostCapExceeded as refused:
                 # The adapter's gate refused this call (user cap or global
                 # ceiling); the model was not called.
@@ -216,7 +219,6 @@ async def run_streaming(
                     }
                 yield StreamEvent("error", payload)
                 return
-            inflight = None
             content_buf = stream.text
 
             # No tool calls -> the streamed content was the final answer.

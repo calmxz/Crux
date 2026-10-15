@@ -2303,8 +2303,8 @@ x-sse-events:
 # ---------------------------------------------------------------------------
 # Error-code list (vendor extension - not processed by codegen)
 # Every `code` the backend sends: in `detail.code` of an HTTP error
-# (CodedErrorDetail), in an SSE `error` event, or (tool_failed only) in
-# `tool_call_done.error`. backend/lib/error_codes.py must hold exactly these
+# (CodedErrorDetail), in an SSE `error` event, or (the entries with
+# `via: tool_call_done.error`) in `tool_call_done.error`. backend/lib/error_codes.py must hold exactly these
 # keys and frontend/src/lib/errorCodes.js a subset; tests enforce both.
 # Keys: status = HTTP status, sse = true when sent as an SSE `error` event,
 # via = any other carrier, when = one line on when it is sent.
@@ -2317,10 +2317,13 @@ x-error-codes:
   daily_cost_cap_reached:
     status: 429
     sse: true
-    when: The per-user daily LLM spend hit its hard cap, before a turn or upload (429) or mid-turn (SSE).
+    via: tool_call_done.error
+    when: The per-user daily LLM spend hit its hard cap, before a turn or upload (429), mid-turn (SSE), or on a retrieve_chunks embedding (tool_call_done.error).
   global_cost_cap_reached:
     status: 429
-    when: The service-wide daily LLM spend ceiling is reached.
+    sse: true
+    via: tool_call_done.error
+    when: The service-wide daily LLM spend ceiling is reached, before a turn or upload (429), mid-turn (SSE), or on a retrieve_chunks embedding (tool_call_done.error).
   chunk_limit_exceeded:
     status: 413
     when: An upload would produce more chunks than the per-document limit.

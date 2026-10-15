@@ -487,9 +487,10 @@ async def test_stream_provider_error_after_events_settles_once_and_does_not_retr
 
 
 async def test_stream_429_before_the_first_event_retries_and_bills_once(db_session, user, fake_llm):
-    fake_llm.streams = [_rate_limited(), [_rate_limited()], ["second ", "try"]]
+    fake_llm.streams = [_rate_limited(), _rate_limited(), ["second ", "try"]]
     fake_llm.cost = Decimal("0.002")
     fake_llm.partial_cost = Decimal("0.5")
+    fake_llm.timeout_cost = Decimal("0.5")
 
     async with _stream() as s:
         assert await _drain(s) == ["second ", "try"]
@@ -497,6 +498,28 @@ async def test_stream_429_before_the_first_event_retries_and_bills_once(db_sessi
     assert len(fake_llm.stream_calls) == 3
     assert fake_llm.estimates == []
     assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
+
+
+async def test_stream_failing_after_open_settles_its_prompt_then_retries(
+    db_session, user, fake_llm
+):
+    """An attempt the vendor accepted (the stream opened) processed the
+    prompt even if it failed before any chunk: it settles a prompt estimate,
+    is closed, and the retry is billed on its own."""
+    fake_llm.streams = [[_rate_limited()], ["ok"]]
+    fake_llm.cost = Decimal("0.002")
+    fake_llm.partial_cost = Decimal("0.0003")
+
+    async with _stream() as s:
+        assert await _drain(s) == ["ok"]
+
+    assert len(fake_llm.stream_calls) == 2
+    assert fake_llm.opened[0].closed
+    assert fake_llm.estimates == [("stream", MESSAGES, "")]
+    assert [cost for _, _, cost in _log_rows(db_session)] == [
+        Decimal("0.0003"),
+        Decimal("0.0020"),
+    ]
 
 
 async def test_stream_cancelled_during_retry_backoff_bills_nothing(
@@ -712,6 +735,19 @@ async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stre
     ps.estimate()
 
     assert litellm_stream["counted"] == [MESSAGES, "partial"]
+
+
+async def test_litellm_stream_estimate_counts_tool_call_arguments(litellm_stream, monkeypatch):
+    """Tool-call arguments already streamed are billed output."""
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    ps, _ = await _provider_stream(
+        litellm_stream,
+        [_chunk(content="Q: "), _chunk(tool_calls=[_frag(0, id="a", name="ask", arguments="{}")])],
+    )
+
+    ps.estimate()
+
+    assert litellm_stream["counted"] == [MESSAGES, "Q: {}"]
 
 
 # --- provider resolution -----------------------------------------------------

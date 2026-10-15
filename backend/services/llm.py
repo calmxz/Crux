@@ -152,7 +152,8 @@ class ProviderStream(Protocol):
         """(cost, usage) of the finished stream. Never raises."""
 
     def estimate(self) -> Decimal:
-        """Prompt plus the text received so far, by token math. Never raises."""
+        """Prompt plus the output received so far (text and tool-call
+        arguments), by token math. Never raises."""
 
     async def aclose(self) -> None: ...
 
@@ -356,7 +357,9 @@ class _LiteLlmStream:
         )
 
     def estimate(self) -> Decimal:
-        return self._provider._token_math(self._messages, self.text)
+        # Tool-call arguments received so far are billed output too.
+        args = "".join(slot["args"] for slot in self._frags.values())
+        return self._provider._token_math(self._messages, self.text + args)
 
     async def aclose(self) -> None:
         close = getattr(self._resp, "aclose", None)
@@ -489,6 +492,13 @@ def _backoff(i: int) -> float:
     return max(0.0, settings.llm_retry_base_delay_s) * (2**i)
 
 
+async def _close_quietly(ps: ProviderStream) -> None:
+    try:
+        await ps.aclose()
+    except Exception as e:  # noqa: BLE001 - closing never masks the caller's path
+        log.warning("closing the llm stream failed: %s", e)
+
+
 class LlmStream:
     """One streamed completion: `async with llm.get().stream(...) as s`.
 
@@ -498,13 +508,15 @@ class LlmStream:
 
     - normal end: the provider's price of the built response (token math if
       pricing fails);
-    - a provider error: an estimate of the prompt plus the text received if
-      any chunk arrived or the error was a Timeout, otherwise $0;
+    - a provider error: $0 if the request was refused on open (anything but
+      a Timeout), otherwise an estimate of the prompt plus the output
+      received;
     - any other exit (cancellation, the caller's generator closed, an error in
       the caller's block): always the estimate.
 
     A 429, 503, 500 or connection error before any chunk arrives retries with
-    backoff; a failed attempt with nothing received costs nothing. Timeout is
+    backoff. An attempt refused on open costs nothing; one that failed after
+    the stream opened settles its prompt estimate before the retry. Timeout is
     never retried.
     """
 
@@ -563,15 +575,24 @@ class LlmStream:
                 self._finished = True
                 return
             except Exception as e:
-                received = self._ps is not None and self._ps.received
+                ps = self._ps
+                received = ps is not None and ps.received
                 retry, _ = _failed_attempt(e, retry_timeout=False)
                 if received or not retry or i == attempts:
                     self._provider_error = e
                     raise
-                # Nothing received: this attempt cost nothing, and until the
-                # next opens no request is in flight.
+                # Until the next attempt opens no request is in flight. Cleared
+                # first, so a cancel below cannot make the exit settle it again.
                 self._attempt_open = False
                 self._ps = None
+                if ps is not None:
+                    # The vendor accepted this attempt before it failed, so it
+                    # processed the prompt: settle that (the thread finishes
+                    # even if this await is cancelled), and release the response.
+                    await run_in_threadpool(
+                        _settle, self._meter, self._provider.chat_model, ps.estimate(), {}
+                    )
+                    await _close_quietly(ps)
             await asyncio.sleep(_backoff(i))
 
     def _exit_cost(self) -> tuple[Decimal, dict]:
@@ -581,9 +602,8 @@ class LlmStream:
         if not self._attempt_open:
             return Decimal("0"), {}
         err = self._provider_error
-        if err is not None and not (
-            isinstance(err, litellm.Timeout) or (ps is not None and ps.received)
-        ):
+        if err is not None and ps is None and not isinstance(err, litellm.Timeout):
+            # Refused on open (429, 503, ...): the vendor never processed it.
             return Decimal("0"), {}
         if ps is None:
             # The request went out but no stream object came back yet.

@@ -76,8 +76,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
     except cost_meter.CostCapExceeded as e:
-        # A tool result, not an exception: the model sees the refusal, and the
-        # tutor's next call is refused by the adapter gate with the cap event.
+        # A tool result, not an exception, so the turn does not fail: the
+        # model sees the refusal, and if the turn continues the tutor's next
+        # call is refused by the adapter gate with the cap event. A turn
+        # ended by a bundled terminal tool (a check or topic card) ends
+        # without one; the route's admission gate refuses the next turn.
         return ToolResult(ok=False, status="failed", error=e.code)
     except Exception as e:
         log.error(

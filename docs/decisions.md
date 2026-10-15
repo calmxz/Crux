@@ -895,9 +895,13 @@ a test fake).
   attempt with no output settles $0, except a timeout.
   **Amended 2026-10-15 (#412):** a stream retries only while no chunk of any
   kind has arrived, not merely no text event. A tool-call fragment is output
-  the vendor bills, so an attempt that received one settles its estimate and
-  is not retried; this keeps "a failed attempt with no output settles $0"
-  true for every retried attempt. The tutor and the `retrieve` tool now
+  the vendor bills, so an attempt that received one settles its estimate
+  (prompt plus text plus tool-call arguments) and is not retried. "A failed
+  attempt with no output settles $0" is narrowed to an attempt refused on
+  open: once the stream has opened the vendor has accepted the request and
+  processed the prompt, so an attempt that fails before its first chunk
+  settles a prompt estimate before the retry. Overcounting is the accepted
+  direction. The tutor and the `retrieve` tool now
   write no ledger row themselves (every call settles in the adapter), so the
   previous amendment's "commits each iteration's `record_cost`" and
   "commits its embedding metering" no longer apply. The retrieve tool's
