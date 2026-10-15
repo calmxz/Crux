@@ -72,10 +72,11 @@ def diagnostic_set(db_session):
 
 @pytest.fixture
 def commits(db_session):
+    """One entry per commit on the shared test session."""
     seen = []
 
-    def on_commit(_session):
-        seen.append(1)
+    def on_commit(session):
+        seen.append(session)
 
     event.listen(db_session, "after_commit", on_commit)
     yield seen
@@ -106,6 +107,17 @@ def test_final_diagnostic_answer_commits_once_and_grades(
     assert len(commits) == 1
     db_session.expire_all()
     assert profile_service.load_profile(db_session, SID).knowledge_level == "advanced"
+
+
+def test_final_diagnostic_skip_commits_once_and_grades(client, db_session, diagnostic_set, commits):
+    check_question_service.answer(db_session, SID, index=0, selected_index=0)
+    commits.clear()
+    r = client.post(f"/api/sessions/{SID}/check/skip", json={"index": 1, "user_id": USER_ID})
+    assert r.status_code == 200
+    assert r.json()["done"] is True
+    assert len(commits) == 1
+    db_session.expire_all()
+    assert profile_service.load_profile(db_session, SID).knowledge_level == "beginner"
 
 
 def test_skip_commits_once(client, db_session, check_set, commits):
