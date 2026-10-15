@@ -1014,7 +1014,7 @@ async def test_followup_disconnect_during_tool_call_keeps_partial_reply(
     resp = sessions_route._followup_response(request, True, [], "", ctx)
 
     async def consume():
-        async for _chunk in resp.body_iterator:
+        async for _ in resp.body_iterator:
             pass
 
     async with anyio.create_task_group() as tg:

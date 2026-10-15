@@ -543,7 +543,7 @@ async def test_disconnect_drains_producer_before_releasing_reserve(db_session, m
     )
 
     async def consume():
-        async for _chunk in resp.body_iterator:
+        async for _ in resp.body_iterator:
             pass
 
     async with anyio.create_task_group() as tg:
