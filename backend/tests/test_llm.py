@@ -442,7 +442,8 @@ async def test_stream_cancel_mid_stream_settles_an_estimate_readable_after(
     async def consume():
         async with _stream() as s:
             holder["s"] = s
-            async for _ev in s:
+            async for ev in s:
+                holder.setdefault("texts", []).append(ev.text)
                 reached.set()
 
     task = asyncio.create_task(consume())
@@ -451,6 +452,7 @@ async def test_stream_cancel_mid_stream_settles_an_estimate_readable_after(
     with pytest.raises(asyncio.CancelledError):
         await asyncio.gather(task)
 
+    assert holder["texts"] == ["partial "]
     assert holder["s"].cost == Decimal("0.0007")
     assert fake_llm.estimates == [("stream", MESSAGES, "partial ")]
     assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0007"))]
@@ -461,7 +463,8 @@ async def test_stream_closed_by_the_caller_settles_an_estimate(db_session, user,
     fake_llm.partial_cost = Decimal("0.0004")
 
     async with _stream() as s:
-        async for _ev in s:
+        async for ev in s:
+            assert ev.text == "one "
             break
 
     assert s.cost == Decimal("0.0004")

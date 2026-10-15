@@ -144,9 +144,11 @@ class ProviderStream(Protocol):
     text: str
 
     @property
-    def tool_calls(self) -> list[ToolCall]: ...
+    def tool_calls(self) -> list[ToolCall]:
+        """The tool calls assembled so far, in index order."""
 
-    def __aiter__(self) -> AsyncIterator[str]: ...
+    def __aiter__(self) -> AsyncIterator[str]:
+        """The text tokens, as they arrive."""
 
     def priced(self) -> tuple[Decimal, dict]:
         """(cost, usage) of the finished stream. Never raises."""
@@ -155,7 +157,8 @@ class ProviderStream(Protocol):
         """Prompt plus the output received so far (text and tool-call
         arguments), by token math. Never raises."""
 
-    async def aclose(self) -> None: ...
+    async def aclose(self) -> None:
+        """Release the underlying response."""
 
 
 class Provider(Protocol):
