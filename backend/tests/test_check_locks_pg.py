@@ -39,7 +39,7 @@ from contracts import TopicProfile
 from db.database import _normalized_url, get_db
 from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, UsageCounter, User
 from db.models import Session as SessionModel
-from lib.error_codes import CHECK_CONFLICT, NO_RESOLVED_BATCH
+from lib.error_codes import CHECK_CONFLICT, NO_OPEN_CHECK, NO_RESOLVED_BATCH
 from main import app
 from services import check_question_service, velocity_limit
 from services.auth import current_user_id
@@ -175,9 +175,11 @@ class _HeldRowLock:
     """Hold the session row with FOR UPDATE on a connection of our own, and
     count request backends blocked on a lock while it is held."""
 
-    def __init__(self, engine, sid: str):
+    def __init__(self, engine):
         # The holder shares APP_NAME but never waits, so the poll skips it.
         self._conn = engine.connect()
+
+    def lock(self, sid: str) -> None:
         self._conn.execute(text("SELECT id FROM sessions WHERE id = :sid FOR UPDATE"), {"sid": sid})
 
     def _waiters(self) -> int:
@@ -226,8 +228,9 @@ def hold(engine, pool):
     held: list[_HeldRowLock] = []
 
     def _hold(sid: str) -> _HeldRowLock:
-        lock = _HeldRowLock(engine, sid)
-        held.append(lock)
+        lock = _HeldRowLock(engine)
+        held.append(lock)  # before locking, so teardown closes it either way
+        lock.lock(sid)
         return lock
 
     yield _hold
@@ -239,7 +242,10 @@ def _post(uid: str, path: str, body: dict | None = None):
     """One TestClient per call: each request runs on its own portal thread.
     Not entered as a context manager, so the lifespan does not run."""
     client = TestClient(app)
-    return client.post(path, json=body or {}, headers={"Authorization": f"Bearer test-{uid}"})
+    try:
+        return client.post(path, json=body or {}, headers={"Authorization": f"Bearer test-{uid}"})
+    finally:
+        client.close()
 
 
 def _code(resp) -> str | None:
@@ -255,10 +261,18 @@ def _row(Session, sid: str) -> tuple[dict | None, dict | None, TopicProfile, dat
         return pc, cc, profile, row.ended_at
 
 
-def _recap(Session, msg_id: int) -> dict | None:
+def _recap(Session, msg_id: int) -> dict:
+    """The Recap frozen on the asking message; every Close must leave one."""
     with Session() as db:
         raw = db.get(ChatMessage, msg_id).check_batch_json
-        return json.loads(raw) if raw else None
+    assert raw, "no Recap frozen on the asking message"
+    return json.loads(raw)
+
+
+def _cooldown(Session, sid: str) -> dict | None:
+    with Session() as db:
+        raw = db.get(SessionModel, sid).quiz_cooldown_json
+    return json.loads(raw) if raw else None
 
 
 def _events(Session, sid: str) -> list[LearningEvent]:
@@ -274,14 +288,30 @@ def _events(Session, sid: str) -> list[LearningEvent]:
         )
 
 
-def _xfail_if_recap_overwritten(recap: dict) -> None:
+def _follow_ups(Session, sid: str, msg_id: int) -> int:
+    """Assistant messages persisted after the seeded asking message."""
+    with Session() as db:
+        return db.execute(
+            select(func.count())
+            .select_from(ChatMessage)
+            .where(
+                ChatMessage.session_id == sid,
+                ChatMessage.role == "assistant",
+                ChatMessage.id > msg_id,
+            )
+        ).scalar_one()
+
+
+def _xfail_if_recap_overwritten(recap: dict, after_answer: list[str]) -> None:
     """Lock bug found by this file, reported on #418: the answer route writes
     the Recap after its commit, outside the row lock, so a Close (Stop or
     session end) that freezes the Recap in that gap is overwritten with the
-    pre-Close Set, still showing a "pending" Item. A frozen Recap never has
-    one. Only that signature xfails; every other assertion stays red.
-    #419 removes the write and this guard."""
-    if any(it["status"] == "pending" for it in recap["items"]):
+    Set as the answer left it (`after_answer`, still holding a "pending"
+    Item). Only that exact snapshot xfails, and callers first assert what
+    proves the Close itself skipped the rest (cooldown, grade), so a Close
+    that stops skipping still fails red. #419 removes the write and this
+    guard."""
+    if [it["status"] for it in recap["items"]] == after_answer:
         pytest.xfail("#419: unlocked Recap write after the answer commit overwrote the Close")
 
 
@@ -331,31 +361,30 @@ def test_double_complete_lets_one_follow_up_through(app_on_postgres, hold, pool)
     pc, cc, _, _ = _row(Session, sid)
     assert pc is None and cc is None
     assert [it["status"] for it in _recap(Session, msg_id)["items"]] == ["answered", "skipped"]
-    with Session() as db:
-        follow_ups = db.execute(
-            select(func.count())
-            .select_from(ChatMessage)
-            .where(
-                ChatMessage.session_id == sid,
-                ChatMessage.role == "assistant",
-                ChatMessage.id > msg_id,
-            )
-        ).scalar_one()
-    assert follow_ups == 1
+    assert _follow_ups(Session, sid, msg_id) == 1
 
 
-def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool):
+# Lock waiters are granted in arrival order, so each order pins one branch.
+@pytest.mark.parametrize("answer_first", [True, False], ids=["answer-first", "stop-first"])
+def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool, answer_first):
     Session, uid, sid, msg_id = app_on_postgres
     _seed_set(Session, sid, [_item(0), _item(1)], message_id=msg_id)
 
+    def fire_answer():
+        return pool.submit(
+            _post, uid, f"/api/sessions/{sid}/check/answer", {"index": 0, "selected_index": 0}
+        )
+
+    def fire_stop():
+        return pool.submit(_post, uid, f"/api/sessions/{sid}/check/stop")
+
     lock = hold(sid)
-    answer = pool.submit(
-        _post, uid, f"/api/sessions/{sid}/check/answer", {"index": 0, "selected_index": 0}
-    )
+    first = fire_answer() if answer_first else fire_stop()
     lock.wait_for_waiters(1)
-    stop = pool.submit(_post, uid, f"/api/sessions/{sid}/check/stop")
+    second = fire_stop() if answer_first else fire_answer()
     lock.wait_for_waiters(2)
     lock.release()
+    answer, stop = (first, second) if answer_first else (second, first)
     ra, rs = answer.result(JOIN_TIMEOUT_S), stop.result(JOIN_TIMEOUT_S)
 
     # Two items with at most one answered: the set is never done, so Stop
@@ -365,6 +394,9 @@ def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool):
 
     pc, cc, _, _ = _row(Session, sid)
     assert pc is None and cc is None
+    # Either way Stop closed a Set holding a skipped Item, so it recorded a
+    # cooldown; a Stop that stopped skipping would leave none.
+    assert (_cooldown(Session, sid) or {}).get("gap") == "joins"
     events = _events(Session, sid)
     if ra.status_code == 200:
         # (a) the answer landed first; Stop skipped the rest.
@@ -377,10 +409,35 @@ def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool):
         assert events == []
         expected = ["skipped", "skipped"]
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap)
+    _xfail_if_recap_overwritten(recap, ["answered", "pending"])
     assert [it["status"] for it in recap["items"]] == expected
     skipped = {it["question"] for it in recap["items"] if it["status"] == "skipped"}
     assert not any(e.question in skipped for e in events)
+
+
+def test_double_stop_lets_one_follow_up_through(app_on_postgres, hold, pool):
+    Session, uid, sid, msg_id = app_on_postgres
+    _seed_set(Session, sid, [_item(0), _item(1)], message_id=msg_id)
+    path = f"/api/sessions/{sid}/check/stop"
+
+    lock = hold(sid)
+    s0 = pool.submit(_post, uid, path)
+    s1 = pool.submit(_post, uid, path)
+    lock.wait_for_waiters(2)
+    lock.release()
+    responses = [s0.result(JOIN_TIMEOUT_S), s1.result(JOIN_TIMEOUT_S)]
+
+    winners = [r for r in responses if r.status_code == 200]
+    losers = [r for r in responses if r.status_code != 200]
+    assert len(winners) == 1 and len(losers) == 1
+    assert "event: done" in winners[0].text
+    assert losers[0].status_code == 409
+    assert _code(losers[0]) == NO_OPEN_CHECK
+
+    pc, cc, _, _ = _row(Session, sid)
+    assert pc is None and cc is None
+    assert [it["status"] for it in _recap(Session, msg_id)["items"]] == ["skipped", "skipped"]
+    assert _follow_ups(Session, sid, msg_id) == 1
 
 
 def test_message_id_stamp_and_answer_both_land(app_on_postgres, hold, pool):
@@ -459,5 +516,5 @@ def test_session_end_racing_a_diagnostic_answer(app_on_postgres, hold, pool):
         assert profile.knowledge_level == "beginner"
         expected = ["answered", "skipped", "skipped"]
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap)
+    _xfail_if_recap_overwritten(recap, ["answered", "answered", "pending"])
     assert [it["status"] for it in recap["items"]] == expected

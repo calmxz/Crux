@@ -102,8 +102,10 @@ The pattern: the test holds `SELECT ... FOR UPDATE` on the session row on a
 connection of its own, fires real routes on worker threads (one `TestClient`
 each, a fresh `Session` per request), and polls until the expected number of
 request backends show `wait_event_type = 'Lock'` in `pg_stat_activity` before
-committing. Request connections carry an `application_name` so the poll counts
-only them. Reaching the waiter count proves each request blocked; a live
+committing. The test's engine carries an `application_name`, so the poll
+counts only this test's backends that are waiting on a lock. The holder never
+waits, but any other test-side session that blocks (such as a service call
+fired on a worker thread) counts too. Reaching the waiter count proves each request blocked; a live
 thread does not, and sleeps prove nothing.
 
 Activity stats are snapshotted once per transaction, and the holder's stays
