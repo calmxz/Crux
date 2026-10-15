@@ -294,11 +294,7 @@ def _assemble(profile, *, retrieval_required=False, ingestion_status="none", **t
     )
 
 
-def _assemble_review(profile, review_gaps, review_gap=None):
-    return _assemble(profile, review_gaps=review_gaps, review_gap=review_gap)
-
-
-def test_build_prompt_state_carries_learner_prefs():
+def test_assemble_carries_learner_prefs():
     prefs = {"feedback_pref": "direct_answers", "check_ins": "often", "reply_length": "brief"}
     state = _assemble(_fake_profile(), learner_prefs=prefs)
     assert state.learner_prefs == prefs
@@ -325,34 +321,34 @@ def test_prepare_turn_prompt_uses_users_row_preferences(db_session):
     assert "- reply length: thorough" in system_prompt
 
 
-def test_build_prompt_state_review_gaps_picks_first_gap():
+def test_assemble_review_gaps_picks_first_gap():
     profile = _fake_profile(confirmed_gaps=["photosynthesis", "krebs cycle"])
-    state = _assemble_review(profile, review_gaps=True)
+    state = _assemble(profile, review_gaps=True)
     assert state.review_gaps_target == "photosynthesis"
 
 
-def test_build_prompt_state_review_gaps_suppresses_diagnostic():
+def test_assemble_review_gaps_suppresses_diagnostic():
     profile = _fake_profile(knowledge_level=None, confirmed_gaps=["a"])
-    state = _assemble_review(profile, review_gaps=True)
+    state = _assemble(profile, review_gaps=True)
     assert state.review_gaps_target == "a"
     assert state.diagnostic_required is False
 
 
-def test_build_prompt_state_review_gaps_off_when_no_gaps():
+def test_assemble_review_gaps_off_when_no_gaps():
     profile = _fake_profile(confirmed_gaps=[])
-    state = _assemble_review(profile, review_gaps=True)
+    state = _assemble(profile, review_gaps=True)
     assert state.review_gaps_target is None
 
 
-def test_build_prompt_state_review_gaps_off_when_flag_false():
+def test_assemble_review_gaps_off_when_flag_false():
     profile = _fake_profile(confirmed_gaps=["photosynthesis"])
-    state = _assemble_review(profile, review_gaps=False)
+    state = _assemble(profile, review_gaps=False)
     assert state.review_gaps_target is None
 
 
-def test_build_prompt_state_preserves_other_keys():
+def test_assemble_preserves_other_fields():
     profile = _fake_profile(confirmed_gaps=[], last_session_summary="summary text")
-    state = _assemble_review(profile, review_gaps=False)
+    state = _assemble(profile, review_gaps=False)
     assert state.topic == "sql"
     assert state.profile is profile
     assert state.ingestion_status == "none"
@@ -366,35 +362,35 @@ def test_build_prompt_state_preserves_other_keys():
 
 def test_review_gap_targets_named_gap():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _assemble_review(profile, review_gaps=True, review_gap="gap-b")
+    state = _assemble(profile, review_gaps=True, review_gap="gap-b")
     assert state.review_gaps_target == "gap-b"
 
 
 def test_review_gap_invalid_falls_back_to_first():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _assemble_review(profile, review_gaps=True, review_gap="not-a-gap")
+    state = _assemble(profile, review_gaps=True, review_gap="not-a-gap")
     assert state.review_gaps_target == "gap-a"
 
 
 def test_review_gap_none_falls_back_to_first():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _assemble_review(profile, review_gaps=True, review_gap=None)
+    state = _assemble(profile, review_gaps=True, review_gap=None)
     assert state.review_gaps_target == "gap-a"
 
 
-def test_build_prompt_state_carries_rolling_summary():
+def test_assemble_carries_rolling_summary():
     """P2 AC3: rolling_summary flows from the session onto the prompt state
     so build_dynamic_context can render it."""
     state = _assemble(_fake_profile(), rolling_summary="covered limits and continuity")
     assert state.rolling_summary == "covered limits and continuity"
 
 
-def test_build_prompt_state_rolling_summary_defaults_none():
-    state = _assemble_review(_fake_profile(), review_gaps=False)
+def test_assemble_rolling_summary_defaults_none():
+    state = _assemble(_fake_profile(), review_gaps=False)
     assert state.rolling_summary is None
 
 
-def test_build_prompt_state_prefetched_chunks_wraps_excerpts():
+def test_assemble_prefetched_chunks_wraps_excerpts():
     """F-56: prefetched_chunks (server force-retrieve, Task 11) is wrapped
     via agent.excerpt.wrap_chunk into prefetched_excerpts on the prompt
     state, which prompts.build_dynamic_context renders as PROVIDED."""
@@ -410,28 +406,28 @@ def test_build_prompt_state_prefetched_chunks_wraps_excerpts():
     assert "document_excerpt" in excerpt
 
 
-def test_build_prompt_state_no_prefetched_chunks_omits_key():
-    state = _assemble_review(_fake_profile(), review_gaps=False)
+def test_assemble_without_prefetched_chunks_has_no_excerpts():
+    state = _assemble(_fake_profile(), review_gaps=False)
     assert state.prefetched_excerpts == []
 
 
 def test_review_gap_mastered_target_accepted():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _assemble_review(profile, review_gaps=True, review_gap="photosynthesis")
+    state = _assemble(profile, review_gaps=True, review_gap="photosynthesis")
     assert state.review_gaps_target == "photosynthesis"
     assert state.review_gaps_retention is True
 
 
 def test_review_gap_gap_target_not_retention():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _assemble_review(profile, review_gaps=True, review_gap="gap-a")
+    state = _assemble(profile, review_gaps=True, review_gap="gap-a")
     assert state.review_gaps_target == "gap-a"
     assert state.review_gaps_retention is False
 
 
 def test_review_gaps_activates_with_only_mastered():
     profile = _fake_profile(confirmed_gaps=[], mastered_concepts=["photosynthesis"])
-    state = _assemble_review(profile, review_gaps=True)
+    state = _assemble(profile, review_gaps=True)
     assert state.review_gaps_target == "photosynthesis"
     assert state.review_gaps_retention is True
     assert state.diagnostic_required is False
@@ -439,14 +435,14 @@ def test_review_gaps_activates_with_only_mastered():
 
 def test_review_gap_invalid_still_falls_back_to_first_gap():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _assemble_review(profile, review_gaps=True, review_gap="junk")
+    state = _assemble(profile, review_gaps=True, review_gap="junk")
     assert state.review_gaps_target == "gap-a"
     assert state.review_gaps_retention is False
 
 
 def test_review_gaps_off_when_both_lists_empty():
     profile = _fake_profile(confirmed_gaps=[], mastered_concepts=[])
-    state = _assemble_review(profile, review_gaps=True)
+    state = _assemble(profile, review_gaps=True)
     assert state.review_gaps_target is None
     assert state.review_gaps_retention is False
 
@@ -455,5 +451,5 @@ def test_resumed_profile_skips_diagnostic():
     """R1.1 AC2: a resume-seeded profile carries a non-null knowledge_level,
     so the 3Q diagnostic branch must not be taken."""
     profile = _fake_profile(knowledge_level="intermediate", confirmed_gaps=["gap-a"])
-    state = _assemble_review(profile, review_gaps=False)
+    state = _assemble(profile, review_gaps=False)
     assert state.diagnostic_required is False

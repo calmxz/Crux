@@ -91,10 +91,10 @@ def gather_session_inputs(
     *,
     learner_prefs: dict[str, Any] | _NotLoaded = NOT_LOADED,
     ingestion_status: str | None | _NotLoaded = NOT_LOADED,
+    gap_accuracy: dict[str, dict] | _NotLoaded = NOT_LOADED,
 ) -> SessionPromptInputs:
     """Read the session's prompt inputs. Columns come off `session` (which
-    may be detached); only what the caller did not inject is queried, plus
-    gap accuracy when the profile has confirmed gaps."""
+    may be detached); only what the caller did not inject is queried."""
     if isinstance(learner_prefs, _NotLoaded):
         row = db.execute(select(*_PREF_COLS).where(User.id == session.user_id)).first()
         # A missing user reads all-NULL preferences, rendered as defaults.
@@ -108,12 +108,13 @@ def gather_session_inputs(
     # D1.2: per-gap accuracy, best-effort. Only run when there is something
     # to enrich (confirmed_gaps non-empty) to keep the no-gaps path inside
     # the P3.1 budget; a failure here must never kill the turn.
-    gap_accuracy: dict[str, dict] = {}
-    if profile.confirmed_gaps:
-        try:
-            gap_accuracy = learning_event_service.gap_accuracy(db, session.id)
-        except Exception as e:  # noqa: BLE001 - best-effort prompt enrichment
-            log.warning("gap_accuracy failed; continuing without it: %s", e)
+    if isinstance(gap_accuracy, _NotLoaded):
+        gap_accuracy = {}
+        if profile.confirmed_gaps:
+            try:
+                gap_accuracy = learning_event_service.gap_accuracy(db, session.id)
+            except Exception as e:  # noqa: BLE001 - best-effort prompt enrichment
+                log.warning("gap_accuracy failed; continuing without it: %s", e)
 
     return SessionPromptInputs(
         topic=session.topic,

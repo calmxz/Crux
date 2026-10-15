@@ -252,3 +252,35 @@ def test_golden_check_followup_between_sets(db_session):
     _assert_golden("followup_between_sets", system_prompt)
     assert ctx.suppress_check is True
     assert ctx.diagnostic_required is False
+
+
+def test_golden_check_stop_with_level_unknown(db_session, monkeypatch):
+    """/check/stop mid-set while the level is still unknown. The follow-up
+    has always rendered DIAGNOSTIC: OFF (only its tool context keeps the
+    live value), and it never reads gap accuracy."""
+    sid, uid = "golden-stop", "golden-u5"
+    _seed(
+        db_session,
+        sid=sid,
+        uid=uid,
+        topic="sql joins",
+        profile=TopicProfile(
+            confirmed_gaps=[
+                ConceptEntry(name="outer joins", evidence_type="declared", last_event_at=T1)
+            ],
+        ),
+    )
+    _register(db_session, sid, uid, gap="outer joins", set_index=1, set_total=2, items=_ITEMS)
+    check_service.answer(db_session, sid, index=0, selected_index=1)
+    calls = []
+    monkeypatch.setattr(learning_event_service, "gap_accuracy", lambda *a: calls.append(a) or {})
+
+    allowed, _messages, system_prompt, ctx = sessions_route._stop_check_prepare(
+        sid, uid, db_session
+    )
+
+    assert allowed is True
+    _assert_golden("followup_stop_level_unknown", system_prompt)
+    assert calls == []
+    assert ctx.suppress_check is True
+    assert ctx.diagnostic_required is True

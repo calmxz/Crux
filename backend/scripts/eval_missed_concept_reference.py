@@ -109,7 +109,7 @@ def _seed_session() -> tuple[str, str]:
     return user_id, session_id
 
 
-def _build_prompt_state_and_system_prompt(db, session_id: str):
+def _system_prompt(db, session_id: str) -> str:
     """Load the seeded profile/cooldown/gap_accuracy and assemble the system
     prompt through the same prompt_state path as routes/chat.py._prepare_turn."""
     from agent import prompts
@@ -120,7 +120,7 @@ def _build_prompt_state_and_system_prompt(db, session_id: str):
         prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
         prompt_state.TurnInputs(retrieval_required=False),
     )
-    return state, prompts.build_system_prompt(state)
+    return prompts.build_system_prompt(state)
 
 
 async def _collect_reply(tutor, messages, system_prompt, ctx) -> str:
@@ -147,7 +147,7 @@ async def _run_one(replicate: int, model: str | None) -> dict:
     user_id, session_id = _seed_session()
 
     with SessionLocal() as db:
-        _prompt_state, system_prompt = _build_prompt_state_and_system_prompt(db, session_id)
+        system_prompt = _system_prompt(db, session_id)
         ctx = ToolContext(
             db=db,
             session_id=session_id,
@@ -242,7 +242,7 @@ def _dry_run() -> int:
 
     _user_id, session_id = _seed_session()
     with SessionLocal() as db:
-        _prompt_state, system_prompt = _build_prompt_state_and_system_prompt(db, session_id)
+        system_prompt = _system_prompt(db, session_id)
 
     lines = [
         line

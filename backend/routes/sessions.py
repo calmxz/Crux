@@ -839,13 +839,12 @@ def _followup_context(
 
     # The follow-up prompt has always left out the learner prefs, rolling
     # summary, gap accuracy, Check pointer and diagnostic; they are blanked
-    # here so the prompt is unchanged (real values arrive in prompt-state 2/3).
+    # here so the prompt is unchanged (#396 fills the real values).
     # #354: topic_suggest_state still flows through, since a graded diagnostic
     # makes this follow-up the first at-level reply, where the topic card falls due.
     session_inputs = dataclasses.replace(
-        prompt_state.gather_session_inputs(db, row, learner_prefs={}),
+        prompt_state.gather_session_inputs(db, row, learner_prefs={}, gap_accuracy={}),
         rolling_summary=None,
-        gap_accuracy={},
         pending_check=None,
         current_check=None,
         quiz_cooldown=cooldown,

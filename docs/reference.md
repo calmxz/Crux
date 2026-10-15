@@ -229,15 +229,17 @@ The tutor's dynamic context is rendered from a `PromptState`
 (`services/prompt_state.py`), never a dict. Build it in two steps:
 `gather_session_inputs(db, row, ...)` reads the session's inputs and
 `assemble(session_inputs, TurnInputs(...))` adds the turn's. Every
-`PromptState` field is required. Pass `learner_prefs` or `ingestion_status`
-when the caller already has them (chat loads both in its guard SELECTs); the
-default `NOT_LOADED` makes gather query for them. gather reads columns off the
+`PromptState` field is required. Pass `learner_prefs`, `ingestion_status` or
+`gap_accuracy` when the caller already has them (chat loads the first two in
+its guard SELECTs) or wants them blank; the default `NOT_LOADED` makes gather
+query for them. gather reads columns off the
 row it is given, so a detached row costs no refresh SELECT. To override one
 value, use `dataclasses.replace` on either dataclass (the check follow-up
 does this).
 
 `tests/test_prompt_golden.py` pins the full system prompt of three chat turns
-and one check follow-up, byte for byte, against
+and two check follow-ups (`/check/complete`, `/check/stop`), byte for byte,
+against
 `tests/fixtures/prompt_golden/`. A deliberate prompt change rewrites them
 with `UPDATE_PROMPT_GOLDEN=1`; review the fixture diff as the change. Renderer
 tests build state with `tests/prompt_state_factory.make_prompt_state`, whose
