@@ -55,6 +55,7 @@ async def generate_and_persist(
     force-skips any open check batch and writes it in a single commit
     (F-31, F-33). The summary merges onto a freshly re-read profile so
     concurrent writes during the LLM call survive (F-11)."""
+    session_id = session.id  # read before the pre-call commit expires `session`
     messages = (
         db.execute(
             select(ChatMessage)
@@ -84,6 +85,9 @@ async def generate_and_persist(
         summary = _mechanical_fallback(messages)
     else:
         meter = llm.Meter(user_id=session.user_id, session_id=session.id, purpose="summary")
+        # Built before the commit, which expires the loaded rows: reading
+        # them afterwards would re-select each one on the event loop.
+        fallback = _mechanical_fallback(messages)
         # Release the pooled connection for the multi-second call: the adapter
         # takes its own for the gate and the settlement. Only reads are open.
         db.commit()
@@ -98,12 +102,12 @@ async def generate_and_persist(
                 timeout=settings.summary_timeout_s,
             )
             content = completion.text.strip()
-            summary = content if content else _mechanical_fallback(messages)
+            summary = content if content else fallback
         except Exception as e:
             # Includes CallRefused: a breached cap (F-03) still ends the
             # session, with the mechanical summary.
             log.warning("summary LLM failed, using mechanical fallback: %s", e)
-            summary = _mechanical_fallback(messages)
+            summary = fallback
 
     # Single write window after the LLM await, since the caller's _claim_end
     # already owns ended_at (F-30, F-33). Re-read the profile under the row
@@ -113,8 +117,8 @@ async def generate_and_persist(
     # committed the call's spend; if this commit fails after a won claim, the
     # session ends with no summary -- an honest state, since later end calls
     # take the idempotent replay path (F-33).
-    row = profile_service.lock_session_row(db, session.id)
-    check_service.abandon_in_caller_transaction(db, session.id)
+    row = profile_service.lock_session_row(db, session_id)
+    check_service.abandon_in_caller_transaction(db, session_id)
     fresh = profile_service.profile_from_row(row)
     fresh.last_session_summary = summary
     profile_service.save_profile(db, session.id, fresh, commit=False)

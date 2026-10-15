@@ -21,7 +21,8 @@ session:
 
 Invariant for callers: no uncommitted ledger write in the caller's session
 across a call. Settlement upserts the same ledger row and would wait on it;
-lock_timeout makes that fail fast (and log) instead of hanging.
+lock_timeout (SETTLE_LOCK_TIMEOUT) bounds that wait, then the settlement is
+logged and dropped instead of hanging.
 """
 
 import asyncio
