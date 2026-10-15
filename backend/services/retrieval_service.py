@@ -34,9 +34,9 @@ def _embed_query(query: str):
     """Sync embed of a single query string. Returns (resp, vector) so callers
     can meter the raw response while also getting the unwrapped vector.
 
-    Stays on litellm directly until #412: the tutor still meters into
-    ctx.db uncommitted before tool dispatch, so the adapter's own-session
-    settlement would wait on that ledger row lock."""
+    Stays on litellm directly until #412: the tool runs synchronously inside
+    the tutor's dispatch on ctx.db, and moving it onto the adapter is that
+    issue's scope."""
     resp = llm_retry.retry_sync(
         lambda: litellm.embedding(
             model=settings.embedding_model,
@@ -90,6 +90,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             session_id=ctx.session_id,
             texts=[args.query],
         )
+        # Publish the ledger write now: a bundled sibling retrieve_chunks call
+        # can spend ~45 s in its own embedding retries, and holding the
+        # user's ledger row that long drops any LLM adapter settlement for
+        # this user (SETTLE_LOCK_TIMEOUT).
+        db.commit()
         hits = pgvector_store.query_chunks(
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )

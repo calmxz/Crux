@@ -63,8 +63,8 @@ session_factory = SessionLocal
 
 # Settlement waits at most this long for the ledger row lock, then logs and
 # drops the settlement. Every ledger writer commits straight after its write
-# (the tutor right after each iteration's record_cost), so a legitimate wait
-# is a single short transaction.
+# (the tutor after each iteration's record_cost, the retrieve tool after its
+# embedding metering), so a legitimate wait is a single short transaction.
 SETTLE_LOCK_TIMEOUT = "5s"
 
 _RETRYABLE: tuple[type[BaseException], ...] = (

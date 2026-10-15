@@ -320,6 +320,26 @@ def test_retrieve_meters_embedding_spend(session, ctx, mock_embed, db_session, m
     assert row.purpose == "embedding"
 
 
+def test_retrieve_commits_its_metering_before_querying(
+    session, ctx, mock_embed, db_session, monkeypatch
+):
+    # A bundled sibling retrieve_chunks call can spend its whole embedding
+    # retry window next; the user's ledger row must not stay locked across it.
+    _seed_ready_doc(db_session)
+    open_at_query: list[bool] = []
+
+    def query(db, **_kw):
+        open_at_query.append(db.in_transaction())
+        return []
+
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
+    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
+    retrieval_service.retrieve(
+        db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
+    )
+    assert open_at_query == [False]
+
+
 def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch, fake_llm):
     db_session.add(User(id="u_fallback"))
     db_session.commit()
