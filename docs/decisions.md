@@ -936,6 +936,13 @@ a test fake).
   **Amended 2026-09-30 (B5):** #435 makes the stub's `embed` and `aembed`
   return deterministic fake vectors (cost 0, no network); `complete` still
   raises. Stub-mode ingestion now reaches ready.
+  **Amended 2026-10-15 (#413):** stub mode wins over a provider a test
+  installs, so `llm.get()` alone reads the flag; the `fake_llm` fixture pins
+  stub mode off instead. The shell skips the cost gate for the stub, which
+  never spends, so stub-mode output does not depend on ledger state (a capped
+  user still gets the mechanical rolling summary, not the cap's None).
+  `LlmUnavailable` carries its own code, `llm_unavailable`, so the tutor and
+  `retrieve` catch `CallRefused` without mistaking it for a cap.
 - **Tracer-bullet order.** #410 characterisation, then #411 (core plus
   summary, retrieval and ingestion), #412 (streaming and the tutor), #413
   (stub). The core is proven on low-risk callers before `run_streaming` is
