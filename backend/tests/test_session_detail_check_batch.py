@@ -91,7 +91,8 @@ def test_open_batch_message_suppressed(client, seeded):
     )
     m = _msg(db)
     check_question_service.attach_message_id(db, SID, m.id)
-    # Answer one item -> per-answer write stamps check_batch_json while OPEN.
+    # Clicks no longer write the Recap (#419), but rows written by older code
+    # can still carry one while the set is open; stamp it by hand.
     check_question_service.answer(db, SID, index=0, selected_index=0)
     check_question_service.write_check_batch(db, check_question_service.get_pending_check(db, SID))
 

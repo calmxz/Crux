@@ -1,6 +1,5 @@
 """TDD: POST /sessions/{id}/check/skip over a batch."""
 
-import json
 from datetime import datetime, timezone
 
 import pytest
@@ -101,7 +100,8 @@ def test_skip_on_ended_session_is_409(client, db_session, seeded_session):
     assert r.json()["detail"]["code"] == "session_ended"
 
 
-def test_skip_writes_check_batch_to_message(client, db_session, seeded_session):
+def test_skip_leaves_check_batch_unfrozen(client, db_session, seeded_session):
+    """#419: a click never writes the Recap; only a Close freezes it."""
     sid = seeded_session.id
     _open_batch(db_session, sid)
     m = ChatMessage(session_id=sid, role="assistant", content="")
@@ -112,7 +112,7 @@ def test_skip_writes_check_batch_to_message(client, db_session, seeded_session):
     r = client.post(f"/api/sessions/{sid}/check/skip", json={"index": 0, "user_id": USER_ID})
     assert r.status_code == 200
     db_session.refresh(m)
-    assert m.check_batch_json is not None
-    data = json.loads(m.check_batch_json)
-    assert data["items"][0]["status"] == "skipped"
-    assert data["items"][0]["selected_index"] is None
+    assert m.check_batch_json is None
+    pc = check_question_service.get_pending_check(db_session, sid)
+    assert pc["items"][0]["status"] == "skipped"
+    assert pc["items"][0]["selected_index"] is None
