@@ -347,6 +347,7 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
     adapter's invariant. Settlement waits on that row lock only until
     lock_timeout, then logs and returns the result instead of hanging."""
     import logging
+    import threading
     import time
 
     from services import llm
@@ -355,16 +356,28 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
 
     with Session() as caller:
         cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row
-        started = time.monotonic()
-        with caplog.at_level(logging.ERROR, logger="services.llm"):
-            result = llm.get().embed(
+        # On a worker thread so a broken lock_timeout fails this test at the
+        # join instead of deadlocking it against the caller's lock.
+        outcome: dict = {}
+
+        def call():
+            outcome["result"] = llm.get().embed(
                 ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
             )
-        elapsed = time.monotonic() - started
-        caller.rollback()
 
+        worker = threading.Thread(target=call)
+        started = time.monotonic()
+        with caplog.at_level(logging.ERROR, logger="services.llm"):
+            worker.start()
+            worker.join(timeout=10)
+        elapsed = time.monotonic() - started
+        hung = worker.is_alive()
+        caller.rollback()  # releases the lock, so a hung worker can finish
+        worker.join(timeout=10)
+
+    assert not hung, f"settlement hung for {elapsed:.1f}s"
+    result = outcome["result"]
     assert len(result.vectors) == 1
-    assert elapsed < 10, f"settlement hung for {elapsed:.1f}s"
     [record] = [r for r in caplog.records if r.name == "services.llm"]
     assert (record.user_id, record.purpose, record.cost_usd) == (uid, "embedding", "0.0005")
     with Session() as db:
