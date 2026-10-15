@@ -175,6 +175,21 @@ async def test_settlement_failure_logs_and_returns_the_result(
     assert record.cost_usd == "0.002"
 
 
+async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(
+    db_session, user, fake_llm, monkeypatch, caplog
+):
+    monkeypatch.setattr(cost_meter, "log_call", lambda *a, **k: False)
+    fake_llm.cost = Decimal("0.002")
+
+    with caplog.at_level(logging.ERROR, logger="services.llm"):
+        await _complete()
+
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert record.getMessage() == "llm call log row lost"
+    assert (record.user_id, record.purpose, record.cost_usd) == (USER_ID, "summary", "0.002")
+
+
 # --- retry and failed-call settlement ---------------------------------------
 
 
@@ -187,6 +202,7 @@ async def test_retry_on_429_then_success_bills_once(db_session, user, fake_llm):
 
     assert result.text == "second try"
     assert len(fake_llm.complete_calls) == 2
+    assert fake_llm.estimates == []
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
 
@@ -212,6 +228,7 @@ async def test_completion_timeout_is_not_retried_and_settles_an_estimate(
         await _complete()
 
     assert len(fake_llm.complete_calls) == 1
+    assert fake_llm.estimates == [("completion", MESSAGES)]
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0003")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0003"))]
     fake_llm.replies.clear()
@@ -225,6 +242,7 @@ def test_embedding_timeout_is_retried_and_each_attempt_settles(db_session, user,
     llm.get().embed(["a"], meter=_meter(purpose="embedding"))
 
     assert fake_llm.embed_calls == [["a"], ["a"]]
+    assert fake_llm.estimates == [("embedding", ["a"])]
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0006")
     assert [cost for _, _, cost in _log_rows(db_session)] == [
         Decimal("0.0001"),
@@ -242,6 +260,7 @@ async def test_non_transient_error_is_raised_at_once_and_settles_nothing(
         await _complete()
 
     assert len(fake_llm.complete_calls) == 1
+    assert fake_llm.estimates == []
     assert _log_rows(db_session) == []
 
 

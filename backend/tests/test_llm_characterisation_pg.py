@@ -1,5 +1,10 @@
-"""#410: characterisation of the real /chat/stream cancel path on Postgres
-(llm-adapter 1/4).
+"""#410/#411: LLM paths on Postgres (llm-adapter 1/4 and 2/4).
+
+The #411 section at the end proves the adapter's settlement is isolated
+from the caller's transaction, through the conftest FakeLlmProvider; the
+rest of this docstring describes the #410 cancel-path test.
+
+#410: characterisation of the real /chat/stream cancel path on Postgres.
 
 Drives the real route and the real run_streaming against a streaming
 `litellm.acompletion` fake, disconnects the client mid-stream, and pins what

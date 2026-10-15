@@ -250,7 +250,8 @@ class FakeLlmProvider:
     str is the reply text, an exception instance is raised. `embed_errors`
     likewise raises on the next embed attempts; `vector` (default 0.1s at
     embedding_dim) is returned for every embedded text. Every successful
-    call costs `cost`; a timed-out attempt settles `timeout_cost`.
+    call costs `cost`; a timed-out attempt settles `timeout_cost`, and
+    `estimates` records which estimator priced it and from what input.
     """
 
     chat_model = "fake/chat"
@@ -262,6 +263,7 @@ class FakeLlmProvider:
         self.vector: list[float] | None = None
         self.cost = Decimal("0")
         self.timeout_cost = Decimal("0")
+        self.estimates: list[tuple[str, Any]] = []
         self.complete_calls: list[dict] = []
         self.embed_calls: list[list[str]] = []
         self.aembed_calls: list[list[str]] = []
@@ -299,9 +301,11 @@ class FakeLlmProvider:
         return self._embedding(texts)
 
     def completion_prompt_cost(self, messages) -> Decimal:
+        self.estimates.append(("completion", messages))
         return self.timeout_cost
 
     def embedding_prompt_cost(self, texts) -> Decimal:
+        self.estimates.append(("embedding", list(texts)))
         return self.timeout_cost
 
 

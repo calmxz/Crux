@@ -157,9 +157,10 @@ def log_call(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     cached_tokens: int | None = None,
-) -> None:
+) -> bool:
     """Best-effort per-call attribution row. Never raises: a failed log
-    write must not fail the user's turn. Cap gating stays on the daily
+    write must not fail the user's turn. Returns False when the write failed,
+    so a caller that owes a reconciliation record can log one. Cap gating stays on the daily
     ledger; this table is analytics-only (roadmap R3 consumes it).
 
     The write happens inside a SAVEPOINT (`db.begin_nested()`): if the flush
@@ -173,7 +174,7 @@ def log_call(
     try:
         cost = _to_decimal(cost_usd)
         if cost <= _ZERO:
-            return
+            return True
         with db.begin_nested():
             db.add(
                 LlmCallLog(
@@ -187,8 +188,10 @@ def log_call(
                     cached_tokens=cached_tokens,
                 )
             )
+        return True
     except Exception as e:  # noqa: BLE001 - isolation by design
         log.warning("llm_call_log write failed: %s", e)
+        return False
 
 
 def extract_usage(resp) -> dict:

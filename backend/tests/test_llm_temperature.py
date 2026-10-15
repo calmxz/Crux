@@ -109,7 +109,7 @@ def session_with_messages(db_session):
     return session
 
 
-def test_summary_acompletion_gets_summary_temperature(session_with_messages, db_session, fake_llm):
+def test_summary_call_gets_summary_temperature(session_with_messages, db_session, fake_llm):
     fake_llm.replies = ["a summary"]
 
     summary = asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
@@ -118,11 +118,9 @@ def test_summary_acompletion_gets_summary_temperature(session_with_messages, db_
 
 
 @pytest.mark.asyncio
-async def test_rolling_summary_acompletion_gets_summary_temperature(
-    db_session, monkeypatch, fake_llm
-):
+async def test_rolling_summary_call_gets_summary_temperature(db_session, monkeypatch, fake_llm):
     # Mirror backend/tests/test_rolling_summary.py's session_with_messages
-    # factory and update_rolling_summary drive, capturing kwargs on the fake.
+    # factory and update_rolling_summary drive; the fake provider records the call.
     db_session.add(User(id="u_roll_temp"))
     db_session.flush()
     session = SessionModel(

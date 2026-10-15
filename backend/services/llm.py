@@ -30,10 +30,10 @@ import time
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Any, Protocol, TypeVar
+from typing import Protocol, TypeVar
 
 import litellm
-from sqlalchemy import text
+from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
 
 from config import settings
@@ -153,11 +153,16 @@ class LiteLlmProvider:
             return _to_decimal(litellm.completion_cost(completion_response=resp))
         except Exception as e:  # noqa: BLE001 - pricing must not fail the call
             log.warning("completion_cost failed: %s", e)
+        return self._token_math(messages, content)
+
+    def _token_math(self, messages, content: str) -> Decimal:
+        """Prompt tokens plus `content` priced at the chat model's rates.
+        Never raises."""
         try:
             pt = litellm.token_counter(model=settings.model, messages=messages)
             return cost_meter.estimate_cancelled_cost(settings.model, content, pt)
-        except Exception as e:  # noqa: BLE001
-            log.warning("completion cost fallback failed: %s", e)
+        except Exception as e:  # noqa: BLE001 - an estimate must not raise
+            log.warning("completion token-math estimate failed: %s", e)
             return Decimal("0")
 
     def _embedding(self, resp, texts: list[str]) -> Embedding:
@@ -187,12 +192,7 @@ class LiteLlmProvider:
         return self._embedding(resp, texts)
 
     def completion_prompt_cost(self, messages) -> Decimal:
-        try:
-            pt = litellm.token_counter(model=settings.model, messages=messages)
-            return cost_meter.estimate_cancelled_cost(settings.model, "", pt)
-        except Exception as e:  # noqa: BLE001 - an estimate must not raise
-            log.warning("completion prompt estimate failed: %s", e)
-            return Decimal("0")
+        return self._token_math(messages, "")
 
     def embedding_prompt_cost(self, texts) -> Decimal:
         model = settings.embedding_model
@@ -214,12 +214,21 @@ def _gate(meter: Meter) -> None:
 def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
     if meter.user_id is None or cost <= 0:
         return
+    reconciliation = {
+        "user_id": meter.user_id,
+        "session_id": meter.session_id,
+        "purpose": meter.purpose,
+        "model": model,
+        "cost_usd": str(cost),
+        "usage": usage,
+    }
     try:
         with session_factory() as db:
             if db.get_bind().dialect.name == "postgresql":
-                db.execute(text(f"SET LOCAL lock_timeout = '{SETTLE_LOCK_TIMEOUT}'"))
+                # SET LOCAL via set_config: bind-safe, scoped to this transaction.
+                db.execute(select(func.set_config("lock_timeout", SETTLE_LOCK_TIMEOUT, True)))
             cost_meter.record_cost(db, meter.user_id, cost)
-            cost_meter.log_call(
+            logged = cost_meter.log_call(
                 db,
                 user_id=meter.user_id,
                 session_id=meter.session_id,
@@ -230,18 +239,11 @@ def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
             )
             db.commit()
     except Exception as e:  # noqa: BLE001 - settlement never fails the call
-        log.error(
-            "llm settlement failed: %s",
-            e,
-            extra={
-                "user_id": meter.user_id,
-                "session_id": meter.session_id,
-                "purpose": meter.purpose,
-                "model": model,
-                "cost_usd": str(cost),
-                "usage": usage,
-            },
-        )
+        log.error("llm settlement failed: %s", e, extra=reconciliation)
+        return
+    if not logged:
+        # The ledger committed; only the attribution row was lost.
+        log.error("llm call log row lost", extra=reconciliation)
 
 
 def _failed_attempt(exc: Exception, *, retry_timeout: bool) -> tuple[bool, bool]:
@@ -346,7 +348,7 @@ class Llm:
 
 
 # The installed provider; None means LiteLlmProvider. Tests install a fake.
-_provider: Any = None
+_provider: Provider | None = None
 
 
 def get() -> Llm:
