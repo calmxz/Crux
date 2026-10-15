@@ -476,7 +476,7 @@ def get_session(
     # message_id is None until stamp_message_id runs (non-streaming run()
     # path, or a narrow race). When None, suppression below cannot fire; the
     # read-time backfill is best-effort and any co-render window is transient.
-    open_msg_id = check_service.open_set_message_id(db, row.id)
+    open_view, open_msg_id = check_service.open_set_view(row)
     messages, has_more = _load_messages(db, row.id, open_msg_id)
     return SessionDetail(
         id=row.id,
@@ -489,7 +489,7 @@ def get_session(
         messages=messages,
         has_more_messages=has_more,
         pinned=row.pinned,
-        pending_check=check_service.open_set_view(db, row.id),
+        pending_check=open_view,
     )
 
 
@@ -506,7 +506,7 @@ def get_session_messages(
         raise HTTPException(status_code=404, detail="session not found")
     # Same open-batch recap suppression as get_session: if the open check
     # message ever lands in an older page, the live card still owns it.
-    open_msg_id = check_service.open_set_message_id(db, row.id)
+    _, open_msg_id = check_service.open_set_view(row)
     items, has_more = _load_messages(db, row.id, open_msg_id, before=before, limit=limit)
     return MessagePage(items=items, has_more=has_more)
 

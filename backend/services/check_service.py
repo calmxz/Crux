@@ -124,15 +124,11 @@ def quiz_cooldown(row: SessionModel | None) -> dict | None:
     return _json_dict(getattr(row, "quiz_cooldown_json", None))
 
 
-def open_set_view(db: Session, session_id: str) -> dict | None:
-    """The open Set's public view (session detail)."""
-    return _public_view(open_set(db.get(SessionModel, session_id)))
-
-
-def open_set_message_id(db: Session, session_id: str) -> int | None:
-    """The open Set's asking message id; None until stamp_message_id runs."""
-    pc = open_set(db.get(SessionModel, session_id))
-    return pc.get("message_id") if pc else None
+def open_set_view(row: SessionModel) -> tuple[dict | None, int | None]:
+    """The open Set's public view and its asking message id (None until
+    stamp_message_id runs), from one read of the row."""
+    pc = open_set(row)
+    return _public_view(pc), (pc.get("message_id") if pc else None)
 
 
 def _public_view(pc: dict | None) -> dict | None:
@@ -184,7 +180,7 @@ def load_session_learning_events(db: Session, session_id: str) -> list[LearningE
 def recap_is_frozen(msg: ChatMessage) -> bool:
     """False when recap_for_message would rebuild from LearningEvents, so a
     caller rendering many messages knows whether to preload them."""
-    return msg.check_batch_json is not None
+    return _json_dict(msg.check_batch_json) is not None
 
 
 def recap_for_message(db: Session, msg: ChatMessage, events: list | None = None) -> dict | None:
@@ -451,6 +447,12 @@ def _close(db: Session, row: SessionModel, pc: dict | None, *, ends_check: bool)
         _write_current_check(row, cc)
 
 
+def _score(pc: dict) -> tuple[list[dict], int]:
+    """The answered Items and how many were correct. Skips do not score."""
+    graded = [it for it in pc.get("items", []) if it["status"] == "answered"]
+    return graded, sum(1 for it in graded if it.get("correct"))
+
+
 def _results_summary(pc: dict, *, stopped: bool = False) -> str:
     """Server-built summary injected as a synthetic user turn for the
     follow-up. Reflects post-answer profile state (demotions already applied
@@ -459,8 +461,7 @@ def _results_summary(pc: dict, *, stopped: bool = False) -> str:
     The header names the Set ("Set N of M.") or, when the learner stopped
     the Check, "learner stopped at set N of M." Pre-#340 Sets get neither."""
     items = pc.get("items", [])
-    graded = [it for it in items if it["status"] == "answered"]
-    n_correct = sum(1 for it in graded if it.get("correct"))
+    graded, n_correct = _score(pc)
     header = f"[check results] gap={pc['gap']}: {n_correct}/{len(graded)} correct."
     set_index, set_total = pc.get("set_index"), pc.get("set_total")
     if set_index and set_total:
@@ -487,8 +488,7 @@ def _build_cooldown(pc: dict) -> dict | None:
     `last_score` is n_correct over GRADED (answered) Items, matching
     _results_summary; skipped Items trigger the cooldown but do not score."""
     items = pc.get("items", [])
-    graded = [it for it in items if it["status"] == "answered"]
-    n_correct = sum(1 for it in graded if it.get("correct"))
+    graded, n_correct = _score(pc)
     has_miss = any(it["status"] == "skipped" for it in items) or n_correct < len(graded)
     if not has_miss:
         return None
@@ -577,6 +577,10 @@ def register(db: Session, ctx: "ToolContext", args: AskCheckQuestionsArgs) -> To
     # concurrent streams otherwise both read None and the second write
     # silently overwrites the first Set.
     with _locked(db, ctx.session_id) as row:
+        # A turn still streaming when the session ended must not open a Set
+        # the end's abandon has already passed over.
+        if row.ended_at is not None:
+            return _refuse("the session has ended; do not quiz")
         if open_set(row) is not None:
             return _refuse("a check-question batch is already open; resolve it first")
 

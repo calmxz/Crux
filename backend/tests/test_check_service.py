@@ -109,7 +109,7 @@ def test_stamp_links_the_open_set_in_one_commit(db, commits):
     commits.clear()
     check_service.stamp_message_id(db, SID, 42)
     assert len(commits) == 1
-    assert check_service.open_set_message_id(db, SID) == 42
+    assert check_service.open_set_view(_row(db))[1] == 42
 
 
 def test_answer_records_the_event_in_one_commit(db, commits):
@@ -228,6 +228,23 @@ def test_register_refused_with_a_set_open_releases_the_lock(db):
     result = check_service.register(db, _ctx(db), _args())
     assert not result.ok
     assert not db.in_transaction()
+
+
+def test_register_on_an_ended_session_is_refused_and_releases_the_lock(db):
+    """A turn still streaming when the session ended must not open a Set
+    after the end's abandon has run."""
+    _row(db).ended_at = datetime.now(timezone.utc)
+    db.commit()
+    result = check_service.register(db, _ctx(db), _args())
+    assert not result.ok
+    assert not db.in_transaction()
+    assert check_service.open_set(_row(db)) is None
+
+
+def test_a_malformed_recap_is_not_frozen():
+    assert check_service.recap_is_frozen(ChatMessage(check_batch_json='{"gap": "g"}'))
+    assert not check_service.recap_is_frozen(ChatMessage(check_batch_json=None))
+    assert not check_service.recap_is_frozen(ChatMessage(check_batch_json="{not json"))
 
 
 def test_register_refused_out_of_order_releases_the_lock(db):
