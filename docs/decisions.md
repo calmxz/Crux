@@ -900,9 +900,14 @@ a test fake).
   attempt with no output settles $0" stands, including an attempt whose
   stream opened and then failed before its first chunk; that stream is
   closed before the retry. Billing such an attempt (on the premise that the
-  vendor processed the prompt) was tried in review and reverted: the premise
-  is unverified, and it charged learners during an outage with no reply.
-  #561 checks whether Gemini bills these attempts. The tutor and the `retrieve` tool now
+  vendor processed the prompt) was tried in review and reverted: it charged
+  learners during an outage with no reply. #561 settled the premise: the
+  Gemini API billing FAQ ("Am I charged for failed requests?") says a request
+  that fails with a 400 or 500 error is not charged for its tokens, though it
+  counts against quota, so $0 matches the bill for 429, 503 and 500. A
+  connection dropped mid-stream with no error status is not covered by the
+  FAQ; it is left at $0, a bounded undercount the daily budget absorbs
+  (`.out-of-scope/llm-settlement-reconciliation.md`). The tutor and the `retrieve` tool now
   write no ledger row themselves (every call settles in the adapter), so the
   previous amendment's "commits each iteration's `record_cost`" and
   "commits its embedding metering" no longer apply. The retrieve tool's
