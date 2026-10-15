@@ -341,7 +341,7 @@ async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
 
 
 def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
-    adapter_on_postgres, caplog
+    adapter_on_postgres, caplog, monkeypatch
 ):
     """A caller holding an uncommitted ledger write across a call violates the
     adapter's invariant. Settlement waits on that row lock only until
@@ -353,6 +353,8 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
     from services import llm
 
     Session, uid, sid = adapter_on_postgres
+    # The production value covers a tutor's tool dispatch; keep the test quick.
+    monkeypatch.setattr(llm, "SETTLE_LOCK_TIMEOUT", "1s")
 
     with Session() as caller:
         cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row

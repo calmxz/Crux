@@ -571,3 +571,22 @@ def test_session_centroid_materialises_and_does_not_commit(db_session, monkeypat
     row = db_session.get(SessionModel, "s_cent2")
     db_session.refresh(row)
     assert list(row.chunk_centroid) == computed
+
+
+def test_prefetch_holds_no_db_transaction_during_the_embedding(
+    session, db_session, monkeypatch, fake_llm
+):
+    """#411: has_ready_document opens a transaction; it is committed before
+    the adapter checks out its own connection for the gate and settlement."""
+    _seed_ready_doc(db_session)
+    _stub_query(monkeypatch, [])
+    seen = []
+    real_aembed = fake_llm.aembed
+
+    async def spy(texts):
+        seen.append(db_session.in_transaction())
+        return await real_aembed(texts)
+
+    fake_llm.aembed = spy
+    asyncio.run(retrieval_service.prefetch_for_prompt(db_session, SESSION_ID, USER_ID, "q"))
+    assert seen == [False]

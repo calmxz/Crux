@@ -238,3 +238,22 @@ async def test_update_rolling_summary_empty_content_still_meters_before_returnin
     # empty-content debounce behavior unchanged: neither field is written
     assert s.rolling_summary is None
     assert s.rolling_summary_count is None
+
+
+async def test_rolling_summary_holds_no_db_transaction_during_the_llm_call(
+    db_session, session_with_messages, monkeypatch, fake_llm
+):
+    """#411: the caller releases its pooled connection before the call."""
+    s = session_with_messages(n=31)
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "real")
+    seen = []
+    real_complete = fake_llm.complete
+
+    async def spy(messages, **kwargs):
+        seen.append(db_session.in_transaction())
+        return await real_complete(messages, **kwargs)
+
+    fake_llm.complete = spy
+    await summary_service.update_rolling_summary(db_session, s.id)
+    assert seen == [False]

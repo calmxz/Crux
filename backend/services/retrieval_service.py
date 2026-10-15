@@ -48,9 +48,16 @@ def _embed_query(query: str):
     return resp, _unwrap_embedding(resp)
 
 
-async def _aembed_query(query: str, *, user_id: str | None, session_id: str) -> list[float]:
+async def _aembed_query(
+    db: Session, query: str, *, user_id: str | None, session_id: str
+) -> list[float]:
     """Async embed of a single query string through the adapter, which gates,
-    retries and settles the spend (F-19)."""
+    retries and settles the spend (F-19).
+
+    Commits `db` first so the request's pooled connection is not held idle
+    across the network call while the adapter checks out its own for the gate
+    and the settlement (two per request under load would starve the pool)."""
+    await run_in_threadpool(db.commit)
     result = await llm.get().aembed(
         [query], meter=llm.Meter(user_id=user_id, session_id=session_id, purpose="embedding")
     )
@@ -136,9 +143,10 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     The dialect guard stays the first statement so sqlite issues no statement
     at all here (test_chat_prepare_perf counts statements on sqlite).
 
-    The write-back flushes but never commits: this runs inside _prepare_turn's
-    transaction, which rolls back on a prompt-build failure. A rolled-back
-    write-back just means the next turn recomputes.
+    The write-back flushes but never commits here; the caller's next commit
+    (semantic_fallback_required releases the connection before embedding)
+    publishes it. A write-back that is rolled back instead just means the
+    next turn recomputes.
     """
     if not _is_postgres(db):
         return None
@@ -191,7 +199,7 @@ async def prefetch_for_prompt(
         if not documents_service.has_ready_document(db, session_id):
             return None
         if query_vec is None:
-            query_vec = await _aembed_query(query, user_id=user_id, session_id=session_id)
+            query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
         hits = pgvector_store.query_chunks(
             db, session_id=session_id, query_embedding=query_vec, k=k
         )
@@ -242,7 +250,7 @@ async def semantic_fallback_required(
         centroid = await run_in_threadpool(_session_centroid, db, session_id)
         if centroid is None:
             return False, None
-        query_vec = await _aembed_query(query, user_id=user_id, session_id=session_id)
+        query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
         sim = _cosine_similarity(list(query_vec), centroid)
         # B-09: hand the vector back so prefetch_for_prompt can skip its
         # identical embed (2x cost + one extra round-trip on every

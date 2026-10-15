@@ -83,13 +83,17 @@ async def generate_and_persist(
         # rate-limited end must not spend either.
         summary = _mechanical_fallback(messages)
     else:
+        meter = llm.Meter(user_id=session.user_id, session_id=session.id, purpose="summary")
+        # Release the pooled connection for the multi-second call: the adapter
+        # takes its own for the gate and the settlement. Only reads are open.
+        db.commit()
         try:
             completion = await llm.get().complete(
                 [
                     {"role": "system", "content": SUMMARY_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
-                meter=llm.Meter(user_id=session.user_id, session_id=session.id, purpose="summary"),
+                meter=meter,
                 temperature=settings.summary_temperature,
                 timeout=settings.summary_timeout_s,
             )
@@ -192,12 +196,16 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
                     "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}",
                 },
             ]
+            meter = llm.Meter(
+                user_id=session.user_id, session_id=session.id, purpose="rolling_summary"
+            )
+            # Release the pooled connection for the call (reads only so far);
+            # the adapter takes its own for the gate and the settlement.
+            db.commit()
             try:
                 completion = await llm.get().complete(
                     rolling_messages,
-                    meter=llm.Meter(
-                        user_id=session.user_id, session_id=session.id, purpose="rolling_summary"
-                    ),
+                    meter=meter,
                     temperature=settings.summary_temperature,
                     timeout=settings.summary_timeout_s,
                 )

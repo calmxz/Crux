@@ -60,8 +60,14 @@ T = TypeVar("T")
 # test engine.
 session_factory = SessionLocal
 
-# Settlement waits at most this long for the ledger row lock.
-SETTLE_LOCK_TIMEOUT = "2s"
+# Settlement waits at most this long for the ledger row lock, then logs and
+# drops the settlement. Until #412 the tutor keeps its per-iteration
+# record_cost uncommitted across tool dispatch, so another request for the
+# same user (ingestion, a background rolling summary) can legitimately wait
+# behind it for the retrieve tool's whole embedding retry window (15 s
+# timeout, 3 attempts, 1.5 s backoff). #412 removes that hold; lower this to
+# a few seconds then.
+SETTLE_LOCK_TIMEOUT = "60s"
 
 _RETRYABLE: tuple[type[BaseException], ...] = (
     litellm.APIConnectionError,
@@ -299,7 +305,8 @@ class Llm:
             except Exception as e:
                 retry, estimated = _failed_attempt(e, retry_timeout=retry_timeout)
                 if estimated:
-                    await run_in_threadpool(_settle, meter, model, estimate(), {})
+                    # The estimate tokenizes the prompt: keep it off the loop.
+                    await run_in_threadpool(lambda: _settle(meter, model, estimate(), {}))
                 if not retry or i == attempts:
                     raise
             await asyncio.sleep(_backoff(i))

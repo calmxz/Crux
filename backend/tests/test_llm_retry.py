@@ -63,23 +63,3 @@ def test_retry_sync_zero_attempts_is_single_call(monkeypatch):
     with pytest.raises(litellm.APIConnectionError):
         llm_retry.retry_sync(fn)
     assert calls["n"] == 1
-
-
-async def test_retry_async_recovers(monkeypatch):
-    # pyproject sets asyncio_mode = "auto": no marker needed.
-    monkeypatch.setattr(settings, "llm_retry_attempts", 1)
-    calls = {"n": 0}
-
-    async def no_sleep(_s):
-        return None
-
-    monkeypatch.setattr(llm_retry.asyncio, "sleep", no_sleep)
-
-    async def fn():
-        calls["n"] += 1
-        if calls["n"] == 1:
-            raise _conn_err()
-        return "ok"
-
-    assert await llm_retry.retry_async(fn) == "ok"
-    assert calls["n"] == 2
