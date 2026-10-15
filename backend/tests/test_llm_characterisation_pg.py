@@ -353,7 +353,7 @@ def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
     from services import llm
 
     Session, uid, sid = adapter_on_postgres
-    # The production value covers a tutor's tool dispatch; keep the test quick.
+    # Shorter than the production value to keep the test quick.
     monkeypatch.setattr(llm, "SETTLE_LOCK_TIMEOUT", "1s")
 
     with Session() as caller:

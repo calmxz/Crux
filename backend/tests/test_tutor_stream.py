@@ -699,6 +699,46 @@ async def test_run_streaming_records_cost_on_tool_iterations(db_session, monkeyp
 
 
 @pytest.mark.asyncio
+async def test_iteration_cost_is_committed_before_tool_dispatch(db_session, monkeypatch):
+    """The iteration's ledger upsert holds the user's ledger row lock until
+    commit; a tool can run for tens of seconds, and every other settlement
+    for this user (the LLM adapter's own transaction) would wait behind it.
+    So no transaction may be open when a tool starts."""
+    _disable_stub(monkeypatch)
+    _allow_cap(monkeypatch)
+
+    from agent import tutor
+
+    turn1 = _make_stream(
+        _tool_chunk(
+            _tool_fragment(0, id="tc_1", name="retrieve_chunks", arguments='{"query":"x"}')
+        ),
+    )
+    turn2 = _make_stream(_content_chunk("done"))
+    monkeypatch.setattr(
+        "agent.tutor.litellm.acompletion",
+        AsyncMock(side_effect=[turn1, turn2]),
+    )
+    open_at_dispatch: list[bool] = []
+
+    def dispatch(*_a, **_k):
+        open_at_dispatch.append(db_session.in_transaction())
+        return ToolResult(ok=True, status="ok", error=None, data={"chunks": []})
+
+    monkeypatch.setattr("agent.tutor.tools.dispatch", dispatch)
+    monkeypatch.setattr(
+        "agent.tutor.litellm.stream_chunk_builder",
+        MagicMock(return_value=SimpleNamespace()),
+    )
+    monkeypatch.setattr("agent.tutor.litellm.completion_cost", MagicMock(return_value=0.01))
+
+    ctx = _ctx(db_session, session_id="s_cost_commit")
+    await _drain(tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx))
+
+    assert open_at_dispatch == [False]
+
+
+@pytest.mark.asyncio
 async def test_run_streaming_ask_check_question_dispatches_sibling_first(db_session, monkeypatch):
     """ask_check_questions is turn-terminating and must be the LAST call
     dispatched. F-10: a sibling non-ask tool call streamed in the same

@@ -62,13 +62,10 @@ T = TypeVar("T")
 session_factory = SessionLocal
 
 # Settlement waits at most this long for the ledger row lock, then logs and
-# drops the settlement. Until #412 the tutor keeps its per-iteration
-# record_cost uncommitted across tool dispatch, so another request for the
-# same user (ingestion, a background rolling summary) can legitimately wait
-# behind it for the retrieve tool's whole embedding retry window (15 s
-# timeout, 3 attempts, 1.5 s backoff). #412 removes that hold; lower this to
-# a few seconds then.
-SETTLE_LOCK_TIMEOUT = "60s"
+# drops the settlement. Every ledger writer commits straight after its write
+# (the tutor right after each iteration's record_cost), so a legitimate wait
+# is a single short transaction.
+SETTLE_LOCK_TIMEOUT = "5s"
 
 _RETRYABLE: tuple[type[BaseException], ...] = (
     litellm.APIConnectionError,

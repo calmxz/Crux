@@ -303,6 +303,11 @@ async def run_streaming(
                     cost_usd=cost,
                     **cost_meter.extract_usage(built),
                 )
+                # Publish now rather than at the next loop-top commit: the
+                # upsert holds the user's ledger row lock, and tool dispatch
+                # can run for tens of seconds, stalling any other settlement
+                # for this user (LLM adapter, SETTLE_LOCK_TIMEOUT).
+                ctx.db.commit()
             billed_iters = len(iter_prompt_snapshots)
             billed_chars = len(accumulated_text)
 

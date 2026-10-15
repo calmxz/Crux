@@ -98,9 +98,10 @@ it without importing the adapter.
 Caller rule: never hold an uncommitted ledger write (`record_cost`,
 `reserve_cost`, `adjust_cost`) in your session across an adapter call. The
 settlement upserts the same row; on Postgres it waits at most
-`SETTLE_LOCK_TIMEOUT`, then logs and drops the settlement. That is 60 s until
-#412, because the tutor still holds its own ledger write across tool dispatch
-and other requests for the same user must outwait it. The adapter's gate and
+`SETTLE_LOCK_TIMEOUT` (5 s), then logs and drops the settlement. The tutor
+commits each iteration's `record_cost` before tool dispatch for the same
+reason: a tool can run for tens of seconds, and holding the user's ledger
+row across it stalls every other settlement for that user. The adapter's gate and
 settlement each take their own pooled connection, so callers commit before
 the call (as every moved call site does) instead of holding an idle one.
 
