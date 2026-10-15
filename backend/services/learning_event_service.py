@@ -14,7 +14,7 @@ from sqlalchemy import case, func, select
 from sqlalchemy.orm import Session
 
 from db.models import LearningEvent
-from services import pending_check_store, profile_service
+from services import profile_service
 
 
 def record_from_answer(
@@ -28,14 +28,12 @@ def record_from_answer(
     correct_index: int | None = None,
     options: list[str] | None = None,
     purpose: str = "check",
-    clear_pending: bool = True,
-    commit: bool = True,
     apply_profile_effects: bool = True,
 ) -> LearningEvent:
     """Record a learner's clicked check-question answer (deterministic path).
 
-    clear_pending=False / commit=False let the batch caller (check_question_service.
-    answer) keep the rest of the batch open and fold this into one commit.
+    Never commits and never touches Check state: it joins the caller's
+    transaction (check_service.answer commits once for the whole click).
 
     No turn-barrier applies here: a human click is not the LLM,
     and record_learning_event is no longer a tool, so the ask-and-self-grade
@@ -69,9 +67,9 @@ def record_from_answer(
     db.flush()
 
     if apply_profile_effects:
-        # Lock before the load-mutate-save span; if the batch caller
-        # (check_question_service.answer) already holds the lock in this
-        # same transaction, the re-lock is a no-op (F-12).
+        # Lock before the load-mutate-save span; if the caller
+        # (check_service.answer) already holds the lock in this same
+        # transaction, the re-lock is a no-op (F-12).
         profile_service.lock_session_row(db, session_id)
         profile = profile_service.load_profile(db, session_id)
         stamp = datetime.now(timezone.utc)
@@ -97,12 +95,6 @@ def record_from_answer(
                 stamp=stamp,
             )
         profile_service.save_profile(db, session_id, profile, commit=False)
-
-    if clear_pending:
-        pending_check_store.clear_pending_check(db, session_id, commit=False)
-    if commit:
-        db.commit()
-        db.refresh(event)
     return event
 
 

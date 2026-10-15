@@ -31,11 +31,10 @@ from lib.error_codes import (
     SESSION_ENDED,
 )
 from services import (
-    check_question_service,
+    check_service,
     cost_meter,
     documents_service,
     learning_event_service,
-    pending_check_store,
     profile_service,
     rate_limit,
     retrieval_service,
@@ -92,12 +91,7 @@ def _build_prompt_state(
         "last_session_summary": profile.last_session_summary,
         "rolling_summary": getattr(session, "rolling_summary", None),
         "pending_check": pending_check,
-        # #340: lets the prompt tell "between sets" from "no check".
-        "current_check": (
-            pending_check_store.get_current_check_from_row(session)
-            if getattr(session, "current_check_json", None)
-            else None
-        ),
+        "current_check": check_service.current_check(session),
         "quiz_cooldown": quiz_cooldown,
         "gap_accuracy": gap_accuracy or {},
         "learner_prefs": learner_prefs or {},
@@ -418,8 +412,8 @@ async def _prepare_turn_after_guards(
             review_gaps=getattr(req, "review_gaps", False),
             review_gap=getattr(req, "review_gap", None),
             diagnostic_accepted=getattr(req, "diagnostic_accepted", False),
-            pending_check=pending_check_store.get_pending_check_from_row(session),
-            quiz_cooldown=check_question_service.get_quiz_cooldown_from_row(session),
+            pending_check=check_service.open_set(session),
+            quiz_cooldown=check_service.quiz_cooldown(session),
             gap_accuracy=gap_accuracy,
             prefetched_chunks=prefetched_chunks,
             learner_prefs=learner_prefs,

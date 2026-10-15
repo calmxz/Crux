@@ -12,7 +12,7 @@ from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, LlmCallLog, User
 from db.models import Session as SessionModel
-from services import check_question_service, cost_meter, profile_service, summary_service
+from services import check_service, cost_meter, profile_service, summary_service
 
 USER_ID = "u1"
 SESSION_ID = "s1"
@@ -269,7 +269,7 @@ def _open_batch(db, session_id, user_id=USER_ID, n=2):
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
     )
-    return check_question_service.register(
+    return check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -325,7 +325,7 @@ def test_summary_write_window_is_atomic(db_session, session_with_open_batch, mon
         asyncio.run(summary_service.generate_and_persist(db_session, session_with_open_batch))
     db_session.rollback()
     assert (
-        check_question_service.get_pending_check(db_session, session_with_open_batch.id) is not None
+        check_service.open_set(db_session.get(SessionModel, session_with_open_batch.id)) is not None
     )
 
 

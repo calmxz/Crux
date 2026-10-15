@@ -20,7 +20,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile, UpdateTopicProfileArgs
 from db.models import Session as SessionModel
 from db.models import User
-from services import check_question_service as cq
+from services import check_service as cq
 from services import learning_event_service, profile_service
 
 SESSION_ID = "sess_a5"

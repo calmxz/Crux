@@ -10,7 +10,7 @@ from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, Document, UsageCounter, User
 from db.models import Session as SessionModel
 from lib.error_codes import TOO_MANY_REQUESTS
-from services import check_question_service, summary_service, velocity_limit
+from services import check_service, summary_service, velocity_limit
 
 USER_ID = "u1"
 
@@ -734,7 +734,7 @@ def _open_batch(db, session_id, user_id=USER_ID, n=2):
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
     )
-    return check_question_service.register(
+    return check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -815,7 +815,7 @@ def test_resume_create_abandons_prior_open_batch(client, db_session, session_wit
     )
     assert resp.status_code == 201, resp.text
     db_session.expire_all()
-    assert check_question_service.get_pending_check(db_session, prior.id) is None
+    assert check_service.open_set(db_session.get(SessionModel, prior.id)) is None
     db_session.refresh(prior)
     assert prior.ended_at is not None
 

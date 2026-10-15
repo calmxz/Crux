@@ -21,7 +21,7 @@ from contracts import (
 )
 from lib import error_codes
 from services import (
-    check_question_service,
+    check_service,
     profile_service,
     retrieval_service,
     topic_suggest_service,
@@ -127,9 +127,7 @@ def dispatch(name: str, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
         if name == "retrieve_chunks":
             return retrieval_service.retrieve(ctx.db, ctx, RetrieveChunksArgs.model_validate(args))
         if name == "ask_check_questions":
-            return check_question_service.register(
-                ctx.db, ctx, AskCheckQuestionsArgs.model_validate(args)
-            )
+            return check_service.register(ctx.db, ctx, AskCheckQuestionsArgs.model_validate(args))
         if name == "suggest_topics":
             return topic_suggest_service.register(
                 ctx.db, ctx, SuggestTopicsArgs.model_validate(args)

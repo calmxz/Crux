@@ -8,7 +8,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service
+from services import check_service
 
 USER_ID = "u_skip_1"
 
@@ -34,7 +34,7 @@ def _open_batch(db, session_id):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -108,11 +108,11 @@ def test_skip_leaves_check_batch_unfrozen(client, db_session, seeded_session):
     db_session.add(m)
     db_session.commit()
     db_session.refresh(m)
-    check_question_service.attach_message_id(db_session, sid, m.id)
+    check_service.stamp_message_id(db_session, sid, m.id)
     r = client.post(f"/api/sessions/{sid}/check/skip", json={"index": 0, "user_id": USER_ID})
     assert r.status_code == 200
     db_session.refresh(m)
     assert m.check_batch_json is None
-    pc = check_question_service.get_pending_check(db_session, sid)
+    pc = check_service.open_set(db_session.get(SessionModel, sid))
     assert pc["items"][0]["status"] == "skipped"
     assert pc["items"][0]["selected_index"] is None

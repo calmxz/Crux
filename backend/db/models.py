@@ -89,7 +89,7 @@ class Session(Base):
     kw_index_json: Mapped[str] = mapped_column(Text, default="[]", nullable=False)
     pending_check_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     quiz_cooldown_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
-    # #340: check-level pointer across sets; see services/pending_check_store.py.
+    # #340: check-level pointer across sets; see services/check_service.py.
     current_check_json: Mapped[str | None] = mapped_column(Text, nullable=True, default=None)
     # #354: the once-per-session topic card. "awaiting_level" when the session
     # started without a level, "done" once suggest_topics ran, NULL otherwise.

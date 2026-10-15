@@ -114,11 +114,11 @@ def _build_prompt_state_and_system_prompt(db, session_id: str) -> tuple[dict, st
     prompt the same way routes/chat.py._prepare_turn does."""
     from agent import prompts
     from db.models import Session as SessionModel
-    from services import check_question_service, learning_event_service, profile_service
+    from services import check_service, learning_event_service, profile_service
 
     session = db.get(SessionModel, session_id)
     profile = profile_service.load_profile(db, session_id)
-    quiz_cooldown = check_question_service.get_quiz_cooldown_from_row(session)
+    quiz_cooldown = check_service.quiz_cooldown(session)
     gap_accuracy = learning_event_service.gap_accuracy(db, session_id)
 
     prompt_state = {

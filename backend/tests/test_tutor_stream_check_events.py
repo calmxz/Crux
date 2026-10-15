@@ -19,7 +19,7 @@ from config import settings
 from db.models import ChatMessage
 from db.models import Session as SessionModel
 from db.models import User as UserModel
-from services import check_question_service, profile_service
+from services import check_service, profile_service
 from services.cost_meter import CapStatus
 
 # ---------------------------------------------------------------------------
@@ -107,7 +107,7 @@ USER_ID = "u1"
 
 
 def _insert_session(db_session, session_id=SESSION_ID, user_id=USER_ID):
-    """Insert a minimal User + Session row so check_question_service can find the row."""
+    """Insert a minimal User + Session row so check_service can find the row."""
     # SQLite in-memory: ForeignKey enforcement depends on pragma; insert user first.
     user = UserModel(id=user_id)
     db_session.add(user)
@@ -200,7 +200,7 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
     assert msg.status == "complete"
     assert msg.role == "assistant"
 
-    pc = check_question_service.get_pending_check(db_session, SESSION_ID)
+    pc = check_service.open_set(db_session.get(SessionModel, SESSION_ID))
     assert pc is not None and pc["message_id"] is not None
 
 
@@ -285,9 +285,9 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
 
     NOTE on the ask_check_questions + cancel scenario: when a check-ask turn
     completes normally (asked_check=True), the happy path at the 'if asked_check:'
-    block calls _persist_assistant_message + attach_message_id BEFORE yielding
+    block calls _persist_assistant_message + stamp_message_id BEFORE yielding
     the 'done' event. If CancelledError is thrown at the 'done' yield, the
-    except branch's attach_message_id call is redundant (happy path already ran it).
+    except branch's stamp_message_id call is redundant (happy path already ran it).
     There is no yield between asked_check=True and the done yield where
     CancelledError could land without the happy path having already attached.
     So the hoist is a correct defensive measure even if its effect is only
@@ -512,5 +512,5 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
     names = [tc["name"] for tc in json.loads(msg.tool_calls_json)]
     assert names == ["ask_check_questions"], names
 
-    pc = check_question_service.get_pending_check(db_session, sid)
+    pc = check_service.open_set(db_session.get(SessionModel, sid))
     assert pc is not None and pc.get("gap") == "first_gap"

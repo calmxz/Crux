@@ -11,7 +11,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service, pending_check_store, profile_service
+from services import check_service, profile_service
 
 USER_ID = "u_done_1"
 
@@ -37,7 +37,7 @@ def _resolved_batch(db, sid):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -50,7 +50,7 @@ def _resolved_batch(db, sid):
             ],
         ),
     )
-    check_question_service.answer(db, sid, index=0, selected_index=0)
+    check_service.answer(db, sid, index=0, selected_index=0)
 
 
 def _make_fake_run_streaming(db, session_id):
@@ -70,7 +70,7 @@ def _make_fake_run_streaming(db, session_id):
 @pytest.fixture
 def resolved_diagnostic_batch_session(db_session):
     """A diagnostic batch fully resolved by writing pending_check_json DIRECTLY
-    onto the session row -- bypassing check_question_service.answer(), which
+    onto the session row -- bypassing check_service.answer(), which
     would grade. Simulates the F-24 crash window: the per-item grade call
     never ran (e.g. process died right after the answer commit), but the
     batch itself is fully done. knowledge_level must still be None here."""
@@ -90,7 +90,7 @@ def resolved_diagnostic_batch_session(db_session):
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         diagnostic_required=True,
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -103,7 +103,7 @@ def resolved_diagnostic_batch_session(db_session):
             ],
         ),
     )
-    pc = check_question_service.get_pending_check(db_session, row.id)
+    pc = check_service.open_set(db_session.get(SessionModel, row.id))
     pc["items"][0]["status"] = "answered"
     pc["items"][0]["selected_index"] = 0
     pc["items"][0]["correct"] = True
@@ -117,7 +117,7 @@ def test_complete_grades_diagnostic_before_clearing(
     client, db_session, resolved_diagnostic_batch_session, monkeypatch
 ):
     # F-24 crash-window backstop: the batch is fully resolved but
-    # grade_if_diagnostic never ran per-item. POST /check/complete must grade
+    # diagnostic grading never ran per-item. POST /check/complete must grade
     # before clearing the batch.
     sid = resolved_diagnostic_batch_session
     monkeypatch.setattr("agent.tutor.run_streaming", _make_fake_run_streaming(db_session, sid))
@@ -140,7 +140,7 @@ def test_complete_streams_reply_clears_batch_no_user_message(
     assert "text/event-stream" in r.headers["content-type"]
     body = r.text
     assert "event: done" in body
-    assert check_question_service.get_pending_check(db_session, sid) is None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
     rows = (
         db_session.execute(select(ChatMessage).where(ChatMessage.session_id == sid)).scalars().all()
     )
@@ -155,7 +155,7 @@ def test_complete_409_when_not_done(client, db_session, seeded_session, monkeypa
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -207,7 +207,7 @@ def _resolved_batch_miss(db, sid):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -220,7 +220,7 @@ def _resolved_batch_miss(db, sid):
             ],
         ),
     )
-    check_question_service.answer(db, sid, index=0, selected_index=1)
+    check_service.answer(db, sid, index=0, selected_index=1)
 
 
 def test_complete_sets_quiz_cooldown_on_miss(client, db_session, seeded_session, monkeypatch):
@@ -229,7 +229,7 @@ def test_complete_sets_quiz_cooldown_on_miss(client, db_session, seeded_session,
     monkeypatch.setattr("agent.tutor.run_streaming", _make_fake_run_streaming(db_session, sid))
     r = client.post(f"/api/sessions/{sid}/check/complete", json={"user_id": USER_ID})
     assert r.status_code == 200
-    cd = check_question_service.get_quiz_cooldown(db_session, sid)
+    cd = check_service.quiz_cooldown(db_session.get(SessionModel, sid))
     assert cd is not None
     assert cd["gap"] == "atp"
     assert cd["last_score"] == "0/1"
@@ -241,7 +241,7 @@ def test_complete_no_cooldown_on_all_correct(client, db_session, seeded_session,
     monkeypatch.setattr("agent.tutor.run_streaming", _make_fake_run_streaming(db_session, sid))
     r = client.post(f"/api/sessions/{sid}/check/complete", json={"user_id": USER_ID})
     assert r.status_code == 200
-    assert check_question_service.get_quiz_cooldown(db_session, sid) is None
+    assert check_service.quiz_cooldown(db_session.get(SessionModel, sid)) is None
 
 
 def test_complete_writes_check_batch_to_message(client, db_session, seeded_session, monkeypatch):
@@ -251,7 +251,7 @@ def test_complete_writes_check_batch_to_message(client, db_session, seeded_sessi
     db_session.add(m)
     db_session.commit()
     db_session.refresh(m)
-    check_question_service.attach_message_id(db_session, sid, m.id)
+    check_service.stamp_message_id(db_session, sid, m.id)
 
     monkeypatch.setattr("agent.tutor.run_streaming", _make_fake_run_streaming(db_session, sid))
 
@@ -263,7 +263,7 @@ def test_complete_writes_check_batch_to_message(client, db_session, seeded_sessi
     data = json.loads(m.check_batch_json)
     assert data["gap"] == "atp"
     assert data["items"][0]["correct"] is True
-    assert check_question_service.get_pending_check(db_session, sid) is None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
 
 
 def test_complete_check_claims_batch_under_row_lock(
@@ -287,13 +287,13 @@ def test_complete_check_claims_batch_under_row_lock(
 
     monkeypatch.setattr(profile_service, "lock_session_row", lock_spy)
 
-    real_get = pending_check_store.get_pending_check
+    real_get = check_service.open_set
 
-    def get_spy(db, session_id):
+    def get_spy(row):
         events.append("get")
-        return real_get(db, session_id)
+        return real_get(row)
 
-    monkeypatch.setattr(pending_check_store, "get_pending_check", get_spy)
+    monkeypatch.setattr(check_service, "open_set", get_spy)
 
     resp = client.post(f"/api/sessions/{sid}/check/complete", json={"user_id": USER_ID})
     assert resp.status_code == 200

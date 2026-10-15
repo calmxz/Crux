@@ -1,11 +1,11 @@
 """Check-recap persistence and attach-guard tests (streaming chat path).
 
-Originally these covered the non-streaming /chat route's attach_message_id
+Originally these covered the non-streaming /chat route's stamp_message_id
 fix; when that route was deleted they were migrated:
 
   - end-to-end recap: ask (via /api/chat/stream) -> wrong answer -> complete
     -> GET /sessions confirms selected_index and correct are preserved in
-    check_batch (write_check_batch persists the real pick because message_id
+    check_batch (the Recap freeze persists the real pick because message_id
     was attached).
   - attach guard: a FAILED ask_check_questions dispatched inside
     run_streaming must NOT repoint an already-open batch's message_id.
@@ -26,7 +26,7 @@ from config import settings
 from contracts import AskCheckQuestionsArgs, ToolCallRecord, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service
+from services import check_service
 from services.cost_meter import CapStatus
 
 # ---------------------------------------------------------------------------
@@ -76,7 +76,7 @@ ASK_ITEMS = [
 
 def _make_fake_run_streaming_asking():
     async def fake(messages, system_prompt, ctx):
-        result = check_question_service.register(
+        result = check_service.register(
             ctx.db,
             ctx,
             AskCheckQuestionsArgs(
@@ -104,7 +104,7 @@ def _make_fake_run_streaming_asking():
         )
         ctx.db.add(msg)
         ctx.db.commit()
-        check_question_service.attach_message_id(ctx.db, ctx.session_id, msg.id)
+        check_service.stamp_message_id(ctx.db, ctx.session_id, msg.id)
         data = result.data or {}
         yield StreamEvent(
             "check_question",
@@ -130,8 +130,8 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
     """Full flow: ask (via /chat/stream) -> answer wrong -> complete ->
     GET /sessions shows selected_index != None and correct=False.
 
-    With message_id attached to the batch, write_check_batch persists the
-    real pick instead of the reconstruct_check_batch fallback (which sets
+    With message_id attached to the batch, the Recap freeze persists the
+    real pick instead of the the Recap rebuild fallback (which sets
     selected_index=None).
     """
     # 1. Ask a check question via the streaming chat route.
@@ -147,7 +147,7 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
         for _ in resp.iter_lines():
             pass
 
-    pc_after_ask = check_question_service.get_pending_check(db_session, SESSION_ID)
+    pc_after_ask = check_service.open_set(db_session.get(SessionModel, SESSION_ID))
     assert pc_after_ask is not None
     asking_msg_id = pc_after_ask["message_id"]
     assert asking_msg_id is not None
@@ -163,7 +163,7 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
     assert answer_data["correct"] is False
 
     # 3. Complete the batch (hidden follow-up stream). Patch run_streaming to
-    #    avoid real LLM while still exercising write_check_batch.
+    #    avoid real LLM while still exercising the Recap freeze.
     async def fake_run_streaming(messages, system_prompt, ctx):
         msg = ChatMessage(session_id=SESSION_ID, role="assistant", content="Better luck!")
         ctx.db.add(msg)
@@ -199,7 +199,7 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
     assert len(items) == 1
     item = items[0]
     assert item["selected_index"] is not None, (
-        "selected_index must be persisted (not None) - if None, write_check_batch "
+        "selected_index must be persisted (not None) - if None, the Recap freeze "
         "no-oped because message_id was never attached"
     )
     assert item["selected_index"] == 0, (
@@ -245,9 +245,9 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
     """Gate correctness: a FAILED ask_check_questions must NOT attach the
     current message's id to an already-open pending_check.
 
-    run_streaming only sets asked_check (and thereby calls attach_message_id)
+    run_streaming only sets asked_check (and thereby calls stamp_message_id)
     when the ask dispatch result is ok. A second ask while a batch is open
-    fails in check_question_service.register, so the prior batch's message_id
+    fails in check_service.register, so the prior batch's message_id
     must stay untouched.
     """
     monkeypatch.setattr(settings, "llm_stub", False)
@@ -275,7 +275,7 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
         user_id=USER_ID,
         turn_started_at=datetime.now(timezone.utc),
     )
-    result = check_question_service.register(
+    result = check_service.register(
         db_session,
         prior_ctx,
         AskCheckQuestionsArgs(
@@ -294,9 +294,9 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
         ),
     )
     assert result.ok
-    check_question_service.attach_message_id(db_session, SESSION_ID, 99999)
+    check_service.stamp_message_id(db_session, SESSION_ID, 99999)
 
-    pc_before = check_question_service.get_pending_check(db_session, SESSION_ID)
+    pc_before = check_service.open_set(db_session.get(SessionModel, SESSION_ID))
     assert pc_before["message_id"] == 99999
 
     # 2. Stream a turn whose ask fails (batch already open), then finishes
@@ -328,10 +328,10 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(db_session, mo
     assert events[-1].type == "done"
 
     # 3. The prior batch's message_id must still be 99999 (not clobbered).
-    pc_after = check_question_service.get_pending_check(db_session, SESSION_ID)
+    pc_after = check_service.open_set(db_session.get(SessionModel, SESSION_ID))
     assert pc_after is not None
     assert pc_after["message_id"] == 99999, (
         f"Failed ask must NOT repoint the prior batch's message_id "
         f"(got {pc_after['message_id']!r}, expected 99999). "
-        "attach_message_id must only run when the ask dispatch result is ok."
+        "stamp_message_id must only run when the ask dispatch result is ok."
     )
