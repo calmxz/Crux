@@ -1,5 +1,10 @@
-"""#410: characterisation of the real /chat/stream cancel path on Postgres
-(llm-adapter 1/4).
+"""#410/#411: LLM paths on Postgres (llm-adapter 1/4 and 2/4).
+
+The #411 section at the end proves the adapter's settlement is isolated
+from the caller's transaction, through the conftest FakeLlmProvider; the
+rest of this docstring describes the #410 cancel-path test.
+
+#410: characterisation of the real /chat/stream cancel path on Postgres.
 
 Drives the real route and the real run_streaming against a streaming
 `litellm.acompletion` fake, disconnects the client mid-stream, and pins what
@@ -287,3 +292,107 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         assert [(p, m, s, Decimal(str(c))) for p, m, s, c in rows] == [
             ("chat", MODEL, sid, CANCEL_ESTIMATE)
         ]
+
+
+# ---------------------------------------------------------------------------
+# #411: the adapter settles in its own transaction
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def adapter_on_postgres(seeded, monkeypatch, fake_llm):
+    """The LLM adapter's gate and settlement on the seeded Postgres, behind
+    the scripted fake provider. Yields the seeded (Session, uid, sid)."""
+    from services import llm
+
+    Session, _, _ = seeded
+    monkeypatch.setattr(llm, "session_factory", Session)
+    monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)
+    fake_llm.cost = Decimal("0.0005")
+    return seeded
+
+
+def _call_log(db, uid):
+    rows = db.execute(
+        select(LlmCallLog.purpose, LlmCallLog.cost_usd).where(LlmCallLog.user_id == uid)
+    ).all()
+    return [(p, Decimal(str(c))) for p, c in rows]
+
+
+async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+
+    with Session() as caller:
+        caller.add(ChatMessage(session_id=sid, role="user", content="rolled back"))
+        caller.flush()
+        await llm.get().aembed(
+            ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+        )
+        caller.rollback()
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+        assert db.execute(select(ChatMessage).where(ChatMessage.session_id == sid)).first() is None
+
+
+def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
+    adapter_on_postgres, caplog, monkeypatch
+):
+    """A caller holding an uncommitted ledger write across a call violates the
+    adapter's invariant. Settlement waits on that row lock only until
+    lock_timeout, keeps the LlmCallLog row, and returns the result instead of
+    hanging; the deferred ledger write lands once the lock is released."""
+    import logging
+    import threading
+    import time
+
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+    # Shorter than the production value to keep the test quick.
+    monkeypatch.setattr(llm, "SETTLE_LOCK_TIMEOUT", "1s")
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
+
+    with Session() as caller:
+        cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row
+        # On a worker thread so a broken lock_timeout fails this test at the
+        # join instead of deadlocking it against the caller's lock.
+        outcome: dict = {}
+
+        def call():
+            outcome["result"] = llm.get().embed(
+                ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+            )
+
+        worker = threading.Thread(target=call)
+        started = time.monotonic()
+        with caplog.at_level(logging.ERROR, logger="services.llm"):
+            worker.start()
+            worker.join(timeout=10)
+        elapsed = time.monotonic() - started
+        hung = worker.is_alive()
+        with Session() as db:
+            # Committed while the caller still holds the ledger row.
+            assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+        caller.rollback()  # releases the lock, so a hung worker can finish
+        worker.join(timeout=10)
+
+    assert not hung, f"settlement hung for {elapsed:.1f}s"
+    assert len(outcome["result"].vectors) == 1
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert (record.user_id, record.purpose, record.cost_usd) == (uid, "embedding", "0.0005")
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0")
+
+    [(fn, args)] = scheduled
+    fn(*args)  # the background retry, now that the row is free
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]

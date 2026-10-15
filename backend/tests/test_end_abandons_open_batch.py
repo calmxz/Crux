@@ -115,15 +115,10 @@ def test_abandon_is_noop_without_a_batch(db_session, seeded_session):
     assert check_service.abandon_in_caller_transaction(db_session, sid) is False
 
 
-def test_end_route_abandons_open_batch(
-    client, db_session, seeded_session, mock_litellm, llm_text, monkeypatch
-):
+def test_end_route_abandons_open_batch(client, db_session, seeded_session, fake_llm, monkeypatch):
     """End-to-end: POST /end clears a dangling batch so review-gaps resume works."""
 
-    async def fake_acompletion(**kwargs):
-        return llm_text("wrapped up")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+    fake_llm.replies = ["wrapped up"]
 
     sid = seeded_session.id
     _open_batch(db_session, sid)

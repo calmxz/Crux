@@ -5,8 +5,10 @@ Tests mock the embed + storage layers so they run against in-memory SQLite.
 """
 
 import json
+from decimal import Decimal
 from types import SimpleNamespace
 
+import litellm
 import pytest
 
 from contracts import TopicProfile
@@ -95,13 +97,9 @@ def mock_pdf(monkeypatch):
 
 
 @pytest.fixture
-def mock_embed(monkeypatch):
-    def fake_embedding(model, input, **_):
-        if isinstance(input, str):
-            input = [input]
-        return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
+def mock_embed(fake_llm):
+    fake_llm.vector = [0.1] * 8
+    return fake_llm
 
 
 def _write_blob_stub(monkeypatch, tmp_path, doc_id, filename, content=b"stub blob bytes"):
@@ -116,7 +114,8 @@ def test_embed_and_store_requests_configured_dimension(db_session, setup_doc, mo
     """Embeddings must be requested at settings.embedding_dim so they match the
     chunk_embeddings.embedding column. Without an explicit dimensions argument
     the model emits its native size (e.g. gemini-embedding-2 -> 3072), which the
-    768-dim pgvector column rejects, failing ingestion for every document."""
+    768-dim pgvector column rejects, failing ingestion for every document.
+    Runs the real LiteLlmProvider: the dimensions kwarg is the provider's job."""
     from config import settings
     from services import ingestion_service
 
@@ -127,7 +126,7 @@ def test_embed_and_store_requests_configured_dimension(db_session, setup_doc, mo
         captured["dimensions"] = kw.get("dimensions")
         return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
 
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
+    monkeypatch.setattr(litellm, "embedding", fake_embedding)
     monkeypatch.setattr(
         "services.ingestion_service.pgvector_store.insert_chunks",
         lambda db, **kw: len(kw["rows"]),
@@ -139,36 +138,27 @@ def test_embed_and_store_requests_configured_dimension(db_session, setup_doc, mo
 
 
 def test_embed_and_store_retries_once_on_transient_provider_error(
-    db_session, setup_doc, monkeypatch
+    db_session, setup_doc, monkeypatch, fake_llm
 ):
     """A single APIConnectionError from the provider must not fail the batch;
-    the retry helper re-issues the call and the chunks are stored."""
-    import litellm
-
-    from config import settings
+    the adapter re-issues the call and the chunks are stored."""
     from services import ingestion_service
 
     doc = db_session.get(Document, setup_doc)
-    calls = {"n": 0}
-
-    def flaky_embedding(model, input, **kw):
-        calls["n"] += 1
-        if calls["n"] == 1:
-            raise litellm.APIConnectionError(message="blip", llm_provider="gemini", model=model)
-        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
+    fake_llm.embed_errors = [
+        litellm.APIConnectionError(message="blip", llm_provider="gemini", model="m")
+    ]
 
     stored = []
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", flaky_embedding)
     monkeypatch.setattr(
         "services.ingestion_service.pgvector_store.insert_chunks",
         lambda db, **kw: stored.append(kw["rows"]) or len(kw["rows"]),
     )
-    monkeypatch.setattr("services.ingestion_service.llm_retry.time.sleep", lambda _s: None)
 
     chunks = [chunking.Chunk(text="hello world", page=1, chunk_idx=0)]
     ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
 
-    assert calls["n"] == 2
+    assert fake_llm.embed_calls == [["hello world"], ["hello world"]]
     assert len(stored) == 1 and len(stored[0]) == 1
 
 
@@ -223,14 +213,10 @@ def test_pypdf_failure_marks_failed(
 
 
 def test_embedding_failure_marks_failed(
-    setup_doc, insert_capture, mock_pdf, db_session, monkeypatch, tmp_path
+    setup_doc, insert_capture, mock_pdf, db_session, monkeypatch, tmp_path, fake_llm
 ):
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
-
-    def boom(model, input, **_):
-        raise RuntimeError("embedding api down")
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", boom)
+    fake_llm.embed_errors = [RuntimeError("embedding api down")]
     from services import ingestion_service
 
     ingestion_service.run(setup_doc)
@@ -260,7 +246,7 @@ def test_pgvector_insert_failure_marks_failed(
     assert doc.error == ingestion_service.ERR_EMBEDDING_FAILED
 
 
-def test_run_fails_over_chunk_cap_before_embedding(db_session, monkeypatch, tmp_path):
+def test_run_fails_over_chunk_cap_before_embedding(db_session, monkeypatch, tmp_path, fake_llm):
     """F-03 enforcement: documents whose chunk count exceeds settings.max_chunks
     must fail before any embedding call -- no vendor spend for an oversized doc."""
     from sqlalchemy.orm import sessionmaker
@@ -292,14 +278,6 @@ def test_run_fails_over_chunk_cap_before_embedding(db_session, monkeypatch, tmp_
     # chunk=500 tokens, stride 450 -- 4000 words yields well over 1 chunk.
     _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 4000)
 
-    embed_calls: list[object] = []
-
-    def boom_if_called(model, input, **_):
-        embed_calls.append((model, input))
-        raise AssertionError("embedding must not be called over the chunk cap")
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", boom_if_called)
-
     inserted: list[dict] = []
 
     def fake_insert(db, *, session_id, document_id, rows):
@@ -314,11 +292,11 @@ def test_run_fails_over_chunk_cap_before_embedding(db_session, monkeypatch, tmp_
     refreshed = db_session.get(Document, doc.id)
     assert refreshed.status == "failed"
     assert "chunk limit" in refreshed.error
-    assert embed_calls == []
+    assert fake_llm.embed_calls == []
     assert inserted == []
 
 
-def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, tmp_path):
+def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, tmp_path, fake_llm):
     """F-02/F-03/B-02: _embed_and_store commits each batch (embed+insert+meter)
     as it goes, so chunks are durable before run() ever reaches the
     keyword-merge step. A later failure in merge_into_session must still roll
@@ -328,7 +306,6 @@ def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, t
     resume instead of re-embedding from scratch)."""
     from sqlalchemy.orm import sessionmaker
 
-    from config import settings
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -357,13 +334,6 @@ def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, t
         sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
 
-    def fake_embedding(model, input, **_):
-        if isinstance(input, str):
-            input = [input]
-        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
-
     def boom(db, session_id, stems):
         raise RuntimeError("kw merge exploded")
 
@@ -377,16 +347,17 @@ def test_merge_failure_keeps_already_committed_chunks(db_session, monkeypatch, t
     assert db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() > 0
 
 
-def test_rerun_after_partial_failure_skips_already_paid_chunks(db_session, monkeypatch, tmp_path):
+def test_rerun_after_partial_failure_skips_already_paid_chunks(
+    db_session, monkeypatch, tmp_path, fake_llm
+):
     """F-02 resume contract, exercised through run() (not just the
     _embed_and_store unit tests) with the real _existing_chunk_indexes query:
     a first run that embeds+stores all chunks but then fails at the
     keyword-merge step leaves those chunks committed. Re-running the same
-    document must not re-embed any of them -- litellm.embedding must not be
+    document must not re-embed any of them -- the provider must not be
     called again -- and must reach status=ready this time."""
     from sqlalchemy.orm import sessionmaker
 
-    from config import settings
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -415,13 +386,7 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(db_session, monke
         sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
 
-    embed_calls = []
-
-    def fake_embedding(model, input, **_):
-        embed_calls.append(list(input))
-        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
+    embed_calls = fake_llm.embed_calls
     monkeypatch.setattr(
         "services.ingestion_service.keyword_index.merge_into_session",
         lambda db, session_id, stems: (_ for _ in ()).throw(RuntimeError("kw merge exploded")),
@@ -452,18 +417,15 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(db_session, monke
 
 
 def test_merge_failure_still_records_embedding_spend_after_rollback(
-    db_session, monkeypatch, tmp_path
+    db_session, monkeypatch, tmp_path, fake_llm
 ):
-    """F-02/F-03/B-02: metering now commits per batch inside _embed_and_store,
-    before run() ever reaches the keyword-merge step. So the embedding
-    vendor's real spend lands on the daily cost ledger as a durable part of
-    each batch's own commit -- not via a post-rollback re-record -- even
-    though the doc ends up 'failed' from a later merge_into_session error."""
-    from decimal import Decimal
-
+    """F-02/F-03/B-02: the adapter settles each batch's embedding spend in
+    its own transaction, before run() ever reaches the keyword-merge step.
+    So the vendor's real spend is durable on the daily cost ledger -- not
+    via a post-rollback re-record -- even though the doc ends up 'failed'
+    from a later merge_into_session error."""
     from sqlalchemy.orm import sessionmaker
 
-    from config import settings
     from db.models import ChunkEmbedding
     from services import cost_meter, ingestion_service
 
@@ -492,16 +454,7 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
         sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
 
-    def fake_embedding(model, input, **_):
-        if isinstance(input, str):
-            input = [input]
-        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", fake_embedding)
-    monkeypatch.setattr(
-        "services.ingestion_service.cost_meter.litellm.completion_cost",
-        lambda **kw: 0.004,
-    )
+    fake_llm.cost = Decimal("0.004")
 
     def boom(db, session_id, stems):
         raise RuntimeError("kw merge exploded")
@@ -608,10 +561,8 @@ def test_extract_slides_includes_table_cell_text(monkeypatch):
 def test_ingestion_meters_embedding_spend(
     db_session, insert_capture, mock_embed, monkeypatch, tmp_path
 ):
-    """F-19: ingestion is the largest embedding spender; its litellm.embedding
-    calls must land on the same daily_cost_ledger as chat/retrieval spend."""
-    from decimal import Decimal
-
+    """F-19: ingestion is the largest embedding spender; its embedding calls
+    must land on the same daily_cost_ledger as chat/retrieval spend."""
     from sqlalchemy import select
     from sqlalchemy.orm import sessionmaker
 
@@ -641,10 +592,7 @@ def test_ingestion_meters_embedding_spend(
         "services.ingestion_service.SessionLocal",
         sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.cost_meter.litellm.completion_cost",
-        lambda **kw: 0.004,
-    )
+    mock_embed.cost = Decimal("0.004")
 
     ingestion_service.run(doc.id)
 
@@ -654,12 +602,9 @@ def test_ingestion_meters_embedding_spend(
     assert cost_meter.current_spend(db_session, user_id) == Decimal("0.0040")
 
 
-def test_embed_and_store_stops_at_cap_between_batches(db_session, monkeypatch):
-    """B-01: _embed_and_store must consult the daily cost cap at the TOP of
-    each per-batch loop iteration, before spending on litellm.embedding -- a
-    user already over cap must not trigger another paid call."""
-    from decimal import Decimal
-
+def test_embed_and_store_stops_at_cap_between_batches(db_session, monkeypatch, fake_llm):
+    """B-01: each batch's embed is gated on the daily cost cap before any
+    paid call -- a user already over cap must not trigger another one."""
     from services import cost_meter as cm
     from services import ingestion_service
 
@@ -681,25 +626,16 @@ def test_embed_and_store_stops_at_cap_between_batches(db_session, monkeypatch):
     db_session.refresh(doc)
     cm.record_cost(db_session, "u_capped", Decimal("0.2000"))
     db_session.commit()
-    called = []
-    monkeypatch.setattr(
-        "services.ingestion_service.litellm.embedding",
-        lambda **kw: called.append(1),
-    )
     chunks = [chunking.Chunk(text="text", page=None, chunk_idx=0)]
     with pytest.raises(cm.CostCapExceeded):
         ingestion_service._embed_and_store(db_session, doc, chunks, user_id="u_capped")
-    assert called == []
+    assert fake_llm.embed_calls == []
 
 
-def test_run_fails_over_cost_cap_and_keeps_prior_spend(db_session, monkeypatch, tmp_path):
+def test_run_fails_over_cost_cap_and_keeps_prior_spend(db_session, monkeypatch, tmp_path, fake_llm):
     """B-01: a cap breach discovered mid-ingestion must fail the document
     with a friendly error, distinct from the generic embedding-failure
-    message, and must not lose spend already paid for by earlier batches
-    (Finding 1 pattern -- the cost-cap branch also re-records
-    embed_cost_holder like the broad except arm does)."""
-    from decimal import Decimal
-
+    message, and must not lose spend already paid for by earlier batches."""
     from sqlalchemy.orm import sessionmaker
 
     from services import cost_meter as cm
@@ -735,21 +671,13 @@ def test_run_fails_over_cost_cap_and_keeps_prior_spend(db_session, monkeypatch, 
     cm.record_cost(db_session, "u_cap_run", Decimal("0.2000"))
     db_session.commit()
 
-    embed_calls: list[object] = []
-
-    def boom_if_called(model, input, **_):
-        embed_calls.append((model, input))
-        raise AssertionError("embedding must not be called once the cap is exceeded")
-
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", boom_if_called)
-
     ingestion_service.run(doc.id)
 
     db_session.expire_all()
     refreshed = db_session.get(Document, doc.id)
     assert refreshed.status == "failed"
     assert refreshed.error == "daily cost cap reached; ingestion stopped"
-    assert embed_calls == []
+    assert fake_llm.embed_calls == []
     # Spend already on the ledger before ingestion ran must survive intact
     # (nothing new was spent since the very first batch was blocked).
     assert cm.current_spend(db_session, "u_cap_run") == Decimal("0.2000")
@@ -905,22 +833,21 @@ def test_run_logs_carry_document_and_session_ids(
 # --- F-02/F-03/B-02: streaming per-batch embed-insert-meter-commit --------
 
 
-def _fake_embedding_factory(fail_on_call: int | None = None):
-    """Returns (stub, calls) where stub mimics litellm.embedding and
-    optionally raises on the Nth call (1-based)."""
-    calls = []
+def _fail_embed_on_call(fake_llm, n: int) -> None:
+    """Make the fake provider's Nth embed call (1-based) raise."""
+    real = fake_llm.embed
 
-    def stub(*, model, input, dimensions, timeout):
-        calls.append(list(input))
-        if fail_on_call is not None and len(calls) == fail_on_call:
+    def embed(texts):
+        result = real(texts)  # records the call
+        if len(fake_llm.embed_calls) == n:
             raise RuntimeError("embedding api down")
-        return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
+        return result
 
-    return stub, calls
+    fake_llm.embed = embed
 
 
 def test_batches_commit_incrementally_and_resume_skips_paid_batches(
-    db_session, setup_doc, monkeypatch
+    db_session, setup_doc, monkeypatch, fake_llm
 ):
     doc = db_session.get(Document, setup_doc)
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 2)
@@ -939,8 +866,7 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
         lambda db, doc_id: {r[0] for r in stored_rows},
         raising=False,
     )
-    stub, calls = _fake_embedding_factory(fail_on_call=2)
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", stub)
+    _fail_embed_on_call(fake_llm, 2)
 
     from services import ingestion_service
 
@@ -948,15 +874,18 @@ def test_batches_commit_incrementally_and_resume_skips_paid_batches(
         ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
     assert [r[0] for r in stored_rows] == [0, 1]  # batch 1 survived
 
-    stub2, calls2 = _fake_embedding_factory()
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", stub2)
+    del fake_llm.embed  # back to the plain fake
+    first_run_calls = len(fake_llm.embed_calls)
     n = ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
+    calls2 = fake_llm.embed_calls[first_run_calls:]
     assert n == 3  # only the unpaid chunks were embedded and stored
     assert sorted(r[0] for r in stored_rows) == [0, 1, 2, 3, 4]
     assert all(len(c) <= 2 for c in calls2)  # still batched
 
 
-def test_metering_commits_per_batch(db_session, setup_doc, monkeypatch):
+def test_metering_commits_per_batch(db_session, setup_doc, monkeypatch, fake_llm):
+    from services import cost_meter, ingestion_service
+
     doc = db_session.get(Document, setup_doc)
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 1)
     chunks = [chunking.Chunk(text=f"c{i}", page=1, chunk_idx=i) for i in range(2)]
@@ -964,25 +893,19 @@ def test_metering_commits_per_batch(db_session, setup_doc, monkeypatch):
         "services.ingestion_service.pgvector_store.insert_chunks",
         lambda db, **kw: len(kw["rows"]),
     )
-    metered = []
-    monkeypatch.setattr(
-        "services.ingestion_service.cost_meter.meter_embedding_response",
-        lambda db, resp, **kw: metered.append(len(kw["texts"])),
-    )
+    fake_llm.cost = Decimal("0.001")
     ledger_seen_at_call = []
-    stub, calls = _fake_embedding_factory()
+    real_embed = fake_llm.embed
 
-    def spying_stub(**kw):
-        ledger_seen_at_call.append(len(metered))
-        return stub(**kw)
+    def spying_embed(texts):
+        ledger_seen_at_call.append(cost_meter.current_spend(db_session, USER_ID))
+        return real_embed(texts)
 
-    monkeypatch.setattr("services.ingestion_service.litellm.embedding", spying_stub)
+    fake_llm.embed = spying_embed
 
-    from services import ingestion_service
-
-    ingestion_service._embed_and_store(db_session, doc, chunks, user_id=None)
-    # Before batch 2's embedding call, batch 1 was already metered:
-    assert ledger_seen_at_call == [0, 1]
+    ingestion_service._embed_and_store(db_session, doc, chunks, user_id=USER_ID)
+    # Before batch 2's embedding call, batch 1 was already settled:
+    assert ledger_seen_at_call == [Decimal("0"), Decimal("0.0010")]
 
 
 def test_run_holds_no_db_transaction_during_blob_load_and_extract(

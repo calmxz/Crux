@@ -185,7 +185,7 @@ def _real_llm_settings(monkeypatch):
 
 
 @pytest.fixture
-def fake_llm(monkeypatch):
+def fake_litellm(monkeypatch):
     fake = FakeLitellm(monkeypatch)
     yield fake
     # Every scripted response and price was consumed, and nothing unscripted
@@ -285,9 +285,9 @@ def _assert_summary_call(call: dict) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_single_text_iteration(db_session, seeded, fake_llm):
-    fake_llm.responses = [_litellm_stream(_text_chunk("Hello "), _text_chunk("there"))]
-    fake_llm.costs = [0.001]
+async def test_single_text_iteration(db_session, seeded, fake_litellm):
+    fake_litellm.responses = [_litellm_stream(_text_chunk("Hello "), _text_chunk("there"))]
+    fake_litellm.costs = [0.001]
 
     events = await _run(_ctx(db_session))
 
@@ -295,19 +295,19 @@ async def test_single_text_iteration(db_session, seeded, fake_llm):
     msg = _assistant(db_session)
     assert events[-1].data == {"message_id": str(msg.id)}
     assert (msg.status, msg.content) == ("complete", "Hello there")
-    assert len(fake_llm.acompletion_calls) == 1
-    _assert_chat_call(fake_llm.acompletion_calls[0])
+    assert len(fake_litellm.acompletion_calls) == 1
+    _assert_chat_call(fake_litellm.acompletion_calls[0])
     assert _ledger(db_session) == Decimal("0.0010")
     assert _log_rows(db_session) == [("chat", Decimal("0.0010"))]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_tool_iteration_then_text_bills_both(db_session, seeded, fake_llm):
-    fake_llm.responses = [
+async def test_tool_iteration_then_text_bills_both(db_session, seeded, fake_litellm):
+    fake_litellm.responses = [
         _litellm_stream(_tool_chunk("tc1", "update_topic_profile", PROFILE_PATCH)),
         _litellm_stream(_text_chunk("Noted.")),
     ]
-    fake_llm.costs = [0.001, 0.002]
+    fake_litellm.costs = [0.001, 0.002]
 
     events = await _run(_ctx(db_session))
 
@@ -315,8 +315,8 @@ async def test_tool_iteration_then_text_bills_both(db_session, seeded, fake_llm)
     assert events[0].data["name"] == "update_topic_profile"
     assert events[1].data["status"] == "ok"
     assert _assistant(db_session).status == "complete"
-    assert len(fake_llm.acompletion_calls) == 2
-    for call in fake_llm.acompletion_calls:
+    assert len(fake_litellm.acompletion_calls) == 2
+    for call in fake_litellm.acompletion_calls:
         _assert_chat_call(call)
     assert _ledger(db_session) == Decimal("0.0030")
     assert _log_rows(db_session) == [
@@ -326,19 +326,19 @@ async def test_tool_iteration_then_text_bills_both(db_session, seeded, fake_llm)
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_cancel_during_iteration_two(db_session, seeded, fake_llm):
+async def test_cancel_during_iteration_two(db_session, seeded, fake_litellm):
     """Iteration 1 is billed at its real price; the cancelled iteration 2 is
     billed by token math over its prompt snapshot plus only the text streamed
     since iteration 1 was billed."""
     parked = asyncio.Event()  # never set: iteration 2 hangs until cancelled
-    fake_llm.responses = [
+    fake_litellm.responses = [
         _litellm_stream(
             _text_chunk(FIRST_TEXT),
             _tool_chunk("tc1", "update_topic_profile", PROFILE_PATCH),
         ),
         _litellm_stream(_text_chunk(TAIL_TEXT), block=parked),
     ]
-    fake_llm.costs = [0.001]
+    fake_litellm.costs = [0.001]
 
     events: list = []
     reached = asyncio.Event()
@@ -388,15 +388,15 @@ async def test_cancel_during_iteration_two(db_session, seeded, fake_llm):
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_provider_error_mid_stream(db_session, seeded, fake_llm):
-    fake_llm.responses = [
+async def test_provider_error_mid_stream(db_session, seeded, fake_litellm):
+    fake_litellm.responses = [
         _litellm_stream(
             _text_chunk(FIRST_TEXT),
             _tool_chunk("tc1", "update_topic_profile", PROFILE_PATCH),
         ),
         _litellm_stream(_text_chunk(TAIL_TEXT), error=RuntimeError("provider 503")),
     ]
-    fake_llm.costs = [0.001]
+    fake_litellm.costs = [0.001]
 
     events = await _run(_ctx(db_session))
 
@@ -422,24 +422,24 @@ async def test_provider_error_mid_stream(db_session, seeded, fake_llm):
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_mid_turn_hard_cap(db_session, seeded, fake_llm, monkeypatch):
+async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch):
     """Iteration 1's real cost reaches the hard cap; the loop-top cap check
     before iteration 2 stops the turn without another provider call."""
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.0005)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 0.001)
-    fake_llm.responses = [
+    fake_litellm.responses = [
         _litellm_stream(
             _text_chunk("Checking. "),
             _tool_chunk("tc1", "update_topic_profile", PROFILE_PATCH),
         ),
     ]
-    fake_llm.costs = [0.001]
+    fake_litellm.costs = [0.001]
 
     events = await _run(_ctx(db_session))
 
     assert _types(events) == ["assistant_delta", "tool_call_start", "tool_call_done", "error"]
     assert events[-1].data["code"] == "daily_cost_cap_reached"
-    assert len(fake_llm.acompletion_calls) == 1
+    assert len(fake_litellm.acompletion_calls) == 1
     msg = _assistant(db_session)
     assert (msg.status, msg.content) == ("partial", "Checking. ")
     assert _ledger(db_session) == Decimal("0.0010")
@@ -447,8 +447,8 @@ async def test_mid_turn_hard_cap(db_session, seeded, fake_llm, monkeypatch):
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_max_iters_reached(db_session, seeded, fake_llm):
-    fake_llm.responses = [
+async def test_max_iters_reached(db_session, seeded, fake_litellm):
+    fake_litellm.responses = [
         _litellm_stream(
             _text_chunk("Step one. "),
             _tool_chunk("tc1", "update_topic_profile", PROFILE_PATCH),
@@ -458,7 +458,7 @@ async def test_max_iters_reached(db_session, seeded, fake_llm):
             _tool_chunk("tc2", "update_topic_profile", PROFILE_PATCH),
         ),
     ]
-    fake_llm.costs = [0.001, 0.002]
+    fake_litellm.costs = [0.001, 0.002]
 
     events = await _run(_ctx(db_session), max_iters=2)
 
@@ -482,7 +482,7 @@ async def test_max_iters_reached(db_session, seeded, fake_llm):
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_stub_mode_fresh_and_resumed(db_session, seeded, fake_llm, monkeypatch):
+async def test_stub_mode_fresh_and_resumed(db_session, seeded, fake_litellm, monkeypatch):
     monkeypatch.setattr(settings, "llm_stub", True)
 
     fresh = await _run(_ctx(db_session))
@@ -502,20 +502,20 @@ async def test_stub_mode_fresh_and_resumed(db_session, seeded, fake_llm, monkeyp
         select(ChatMessage.status).where(ChatMessage.role == "assistant")
     ).scalars()
     assert list(statuses) == ["complete", "complete"]
-    assert fake_llm.acompletion_calls == []
+    assert fake_litellm.acompletion_calls == []
     assert db_session.execute(select(func.count()).select_from(DailyCostLedger)).scalar_one() == 0
     assert _log_rows(db_session) == []
 
 
-async def test_check_followup_turn_logs_followup_purpose(db_session, seeded, fake_llm):
-    fake_llm.responses = [_litellm_stream(_text_chunk("Right."))]
-    fake_llm.costs = [0.001]
+async def test_check_followup_turn_logs_followup_purpose(db_session, seeded, fake_litellm):
+    fake_litellm.responses = [_litellm_stream(_text_chunk("Right."))]
+    fake_litellm.costs = [0.001]
 
     events = await _run(_ctx(db_session, suppress_check=True))
 
     assert _types(events) == ["assistant_delta", "done"]
     assert _assistant(db_session).status == "complete"
-    _assert_chat_call(fake_llm.acompletion_calls[0])
+    _assert_chat_call(fake_litellm.acompletion_calls[0])
     assert _ledger(db_session) == Decimal("0.0010")
     assert _log_rows(db_session) == [("followup", Decimal("0.0010"))]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
@@ -546,10 +546,10 @@ def ledger_down(monkeypatch):
     monkeypatch.setattr(cost_meter, "record_cost", boom)
 
 
-async def test_generate_and_persist_meters_summary(db_session, seeded, fake_llm):
+async def test_generate_and_persist_meters_summary(db_session, seeded, fake_litellm):
     _seed_messages(db_session, 2)
-    fake_llm.responses = [_completion("Covered joins; foreign keys remain a gap.")]
-    fake_llm.costs = [0.002]
+    fake_litellm.responses = [_completion("Covered joins; foreign keys remain a gap.")]
+    fake_litellm.costs = [0.002]
 
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
@@ -557,37 +557,37 @@ async def test_generate_and_persist_meters_summary(db_session, seeded, fake_llm)
     assert summary == "Covered joins; foreign keys remain a gap."
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
-    _assert_summary_call(fake_llm.acompletion_calls[0])
+    _assert_summary_call(fake_litellm.acompletion_calls[0])
     assert _ledger(db_session) == Decimal("0.0020")
     assert _log_rows(db_session) == [("summary", Decimal("0.0020"))]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_generate_and_persist_record_cost_failure_falls_back(
-    db_session, seeded, fake_llm, ledger_down
+async def test_generate_and_persist_record_cost_failure_keeps_summary(
+    db_session, seeded, fake_litellm, ledger_down
 ):
     _seed_messages(db_session, 2)
-    fake_llm.responses = [_completion("Covered joins.")]
-    fake_llm.costs = [0.002]
+    fake_litellm.responses = [_completion("Covered joins.")]
+    fake_litellm.costs = [0.002]
 
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
 
-    # #411 changes this: today a failed ledger write throws the paid summary
-    # away for the mechanical one. After #411 settlement never raises and the
-    # LLM summary is kept.
-    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
-    assert fake_llm.costs == []
-    assert summary.startswith("[auto] ")
+    # Changed by #411: settlement never raises, so a failed ledger write no
+    # longer throws the paid summary away for the mechanical one.
+    assert len(fake_litellm.acompletion_calls) == 1
+    assert fake_litellm.costs == []
+    assert summary == "Covered joins."
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
-    assert _log_rows(db_session) == []
+    # The receipt row is kept even though the ledger write failed.
+    assert _log_rows(db_session) == [("summary", Decimal("0.0020"))]
 
 
-async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded, fake_llm):
+async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded, fake_litellm):
     _seed_messages(db_session, 31)  # 11 dropped past the 20-message window
-    fake_llm.responses = [_completion("Earlier the learner practised joins.")]
-    fake_llm.costs = [0.002]
+    fake_litellm.responses = [_completion("Earlier the learner practised joins.")]
+    fake_litellm.costs = [0.002]
 
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
@@ -595,30 +595,31 @@ async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded,
     session = db_session.get(SessionModel, SESSION_ID)
     assert session.rolling_summary == result
     assert session.rolling_summary_count == 11
-    _assert_summary_call(fake_llm.acompletion_calls[0])
+    _assert_summary_call(fake_litellm.acompletion_calls[0])
     assert _ledger(db_session) == Decimal("0.0020")
     assert _log_rows(db_session) == [("rolling_summary", Decimal("0.0020"))]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_update_rolling_summary_record_cost_failure_returns_none(
-    db_session, seeded, fake_llm, ledger_down
+async def test_update_rolling_summary_record_cost_failure_keeps_summary(
+    db_session, seeded, fake_litellm, ledger_down
 ):
     _seed_messages(db_session, 31)
-    fake_llm.responses = [_completion("Earlier the learner practised joins.")]
-    fake_llm.costs = [0.002]
+    fake_litellm.responses = [_completion("Earlier the learner practised joins.")]
+    fake_litellm.costs = [0.002]
 
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
-    # #411 changes this: today a failed ledger write discards the paid
-    # rolling summary. After #411 settlement never raises and it is kept.
-    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
-    assert fake_llm.costs == []
-    assert result is None
+    # Changed by #411: settlement never raises, so a failed ledger write no
+    # longer discards the paid rolling summary.
+    assert len(fake_litellm.acompletion_calls) == 1
+    assert fake_litellm.costs == []
+    assert result == "Earlier the learner practised joins."
     session = db_session.get(SessionModel, SESSION_ID)
-    assert session.rolling_summary is None
-    assert session.rolling_summary_count is None
-    assert _log_rows(db_session) == []
+    assert session.rolling_summary == result
+    assert session.rolling_summary_count == 11
+    # The receipt row is kept even though the ledger write failed.
+    assert _log_rows(db_session) == [("rolling_summary", Decimal("0.0020"))]
 
 
 # ---------------------------------------------------------------------------
@@ -626,8 +627,8 @@ async def test_update_rolling_summary_record_cost_failure_returns_none(
 # ---------------------------------------------------------------------------
 
 
-def test_prepare_failure_after_prefetch_rerecords_embedding(
-    client, db_session, seeded, fake_llm, monkeypatch
+def test_prepare_failure_after_prefetch_keeps_embedding_spend(
+    client, db_session, seeded, fake_litellm, monkeypatch
 ):
     message = "explain foreign keys"
     session = db_session.get(SessionModel, SESSION_ID)
@@ -637,7 +638,7 @@ def test_prepare_failure_after_prefetch_rerecords_embedding(
     db_session.add(Document(session_id=SESSION_ID, filename="ref.txt", status="ready"))
     db_session.commit()
 
-    fake_llm.costs = [0.0005]
+    fake_litellm.costs = [0.0005]
     monkeypatch.setattr(pgvector_store, "query_chunks", lambda *a, **k: [])
 
     def boom(prompt_state):
@@ -654,18 +655,19 @@ def test_prepare_failure_after_prefetch_rerecords_embedding(
         assert resp.status_code == 500
 
     # The request path embeds on the event loop (async), never the sync call.
-    assert fake_llm.aembedding_calls == [[message]]
-    assert fake_llm.embedding_calls == []
+    assert fake_litellm.aembedding_calls == [[message]]
+    assert fake_litellm.embedding_calls == []
     user_msgs = db_session.execute(
         select(ChatMessage.content).where(ChatMessage.role == "user")
     ).scalars()
     assert list(user_msgs) == [message]
-    # Reservation released; the rolled-back embedding spend re-recorded once.
+    # Reservation released; the embedding spend recorded once, by the
+    # adapter, in its own transaction.
     assert _ledger(db_session) == Decimal("0.0005")
-    # #411 changes this: the embedding's LlmCallLog row is lost with the
-    # rollback today (only the ledger amount is re-recorded). After #411
-    # settlement commits in its own transaction and the row survives.
-    assert _log_rows(db_session) == []
+    # Changed by #411: the embedding's LlmCallLog row used to be lost with
+    # the rollback (only the ledger amount was re-recorded); now it survives.
+    assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))]
+    assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
 
 
 # ---------------------------------------------------------------------------
@@ -689,44 +691,48 @@ def _chunks(n: int) -> list[chunking.Chunk]:
     return [chunking.Chunk(text=f"chunk {i}", page=None, chunk_idx=i) for i in range(n)]
 
 
-def test_ingestion_meters_each_batch(db_session, ingest_doc, fake_llm):
-    fake_llm.costs = [0.0005, 0.0005, 0.0005]
+def test_ingestion_meters_each_batch(db_session, ingest_doc, fake_litellm):
+    fake_litellm.costs = [0.0005, 0.0005, 0.0005]
 
     stored = ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(3), user_id=USER_ID)
 
     assert stored == 3
     # Ingestion embeds synchronously (worker / threadpool), never async.
-    assert fake_llm.embedding_calls == [["chunk 0"], ["chunk 1"], ["chunk 2"]]
-    assert fake_llm.aembedding_calls == []
+    assert fake_litellm.embedding_calls == [["chunk 0"], ["chunk 1"], ["chunk 2"]]
+    assert fake_litellm.aembedding_calls == []
     assert _ledger(db_session) == Decimal("0.0015")
     assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))] * 3
     assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
 
 
-def test_ingestion_capped_user_stops_at_next_batch(db_session, ingest_doc, fake_llm, monkeypatch):
+def test_ingestion_capped_user_stops_at_next_batch(
+    db_session, ingest_doc, fake_litellm, monkeypatch
+):
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.0005)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 0.001)
-    fake_llm.costs = [0.0005, 0.0005]
+    fake_litellm.costs = [0.0005, 0.0005]
 
     with pytest.raises(cost_meter.CostCapExceeded):
         ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(3), user_id=USER_ID)
 
     # Batch 2 brought spend to the cap; batch 3 is refused before embedding.
-    assert fake_llm.embedding_calls == [["chunk 0"], ["chunk 1"]]
+    assert fake_litellm.embedding_calls == [["chunk 0"], ["chunk 1"]]
     assert _ledger(db_session) == Decimal("0.0010")
     assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))] * 2
     assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
 
 
-def test_stub_mode_ingestion_still_embeds_and_meters(db_session, ingest_doc, fake_llm, monkeypatch):
+def test_stub_mode_ingestion_still_embeds_and_meters(
+    db_session, ingest_doc, fake_litellm, monkeypatch
+):
     monkeypatch.setattr(settings, "llm_stub", True)
-    fake_llm.costs = [0.0005]
+    fake_litellm.costs = [0.0005]
 
     ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(1), user_id=USER_ID)
 
     # #413 changes this: stub mode does not gate embeddings today, so the
     # provider is called and billed. After #413 the stub provider returns
     # fake vectors at cost 0 without touching the network.
-    assert fake_llm.embedding_calls == [["chunk 0"]]
+    assert fake_litellm.embedding_calls == [["chunk 0"]]
     assert _ledger(db_session) == Decimal("0.0005")
     assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))]

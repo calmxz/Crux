@@ -291,7 +291,7 @@ def test_semantic_fallback_escalates_gate(client, monkeypatch):
     message = "hello"
     calls = {}
 
-    async def fake_fallback(db, session_id, query, *, user_id=None, cost_holder=None):
+    async def fake_fallback(db, session_id, query, *, user_id=None):
         calls["args"] = (session_id, query)
         calls["user_id"] = user_id
         return True, None

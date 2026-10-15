@@ -69,12 +69,9 @@ def test_create_session_uses_threadpool(client, db_session, spy):
 
 
 def test_end_session_uses_threadpool(
-    client, db_session, seeded_session, spy, mock_litellm, llm_text, monkeypatch
+    client, db_session, seeded_session, spy, fake_llm, monkeypatch
 ):
-    async def fake_acompletion(**kwargs):
-        return llm_text("wrapped up")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+    fake_llm.replies = ["wrapped up"]
     r = client.post(f"/api/sessions/{SESSION_ID}/end?user_id={USER_ID}")
     assert r.status_code == 200, r.text
     assert calls_nonempty(spy)

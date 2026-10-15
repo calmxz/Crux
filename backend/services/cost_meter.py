@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from db.models import DailyCostLedger, LlmCallLog
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
+from lib.llm_errors import CallRefused
 from services.sql_dialect import dialect_insert
 
 log = logging.getLogger(__name__)
@@ -77,15 +78,18 @@ def current_spend(db: Session, user_id: str) -> Decimal:
     return _to_decimal(total)
 
 
-def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
+def _upsert_delta(
+    db: Session, user_id: str, delta: Decimal, date_utc: str | None = None
+) -> Decimal:
     """One atomic INSERT .. ON CONFLICT DO UPDATE .. RETURNING against today's
-    ledger row; returns the post-write total. `delta` may be negative.
+    ledger row (or `date_utc`'s); returns the post-write total. `delta` may be
+    negative.
 
     Shared by record_cost / reserve_cost / adjust_cost so all three serialize
     on the same row the same way (F-17).
     """
     ins = dialect_insert(db)(DailyCostLedger).values(
-        user_id=user_id, date_utc=_today_utc(), cost_usd=delta
+        user_id=user_id, date_utc=date_utc or _today_utc(), cost_usd=delta
     )
     stmt = ins.on_conflict_do_update(
         index_elements=["user_id", "date_utc"],
@@ -98,8 +102,9 @@ def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
     return _to_decimal(db.execute(stmt).scalar_one())
 
 
-def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
-    """Atomically add `cost_usd` to today's ledger row for `user_id` and
+def record_cost(db: Session, user_id: str, cost_usd, *, date_utc: str | None = None) -> Decimal:
+    """Atomically add `cost_usd` to today's ledger row for `user_id` (or the
+    `date_utc` row, for a deferred write booked to the day it was spent) and
     return the new total (F-17: INSERT .. ON CONFLICT DO UPDATE, so two
     concurrent writers serialize on the row instead of read-modify-writing
     a stale total). Safe to call with 0 (no-op write avoided). Flushes into
@@ -108,7 +113,7 @@ def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
     cost = _quantize(_to_decimal(cost_usd))
     if cost <= _ZERO:
         return current_spend(db, user_id)
-    return _upsert_delta(db, user_id, cost)
+    return _upsert_delta(db, user_id, cost, date_utc)
 
 
 def reserve_cost(db: Session, user_id: str, amount) -> Decimal:
@@ -156,9 +161,10 @@ def log_call(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     cached_tokens: int | None = None,
-) -> None:
+) -> bool:
     """Best-effort per-call attribution row. Never raises: a failed log
-    write must not fail the user's turn. Cap gating stays on the daily
+    write must not fail the user's turn. Returns False when the write failed,
+    so a caller that owes a reconciliation record can log one. Cap gating stays on the daily
     ledger; this table is analytics-only (roadmap R3 consumes it).
 
     The write happens inside a SAVEPOINT (`db.begin_nested()`): if the flush
@@ -172,7 +178,7 @@ def log_call(
     try:
         cost = _to_decimal(cost_usd)
         if cost <= _ZERO:
-            return
+            return True
         with db.begin_nested():
             db.add(
                 LlmCallLog(
@@ -186,8 +192,10 @@ def log_call(
                     cached_tokens=cached_tokens,
                 )
             )
+        return True
     except Exception as e:  # noqa: BLE001 - isolation by design
         log.warning("llm_call_log write failed: %s", e)
+        return False
 
 
 def extract_usage(resp) -> dict:
@@ -238,7 +246,7 @@ def check_cap(db: Session, user_id: str) -> CapStatus:
     return check_cap_from_spend(current_spend(db, user_id))
 
 
-class CostCapExceeded(Exception):
+class CostCapExceeded(CallRefused):
     """Raised by assert_within_caps when a spend cap blocks the operation."""
 
     def __init__(self, code: str, cap: CapStatus | None = None):

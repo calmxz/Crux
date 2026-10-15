@@ -115,18 +115,23 @@ def test_prompt_build_failure_still_persists_user_message(client, db_session, mo
     assert [m.content for m in user_msgs] == ["save me"]
 
 
-def test_prepare_turn_failure_rerecords_embedding_spend(client, db_session, monkeypatch):
-    """B-08: when _prepare_turn crashes after retrieval already metered and
-    flushed embedding spend, db.rollback() in the except arm must not discard
-    that real vendor cost. The retrieval call reports what it spent via
-    cost_holder; the except arm re-records the total on the fresh transaction."""
+def test_prepare_turn_failure_keeps_embedding_spend_once(client, db_session, monkeypatch, fake_llm):
+    """B-08: when _prepare_turn crashes after retrieval already paid for an
+    embedding, db.rollback() in the except arm must not discard that real
+    vendor cost. The adapter settled it in its own transaction, so the
+    failure path records nothing itself and the spend lands exactly once."""
     monkeypatch.setattr(settings, "llm_stub", True)
 
     from decimal import Decimal
 
-    async def fake_fallback(db, sid, msg, *, user_id=None, cost_holder=None):
-        if cost_holder is not None:
-            cost_holder.append(Decimal("0.5"))
+    from services import llm
+
+    fake_llm.cost = Decimal("0.5")
+
+    async def fake_fallback(db, sid, msg, *, user_id=None):
+        await llm.get().aembed(
+            [msg], meter=llm.Meter(user_id=user_id, session_id=sid, purpose="embedding")
+        )
         return False, None
 
     monkeypatch.setattr("routes.chat.retrieval_service.semantic_fallback_required", fake_fallback)

@@ -101,13 +101,10 @@ def test_post_resume_with_ended_prior_copies_profile(client, db_session, seeded_
 
 
 def test_post_resume_with_unended_prior_generates_summary(
-    client, db_session, seeded_user, mock_litellm, llm_text, monkeypatch
+    client, db_session, seeded_user, fake_llm, monkeypatch
 ):
     # Stub summary_service.acompletion call inside async path
-    async def fake_acompletion(**kwargs):
-        return llm_text("auto summary about joins")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+    fake_llm.replies = ["auto summary about joins"]
 
     prior = SessionModel(
         id="prior_2",
@@ -138,20 +135,12 @@ def test_post_resume_with_unended_prior_generates_summary(
 
 
 def test_resume_409_when_second_active_session_exists_leaves_prior_untouched(
-    client, db_session, seeded_user, mock_litellm, llm_text, monkeypatch
+    client, db_session, seeded_user, fake_llm, monkeypatch
 ):
     """B-05: a pre-existing active session on the same topic must 409 on
     resume without ending or summarizing the session being resumed, and must
     leave both rows untouched.
     """
-    called = {"summary": False}
-
-    async def fake_acompletion(**kwargs):
-        called["summary"] = True
-        return llm_text("should not be generated")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
-
     prior_ended_at = datetime(2026, 7, 1, tzinfo=timezone.utc)
     active_other = SessionModel(
         id="active_other",
@@ -193,7 +182,7 @@ def test_resume_409_when_second_active_session_exists_leaves_prior_untouched(
         "aborted resume must not touch the prior"
     )
     assert refreshed_active.ended_at is None, "pre-existing active session must be untouched"
-    assert called["summary"] is False, "no summary LLM call must fire before the 409"
+    assert fake_llm.complete_calls == [], "no summary LLM call must fire before the 409"
 
 
 def test_get_list_filters_by_user_desc(client, db_session, seeded_user):
@@ -369,12 +358,9 @@ def test_post_end_idempotent_when_already_ended(client, db_session, seeded_user)
 
 
 def test_post_end_returns_no_exchanges_kind_for_empty_session(
-    client, db_session, seeded_user, mock_litellm, llm_text, monkeypatch
+    client, db_session, seeded_user, fake_llm, monkeypatch
 ):
-    async def fake_acompletion(**kwargs):
-        return llm_text("")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+    fake_llm.replies = [""]
 
     db_session.add(
         SessionModel(
@@ -486,13 +472,8 @@ def test_reopen_404_for_wrong_user(client, db_session, seeded_user):
     assert r.status_code == 404
 
 
-def test_post_end_generates_summary(
-    client, db_session, seeded_user, mock_litellm, llm_text, monkeypatch
-):
-    async def fake_acompletion(**kwargs):
-        return llm_text("learner covered joins")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+def test_post_end_generates_summary(client, db_session, seeded_user, fake_llm, monkeypatch):
+    fake_llm.replies = ["learner covered joins"]
 
     db_session.add(
         SessionModel(
@@ -545,35 +526,27 @@ def _usage_count(db_session, user_id=USER_ID):
     return row.count if row else 0
 
 
-def test_end_session_at_rate_cap_returns_mechanical_summary(client, db_session, monkeypatch):
+def test_end_session_at_rate_cap_returns_mechanical_summary(
+    client, db_session, monkeypatch, fake_llm
+):
     # F-03: end must never 429, but a rate-capped user must not trigger LLM spend.
     # Force the non-stub branch (mirrors Task 4's pattern) so a rate-gate bypass
-    # would actually reach litellm.acompletion instead of being masked by stub mode.
+    # would actually reach the provider instead of being masked by stub mode.
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real")
     monkeypatch.setattr(settings, "daily_cap", 0)
-
-    called = []
-
-    async def fake_acompletion(**kwargs):
-        called.append(1)
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
 
     session_id = _create_active_session_with_messages(db_session)
     resp = client.post(f"/api/sessions/{session_id}/end?user_id={USER_ID}")
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    assert called == []  # rate cap must short-circuit before any LLM call
+    assert fake_llm.complete_calls == []  # rate cap must short-circuit before any LLM call
     assert body["summary"]["kind"] == "summary"
     assert "joins combine tables" in body["summary"]["text"]
 
 
-def test_end_session_consumes_rate_limit_slot(client, db_session, monkeypatch, llm_text):
-    async def fake_acompletion(**kwargs):
-        return llm_text("a fresh summary")
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+def test_end_session_consumes_rate_limit_slot(client, db_session, monkeypatch, fake_llm):
+    fake_llm.replies = ["a fresh summary"]
 
     session_id = _create_active_session_with_messages(db_session)
     before = _usage_count(db_session)

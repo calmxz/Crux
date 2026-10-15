@@ -19,19 +19,19 @@ Pipeline:
      max_chunks=settings.max_chunks: an oversized document raises
      ChunkLimitExceeded mid-stream and is marked failed without the
      remaining pages ever being tokenised (F-03).
-  4. _embed_and_store: per EMBED_BATCH slice (100 chunks) -- cap-check,
-     embed (litellm.embedding), insert (pgvector_store.insert_chunks),
-     meter (cost_meter.meter_embedding_response), commit. No DB transaction
-     is held open during the litellm.embedding HTTP call (F-02/B-02), and
-     nothing accumulates for the whole document in memory at once (F-03) --
-     a batch's vectors and raw response are discarded as soon as that
+  4. _embed_and_store: per EMBED_BATCH slice (100 chunks) -- commit, embed
+     through the LLM adapter (which cap-checks, retries and settles the
+     spend in its own transaction), insert (pgvector_store.insert_chunks),
+     commit. No DB transaction is held open during the embedding HTTP call
+     (F-02/B-02), and nothing accumulates for the whole document in memory
+     at once (F-03) -- a batch's vectors are discarded as soon as that
      batch's commit lands.
   5. lib.keyword_index.merge_into_session(stems).
   6. Document.status = ready, page_count populated (None for plaintext).
 
-Because embedding/insert/meter now commit per batch, a crash mid-document
-leaves a prefix of chunks durably persisted with their spend already on the
-ledger -- nothing to re-record on failure. Resume contract: _embed_and_store
+Because spend settles per call and inserts commit per batch, a crash
+mid-document leaves a prefix of chunks durably persisted with their spend
+already on the ledger -- nothing to re-record on failure. Resume contract: _embed_and_store
 looks up chunk_index values already persisted for the document
 (_existing_chunk_indexes) and skips them before making any embedding call,
 so re-running ingestion for a partially-ingested document never re-pays for
@@ -55,7 +55,6 @@ import io
 import logging
 import os
 
-import litellm
 from pptx import Presentation
 from pypdf import PdfReader
 from sqlalchemy import select, update
@@ -64,8 +63,8 @@ from config import settings
 from db.database import SessionLocal
 from db.models import ChunkEmbedding, Document
 from db.models import Session as SessionModel
-from lib import chunking, keyword_index, llm_retry
-from services import cost_meter, object_store, pgvector_store
+from lib import chunking, keyword_index
+from services import cost_meter, llm, object_store, pgvector_store
 
 log = logging.getLogger(__name__)
 
@@ -168,50 +167,31 @@ def _existing_chunk_indexes(db, document_id: int) -> set[int]:
 def _embed_and_store(db, doc, chunks, *, user_id: str | None) -> int:
     """Embed and persist chunks in EMBED_BATCH slices.
 
-    Per slice: cap-check -> embed (no open transaction during the HTTP
-    call) -> insert -> meter -> commit. Skips chunk indexes already
-    persisted by a previous attempt, so re-runs never re-pay.
+    Per slice: commit (no open transaction during the HTTP call) -> embed
+    (the adapter cap-checks before it and settles after it, audit B-01,
+    F-19) -> insert -> commit. A cap refusal propagates as CostCapExceeded.
+    Skips chunk indexes already persisted by a previous attempt, so re-runs
+    never re-pay.
     """
     existing = _existing_chunk_indexes(db, doc.id)
     todo = [c for c in chunks if c.chunk_idx not in existing]
+    meter = llm.Meter(user_id=user_id, session_id=doc.session_id, purpose="embedding")
     stored = 0
     for i in range(0, len(todo), EMBED_BATCH):
         batch = todo[i : i + EMBED_BATCH]
-        if user_id is not None:
-            cost_meter.assert_within_caps(db, user_id)
         db.commit()  # release the connection before the network call
         try:
-            resp = llm_retry.retry_sync(
-                lambda batch=batch: litellm.embedding(
-                    model=settings.embedding_model,
-                    input=[c.text for c in batch],
-                    dimensions=settings.embedding_dim,
-                    timeout=settings.embedding_timeout_s,
-                )
-            )
+            result = llm.get().embed([c.text for c in batch], meter=meter)
+        except llm.CallRefused:
+            raise
         except Exception as e:
             raise RuntimeError(f"embedding api failed: {e}") from e
         rows = [
-            (
-                c.chunk_idx,
-                c.page,
-                c.text,
-                item["embedding"] if isinstance(item, dict) else item.embedding,
-            )
-            for c, item in zip(batch, resp.data, strict=True)
+            (c.chunk_idx, c.page, c.text, vector)
+            for c, vector in zip(batch, result.vectors, strict=True)
         ]
         stored += pgvector_store.insert_chunks(
             db, session_id=doc.session_id, document_id=doc.id, rows=rows
-        )
-        # F-19: ingestion is the largest embedding spender; meter it. The cap
-        # gate itself runs at the top of the loop above, before each batch's
-        # litellm.embedding call (audit B-01).
-        cost_meter.meter_embedding_response(
-            db,
-            resp,
-            user_id=user_id,
-            session_id=doc.session_id,
-            texts=[c.text for c in batch],
         )
         db.commit()
     return stored

@@ -303,6 +303,11 @@ async def run_streaming(
                     cost_usd=cost,
                     **cost_meter.extract_usage(built),
                 )
+                # Publish now rather than at the next loop-top commit: the
+                # upsert holds the user's ledger row lock, and tool dispatch
+                # can run for tens of seconds, stalling any other settlement
+                # for this user (LLM adapter, SETTLE_LOCK_TIMEOUT).
+                ctx.db.commit()
             billed_iters = len(iter_prompt_snapshots)
             billed_chars = len(accumulated_text)
 
@@ -605,15 +610,14 @@ async def run_streaming(
                 ctx.user_id,
             )
         # F-03/B-10: re-estimate the WHOLE turn (all snapshots), not just the
-        # unbilled tail. Because of B-10's loop-top commit before each
-        # acompletion, completed iterations' real costs already survived the
-        # rollback above, so on an errored multi-iteration turn this
-        # double-counts them -- kept deliberately, since overcounting only
-        # shortens the user's own daily budget (no card billing) and is safer
-        # than the alternative undercount. It also doesn't account for
-        # in-turn retrieval-embedding spend discarded by the rollback (only
-        # chat prompt snapshots are re-tokenized), a known negligible
-        # undercount (~$0.0005/query) in the opposite direction.
+        # unbilled tail. Every iteration that finished streaming committed
+        # its real cost before tool dispatch, so those costs survived the
+        # rollback above and this double-counts them (including a
+        # single-iteration turn that fails in dispatch or while persisting)
+        # -- kept deliberately, since overcounting only shortens the user's
+        # own daily budget (no card billing) and is safer than the
+        # alternative undercount. Retrieval-embedding spend is committed by
+        # the retrieve tool as it is metered, so the rollback keeps it too.
         _record_partial_cost(
             ctx,
             iter_prompt_snapshots,

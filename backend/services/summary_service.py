@@ -1,7 +1,7 @@
 """Synchronous session summary generation (spec §4.3, §8 L381).
 
 generate_and_persist builds a short prompt over the session's last 30 messages,
-calls LiteLLM, then force-skips any open check batch and writes the result
+calls the LLM adapter, then force-skips any open check batch and writes the result
 into TopicProfile.last_session_summary in a single commit; the caller claims
 Session.ended_at first (see routes/sessions.py `_claim_end`). On LLM failure
 or empty content, falls back to a mechanical "[auto]" summary built from the
@@ -10,14 +10,13 @@ last 5 messages.
 
 import logging
 
-import litellm
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from config import settings
 from db.models import ChatMessage
 from db.models import Session as SessionModel
-from services import check_service, cost_meter, profile_service
+from services import check_service, llm, profile_service
 
 log = logging.getLogger(__name__)
 
@@ -56,6 +55,7 @@ async def generate_and_persist(
     force-skips any open check batch and writes it in a single commit
     (F-31, F-33). The summary merges onto a freshly re-read profile so
     concurrent writes during the LLM call survive (F-11)."""
+    session_id = session.id  # read before the pre-call commit expires `session`
     messages = (
         db.execute(
             select(ChatMessage)
@@ -78,67 +78,47 @@ async def generate_and_persist(
     )
 
     summary: str
-    if settings.llm_stub_enabled or not messages:
+    if settings.llm_stub_enabled or not messages or not allow_llm:
         # F-32: an empty transcript has nothing to summarize -- never pay for
-        # an LLM call, never persist hallucinated prose about it.
-        summary = _mechanical_fallback(messages)
-    elif not allow_llm or not cost_meter.check_cap(db, session.user_id).allowed:
-        # F-03: the summary LLM call is real spend and must respect the same
-        # daily ledger and rate limit the chat path is gated on.
+        # an LLM call, never persist hallucinated prose about it. F-03: a
+        # rate-limited end must not spend either.
         summary = _mechanical_fallback(messages)
     else:
+        meter = llm.Meter(user_id=session.user_id, session_id=session.id, purpose="summary")
+        # Built before the commit, which expires the loaded rows: reading
+        # them afterwards would re-select each one on the event loop.
+        fallback = _mechanical_fallback(messages)
+        # Release the pooled connection for the multi-second call: the adapter
+        # takes its own for the gate and the settlement. Only reads are open.
+        db.commit()
         try:
-            resp = await litellm.acompletion(
-                model=settings.model,
-                temperature=settings.summary_temperature,
-                messages=[
+            completion = await llm.get().complete(
+                [
                     {"role": "system", "content": SUMMARY_SYSTEM},
                     {"role": "user", "content": user_prompt},
                 ],
+                meter=meter,
+                temperature=settings.summary_temperature,
                 timeout=settings.summary_timeout_s,
             )
-            content = (resp.choices[0].message.content or "").strip()
-            summary = content if content else _mechanical_fallback(messages)
-            try:
-                cost = litellm.completion_cost(completion_response=resp)
-            except Exception as e:
-                log.warning("summary completion_cost failed: %s", e)
-                try:
-                    pt = litellm.token_counter(
-                        model=settings.model,
-                        messages=[
-                            {"role": "system", "content": SUMMARY_SYSTEM},
-                            {"role": "user", "content": user_prompt},
-                        ],
-                    )
-                    cost = cost_meter.estimate_cancelled_cost(settings.model, content, pt)
-                except Exception as e2:  # noqa: BLE001
-                    log.warning("summary cost fallback failed: %s", e2)
-                    cost = 0
-            cost_meter.record_cost(db, session.user_id, cost)
-            cost_meter.log_call(
-                db,
-                user_id=session.user_id,
-                session_id=session.id,
-                purpose="summary",
-                model=settings.model,
-                cost_usd=cost,
-                **cost_meter.extract_usage(resp),
-            )
+            content = completion.text.strip()
+            summary = content if content else fallback
         except Exception as e:
+            # Includes CallRefused: a breached cap (F-03) still ends the
+            # session, with the mechanical summary.
             log.warning("summary LLM failed, using mechanical fallback: %s", e)
-            summary = _mechanical_fallback(messages)
+            summary = fallback
 
     # Single write window after the LLM await, since the caller's _claim_end
     # already owns ended_at (F-30, F-33). Re-read the profile under the row
     # lock and merge only last_session_summary onto the fresh blob, so
     # concurrent writes during the multi-second call (user PATCH, check
-    # answer elsewhere) aren't clobbered (F-11, F-12). Cost-ledger writes
-    # above publish in this same commit; if it fails after a won claim, the
+    # answer elsewhere) aren't clobbered (F-11, F-12). The adapter already
+    # committed the call's spend; if this commit fails after a won claim, the
     # session ends with no summary -- an honest state, since later end calls
     # take the idempotent replay path (F-33).
-    row = profile_service.lock_session_row(db, session.id)
-    check_service.abandon_in_caller_transaction(db, session.id)
+    row = profile_service.lock_session_row(db, session_id)
+    check_service.abandon_in_caller_transaction(db, session_id)
     fresh = profile_service.profile_from_row(row)
     fresh.last_session_summary = summary
     profile_service.save_profile(db, session.id, fresh, commit=False)
@@ -212,10 +192,6 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
         if settings.llm_stub_enabled:
             summary = _mechanical_rolling(dropped)
         else:
-            if not cost_meter.check_cap(db, session.user_id).allowed:
-                # F-03: capped users skip the rolling summary entirely; count
-                # stays untouched so the next uncapped trigger retries.
-                return None
             transcript = "\n".join(f"{m.role}: {_flatten(m.content)[:500]}" for m in dropped)
             rolling_messages = [
                 {"role": "system", "content": ROLLING_SYSTEM},
@@ -224,36 +200,25 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
                     "content": f"Topic: {session.topic or '(unspecified)'}\n\n{transcript}",
                 },
             ]
-            resp = await litellm.acompletion(
-                model=settings.model,
-                temperature=settings.summary_temperature,
-                messages=rolling_messages,
-                timeout=settings.summary_timeout_s,
+            meter = llm.Meter(
+                user_id=session.user_id, session_id=session.id, purpose="rolling_summary"
             )
-            content = (resp.choices[0].message.content or "").strip()
-            # Meter before branching on content: an empty response is still a
-            # paid acompletion call and must hit the ledger, not just the
-            # non-empty path.
+            # Release the pooled connection for the call (reads only so far);
+            # the adapter takes its own for the gate and the settlement.
+            db.commit()
             try:
-                cost = litellm.completion_cost(completion_response=resp)
-            except Exception as e:
-                log.warning("rolling summary completion_cost failed: %s", e)
-                try:
-                    pt = litellm.token_counter(model=settings.model, messages=rolling_messages)
-                    cost = cost_meter.estimate_cancelled_cost(settings.model, content, pt)
-                except Exception as e2:  # noqa: BLE001
-                    log.warning("rolling summary cost fallback failed: %s", e2)
-                    cost = 0
-            cost_meter.record_cost(db, session.user_id, cost)
-            cost_meter.log_call(
-                db,
-                user_id=session.user_id,
-                session_id=session.id,
-                purpose="rolling_summary",
-                model=settings.model,
-                cost_usd=cost,
-                **cost_meter.extract_usage(resp),
-            )
+                completion = await llm.get().complete(
+                    rolling_messages,
+                    meter=meter,
+                    temperature=settings.summary_temperature,
+                    timeout=settings.summary_timeout_s,
+                )
+            except llm.CallRefused:
+                # F-03: capped users skip the rolling summary entirely; count
+                # stays untouched so the next uncapped trigger retries.
+                return None
+            # An empty reply was still paid for; the adapter settled it.
+            content = completion.text.strip()
             if not content:
                 return None
             summary = content[:ROLLING_SUMMARY_MAX_CHARS]

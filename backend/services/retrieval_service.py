@@ -20,7 +20,7 @@ from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
 from db.models import Session as SessionModel
 from lib import llm_retry
-from services import cost_meter, documents_service, pgvector_store
+from services import cost_meter, documents_service, llm, pgvector_store
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +32,11 @@ def _unwrap_embedding(resp) -> list[float]:
 
 def _embed_query(query: str):
     """Sync embed of a single query string. Returns (resp, vector) so callers
-    can meter the raw response while also getting the unwrapped vector."""
+    can meter the raw response while also getting the unwrapped vector.
+
+    Stays on litellm directly until #412: the tool runs synchronously inside
+    the tutor's dispatch on ctx.db, and moving it onto the adapter is that
+    issue's scope."""
     resp = llm_retry.retry_sync(
         lambda: litellm.embedding(
             model=settings.embedding_model,
@@ -44,17 +48,20 @@ def _embed_query(query: str):
     return resp, _unwrap_embedding(resp)
 
 
-async def _aembed_query(query: str):
-    """Async embed of a single query string. Returns (resp, vector)."""
-    resp = await llm_retry.retry_async(
-        lambda: litellm.aembedding(
-            model=settings.embedding_model,
-            input=[query],
-            dimensions=settings.embedding_dim,
-            timeout=settings.embedding_timeout_s,
-        )
+async def _aembed_query(
+    db: Session, query: str, *, user_id: str | None, session_id: str
+) -> list[float]:
+    """Async embed of a single query string through the adapter, which gates,
+    retries and settles the spend (F-19).
+
+    Commits `db` first so the request's pooled connection is not held idle
+    across the network call while the adapter checks out its own for the gate
+    and the settlement (two per request under load would starve the pool)."""
+    await run_in_threadpool(db.commit)
+    result = await llm.get().aembed(
+        [query], meter=llm.Meter(user_id=user_id, session_id=session_id, purpose="embedding")
     )
-    return resp, _unwrap_embedding(resp)
+    return result.vectors[0]
 
 
 def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolResult:
@@ -83,6 +90,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             session_id=ctx.session_id,
             texts=[args.query],
         )
+        # Publish the ledger write now: a bundled sibling retrieve_chunks call
+        # can spend ~45 s in its own embedding retries, and holding the
+        # user's ledger row that long drops any LLM adapter settlement for
+        # this user (SETTLE_LOCK_TIMEOUT).
+        db.commit()
         hits = pgvector_store.query_chunks(
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
@@ -136,9 +148,9 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     The dialect guard stays the first statement so sqlite issues no statement
     at all here (test_chat_prepare_perf counts statements on sqlite).
 
-    The write-back flushes but never commits: this runs inside _prepare_turn's
-    transaction, which is designed to roll back and re-record embedding spend
-    on a fresh transaction (B-08). A rolled-back write-back just means the
+    The write-back flushes but never commits here; the caller's next commit
+    (semantic_fallback_required releases the connection before embedding)
+    publishes it. A write-back that is rolled back instead just means the
     next turn recomputes.
     """
     if not _is_postgres(db):
@@ -174,19 +186,15 @@ async def prefetch_for_prompt(
     query: str,
     k: int = 5,
     query_vec: list | None = None,
-    cost_holder: list | None = None,
 ) -> list[dict] | None:
     """Server-side retrieval for REQUIRED turns, since the REQUIRED flag is
     only advisory -- the model could otherwise answer ungrounded without
     calling retrieve_chunks (F-56). Fetch the chunks ourselves and inject
     them into the prompt instead. Returns chunk dicts (same shape retrieve()
     produces) or None on any failure/no-results, so the caller falls back to
-    the advisory flag. Embedding spend is metered like every other call
-    (F-19).
-
-    cost_holder, if given, collects the metered Decimal cost so a caller
-    whose own transaction later rolls back (_prepare_turn) can re-record the
-    real vendor spend on a fresh transaction (B-08).
+    the advisory flag. Embedding spend is settled by the adapter in its own
+    transaction (F-19, B-08), so a caller rollback cannot erase it. A cost
+    cap refusal is "no retrieval", like any other failure here.
 
     query_vec, if given, is the vector already embedded for this same query
     by semantic_fallback_required -- reuse it instead of embedding again,
@@ -196,16 +204,7 @@ async def prefetch_for_prompt(
         if not documents_service.has_ready_document(db, session_id):
             return None
         if query_vec is None:
-            resp, query_vec = await _aembed_query(query)
-            cost = cost_meter.meter_embedding_response(
-                db,
-                resp,
-                user_id=user_id,
-                session_id=session_id,
-                texts=[query],
-            )
-            if cost_holder is not None:
-                cost_holder.append(cost)
+            query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
         hits = pgvector_store.query_chunks(
             db, session_id=session_id, query_embedding=query_vec, k=k
         )
@@ -231,22 +230,16 @@ async def semantic_fallback_required(
     query: str,
     *,
     user_id: str | None = None,
-    cost_holder: list | None = None,
 ) -> tuple[bool, list[float] | None]:
     """Escalate the OPTIONAL lexical gate when the query is semantically
     close to the session's uploaded material -- paraphrase/acronym misses
     the stem overlap cannot catch (D2.2). Best-effort by design: any failure
     keeps the gate OPTIONAL, mirroring gap_accuracy in routes/chat.py.
 
-    Meters the embedding call's spend onto the cost ledger when `user_id` is
-    supplied; callers that cannot attribute the call to a user may omit it
-    and skip metering (F-19). Runs the embedding directly on the event loop
-    in _prepare_turn (F-18).
-
-    cost_holder, if given, collects the metered Decimal cost (only when
-    user_id is also given) so a caller whose own transaction later rolls
-    back (_prepare_turn) can re-record the real vendor spend on a fresh
-    transaction (B-08).
+    The adapter gates and settles the embedding call against `user_id`;
+    callers that cannot attribute the call to a user may omit it and skip
+    the gate and the ledger (F-19). A cost cap refusal keeps the gate
+    OPTIONAL. Awaits the embedding on the event loop in _prepare_turn (F-18).
 
     Also returns the embedded query vector (None whenever the embedding call
     never ran) so a caller that goes on to call prefetch_for_prompt can hand
@@ -262,17 +255,7 @@ async def semantic_fallback_required(
         centroid = await run_in_threadpool(_session_centroid, db, session_id)
         if centroid is None:
             return False, None
-        resp, query_vec = await _aembed_query(query)
-        if user_id is not None:
-            cost = cost_meter.meter_embedding_response(
-                db,
-                resp,
-                user_id=user_id,
-                session_id=session_id,
-                texts=[query],
-            )
-            if cost_holder is not None:
-                cost_holder.append(cost)
+        query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
         sim = _cosine_similarity(list(query_vec), centroid)
         # B-09: hand the vector back so prefetch_for_prompt can skip its
         # identical embed (2x cost + one extra round-trip on every
