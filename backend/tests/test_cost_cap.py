@@ -6,12 +6,12 @@ hard cap. Soft-cap warnings on the streaming path are dedicated
 `cost_warning` events, covered in test_tutor_stream.py.
 
 The route-level test pre-seeds `daily_cost_ledger` rather than driving
-spend through the LLM. Cost recording on the agent loop itself is
-exercised by the run_streaming tests below.
+spend through the LLM. Cost recording and the mid-turn gate on the agent
+loop are exercised by the run_streaming tests below, against the fake
+provider behind the real adapter.
 """
 
 from decimal import Decimal
-from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
@@ -22,6 +22,7 @@ from db.models import DailyCostLedger, User
 from db.models import Session as SessionModel
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
 from services import cost_meter
+from tests.conftest import tool_call
 
 USER_ID = "u_cost"
 SESSION_ID = "s_cost"
@@ -160,67 +161,54 @@ def test_chat_rejected_when_global_ceiling_hit(client, db_session, seed_user, mo
 # ---------------------------------------------------------------------------
 
 
-def _content_chunk(token):
-    delta = SimpleNamespace(content=token, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _tool_chunk_retrieve(call_id):
-    fn = SimpleNamespace()
-    fn.name = "retrieve_chunks"
-    fn.arguments = '{"session_id":"s_cost","query":"q"}'
-    frag = SimpleNamespace()
-    frag.index = 0
-    frag.id = call_id
-    frag.function = fn
-    delta = SimpleNamespace(content=None, tool_calls=[frag])
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _make_stream(*chunks):
-    async def _gen():
-        for c in chunks:
-            yield c
-
-    return _gen()
-
-
-@pytest.mark.asyncio
-async def test_tutor_records_cost_per_call(db_session, seed_user, monkeypatch):
-    """run_streaming's billed acompletion call must accumulate its cost to
-    the per-user daily ledger (real record_cost, real ledger row)."""
+def _ctx(db):
     from datetime import datetime, timezone
-    from unittest.mock import AsyncMock
 
-    from agent import tutor
     from agent.types import ToolContext
 
-    # Disable stub so the real loop runs.
+    return ToolContext(
+        db=db, session_id=SESSION_ID, user_id=USER_ID, turn_started_at=datetime.now(timezone.utc)
+    )
+
+
+async def _run_tutor(db):
+    from agent import tutor
+
+    return [
+        ev async for ev in tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", _ctx(db))
+    ]
+
+
+@pytest.fixture
+def real_loop(monkeypatch):
+    # Disable stub so the real loop runs against the fake provider.
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
 
-    monkeypatch.setattr(
-        tutor.litellm,
-        "acompletion",
-        AsyncMock(side_effect=[_make_stream(_content_chunk("done."))]),
-    )
-    # stream_chunk_builder would choke on the SimpleNamespace fakes; pin it.
-    monkeypatch.setattr(
-        tutor.litellm,
-        "stream_chunk_builder",
-        MagicMock(return_value=SimpleNamespace()),
-    )
-    monkeypatch.setattr(tutor.litellm, "completion_cost", lambda completion_response=None: 0.0123)
 
-    ctx = ToolContext(
-        db=db_session,
-        session_id=SESSION_ID,
-        user_id=USER_ID,
-        turn_started_at=datetime.now(timezone.utc),
-    )
-    events = [
-        ev async for ev in tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    ]
+def _retrieve_call(call_id):
+    return tool_call("retrieve_chunks", {"session_id": SESSION_ID, "query": "q"}, id=call_id)
+
+
+def _assistant_status(db):
+    from sqlalchemy import select
+
+    from db.models import ChatMessage
+
+    return db.execute(
+        select(ChatMessage.status).where(ChatMessage.role == "assistant")
+    ).scalar_one()
+
+
+@pytest.mark.asyncio
+async def test_tutor_records_cost_per_call(db_session, seed_user, real_loop, fake_llm):
+    """Each streamed call's cost lands on the per-user daily ledger (real
+    settlement, real ledger row)."""
+    fake_llm.streams = [["done."]]
+    fake_llm.cost = Decimal("0.0123")
+
+    events = await _run_tutor(db_session)
+
     deltas = "".join(e.data["text"] for e in events if e.type == "assistant_delta")
     assert deltas == "done."
     assert events[-1].type == "done"
@@ -248,49 +236,89 @@ def test_end_session_no_header_under_soft_cap(client, db_session, seed_user):
 
 
 @pytest.mark.asyncio
-async def test_tutor_short_circuits_on_mid_turn_hard_cap(db_session, seed_user, monkeypatch):
-    """If `record_cost` pushes spend past `llm_hard_cap_usd` mid-loop, the
-    next iteration must bail with a daily_cost_cap_reached error event
-    before issuing another acompletion."""
-    from datetime import datetime, timezone
-    from unittest.mock import AsyncMock
-
-    from agent import tutor
-    from agent.types import ToolContext
+async def test_tutor_short_circuits_on_mid_turn_hard_cap(
+    db_session, seed_user, real_loop, fake_llm, monkeypatch
+):
+    """A call whose cost pushes spend past `llm_hard_cap_usd` makes the next
+    iteration's gate refuse: a daily_cost_cap_reached error event, and no
+    second provider call."""
     from contracts import ToolResult
 
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.50)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 1.00)
-
     # Every iteration returns a tool call so the loop wants to iterate again.
-    acompletion = AsyncMock(
-        side_effect=[_make_stream(_tool_chunk_retrieve(f"t{i}")) for i in range(4)]
-    )
-    monkeypatch.setattr(tutor.litellm, "acompletion", acompletion)
-    monkeypatch.setattr(
-        tutor.litellm,
-        "stream_chunk_builder",
-        MagicMock(return_value=SimpleNamespace()),
-    )
-    # First call already pushes spend past the hard cap (1.50 > 1.00).
-    monkeypatch.setattr(tutor.litellm, "completion_cost", lambda completion_response=None: 1.5000)
+    fake_llm.streams = [[_retrieve_call(f"t{i}")] for i in range(4)]
+    # The first call already pushes spend past the hard cap (1.50 > 1.00).
+    fake_llm.cost = Decimal("1.5000")
     monkeypatch.setattr(
         "agent.tutor.tools.dispatch",
         MagicMock(return_value=ToolResult(ok=True, status="ok", error=None, data={"chunks": []})),
     )
 
-    ctx = ToolContext(
-        db=db_session,
-        session_id=SESSION_ID,
-        user_id=USER_ID,
-        turn_started_at=datetime.now(timezone.utc),
-    )
-    events = [
-        ev async for ev in tutor.run_streaming([{"role": "user", "content": "hi"}], "sys", ctx)
-    ]
-    # Exactly one LLM call should have fired; the next iter must short-circuit.
-    assert acompletion.await_count == 1
+    events = await _run_tutor(db_session)
+
+    assert len(fake_llm.stream_calls) == 1
     assert events[-1].type == "error"
-    assert events[-1].data["code"] == "daily_cost_cap_reached"
+    assert events[-1].data == {
+        "code": DAILY_COST_CAP_REACHED,
+        "used_usd": "1.5000",
+        "soft_cap_usd": "0.5",
+        "hard_cap_usd": "1.0",
+    }
+
+
+@pytest.mark.asyncio
+async def test_tutor_mid_turn_global_ceiling_reports_its_own_code(
+    db_session, seed_user, real_loop, fake_llm, monkeypatch
+):
+    """The tutor honours the global ceiling between calls (#412): the error
+    event carries global_cost_cap_reached and the streamed text persists as
+    partial."""
+    from contracts import ToolResult
+
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", 1.00)
+    fake_llm.streams = [["Looking. ", _retrieve_call("t0")], ["never"]]
+    fake_llm.cost = Decimal("0.10")
+
+    def other_user_spends(name, args, ctx):
+        cost_meter.record_cost(ctx.db, "someone-else", Decimal("1.00"))
+        ctx.db.commit()
+        return ToolResult(ok=True, status="ok", error=None, data={"chunks": []})
+
+    monkeypatch.setattr("agent.tutor.tools.dispatch", other_user_spends)
+
+    events = await _run_tutor(db_session)
+
+    assert len(fake_llm.stream_calls) == 1
+    assert events[-1].type == "error"
+    assert events[-1].data["code"] == GLOBAL_COST_CAP_REACHED
+    assert _assistant_status(db_session) == "partial"
+    fake_llm.streams.clear()
+
+
+@pytest.mark.asyncio
+async def test_capped_retrieve_embed_is_a_tool_error_then_the_cap_event(
+    db_session, seed_user, real_loop, fake_llm, monkeypatch
+):
+    """The retrieve tool's embedding is refused at the cap: the model gets a
+    tool error result (not an exception, so not llm_failed), and the next
+    call's gate emits daily_cost_cap_reached with the text kept as partial."""
+    from db.models import Document
+
+    db_session.add(Document(session_id=SESSION_ID, filename="ref.txt", status="ready"))
+    db_session.commit()
+    monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.50)
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 1.00)
+    fake_llm.streams = [["Let me look. ", _retrieve_call("t0")], ["never"]]
+    fake_llm.cost = Decimal("1.5000")
+
+    events = await _run_tutor(db_session)
+
+    done = next(e for e in events if e.type == "tool_call_done")
+    assert done.data == {"id": "t0", "status": "error", "error": DAILY_COST_CAP_REACHED}
+    assert fake_llm.embed_calls == []
+    assert len(fake_llm.stream_calls) == 1
+    assert events[-1].type == "error"
+    assert events[-1].data["code"] == DAILY_COST_CAP_REACHED
+    assert _assistant_status(db_session) == "partial"
+    fake_llm.streams.clear()

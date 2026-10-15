@@ -50,12 +50,13 @@ PROMPT_TOKENS = 1000
 TOKENS_PER_WORD = 200
 FIRST_TEXT = "Let me note that. "  # iteration 1, billed at its real price
 TAIL_TEXT = "partial answer "  # iteration 2, cut short
-# Cancel bills one snapshot plus the unbilled tail (2 words):
+# Cancel bills the cut-short call's own prompt plus the 2 words it streamed:
 # (1000 * 0.0003 + 400 * 0.0025) / 1000.
 CANCEL_TAIL_ESTIMATE = Decimal("0.0013")
-# Error bills both snapshots plus the whole turn's text (6 words):
-# (2000 * 0.0003 + 1200 * 0.0025) / 1000.
-ERROR_WHOLE_TURN_ESTIMATE = Decimal("0.0036")
+# Changed by #412: an error bills only the failed call, the same math as the
+# cancel (one prompt plus the 2 words it streamed); it used to re-estimate the
+# whole turn, both snapshots plus all 6 words, $0.0036.
+ERROR_CALL_ESTIMATE = CANCEL_TAIL_ESTIMATE
 
 PROFILE_PATCH = {"add_confirmed_gap": "joins", "evidence_type": "declared"}
 
@@ -129,7 +130,10 @@ class FakeLitellm:
         if not self.responses:
             self.unexpected.append("acompletion")
             raise AssertionError("unexpected litellm.acompletion call")
-        return self.responses.pop(0)
+        response = self.responses.pop(0)
+        if isinstance(response, BaseException):
+            raise response
+        return response
 
     def completion_cost(self, completion_response=None, **kwargs):
         if not self.costs:
@@ -410,21 +414,41 @@ async def test_provider_error_mid_stream(db_session, seeded, fake_litellm):
     assert events[-1].data["code"] == "llm_failed"
     msg = _assistant(db_session)
     assert (msg.status, msg.content) == ("error", FIRST_TEXT + TAIL_TEXT)
-    # #412 changes this: today the error arm re-estimates the WHOLE turn (both
-    # prompt snapshots and all the text) on top of iteration 1's
-    # already-committed real cost -- the deliberate F-03/B-10 double-count.
-    # After #412 an errored turn bills once.
-    assert _ledger(db_session) == Decimal("0.0010") + ERROR_WHOLE_TURN_ESTIMATE
+    # Changed by #412: the failed call settles its own estimate once; the
+    # error arm no longer re-estimates the whole turn on top of iteration 1.
+    assert _ledger(db_session) == Decimal("0.0010") + ERROR_CALL_ESTIMATE
     assert _log_rows(db_session) == [
         ("chat", Decimal("0.0010")),
-        ("chat", ERROR_WHOLE_TURN_ESTIMATE),
+        ("chat", ERROR_CALL_ESTIMATE),
     ]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
+async def test_transient_429_before_the_first_token_retries(
+    db_session, seeded, fake_litellm, monkeypatch
+):
+    """New in #412: a 429 before any chunk retries instead of failing the
+    turn, and the refused attempt costs nothing."""
+    monkeypatch.setattr(settings, "llm_retry_base_delay_s", 0)
+    fake_litellm.responses = [
+        litellm.RateLimitError(message="slow down", llm_provider="gemini", model=MODEL),
+        _litellm_stream(_text_chunk("Hello")),
+    ]
+    fake_litellm.costs = [0.001]
+
+    events = await _run(_ctx(db_session))
+
+    assert _types(events) == ["assistant_delta", "done"]
+    assert _assistant(db_session).status == "complete"
+    assert len(fake_litellm.acompletion_calls) == 2
+    assert _ledger(db_session) == Decimal("0.0010")
+    assert _log_rows(db_session) == [("chat", Decimal("0.0010"))]
+
+
 async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch):
-    """Iteration 1's real cost reaches the hard cap; the loop-top cap check
-    before iteration 2 stops the turn without another provider call."""
+    """Iteration 1's real cost reaches the hard cap; the adapter gate on
+    iteration 2's stream refuses, stopping the turn without another provider
+    call."""
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.0005)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 0.001)
     fake_litellm.responses = [

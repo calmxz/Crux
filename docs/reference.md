@@ -82,12 +82,13 @@ and the stream start releases in `_prepare_turn`'s `except BaseException` arm.
 Consequences: the usage ledger reads `reserve` high for the duration of a turn,
 and a process crash mid-turn leaves the reserve on the ledger until UTC midnight.
 
-### LLM adapter (#411)
+### LLM adapter (#411, #412)
 
-`backend/services/llm.py` is the one place that calls the model (the tutor's
-stream and the `retrieve` tool's embedding move in #412). `llm.get()` returns
-the shell around the active provider: `complete`, `embed`, `aembed`, each
-taking a `Meter(user_id, session_id, purpose)`. The shell gates on
+`backend/services/llm.py` is the one place that calls the model; only it and
+`cost_meter`'s pricing helpers import `litellm` (the offline eval script
+excepted). `llm.get()` returns the shell around the active provider:
+`complete`, `stream`, `embed`, `aembed`, each taking a
+`Meter(user_id, session_id, purpose)`. The shell gates on
 `cost_meter.assert_within_caps` and settles the ledger row plus the
 `LlmCallLog` row in its own short session, so spend survives any caller
 rollback. Settlement never raises; a failure is an error-level log line
@@ -119,16 +120,41 @@ settlement upserts the same row; on Postgres it waits at most
 Reconcile from the logs: a deferral with no matching `landed` line is spend
 missing from the ledger. Until a deferred write lands the cap undercounts, so
 any ledger write still commits before the next slow step, not just before
-adapter calls: the tutor commits each iteration's `record_cost` before tool
-dispatch, and the retrieve tool commits its embedding metering before a
-bundled sibling call can spend its own retry window. The adapter's gate and
-settlement each take their own pooled connection, so callers commit before
-the call (as every moved call site does) instead of holding an idle one.
+adapter calls. The tutor and the `retrieve` tool write no ledger rows
+themselves; the chat route's B-05 reservation is the one caller-side write,
+published by its admission commit. The adapter's gate and settlement each
+take their own pooled connection, so callers commit before the call (the
+tutor before each stream, the retrieve tool before its embed) instead of
+holding an idle one.
+
+Streams: `async with llm.get().stream(messages, meter=..., tools=...,
+tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
+refusal raises `CostCapExceeded` before the block runs), then
+`async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
+(`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete
+once iteration ends; `s.cost` is set when the block exits and stays readable
+after a cancel. The exit settles once, synchronously, before any await: the
+provider's price on a normal end (token math if pricing fails), an estimate
+of the prompt plus the output received (text and tool-call arguments) on
+cancel or on the caller's generator closing, and on a provider error the
+estimate only if a chunk arrived or it was a `Timeout` ($0 otherwise).
+Retry (429, 503, 500, connection) happens only while no chunk has arrived;
+a retried attempt costs nothing and its stream, if it opened, is closed
+(whether Gemini bills such an attempt is open, #561). The tutor keeps the
+stream it is inside in `inflight` until its iteration finishes, so its
+cancel event reports what the cut-short call settled, or $0 for a cancel
+during tool dispatch or while a finished stream closes.
 
 Tests: the `fake_llm` fixture (conftest) installs `FakeLlmProvider` under the
 real shell; script it with `replies` (str or exception per `complete`
-attempt), `embed_errors`, `vector`, `cost` and `timeout_cost`. `db_session`
-binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
+attempt), `streams` (per `stream` open: an exception raised on open, or a
+list of steps -- str text, `tool_call(name, args, id=)`, an exception raised
+there, `BLOCK` to park until cancelled), `embed_errors`, `vector`, `cost`,
+`timeout_cost` and `partial_cost` (a cut-short stream). `stream_calls`
+copies each sent message, so later pruning cannot rewrite a capture; the
+tutor still needs `llm_stub` off until #413. litellm's chunk parsing is the
+provider's and is tested against litellm-shaped chunks in `test_llm.py`.
+`db_session` binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits
 the caller's pending writes; isolation is only provable on Postgres. A
 Postgres test must bind `llm.session_factory` to its own sessionmaker (see

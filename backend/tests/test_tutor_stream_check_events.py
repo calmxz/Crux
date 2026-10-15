@@ -1,15 +1,12 @@
 """TDD: run_streaming emits check_question event and terminates turn on ask_check_questions.
 
-Mirrors test_tutor_stream.py harness exactly. Helpers are copied from that
-module so this file is self-contained.
+The model is the scripted fake provider (conftest fake_llm) behind the real
+adapter.
 """
 
 import asyncio
 import json
 from datetime import datetime, timezone
-from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -20,51 +17,7 @@ from db.models import ChatMessage
 from db.models import Session as SessionModel
 from db.models import User as UserModel
 from services import check_service, profile_service
-from services.cost_meter import CapStatus
-
-# ---------------------------------------------------------------------------
-# Streaming chunk builders (copied verbatim from test_tutor_stream.py)
-# ---------------------------------------------------------------------------
-
-
-def _content_chunk(token: str) -> SimpleNamespace:
-    """A streamed chunk carrying a single text token."""
-    delta = SimpleNamespace(content=token, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _tool_fragment(index: int, id=None, name=None, arguments=None) -> SimpleNamespace:
-    """A single tool-call delta fragment.
-
-    `name` is assigned AFTER construction because MagicMock(name=...) is
-    reserved and would NOT set a real .name attribute. We use SimpleNamespace
-    here which has no such restriction, but build the .function with an
-    explicit name attr to mirror the real shape.
-    """
-    fn = SimpleNamespace()
-    fn.name = name
-    fn.arguments = arguments
-    frag = SimpleNamespace()
-    frag.index = index
-    frag.id = id
-    frag.function = fn
-    return frag
-
-
-def _tool_chunk(*fragments) -> SimpleNamespace:
-    """A streamed chunk carrying tool-call fragments and no content."""
-    delta = SimpleNamespace(content=None, tool_calls=list(fragments))
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _make_stream(*chunks):
-    """Return a fresh async-generator instance yielding the given chunks."""
-
-    async def _gen():
-        for c in chunks:
-            yield c
-
-    return _gen()
+from tests.conftest import tool_call
 
 
 def _ctx(db_session, session_id="s1"):
@@ -79,19 +32,6 @@ def _ctx(db_session, session_id="s1"):
 def _disable_stub(monkeypatch):
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
-
-
-def _allow_cap(monkeypatch):
-    cap = CapStatus(
-        allowed=True,
-        used=Decimal("0.0"),
-        soft_breached=False,
-        urgent_breached=False,
-        soft_cap=Decimal("2.0"),
-        urgent_cap=Decimal("2.70"),
-        hard_cap=Decimal("3.0"),
-    )
-    monkeypatch.setattr("agent.tutor.cost_meter.check_cap", MagicMock(return_value=cap))
 
 
 async def _drain(agen):
@@ -123,50 +63,41 @@ def _insert_session(db_session, session_id=SESSION_ID, user_id=USER_ID):
 
 
 @pytest.mark.asyncio
-async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
+async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session, fake_llm):
     """ask_check_questions dispatch -> check_question event emitted, turn terminates.
 
     turn1: LLM calls ask_check_questions tool.
     turn2: supplied but must NEVER be consumed (loop terminates after ask).
     """
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     _insert_session(db_session, session_id=SESSION_ID)
     ctx = _ctx(db_session, session_id=SESSION_ID)
 
-    turn1 = _make_stream(
-        _content_chunk("Question: Inputs?"),
-        _tool_chunk(
-            _tool_fragment(
-                index=0,
-                id="tc_1",
-                name="ask_check_questions",
-                arguments=json.dumps(
+    turn1 = [
+        "Question: Inputs?",
+        tool_call(
+            "ask_check_questions",
+            id="tc_1",
+            args={
+                "session_id": SESSION_ID,
+                "set_index": 1,
+                "set_total": 1,
+                "gap": "linear_algebra",
+                "items": [
                     {
-                        "session_id": SESSION_ID,
-                        "set_index": 1,
-                        "set_total": 1,
-                        "gap": "linear_algebra",
-                        "items": [
-                            {
-                                "question": "Inputs?",
-                                "options": ["vectors", "scalars"],
-                                "correct_index": 0,
-                                "explanation": "Vectors are inputs.",
-                            }
-                        ],
+                        "question": "Inputs?",
+                        "options": ["vectors", "scalars"],
+                        "correct_index": 0,
+                        "explanation": "Vectors are inputs.",
                     }
-                ),
-            )
+                ],
+            },
         ),
-    )
-    turn2 = _make_stream(_content_chunk("SHOULD-NOT-APPEAR"))
+    ]
+    turn2 = ["SHOULD-NOT-APPEAR"]
 
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[turn1, turn2]),
-    )
+    fake_llm.streams = [turn1, turn2]
 
     events = await _drain(
         tutor.run_streaming(
@@ -205,45 +136,36 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session):
 
 
 @pytest.mark.asyncio
-async def test_stream_check_question_event_shape(monkeypatch, db_session):
+async def test_stream_check_question_event_shape(monkeypatch, db_session, fake_llm):
     """check_question event carries gap, items, and total keys."""
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     sid = "sc2"
     _insert_session(db_session, session_id=sid)
     ctx = _ctx(db_session, session_id=sid)
 
-    turn1 = _make_stream(
-        _tool_chunk(
-            _tool_fragment(
-                index=0,
-                id="tc_2",
-                name="ask_check_questions",
-                arguments=json.dumps(
+    turn1 = [
+        tool_call(
+            "ask_check_questions",
+            id="tc_2",
+            args={
+                "session_id": sid,
+                "set_index": 1,
+                "set_total": 1,
+                "gap": "derivatives",
+                "items": [
                     {
-                        "session_id": sid,
-                        "set_index": 1,
-                        "set_total": 1,
-                        "gap": "derivatives",
-                        "items": [
-                            {
-                                "question": "What is d/dx x^2?",
-                                "options": ["2x", "x^2"],
-                                "correct_index": 0,
-                                "explanation": "d/dx x^2 = 2x.",
-                            }
-                        ],
+                        "question": "What is d/dx x^2?",
+                        "options": ["2x", "x^2"],
+                        "correct_index": 0,
+                        "explanation": "d/dx x^2 = 2x.",
                     }
-                ),
-            )
-        ),
-    )
+                ],
+            },
+        )
+    ]
 
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[turn1]),
-    )
+    fake_llm.streams = [turn1]
 
     events = await _drain(
         tutor.run_streaming(
@@ -269,7 +191,7 @@ async def test_stream_check_question_event_shape(monkeypatch, db_session):
 
 
 @pytest.mark.asyncio
-async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_session):
+async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_session, fake_llm):
     """Part B: after hoisting 'asked_check = False' before the try: block in
     run_streaming, a plain-text cancel does not raise NameError for asked_check.
 
@@ -294,35 +216,13 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
     observable via the NameError guard (this test).
     """
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     sid = "sc_cancel_text"
     _insert_session(db_session, session_id=sid)
     ctx = _ctx(db_session, session_id=sid)
 
-    monkeypatch.setattr(
-        "agent.tutor.cost_meter.estimate_cancelled_cost",
-        MagicMock(return_value=0),
-    )
-    monkeypatch.setattr(
-        "agent.tutor.cost_meter.record_cost",
-        MagicMock(),
-    )
-    monkeypatch.setattr(
-        "agent.tutor.litellm.stream_chunk_builder",
-        MagicMock(return_value=SimpleNamespace()),
-    )
-
     # A text-only stream: no tool calls, so asked_check is never set inside the loop.
-    stream = _make_stream(
-        _content_chunk("partial text"),
-        _content_chunk(" more text"),
-    )
-
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[stream]),
-    )
+    fake_llm.streams = [["partial text", " more text"]]
 
     agen = tutor.run_streaming(
         [{"role": "user", "content": "tell me something"}],
@@ -359,59 +259,47 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
 
 
 @pytest.mark.asyncio
-async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_session):
+async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_session, fake_llm):
     """F-10: a response bundling update_topic_profile + ask_check_questions in
     one iteration dispatches BOTH -- the patch first, the ask last -- instead
     of dropping the patch. The ask still terminates the turn.
     """
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     sid = "sc_bundle"
     _insert_session(db_session, session_id=sid)
     ctx = _ctx(db_session, session_id=sid)
 
-    turn1 = _make_stream(
-        _tool_chunk(
-            _tool_fragment(
-                index=0,
-                id="tc_patch",
-                name="update_topic_profile",
-                arguments=json.dumps(
-                    {
-                        "session_id": sid,
-                        "focus_target_gap": "chain rule",
-                    }
-                ),
-            ),
-            _tool_fragment(
-                index=1,
-                id="tc_ask",
-                name="ask_check_questions",
-                arguments=json.dumps(
-                    {
-                        "session_id": sid,
-                        "set_index": 1,
-                        "set_total": 1,
-                        "gap": "chain rule",
-                        "items": [
-                            {
-                                "question": "What is d/dx f(g(x))?",
-                                "options": ["f'(g(x))g'(x)", "f'(x)g'(x)"],
-                                "correct_index": 0,
-                                "explanation": "Chain rule.",
-                            }
-                        ],
-                    }
-                ),
-            ),
+    turn1 = [
+        tool_call(
+            "update_topic_profile",
+            id="tc_patch",
+            args={
+                "session_id": sid,
+                "focus_target_gap": "chain rule",
+            },
         ),
-    )
+        tool_call(
+            "ask_check_questions",
+            id="tc_ask",
+            args={
+                "session_id": sid,
+                "set_index": 1,
+                "set_total": 1,
+                "gap": "chain rule",
+                "items": [
+                    {
+                        "question": "What is d/dx f(g(x))?",
+                        "options": ["f'(g(x))g'(x)", "f'(x)g'(x)"],
+                        "correct_index": 0,
+                        "explanation": "Chain rule.",
+                    }
+                ],
+            },
+        ),
+    ]
 
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[turn1]),
-    )
+    fake_llm.streams = [turn1]
 
     events = await _drain(
         tutor.run_streaming(
@@ -438,12 +326,11 @@ async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_sessi
 
 
 @pytest.mark.asyncio
-async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
+async def test_second_bundled_ask_is_dropped(monkeypatch, db_session, fake_llm):
     """Only ONE ask_check_questions may run per turn: if the model streams two
     asks in the same response, the first is dispatched and the second is
     dropped (not two check_question events / two registered batches)."""
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     sid = "sc_double_ask"
     _insert_session(db_session, session_id=sid)
@@ -456,43 +343,32 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session):
         "explanation": "because.",
     }
 
-    turn1 = _make_stream(
-        _tool_chunk(
-            _tool_fragment(
-                index=0,
-                id="tc_ask1",
-                name="ask_check_questions",
-                arguments=json.dumps(
-                    {
-                        "session_id": sid,
-                        "set_index": 1,
-                        "set_total": 1,
-                        "gap": "first_gap",
-                        "items": [item],
-                    }
-                ),
-            ),
-            _tool_fragment(
-                index=1,
-                id="tc_ask2",
-                name="ask_check_questions",
-                arguments=json.dumps(
-                    {
-                        "session_id": sid,
-                        "set_index": 1,
-                        "set_total": 1,
-                        "gap": "second_gap",
-                        "items": [item],
-                    }
-                ),
-            ),
+    turn1 = [
+        tool_call(
+            "ask_check_questions",
+            id="tc_ask1",
+            args={
+                "session_id": sid,
+                "set_index": 1,
+                "set_total": 1,
+                "gap": "first_gap",
+                "items": [item],
+            },
         ),
-    )
+        tool_call(
+            "ask_check_questions",
+            id="tc_ask2",
+            args={
+                "session_id": sid,
+                "set_index": 1,
+                "set_total": 1,
+                "gap": "second_gap",
+                "items": [item],
+            },
+        ),
+    ]
 
-    monkeypatch.setattr(
-        "agent.tutor.litellm.acompletion",
-        AsyncMock(side_effect=[turn1]),
-    )
+    fake_llm.streams = [turn1]
 
     events = await _drain(
         tutor.run_streaming(

@@ -6,9 +6,11 @@ Isolation from the caller's transaction is asserted on Postgres only, in
 test_llm_characterisation_pg.py.
 """
 
+import asyncio
 import logging
 import threading
 from decimal import Decimal
+from types import SimpleNamespace
 
 import litellm
 import pytest
@@ -19,6 +21,7 @@ from config import settings
 from db.models import DailyCostLedger, LlmCallLog, User
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
 from services import cost_meter, llm
+from tests.conftest import BLOCK, tool_call
 
 USER_ID = "llm-u1"
 SESSION_ID = "llm-s1"
@@ -382,6 +385,401 @@ async def test_non_transient_error_is_raised_at_once_and_settles_nothing(
     assert len(fake_llm.complete_calls) == 1
     assert fake_llm.estimates == []
     assert _log_rows(db_session) == []
+
+
+# --- streamed completions (#412) ---------------------------------------------
+
+
+def _stream(**kwargs):
+    return llm.get().stream(
+        MESSAGES,
+        meter=_meter(purpose="chat"),
+        tools=[{"type": "function"}],
+        tool_choice="auto",
+        temperature=0.2,
+        timeout=5,
+        **kwargs,
+    )
+
+
+async def _drain(s) -> list[str]:
+    return [ev.text async for ev in s]
+
+
+async def test_stream_settles_once_on_normal_end(db_session, user, fake_llm):
+    fake_llm.streams = [["Hel", "lo", tool_call("retrieve_chunks", {"q": 1}, id="c1")]]
+    fake_llm.cost = Decimal("0.002")
+    fake_llm.partial_cost = Decimal("0.5")  # must not be charged
+
+    async with _stream() as s:
+        assert await _drain(s) == ["Hel", "lo"]
+
+    assert (s.text, s.cost) == ("Hello", Decimal("0.002"))
+    assert s.tool_calls == [llm.ToolCall(id="c1", name="retrieve_chunks", arguments='{"q": 1}')]
+    assert fake_llm.stream_calls == [
+        {
+            "messages": MESSAGES,
+            "tools": [{"type": "function"}],
+            "tool_choice": "auto",
+            "temperature": 0.2,
+            "timeout": 5,
+        }
+    ]
+    assert fake_llm.estimates == []
+    assert fake_llm.opened[0].closed
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
+
+
+async def test_stream_cancel_mid_stream_settles_an_estimate_readable_after(
+    db_session, user, fake_llm
+):
+    fake_llm.streams = [["partial ", BLOCK]]
+    fake_llm.cost = Decimal("0.5")  # a cut-short stream is never priced
+    fake_llm.partial_cost = Decimal("0.0007")
+    reached = asyncio.Event()
+    holder = {}
+
+    async def consume():
+        async with _stream() as s:
+            holder["s"] = s
+            async for ev in s:
+                holder.setdefault("texts", []).append(ev.text)
+                reached.set()
+
+    task = asyncio.create_task(consume())
+    await asyncio.wait_for(reached.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.gather(task)
+
+    assert holder["texts"] == ["partial "]
+    assert holder["s"].cost == Decimal("0.0007")
+    assert fake_llm.estimates == [("stream", MESSAGES, "partial ")]
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0007"))]
+
+
+async def test_stream_closed_by_the_caller_settles_an_estimate(db_session, user, fake_llm):
+    fake_llm.streams = [["one ", "two ", "three"]]
+    fake_llm.partial_cost = Decimal("0.0004")
+
+    async with _stream() as s:
+        async for ev in s:
+            assert ev.text == "one "
+            break
+
+    assert s.cost == Decimal("0.0004")
+    assert fake_llm.estimates == [("stream", MESSAGES, "one ")]
+    assert len(_log_rows(db_session)) == 1
+
+
+async def test_stream_provider_error_after_events_settles_once_and_does_not_retry(
+    db_session, user, fake_llm
+):
+    fake_llm.streams = [["some text ", _rate_limited()], ["never"]]
+    fake_llm.partial_cost = Decimal("0.0009")
+
+    with pytest.raises(litellm.RateLimitError):
+        async with _stream() as s:
+            await _drain(s)
+
+    assert s.cost == Decimal("0.0009")
+    assert len(fake_llm.stream_calls) == 1
+    assert fake_llm.estimates == [("stream", MESSAGES, "some text ")]
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0009"))]
+    fake_llm.streams.clear()
+
+
+async def test_stream_429_before_the_first_event_retries_and_bills_once(db_session, user, fake_llm):
+    fake_llm.streams = [_rate_limited(), _rate_limited(), ["second ", "try"]]
+    fake_llm.cost = Decimal("0.002")
+    fake_llm.partial_cost = Decimal("0.5")
+    fake_llm.timeout_cost = Decimal("0.5")
+
+    async with _stream() as s:
+        assert await _drain(s) == ["second ", "try"]
+
+    assert len(fake_llm.stream_calls) == 3
+    assert fake_llm.estimates == []
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
+
+
+async def test_stream_failing_after_open_with_no_output_bills_nothing_and_closes(
+    db_session, user, fake_llm
+):
+    """An attempt that opened but failed before any chunk produced no output:
+    it costs nothing, its stream is closed, and only the retry is billed.
+    (Whether the vendor bills such an attempt is unverified; see the B3
+    amendment of 2026-10-15.)"""
+    fake_llm.streams = [[_rate_limited()], ["ok"]]
+    fake_llm.cost = Decimal("0.002")
+    fake_llm.partial_cost = Decimal("0.5")
+
+    async with _stream() as s:
+        assert await _drain(s) == ["ok"]
+
+    assert len(fake_llm.stream_calls) == 2
+    assert fake_llm.opened[0].closed
+    assert fake_llm.estimates == []
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
+    assert s.cost == Decimal("0.002")
+
+
+async def test_stream_failing_after_open_on_every_attempt_bills_nothing(db_session, user, fake_llm):
+    fake_llm.streams = [[_rate_limited()], [_rate_limited()], [_rate_limited()]]
+    fake_llm.partial_cost = Decimal("0.5")
+
+    with pytest.raises(litellm.RateLimitError):
+        async with _stream() as s:
+            await _drain(s)
+
+    assert len(fake_llm.stream_calls) == 3
+    assert all(opened.closed for opened in fake_llm.opened)
+    assert _log_rows(db_session) == []
+    assert s.cost == Decimal("0")
+
+
+async def test_stream_non_transient_error_with_no_output_is_not_retried_or_billed(
+    db_session, user, fake_llm
+):
+    fake_llm.streams = [[ValueError("bad response")], ["never"]]
+    fake_llm.partial_cost = Decimal("0.5")
+
+    with pytest.raises(ValueError):
+        async with _stream() as s:
+            await _drain(s)
+
+    assert len(fake_llm.stream_calls) == 1
+    assert s.cost == Decimal("0")
+    assert _log_rows(db_session) == []
+    fake_llm.streams.clear()
+
+
+async def test_stream_cancelled_during_retry_backoff_bills_nothing(
+    db_session, user, fake_llm, monkeypatch
+):
+    """Between attempts no request is in flight: the refused attempt cost
+    nothing and the next was never sent, so a cancel there settles $0."""
+    fake_llm.streams = [_rate_limited(), ["never"]]
+    fake_llm.timeout_cost = Decimal("0.5")
+    fake_llm.partial_cost = Decimal("0.5")
+    backing_off = asyncio.Event()
+
+    async def parked_sleep(_s):
+        backing_off.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(llm.asyncio, "sleep", parked_sleep)
+    holder = {}
+
+    async def consume():
+        async with _stream() as s:
+            holder["s"] = s
+            await _drain(s)
+
+    task = asyncio.create_task(consume())
+    await asyncio.wait_for(backing_off.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.gather(task)
+
+    assert holder["s"].cost == Decimal("0")
+    assert len(fake_llm.stream_calls) == 1
+    assert fake_llm.estimates == []
+    assert _log_rows(db_session) == []
+    fake_llm.streams.clear()
+
+
+async def test_stream_gives_up_after_the_configured_attempts_and_bills_nothing(
+    db_session, user, fake_llm
+):
+    fake_llm.streams = [_rate_limited(), _rate_limited(), _rate_limited(), ["never"]]
+
+    with pytest.raises(litellm.RateLimitError):
+        async with _stream() as s:
+            await _drain(s)
+
+    assert len(fake_llm.stream_calls) == 3
+    assert s.cost == Decimal("0")
+    assert _log_rows(db_session) == []
+    fake_llm.streams.clear()
+
+
+async def test_stream_timeout_is_not_retried_and_settles_a_prompt_estimate(
+    db_session, user, fake_llm
+):
+    fake_llm.streams = [_timeout(), ["never"]]
+    fake_llm.timeout_cost = Decimal("0.0003")
+
+    with pytest.raises(litellm.Timeout):
+        async with _stream() as s:
+            await _drain(s)
+
+    assert len(fake_llm.stream_calls) == 1
+    assert fake_llm.estimates == [("completion", MESSAGES)]
+    assert s.cost == Decimal("0.0003")
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0003"))]
+    fake_llm.streams.clear()
+
+
+async def test_stream_gate_refuses_on_enter(db_session, user, fake_llm):
+    cost_meter.record_cost(db_session, USER_ID, Decimal("3.00"))
+    db_session.commit()
+
+    with pytest.raises(cost_meter.CostCapExceeded) as exc:
+        async with _stream():
+            pytest.fail("the block must not run")
+
+    assert exc.value.code == DAILY_COST_CAP_REACHED
+    assert fake_llm.stream_calls == []
+
+
+# --- LiteLlmProvider streams: litellm's chunk shape (#412) -------------------
+
+
+def _chunk(content=None, tool_calls=None):
+    delta = SimpleNamespace(content=content, tool_calls=tool_calls)
+    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
+
+
+def _frag(index, *, id=None, name=None, arguments=None):
+    fn = SimpleNamespace(arguments=arguments)
+    fn.name = name
+    return SimpleNamespace(index=index, id=id, function=fn)
+
+
+@pytest.fixture
+def litellm_stream(monkeypatch):
+    """Patch litellm.acompletion to stream `chunks` and record its kwargs;
+    `counted` records every token_counter call."""
+    state = {"chunks": [], "calls": [], "counted": []}
+
+    async def acompletion(**kwargs):
+        state["calls"].append(kwargs)
+
+        async def gen():
+            for c in state["chunks"]:
+                yield c
+
+        return gen()
+
+    def token_counter(model=None, messages=None, text=None, **kwargs):
+        state["counted"].append(messages if messages is not None else text)
+        return 1000
+
+    monkeypatch.setattr(litellm, "acompletion", acompletion)
+    monkeypatch.setattr(litellm, "token_counter", token_counter)
+    return state
+
+
+async def _provider_stream(chunks_state, chunks):
+    chunks_state["chunks"] = chunks
+    ps = await llm.LiteLlmProvider().stream(
+        MESSAGES, tools=[{"type": "function"}], tool_choice="auto", temperature=0.3, timeout=7
+    )
+    tokens = [t async for t in ps]
+    return ps, tokens
+
+
+async def test_litellm_stream_assembles_tool_calls_from_fragments(litellm_stream, monkeypatch):
+    monkeypatch.setattr(settings, "model", "gemini/m")
+    ps, tokens = await _provider_stream(
+        litellm_stream,
+        [
+            _chunk(content="Let me "),
+            _chunk(tool_calls=[_frag(1, id="b", name="ask_check_questions", arguments="{}")]),
+            _chunk(tool_calls=[_frag(0, id="a", name="retrieve_chunks", arguments='{"query":')]),
+            _chunk(content="look."),
+            _chunk(tool_calls=[_frag(0, arguments='"x"}')]),
+        ],
+    )
+
+    assert tokens == ["Let me ", "look."]
+    assert ps.text == "Let me look."
+    # Ordered by index; argument fragments concatenated; id/name set once.
+    assert ps.tool_calls == [
+        llm.ToolCall(id="a", name="retrieve_chunks", arguments='{"query":"x"}'),
+        llm.ToolCall(id="b", name="ask_check_questions", arguments="{}"),
+    ]
+    assert litellm_stream["calls"] == [
+        {
+            "model": "gemini/m",
+            "temperature": 0.3,
+            "messages": MESSAGES,
+            "stream": True,
+            "timeout": 7,
+            "tools": [{"type": "function"}],
+            "tool_choice": "auto",
+        }
+    ]
+
+
+async def test_litellm_stream_prices_the_built_response_without_tokenizing(
+    litellm_stream, monkeypatch
+):
+    built = SimpleNamespace(
+        usage=SimpleNamespace(
+            prompt_tokens=1500,
+            completion_tokens=200,
+            prompt_tokens_details=SimpleNamespace(cached_tokens=1100),
+        )
+    )
+    seen = {}
+
+    def builder(chunks, messages=None):
+        seen["chunks"], seen["messages"] = len(chunks), messages
+        return built
+
+    monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
+    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response: 0.0032)
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+
+    cost, usage = ps.priced()
+
+    assert cost == Decimal("0.0032")
+    assert usage == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
+    assert seen == {"chunks": 1, "messages": MESSAGES}
+    assert litellm_stream["counted"] == []  # P3.2: no tokenization on the happy path
+
+
+async def test_litellm_stream_pricing_gap_falls_back_to_token_math(litellm_stream, monkeypatch):
+    """F-19: a pricing-table gap must not register the call as $0."""
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    monkeypatch.setattr(
+        litellm, "stream_chunk_builder", lambda chunks, messages=None: SimpleNamespace(usage=None)
+    )
+
+    def no_price(completion_response):
+        raise ValueError("unknown model")
+
+    monkeypatch.setattr(litellm, "completion_cost", no_price)
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+
+    cost, _usage = ps.priced()
+
+    assert cost > Decimal("0")
+    assert cost == ps.estimate()
+
+
+async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stream, monkeypatch):
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="partial")])
+
+    ps.estimate()
+
+    assert litellm_stream["counted"] == [MESSAGES, "partial"]
+
+
+async def test_litellm_stream_estimate_counts_tool_call_arguments(litellm_stream, monkeypatch):
+    """Tool-call arguments already streamed are billed output."""
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    ps, _ = await _provider_stream(
+        litellm_stream,
+        [_chunk(content="Q: "), _chunk(tool_calls=[_frag(0, id="a", name="ask", arguments="{}")])],
+    )
+
+    ps.estimate()
+
+    assert litellm_stream["counted"] == [MESSAGES, "Q: {}"]
 
 
 # --- provider resolution -----------------------------------------------------

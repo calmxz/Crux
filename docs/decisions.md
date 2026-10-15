@@ -893,6 +893,24 @@ a test fake).
   user. Completions do not retry timeouts (a 30 s timeout retried twice
   would keep the user waiting 90 s or more); embeddings still do. A failed
   attempt with no output settles $0, except a timeout.
+  **Amended 2026-10-15 (#412):** a stream retries only while no chunk of any
+  kind has arrived, not merely no text event. A tool-call fragment is output
+  the vendor bills, so an attempt that received one settles its estimate
+  (prompt plus text plus tool-call arguments) and is not retried. "A failed
+  attempt with no output settles $0" stands, including an attempt whose
+  stream opened and then failed before its first chunk; that stream is
+  closed before the retry. Billing such an attempt (on the premise that the
+  vendor processed the prompt) was tried in review and reverted: the premise
+  is unverified, and it charged learners during an outage with no reply.
+  #561 checks whether Gemini bills these attempts. The tutor and the `retrieve` tool now
+  write no ledger row themselves (every call settles in the adapter), so the
+  previous amendment's "commits each iteration's `record_cost`" and
+  "commits its embedding metering" no longer apply. The retrieve tool's
+  embedding goes through `llm.get().embed`; a `CostCapExceeded` there is a
+  tool error result (code in `error`), and the next stream's gate emits the
+  cap event. The tutor's mid-turn refusal carries the exception's code, so a
+  global-ceiling refusal reports `global_cost_cap_reached` and the frontend
+  keeps the streamed text as `partial`.
 - **One module-level active adapter, one test fake.** `llm.get()` resolves
   per call. Tests install a fake provider under the real shell, so the gate,
   retry and settlement run in every test. Explicit injection was rejected

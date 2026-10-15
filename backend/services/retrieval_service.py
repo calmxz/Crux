@@ -8,7 +8,6 @@ cosine-distance search over `chunk_embeddings` scoped to the session.
 import logging
 import math
 
-import litellm
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
@@ -19,33 +18,23 @@ from config import settings
 from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
 from db.models import Session as SessionModel
-from lib import llm_retry
 from services import cost_meter, documents_service, llm, pgvector_store
 
 log = logging.getLogger(__name__)
 
 
-def _unwrap_embedding(resp) -> list[float]:
-    d = resp.data[0]
-    return d["embedding"] if isinstance(d, dict) else d.embedding
+def _embed_query(db: Session, query: str, *, user_id: str | None, session_id: str) -> list[float]:
+    """Sync embed of a single query string through the adapter, which gates,
+    retries and settles the spend (F-19). Runs inside the tutor's tool
+    dispatch thread.
 
-
-def _embed_query(query: str):
-    """Sync embed of a single query string. Returns (resp, vector) so callers
-    can meter the raw response while also getting the unwrapped vector.
-
-    Stays on litellm directly until #412: the tool runs synchronously inside
-    the tutor's dispatch on ctx.db, and moving it onto the adapter is that
-    issue's scope."""
-    resp = llm_retry.retry_sync(
-        lambda: litellm.embedding(
-            model=settings.embedding_model,
-            input=[query],
-            dimensions=settings.embedding_dim,
-            timeout=settings.embedding_timeout_s,
-        )
+    Commits `db` first so its pooled connection is not held idle across the
+    network call and its retries."""
+    db.commit()
+    result = llm.get().embed(
+        [query], meter=llm.Meter(user_id=user_id, session_id=session_id, purpose="embedding")
     )
-    return resp, _unwrap_embedding(resp)
+    return result.vectors[0]
 
 
 async def _aembed_query(
@@ -82,22 +71,17 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
         )
 
     try:
-        resp, query_vec = _embed_query(args.query)
-        cost_meter.meter_embedding_response(
-            db,
-            resp,
-            user_id=ctx.user_id,
-            session_id=ctx.session_id,
-            texts=[args.query],
-        )
-        # Publish the ledger write now: a bundled sibling retrieve_chunks call
-        # can spend ~45 s in its own embedding retries, and holding the
-        # user's ledger row that long drops any LLM adapter settlement for
-        # this user (SETTLE_LOCK_TIMEOUT).
-        db.commit()
+        query_vec = _embed_query(db, args.query, user_id=ctx.user_id, session_id=ctx.session_id)
         hits = pgvector_store.query_chunks(
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
+    except cost_meter.CostCapExceeded as e:
+        # A tool result, not an exception, so the turn does not fail: the
+        # model sees the refusal, and if the turn continues the tutor's next
+        # call is refused by the adapter gate with the cap event. A turn
+        # ended by a bundled terminal tool (a check or topic card) ends
+        # without one; the route's admission gate refuses the next turn.
+        return ToolResult(ok=False, status="failed", error=e.code)
     except Exception as e:
         log.error(
             "retrieval failed",

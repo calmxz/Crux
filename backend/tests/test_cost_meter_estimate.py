@@ -84,7 +84,7 @@ def test_unknown_model_double_failure_returns_zero(monkeypatch):
     assert cost == Decimal("0")
 
 
-# Tests for embedding_cost and meter_embedding_response (F-19 groundwork)
+# Tests for embedding_cost (F-19 groundwork)
 
 
 class _FakeUsage:
@@ -121,25 +121,3 @@ def test_embedding_cost_unknown_model_returns_zero(monkeypatch):
         lambda **kw: (_ for _ in ()).throw(ValueError("unknown model")),
     )
     assert cost_meter.embedding_cost("nope/nope", _FakeEmbedResp(), ["q"]) == Decimal("0")
-
-
-def test_meter_embedding_response_writes_ledger_and_log(db_session, monkeypatch):
-    from sqlalchemy import select
-
-    from db.models import LlmCallLog
-    from services import cost_meter
-
-    def _mk_user(db, uid):
-        from db.models import User
-
-        db.add(User(id=uid))
-        db.flush()
-
-    _mk_user(db_session, "uemb")
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.002)
-    cost_meter.meter_embedding_response(
-        db_session, _FakeEmbedResp(), user_id="uemb", session_id="s1", texts=["q"]
-    )
-    assert cost_meter.current_spend(db_session, "uemb") == Decimal("0.0020")
-    row = db_session.execute(select(LlmCallLog).where(LlmCallLog.user_id == "uemb")).scalar_one()
-    assert row.purpose == "embedding"

@@ -1,6 +1,7 @@
-"""Streaming tutor agent loop. Calls LiteLLM (stream=True) with the
-registered tools and dispatches tool calls until the model returns a final
-text answer or max_iters is exhausted, yielding StreamEvent objects live.
+"""Streaming tutor agent loop. Streams each iteration through the LLM adapter
+(services/llm.py) with the registered tools and dispatches tool calls until
+the model returns a final text answer or max_iters is exhausted, yielding
+StreamEvent objects live. The adapter gates, retries and settles each call.
 """
 
 import asyncio
@@ -9,8 +10,6 @@ import logging
 from datetime import datetime, timezone
 from decimal import Decimal
 from typing import AsyncIterator
-
-import litellm
 
 from agent import context_budget, tools
 from agent._stub import stub_response
@@ -21,8 +20,8 @@ from config import settings
 from contracts import Citation, ToolCallRecord, ToolResult
 from db.models import ChatMessage
 from lib.citations import chunks_to_citations
-from lib.error_codes import DAILY_COST_CAP_REACHED, LLM_FAILED, MAX_ITERS_REACHED
-from services import check_service, cost_meter, topic_suggest_service
+from lib.error_codes import LLM_FAILED, MAX_ITERS_REACHED
+from services import check_service, cost_meter, llm, topic_suggest_service
 
 log = logging.getLogger(__name__)
 
@@ -101,36 +100,19 @@ def _summarize(name: str, result) -> str:
     return "ok"
 
 
-def _record_partial_cost(ctx, snapshots: list[list[dict]], text: str, purpose: str) -> Decimal:
-    """Estimate and record spend for iterations whose acompletion started but
-    was never metered (cancelled or crashed mid-stream). Token-math estimate,
-    same shape as the cancellation arm always used. Never raises."""
-    prompt_tokens_total = 0
-    for snapshot in snapshots:
-        try:
-            prompt_tokens_total += litellm.token_counter(model=settings.model, messages=snapshot)
-        except Exception as e:
-            # Local tokenization only; no credential in the exception.
-            # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
-            log.warning("token_counter failed: %s", e)
+async def _drain_dispatch(dispatch_task: asyncio.Task | None, ctx) -> None:
+    """Wait for an in-flight tools.dispatch thread to finish. Never raises."""
+    if dispatch_task is None or dispatch_task.done():
+        return
     try:
-        cost = cost_meter.estimate_cancelled_cost(settings.model, text, prompt_tokens_total)
-    except Exception as e:
-        log.warning("estimate_cancelled_cost failed: %s", e)
-        cost = Decimal("0")
-    try:
-        cost_meter.record_cost(ctx.db, ctx.user_id, cost)
-    except Exception as e:
-        log.warning("cost_meter.record_cost (partial) failed: %s", e)
-    cost_meter.log_call(
-        ctx.db,
-        user_id=ctx.user_id,
-        session_id=ctx.session_id,
-        purpose=purpose,
-        model=settings.model,
-        cost_usd=cost,
-    )
-    return cost
+        await dispatch_task
+    except Exception:
+        log.warning(
+            "in-flight tool dispatch raised while draining on cancel session_id=%s user_id=%s",
+            ctx.session_id,
+            ctx.user_id,
+            exc_info=True,
+        )
 
 
 def _chunk_text(text: str, parts: int = 3) -> list[str]:
@@ -156,9 +138,10 @@ async def run_streaming(
 ) -> AsyncIterator[StreamEvent]:
     """The tutor agent loop. Yields StreamEvent objects live.
 
-    Real token streaming via litellm.acompletion(stream=True) each iteration.
-    Owns persistence of the assistant ChatMessage (complete or cancelled) and
-    records an estimated cost on cancellation.
+    Real token streaming through llm.get().stream() each iteration. Owns
+    persistence of the assistant ChatMessage (complete or cancelled). Spend is
+    the adapter's: each call settles once on its own exit, so no path here
+    records cost.
     """
     # Stub mode: deterministic, no LLM, no tools, no cost. Chunked so the UI
     # still exercises the delta path.
@@ -174,15 +157,16 @@ async def run_streaming(
 
     full: list[dict] = [{"role": "system", "content": system_prompt}] + list(messages)
     accumulated_text = ""
-    iter_prompt_snapshots: list[
-        list[dict]
-    ] = []  # shallow-copied prefix at each iteration start; used only on cancel/error
-    billed_iters = 0  # iterations whose cost was metered (real or fallback)
-    billed_chars = 0  # accumulated_text length at the last metering point
+    meter = llm.Meter(
+        ctx.user_id,
+        ctx.session_id,
+        "followup" if getattr(ctx, "suppress_check", False) else "chat",
+    )
     tool_calls_record: list[ToolCallRecord] = []
     citations: list[Citation] = list(ctx.prefetched_citations or [])
     asked_check = False  # hoisted so the except asyncio.CancelledError: branch can read it
     dispatch_task: asyncio.Task | None = None  # in-flight tools.dispatch thread (see cancel arm)
+    inflight: llm.LlmStream | None = None  # the call a cancel cut short, if any
 
     if citations:
         # F-56: server-prefetched excerpts -- emit their citations up front so
@@ -191,128 +175,54 @@ async def run_streaming(
 
     try:
         for _i in range(max_iters):
-            cap = cost_meter.check_cap(ctx.db, ctx.user_id)
-            if not cap.allowed:
+            # B-10 (structural): close the transaction this turn's earlier
+            # reads opened so the pooled connection (and, on the Supabase
+            # transaction pooler, its pinned backend) returns to the pool for
+            # the 10-60 s stream. Post-stream code reopens one on first use.
+            ctx.db.commit()
+
+            stream = llm.get().stream(
+                full,
+                meter=meter,
+                tools=tools.TOOLS,
+                tool_choice="auto",
+                temperature=settings.llm_temperature,
+                timeout=settings.llm_timeout_s,
+            )
+            try:
+                async with stream:
+                    inflight = stream
+                    async for ev in stream:
+                        accumulated_text += ev.text
+                        yield StreamEvent("assistant_delta", {"text": ev.text})
+                    # Finished, so a cancel landing in the exit's close cut
+                    # nothing short (the exit settles its real price).
+                    inflight = None
+            except cost_meter.CostCapExceeded as refused:
+                # The adapter's gate refused this call (user cap or global
+                # ceiling); the model was not called.
                 log.warning(
-                    "hard cost cap reached mid-turn (stream) session_id=%s user_id=%s used=%s",
+                    "cost cap reached mid-turn (stream) code=%s session_id=%s user_id=%s",
+                    refused.code,
                     ctx.session_id,
                     ctx.user_id,
-                    cap.used,
                 )
                 _persist_partial_on_abort(
                     ctx, accumulated_text, tool_calls_record, citations, asked_check
                 )
-                yield StreamEvent(
-                    "error",
-                    {
-                        "code": DAILY_COST_CAP_REACHED,
-                        "used_usd": str(cap.used),
-                        "soft_cap_usd": str(cap.soft_cap),
-                        "hard_cap_usd": str(cap.hard_cap),
-                    },
-                )
+                payload = {"code": refused.code}
+                if refused.cap is not None:
+                    payload |= {
+                        "used_usd": str(refused.cap.used),
+                        "soft_cap_usd": str(refused.cap.soft_cap),
+                        "hard_cap_usd": str(refused.cap.hard_cap),
+                    }
+                yield StreamEvent("error", payload)
                 return
+            content_buf = stream.text
 
-            # Shallow-copy each message dict: prune_superseded_excerpts (P2)
-            # mutates a tool message's "content" VALUE on the shared dict
-            # later in the loop, but a copied dict keeps its own reference to
-            # the original (unmutated) string, so this prefix stays exact
-            # even if a later iteration's prune stubs an earlier round.
-            iter_prompt_snapshots.append([dict(m) for m in full])
-
-            # B-10 (structural): close the transaction the loop-top check_cap
-            # SELECT opened so the pooled connection (and, on the Supabase
-            # transaction pooler, its pinned backend) returns to the pool for
-            # the 10-60 s stream. Commit, not rollback: any flushed ledger
-            # increments from earlier this turn are real spend and must
-            # survive. Post-stream code reopens a transaction on first use.
-            ctx.db.commit()
-
-            resp = await litellm.acompletion(
-                model=settings.model,
-                temperature=settings.llm_temperature,
-                messages=full,
-                tools=tools.TOOLS,
-                tool_choice="auto",
-                stream=True,
-                timeout=settings.llm_timeout_s,
-            )
-
-            content_buf = ""
-            tool_frags: dict[int, dict] = {}
-            chunks: list = []
-
-            async for chunk in resp:
-                chunks.append(chunk)
-                delta = chunk.choices[0].delta
-
-                token = getattr(delta, "content", None)
-                if token:
-                    content_buf += token
-                    accumulated_text += token
-                    yield StreamEvent("assistant_delta", {"text": token})
-
-                tcs = getattr(delta, "tool_calls", None)
-                if tcs:
-                    for tcd in tcs:
-                        idx = getattr(tcd, "index", 0)
-                        slot = tool_frags.setdefault(idx, {"id": None, "name": None, "args": ""})
-                        tcd_id = getattr(tcd, "id", None)
-                        if tcd_id:
-                            slot["id"] = tcd_id
-                        fn = getattr(tcd, "function", None)
-                        if fn is not None:
-                            fn_name = getattr(fn, "name", None)
-                            if fn_name:
-                                slot["name"] = fn_name
-                            fn_args = getattr(fn, "arguments", None)
-                            if fn_args:
-                                slot["args"] += fn_args
-
-            # Record this iteration's cost BEFORE branching on tool_frags. Every
-            # acompletion above is billed, so tool-dispatch iterations must count
-            # toward the daily cap too -- otherwise a multi-tool turn could evade
-            # the hard cost cap by only ever billing its final text iteration.
-            built = None
-            try:
-                built = litellm.stream_chunk_builder(chunks, messages=full)
-                cost = litellm.completion_cost(completion_response=built) or 0.0
-            except Exception as e:
-                log.warning("stream completion_cost failed: %s", e)
-                # F-19: a pricing-table gap must not register the turn as $0 --
-                # fall back to token math so the cap still sees real spend.
-                try:
-                    pt = litellm.token_counter(model=settings.model, messages=full)
-                    cost = cost_meter.estimate_cancelled_cost(settings.model, content_buf, pt)
-                except Exception as e2:  # noqa: BLE001
-                    # Local tokenization/cost-estimation only; no credential in the exception.
-                    # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
-                    log.warning("stream cost token-math fallback failed: %s", e2)
-                    cost = 0.0
-            if cost > 0:
-                try:
-                    cost_meter.record_cost(ctx.db, ctx.user_id, cost)
-                except Exception as e:
-                    log.warning("cost_meter.record_cost failed: %s", e)
-                cost_meter.log_call(
-                    ctx.db,
-                    user_id=ctx.user_id,
-                    session_id=ctx.session_id,
-                    purpose="followup" if getattr(ctx, "suppress_check", False) else "chat",
-                    model=settings.model,
-                    cost_usd=cost,
-                    **cost_meter.extract_usage(built),
-                )
-                # Publish now rather than at the next loop-top commit: the
-                # upsert holds the user's ledger row lock, and tool dispatch
-                # can run for tens of seconds, stalling any other settlement
-                # for this user (LLM adapter, SETTLE_LOCK_TIMEOUT).
-                ctx.db.commit()
-            billed_iters = len(iter_prompt_snapshots)
-            billed_chars = len(accumulated_text)
-
-            # No tool calls assembled -> the streamed content was the final answer.
-            if not tool_frags:
+            # No tool calls -> the streamed content was the final answer.
+            if not stream.tool_calls:
                 # Soft-cap warning: SSE flushes its headers before the LLM runs,
                 # so a response header cannot carry the 90%-of-cap signal; it is
                 # emitted as a dedicated event instead and routed through the
@@ -340,7 +250,7 @@ async def run_streaming(
                 return
 
             # Tool calls present: append the assistant turn, then dispatch each.
-            ordered = [tool_frags[k] for k in sorted(tool_frags)]
+            ordered = stream.tool_calls
             # ask_check_questions and suggest_topics are turn-terminating and
             # must be the LAST call of the turn. F-10: bundled non-terminal
             # calls (profile patches, retrieval) are legitimate and are
@@ -349,36 +259,33 @@ async def run_streaming(
             # check) are dropped, and the first one streamed wins. Reduce
             # BEFORE building the assistant message so the persisted tool
             # calls and `full` stay consistent.
-            terminal_slots = [s for s in ordered if s["name"] in _TERMINAL_TOOLS]
-            if terminal_slots:
-                non_terminal = [s for s in ordered if s["name"] not in _TERMINAL_TOOLS]
-                ordered = non_terminal + terminal_slots[:1]
+            terminal_calls = [tc for tc in ordered if tc.name in _TERMINAL_TOOLS]
+            if terminal_calls:
+                non_terminal = [tc for tc in ordered if tc.name not in _TERMINAL_TOOLS]
+                ordered = non_terminal + terminal_calls[:1]
             full.append(
                 {
                     "role": "assistant",
                     "content": content_buf or None,
                     "tool_calls": [
                         {
-                            "id": slot["id"],
+                            "id": tc.id,
                             "type": "function",
-                            "function": {
-                                "name": slot["name"],
-                                "arguments": slot["args"],
-                            },
+                            "function": {"name": tc.name, "arguments": tc.arguments},
                         }
-                        for slot in ordered
+                        for tc in ordered
                     ],
                 }
             )
 
             asked_check = False
             suggested_topics = False
-            for slot in ordered:
-                name = slot["name"]
-                call_id = slot["id"]
+            for tc in ordered:
+                name = tc.name
+                call_id = tc.id
 
                 try:
-                    args = json.loads(slot["args"]) if slot["args"] else {}
+                    args = json.loads(tc.arguments) if tc.arguments else {}
                 except json.JSONDecodeError as e:
                     # F-20: a truncated/garbled streamed argument blob must
                     # fail loudly. Dispatching {} would validate (session_id
@@ -512,8 +419,6 @@ async def run_streaming(
             if asked_check or suggested_topics:
                 # Turn-terminating: a check or topic card handed to the learner.
                 # Persist and stop. Grading happens on the next turn, not this one.
-                # Cost for this LLM call was already recorded above (before the
-                # tool-dispatch section), so no extra metering needed here.
                 # Soft-cap warning is intentionally skipped here: the card is
                 # the active UI element; the next regular reply surfaces the warning.
                 msg_id = _persist_assistant_message(
@@ -539,26 +444,13 @@ async def run_streaming(
         # thread may still be mid-commit (profile_service.apply_patch,
         # check_service.register, retrieval_service.retrieve), and
         # SQLAlchemy's Session is not thread-safe.
-        if dispatch_task is not None and not dispatch_task.done():
-            try:
-                await dispatch_task
-            except Exception:
-                log.warning(
-                    "in-flight tool dispatch raised while draining on cancel "
-                    "session_id=%s user_id=%s",
-                    ctx.session_id,
-                    ctx.user_id,
-                    exc_info=True,
-                )
+        await _drain_dispatch(dispatch_task, ctx)
 
-        # Bill only iterations not yet metered -- completed iterations already
-        # recorded real cost above.
-        cost = _record_partial_cost(
-            ctx,
-            iter_prompt_snapshots[billed_iters:],
-            accumulated_text[billed_chars:],
-            "followup" if getattr(ctx, "suppress_check", False) else "chat",
-        )
+        # The call this cancel cut short settled its own estimate as it
+        # exited; a cancel between calls (during tool dispatch) cut none.
+        cost = Decimal("0")
+        if inflight is not None and inflight.cost is not None:
+            cost = inflight.cost
 
         # F-01-style guard: a persistence failure here must not replace the
         # CancelledError being propagated below.
@@ -609,21 +501,8 @@ async def run_streaming(
                 ctx.session_id,
                 ctx.user_id,
             )
-        # F-03/B-10: re-estimate the WHOLE turn (all snapshots), not just the
-        # unbilled tail. Every iteration that finished streaming committed
-        # its real cost before tool dispatch, so those costs survived the
-        # rollback above and this double-counts them (including a
-        # single-iteration turn that fails in dispatch or while persisting)
-        # -- kept deliberately, since overcounting only shortens the user's
-        # own daily budget (no card billing) and is safer than the
-        # alternative undercount. Retrieval-embedding spend is committed by
-        # the retrieve tool as it is metered, so the rollback keeps it too.
-        _record_partial_cost(
-            ctx,
-            iter_prompt_snapshots,
-            accumulated_text,
-            "followup" if getattr(ctx, "suppress_check", False) else "chat",
-        )
+        # No re-estimate: every call settled once in the adapter's own
+        # transaction as it exited, so the rollback above erased no spend.
         try:
             msg_id = _persist_assistant_message(
                 ctx,

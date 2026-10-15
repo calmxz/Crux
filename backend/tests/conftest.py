@@ -258,6 +258,68 @@ def client(db_session, monkeypatch):
     app.dependency_overrides.clear()
 
 
+# Stream script step: park the stream here until the consumer is cancelled.
+BLOCK = object()
+
+
+def tool_call(name: str, args: dict | str | None = None, id: str | None = None):
+    """A stream script step: one assembled tool call. A str `args` is passed
+    through raw (to script malformed JSON)."""
+    import json
+
+    from services.llm import ToolCall
+
+    raw = args if isinstance(args, str) else json.dumps(args or {})
+    return ToolCall(id=id or f"call_{name}", name=name, arguments=raw)
+
+
+class _FakeProviderStream:
+    """One scripted stream (see FakeLlmProvider.streams)."""
+
+    def __init__(self, provider: "FakeLlmProvider", steps: list, messages: list[dict]):
+        self._provider = provider
+        self._steps = steps
+        self._messages = messages
+        self._tool_calls: list = []
+        self.received = False
+        self.text = ""
+        self.closed = False
+
+    @property
+    def tool_calls(self):
+        return list(self._tool_calls)
+
+    async def __aiter__(self):
+        import asyncio
+
+        from services.llm import ToolCall
+
+        for step in self._steps:
+            if step is BLOCK:
+                await asyncio.Event().wait()
+            elif isinstance(step, asyncio.Event):
+                await step.wait()
+            elif isinstance(step, BaseException):
+                raise step
+            elif isinstance(step, ToolCall):
+                self.received = True
+                self._tool_calls.append(step)
+            else:
+                self.received = True
+                self.text += step
+                yield step
+
+    def priced(self):
+        return self._provider.cost, self._provider._usage()
+
+    def estimate(self):
+        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], self.text))
+        return self._provider.partial_cost
+
+    async def aclose(self):
+        self.closed = True
+
+
 class FakeLlmProvider:
     """Scripted stand-in for the LLM adapter's provider (#411).
 
@@ -268,6 +330,13 @@ class FakeLlmProvider:
     embedding_dim) is returned for every embedded text. Every successful
     call costs `cost`; a timed-out attempt settles `timeout_cost`, and
     `estimates` records which estimator priced it and from what input.
+
+    `streams` feeds stream() opens in order (#412). An exception instance is
+    raised on open; a list is a script of steps: a str is a text token, a
+    `tool_call(...)` is an assembled tool call, an exception is raised at that
+    point, BLOCK parks until cancelled and an asyncio.Event parks until set.
+    An unscripted open streams `default_reply`. A finished stream costs
+    `cost`; a cut-short one settles `partial_cost`.
     """
 
     chat_model = "fake/chat"
@@ -275,14 +344,37 @@ class FakeLlmProvider:
 
     def __init__(self):
         self.replies: list[Any] = []
+        self.streams: list[Any] = []
+        self.default_reply = "This is a fake reply."
         self.embed_errors: list[BaseException] = []
         self.vector: list[float] | None = None
         self.cost = Decimal("0")
         self.timeout_cost = Decimal("0")
-        self.estimates: list[tuple[str, Any]] = []
+        self.partial_cost = Decimal("0")
+        self.estimates: list[tuple] = []
         self.complete_calls: list[dict] = []
+        self.stream_calls: list[dict] = []
+        self.opened: list[_FakeProviderStream] = []
         self.embed_calls: list[list[str]] = []
         self.aembed_calls: list[list[str]] = []
+
+    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+        # Copy each message: the tutor appends to and prunes its list later.
+        self.stream_calls.append(
+            {
+                "messages": [dict(m) for m in messages],
+                "tools": tools,
+                "tool_choice": tool_choice,
+                "temperature": temperature,
+                "timeout": timeout,
+            }
+        )
+        script = self.streams.pop(0) if self.streams else [self.default_reply]
+        if isinstance(script, BaseException):
+            raise script
+        s = _FakeProviderStream(self, list(script), messages)
+        self.opened.append(s)
+        return s
 
     def _usage(self) -> dict:
         return {"prompt_tokens": None, "completion_tokens": None, "cached_tokens": None}
