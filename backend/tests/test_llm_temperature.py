@@ -109,28 +109,18 @@ def session_with_messages(db_session):
     return session
 
 
-def test_summary_acompletion_gets_summary_temperature(
-    session_with_messages, db_session, monkeypatch
-):
-    # Mirror backend/tests/test_summary_service.py's fake_acompletion test
-    # (session + messages seeding, generate_and_persist call), capturing
-    # kwargs on the fake.
-    captured = {}
-
-    async def fake_acompletion(**kwargs):
-        captured.update(kwargs)
-        msg = SimpleNamespace(content="a summary")
-        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+def test_summary_acompletion_gets_summary_temperature(session_with_messages, db_session, fake_llm):
+    fake_llm.replies = ["a summary"]
 
     summary = asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
     assert summary == "a summary"
-    assert captured["temperature"] == settings.summary_temperature
+    assert fake_llm.complete_calls[0]["temperature"] == settings.summary_temperature
 
 
 @pytest.mark.asyncio
-async def test_rolling_summary_acompletion_gets_summary_temperature(db_session, monkeypatch):
+async def test_rolling_summary_acompletion_gets_summary_temperature(
+    db_session, monkeypatch, fake_llm
+):
     # Mirror backend/tests/test_rolling_summary.py's session_with_messages
     # factory and update_rolling_summary drive, capturing kwargs on the fake.
     db_session.add(User(id="u_roll_temp"))
@@ -149,16 +139,8 @@ async def test_rolling_summary_acompletion_gets_summary_temperature(db_session, 
     db_session.commit()
 
     monkeypatch.setattr(summary_service.settings, "llm_stub", False)
-
-    captured = {}
-
-    async def fake_acompletion(**kwargs):
-        captured.update(kwargs)
-        msg = SimpleNamespace(content="a rolling summary")
-        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", fake_acompletion)
+    fake_llm.replies = ["a rolling summary"]
 
     result = await summary_service.update_rolling_summary(db_session, "s_roll_temp")
     assert result == "a rolling summary"
-    assert captured["temperature"] == settings.summary_temperature
+    assert fake_llm.complete_calls[0]["temperature"] == settings.summary_temperature

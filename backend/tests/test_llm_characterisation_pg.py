@@ -287,3 +287,83 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         assert [(p, m, s, Decimal(str(c))) for p, m, s, c in rows] == [
             ("chat", MODEL, sid, CANCEL_ESTIMATE)
         ]
+
+
+# ---------------------------------------------------------------------------
+# #411: the adapter settles in its own transaction
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def adapter_on_postgres(seeded, monkeypatch, fake_llm):
+    """The LLM adapter's gate and settlement on the seeded Postgres, behind
+    the scripted fake provider. Yields the seeded (Session, uid, sid)."""
+    from services import llm
+
+    Session, _, _ = seeded
+    monkeypatch.setattr(llm, "session_factory", Session)
+    monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)
+    fake_llm.cost = Decimal("0.0005")
+    return seeded
+
+
+def _call_log(db, uid):
+    rows = db.execute(
+        select(LlmCallLog.purpose, LlmCallLog.cost_usd).where(LlmCallLog.user_id == uid)
+    ).all()
+    return [(p, Decimal(str(c))) for p, c in rows]
+
+
+async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+
+    with Session() as caller:
+        caller.add(ChatMessage(session_id=sid, role="user", content="rolled back"))
+        caller.flush()
+        await llm.get().aembed(
+            ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+        )
+        caller.rollback()
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+        assert db.execute(select(ChatMessage).where(ChatMessage.session_id == sid)).first() is None
+
+
+def test_settlement_behind_an_uncommitted_ledger_write_fails_fast_and_logs(
+    adapter_on_postgres, caplog
+):
+    """A caller holding an uncommitted ledger write across a call violates the
+    adapter's invariant. Settlement waits on that row lock only until
+    lock_timeout, then logs and returns the result instead of hanging."""
+    import logging
+    import time
+
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+
+    with Session() as caller:
+        cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row
+        started = time.monotonic()
+        with caplog.at_level(logging.ERROR, logger="services.llm"):
+            result = llm.get().embed(
+                ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+            )
+        elapsed = time.monotonic() - started
+        caller.rollback()
+
+    assert len(result.vectors) == 1
+    assert elapsed < 10, f"settlement hung for {elapsed:.1f}s"
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert (record.user_id, record.purpose, record.cost_usd) == (uid, "embedding", "0.0005")
+    with Session() as db:
+        # The violated invariant costs the settlement; the log line is the
+        # reconciliation record.
+        assert cost_meter.current_spend(db, uid) == Decimal("0")
+        assert _call_log(db, uid) == []

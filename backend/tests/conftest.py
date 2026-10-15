@@ -4,8 +4,7 @@ import os
 # into the test process. Do not move below the imports.
 os.environ["CRUX_SKIP_DOTENV"] = "1"
 
-import json
-from types import SimpleNamespace
+from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -154,7 +153,7 @@ def pytest_sessionfinish(session, exitstatus):
 
 
 @pytest.fixture
-def db_session():
+def db_session(monkeypatch):
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
@@ -162,6 +161,12 @@ def db_session():
     )
     Base.metadata.create_all(bind=engine)
     Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # The LLM adapter settles spend in its own session; point it at this
+    # engine. StaticPool shares one connection, so its commit also commits
+    # the caller's pending writes on sqlite (#411).
+    from services import llm
+
+    monkeypatch.setattr(llm, "session_factory", Session)
     db = Session()
     try:
         yield db
@@ -237,58 +242,82 @@ def client(db_session, monkeypatch):
     app.dependency_overrides.clear()
 
 
-def _text(content: str) -> SimpleNamespace:
-    """Build a fake LiteLLM completion response with a plain text reply."""
-    return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=None))]
-    )
+class FakeLlmProvider:
+    """Scripted stand-in for the LLM adapter's provider (#411).
 
+    Tests swap the provider, not the shell, so the cost gate, retry and
+    settlement run for real. `replies` feeds complete() attempts in order: a
+    str is the reply text, an exception instance is raised. `embed_errors`
+    likewise raises on the next embed attempts; `vector` (default 0.1s at
+    embedding_dim) is returned for every embedded text. Every successful
+    call costs `cost`; a timed-out attempt settles `timeout_cost`.
+    """
 
-def _tool_call(name: str, args: dict[str, Any], tool_call_id: str = "tc_1") -> SimpleNamespace:
-    """Build a fake LiteLLM completion response with a single tool call."""
-    return SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(
-                    content=None,
-                    tool_calls=[
-                        SimpleNamespace(
-                            id=tool_call_id,
-                            type="function",
-                            function=SimpleNamespace(
-                                name=name,
-                                arguments=json.dumps(args),
-                            ),
-                        )
-                    ],
-                )
-            )
-        ]
-    )
+    chat_model = "fake/chat"
+    embedding_model = "fake/embedding"
+
+    def __init__(self):
+        self.replies: list[Any] = []
+        self.embed_errors: list[BaseException] = []
+        self.vector: list[float] | None = None
+        self.cost = Decimal("0")
+        self.timeout_cost = Decimal("0")
+        self.complete_calls: list[dict] = []
+        self.embed_calls: list[list[str]] = []
+        self.aembed_calls: list[list[str]] = []
+
+    def _usage(self) -> dict:
+        return {"prompt_tokens": None, "completion_tokens": None, "cached_tokens": None}
+
+    async def complete(self, messages, *, temperature, timeout):
+        from services.llm import Completion
+
+        self.complete_calls.append(
+            {"messages": messages, "temperature": temperature, "timeout": timeout}
+        )
+        reply = self.replies.pop(0) if self.replies else "This is a fake reply."
+        if isinstance(reply, BaseException):
+            raise reply
+        return Completion(text=reply, cost=self.cost, usage=self._usage())
+
+    def _embedding(self, texts):
+        from config import settings
+        from services.llm import Embedding
+
+        if self.embed_errors:
+            raise self.embed_errors.pop(0)
+        vector = self.vector if self.vector is not None else [0.1] * settings.embedding_dim
+        vectors = [list(vector) for _ in texts]
+        return Embedding(vectors=vectors, cost=self.cost, usage=self._usage())
+
+    def embed(self, texts):
+        self.embed_calls.append(list(texts))
+        return self._embedding(texts)
+
+    async def aembed(self, texts):
+        self.aembed_calls.append(list(texts))
+        return self._embedding(texts)
+
+    def completion_prompt_cost(self, messages) -> Decimal:
+        return self.timeout_cost
+
+    def embedding_prompt_cost(self, texts) -> Decimal:
+        return self.timeout_cost
 
 
 @pytest.fixture
-def mock_litellm(monkeypatch):
-    """Scriptable response queue. Append SimpleNamespace items via _text/_tool_call.
-    Empty queue returns a default text response so existing tests keep working."""
-    queue: list[Any] = []
+def fake_llm(monkeypatch):
+    """Install a FakeLlmProvider behind the real adapter shell. Retries do
+    not sleep. The adapter's session factory is already bound to the test
+    engine by db_session."""
+    from services import llm
 
-    async def fake_acompletion(**kwargs):
-        if not queue:
-            return _text("This is a mocked tutor response.")
-        return queue.pop(0)
+    provider = FakeLlmProvider()
+    monkeypatch.setattr(llm, "_provider", provider)
+    monkeypatch.setattr(llm.time, "sleep", lambda _s: None)
 
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", fake_acompletion)
-    return queue
+    async def no_sleep(_s):
+        return None
 
-
-@pytest.fixture
-def llm_text():
-    """Helper exposed for tests to build text responses."""
-    return _text
-
-
-@pytest.fixture
-def llm_tool_call():
-    """Helper exposed for tests to build tool-call responses."""
-    return _tool_call
+    monkeypatch.setattr(llm.asyncio, "sleep", no_sleep)
+    return provider

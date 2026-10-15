@@ -344,19 +344,13 @@ def _persist_user_turn(req: ChatRequest, db: Session) -> None:
     db.commit()
 
 
-def _persist_user_turn_after_failure(
-    req: ChatRequest, db: Session, user_id: str, embed_cost_holder: list
-) -> None:
+def _persist_user_turn_after_failure(req: ChatRequest, db: Session) -> None:
     """F-11: synchronous failure-path persist segment.
 
-    Rollback discarded metered embedding spend flushed by the retrieval calls;
-    re-record it on the fresh transaction so real vendor cost is never lost.
-    The user-message commit publishes both (B-08/F-19).
+    The rollback cannot erase embedding spend: the LLM adapter settled it in
+    its own transaction (B-08/F-19).
     """
     db.rollback()
-    total_embed = sum(embed_cost_holder, Decimal("0"))
-    if total_embed > 0:
-        cost_meter.record_cost(db, user_id, total_embed)
     db.add(ChatMessage(session_id=req.session_id, role="user", content=req.message))
     db.commit()
 
@@ -378,7 +372,6 @@ async def _prepare_turn_after_guards(
     # 6) History through prompt build. An unexpected crash here must not lose
     # the user's message: persist it, then re-raise. Happy path pays no extra
     # statement.
-    embed_cost_holder: list = []
     try:
         messages, profile, gap_accuracy, retrieval_required = await run_in_threadpool(
             _prepare_turn_context, req, db, session
@@ -390,7 +383,6 @@ async def _prepare_turn_after_guards(
                 req.session_id,
                 req.message,
                 user_id=user_id,
-                cost_holder=embed_cost_holder,
             )
 
         prefetched_chunks = None
@@ -401,7 +393,6 @@ async def _prepare_turn_after_guards(
                 user_id,
                 req.message,
                 query_vec=query_vec,
-                cost_holder=embed_cost_holder,
             )
 
         prompt_state = _build_prompt_state(
@@ -420,9 +411,7 @@ async def _prepare_turn_after_guards(
         )
         system_prompt = prompts.build_system_prompt(prompt_state)
     except Exception:
-        await run_in_threadpool(
-            _persist_user_turn_after_failure, req, db, user_id, embed_cost_holder
-        )
+        await run_in_threadpool(_persist_user_turn_after_failure, req, db)
         raise
 
     # 7) Persist the user turn LAST (still committed before returning, so it

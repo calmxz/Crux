@@ -2,6 +2,7 @@
 
 import json
 
+import litellm
 import pytest
 
 from config import settings
@@ -93,7 +94,7 @@ def test_retrieval_gate_uses_any_ready_not_latest(db_session, monkeypatch):
         captured["called"] = True
         return []
 
-    monkeypatch.setattr("services.retrieval_service.litellm.embedding", fake_embedding)
+    monkeypatch.setattr(litellm, "embedding", fake_embedding)
     monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query_chunks)
 
     ctx = ToolContext(

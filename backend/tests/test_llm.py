@@ -1,0 +1,257 @@
+"""#411: the LLM adapter shell (llm-adapter 2/4).
+
+The provider is the scripted FakeLlmProvider from conftest; the gate, retry
+and settlement are the real ones, running against the sqlite test engine.
+Isolation from the caller's transaction is asserted on Postgres only, in
+test_llm_characterisation_pg.py.
+"""
+
+import logging
+from decimal import Decimal
+
+import litellm
+import pytest
+from sqlalchemy import select
+
+from config import settings
+from db.models import LlmCallLog, User
+from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
+from services import cost_meter, llm
+
+USER_ID = "llm-u1"
+SESSION_ID = "llm-s1"
+MESSAGES = [{"role": "user", "content": "hi"}]
+
+
+@pytest.fixture(autouse=True)
+def _caps(monkeypatch):
+    monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)
+    monkeypatch.setattr(settings, "llm_retry_attempts", 2)
+
+
+@pytest.fixture
+def user(db_session):
+    db_session.add(User(id=USER_ID))
+    db_session.commit()
+
+
+def _meter(user_id=USER_ID, purpose="summary") -> llm.Meter:
+    return llm.Meter(user_id=user_id, session_id=SESSION_ID, purpose=purpose)
+
+
+def _log_rows(db) -> list[tuple[str, str, Decimal]]:
+    rows = db.execute(
+        select(LlmCallLog.purpose, LlmCallLog.model, LlmCallLog.cost_usd).order_by(LlmCallLog.id)
+    ).all()
+    return [(p, m, Decimal(str(c))) for p, m, c in rows]
+
+
+def _rate_limited():
+    return litellm.RateLimitError(message="slow down", llm_provider="gemini", model="m")
+
+
+def _timeout():
+    return litellm.Timeout(message="too slow", model="m", llm_provider="gemini")
+
+
+async def _complete():
+    return await llm.get().complete(MESSAGES, meter=_meter(), temperature=0.2, timeout=5)
+
+
+# --- happy path ------------------------------------------------------------
+
+
+async def test_complete_settles_ledger_and_call_log(db_session, user, fake_llm):
+    fake_llm.replies = ["hello"]
+    fake_llm.cost = Decimal("0.002")
+
+    result = await _complete()
+
+    assert (result.text, result.cost) == ("hello", Decimal("0.002"))
+    assert fake_llm.complete_calls == [{"messages": MESSAGES, "temperature": 0.2, "timeout": 5}]
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+
+
+def test_embed_settles_under_the_embedding_model(db_session, user, fake_llm):
+    fake_llm.cost = Decimal("0.0005")
+
+    result = llm.get().embed(["a", "b"], meter=_meter(purpose="embedding"))
+
+    assert len(result.vectors) == 2
+    assert len(result.vectors[0]) == settings.embedding_dim
+    assert fake_llm.embed_calls == [["a", "b"]]
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0005")
+    assert _log_rows(db_session) == [("embedding", "fake/embedding", Decimal("0.0005"))]
+
+
+async def test_aembed_settles(db_session, user, fake_llm):
+    fake_llm.cost = Decimal("0.0005")
+
+    await llm.get().aembed(["q"], meter=_meter(purpose="embedding"))
+
+    assert fake_llm.aembed_calls == [["q"]]
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0005")
+
+
+# --- gate --------------------------------------------------------------------
+
+
+async def test_gate_refuses_over_the_user_cap(db_session, user, fake_llm):
+    cost_meter.record_cost(db_session, USER_ID, Decimal("3.00"))
+    db_session.commit()
+
+    with pytest.raises(llm.CallRefused) as exc:
+        await _complete()
+
+    assert isinstance(exc.value, cost_meter.CostCapExceeded)
+    assert exc.value.code == DAILY_COST_CAP_REACHED
+    assert fake_llm.complete_calls == []
+
+
+def test_gate_refuses_over_the_global_ceiling(db_session, user, fake_llm, monkeypatch):
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", 1.00)
+    cost_meter.record_cost(db_session, "someone-else", Decimal("1.00"))
+    db_session.commit()
+
+    with pytest.raises(cost_meter.CostCapExceeded) as exc:
+        llm.get().embed(["a"], meter=_meter())
+
+    assert exc.value.code == GLOBAL_COST_CAP_REACHED
+    assert fake_llm.embed_calls == []
+
+
+async def test_failing_spend_read_raises_and_never_calls_the_provider(
+    db_session, user, fake_llm, monkeypatch
+):
+    def boom(db, user_id):
+        raise RuntimeError("spend read failed")
+
+    monkeypatch.setattr(cost_meter, "current_spend", boom)
+
+    with pytest.raises(RuntimeError, match="spend read failed"):
+        await _complete()
+
+    assert fake_llm.complete_calls == []
+
+
+def test_no_user_skips_gate_and_ledger(db_session, fake_llm, monkeypatch):
+    def boom(*args, **kwargs):
+        raise AssertionError("gate must not run without a user")
+
+    monkeypatch.setattr(cost_meter, "assert_within_caps", boom)
+    fake_llm.cost = Decimal("0.0005")
+
+    result = llm.get().embed(["a"], meter=llm.Meter(user_id=None, session_id=None, purpose="x"))
+
+    assert len(result.vectors) == 1
+    assert _log_rows(db_session) == []
+    assert cost_meter.global_spend(db_session) == Decimal("0")
+
+
+# --- settlement --------------------------------------------------------------
+
+
+async def test_settlement_failure_logs_and_returns_the_result(
+    db_session, user, fake_llm, monkeypatch, caplog
+):
+    def ledger_down(*args, **kwargs):
+        raise RuntimeError("ledger down")
+
+    monkeypatch.setattr(cost_meter, "record_cost", ledger_down)
+    fake_llm.replies = ["kept"]
+    fake_llm.cost = Decimal("0.002")
+
+    with caplog.at_level(logging.ERROR, logger="services.llm"):
+        result = await _complete()
+
+    assert result.text == "kept"
+    assert _log_rows(db_session) == []
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert record.levelno == logging.ERROR
+    assert (record.user_id, record.session_id, record.purpose) == (USER_ID, SESSION_ID, "summary")
+    assert record.cost_usd == "0.002"
+
+
+# --- retry and failed-call settlement ---------------------------------------
+
+
+async def test_retry_on_429_then_success_bills_once(db_session, user, fake_llm):
+    fake_llm.replies = [_rate_limited(), "second try"]
+    fake_llm.cost = Decimal("0.002")
+    fake_llm.timeout_cost = Decimal("0.5")  # must not be charged for a 429
+
+    result = await _complete()
+
+    assert result.text == "second try"
+    assert len(fake_llm.complete_calls) == 2
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+
+
+async def test_retry_gives_up_after_the_configured_attempts(db_session, user, fake_llm):
+    fake_llm.replies = [_rate_limited(), _rate_limited(), _rate_limited(), "never"]
+
+    with pytest.raises(litellm.RateLimitError):
+        await _complete()
+
+    assert len(fake_llm.complete_calls) == 3
+    assert fake_llm.replies == ["never"]
+    assert _log_rows(db_session) == []
+
+
+async def test_completion_timeout_is_not_retried_and_settles_an_estimate(
+    db_session, user, fake_llm
+):
+    fake_llm.replies = [_timeout(), "never"]
+    fake_llm.timeout_cost = Decimal("0.0003")
+
+    with pytest.raises(litellm.Timeout):
+        await _complete()
+
+    assert len(fake_llm.complete_calls) == 1
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0003")
+    assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0003"))]
+    fake_llm.replies.clear()
+
+
+def test_embedding_timeout_is_retried_and_each_attempt_settles(db_session, user, fake_llm):
+    fake_llm.embed_errors = [_timeout()]
+    fake_llm.timeout_cost = Decimal("0.0001")
+    fake_llm.cost = Decimal("0.0005")
+
+    llm.get().embed(["a"], meter=_meter(purpose="embedding"))
+
+    assert fake_llm.embed_calls == [["a"], ["a"]]
+    assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0006")
+    assert [cost for _, _, cost in _log_rows(db_session)] == [
+        Decimal("0.0001"),
+        Decimal("0.0005"),
+    ]
+
+
+async def test_non_transient_error_is_raised_at_once_and_settles_nothing(
+    db_session, user, fake_llm
+):
+    fake_llm.replies = [ValueError("bad request")]
+    fake_llm.timeout_cost = Decimal("0.5")
+
+    with pytest.raises(ValueError):
+        await _complete()
+
+    assert len(fake_llm.complete_calls) == 1
+    assert _log_rows(db_session) == []
+
+
+# --- provider resolution -----------------------------------------------------
+
+
+def test_get_resolves_the_provider_per_call(monkeypatch):
+    monkeypatch.setattr(llm, "_provider", None)
+    assert isinstance(llm.get().provider, llm.LiteLlmProvider)
+
+    fake = object()
+    monkeypatch.setattr(llm, "_provider", fake)
+    assert llm.get().provider is fake

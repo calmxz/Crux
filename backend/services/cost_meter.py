@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from db.models import DailyCostLedger, LlmCallLog
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
+from lib.llm_errors import CallRefused
 from services.sql_dialect import dialect_insert
 
 log = logging.getLogger(__name__)
@@ -238,7 +239,7 @@ def check_cap(db: Session, user_id: str) -> CapStatus:
     return check_cap_from_spend(current_spend(db, user_id))
 
 
-class CostCapExceeded(Exception):
+class CostCapExceeded(CallRefused):
     """Raised by assert_within_caps when a spend cap blocks the operation."""
 
     def __init__(self, code: str, cap: CapStatus | None = None):

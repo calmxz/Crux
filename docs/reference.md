@@ -82,6 +82,33 @@ and the stream start releases in `_prepare_turn`'s `except BaseException` arm.
 Consequences: the usage ledger reads `reserve` high for the duration of a turn,
 and a process crash mid-turn leaves the reserve on the ledger until UTC midnight.
 
+### LLM adapter (#411)
+
+`backend/services/llm.py` is the one place that calls the model (the tutor's
+stream and the `retrieve` tool's embedding move in #412). `llm.get()` returns
+the shell around the active provider: `complete`, `embed`, `aembed`, each
+taking a `Meter(user_id, session_id, purpose)`. The shell gates on
+`cost_meter.assert_within_caps` and settles the ledger row plus the
+`LlmCallLog` row in its own short session, so spend survives any caller
+rollback. Settlement never raises; a failure is an error-level log line
+carrying user, session, purpose, cost and usage. `CallRefused` (base of
+`CostCapExceeded`) lives in `lib/llm_errors.py` so `cost_meter` can subclass
+it without importing the adapter.
+
+Caller rule: never hold an uncommitted ledger write (`record_cost`,
+`reserve_cost`, `adjust_cost`) in your session across an adapter call. The
+settlement upserts the same row; on Postgres it waits at most
+`SETTLE_LOCK_TIMEOUT`, then logs and drops the settlement.
+
+Tests: the `fake_llm` fixture (conftest) installs `FakeLlmProvider` under the
+real shell; script it with `replies` (str or exception per `complete`
+attempt), `embed_errors`, `vector`, `cost` and `timeout_cost`. `db_session`
+binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
+is one shared connection (`StaticPool`), so the adapter's commit also commits
+the caller's pending writes; isolation is only provable on Postgres. A
+Postgres test must bind `llm.session_factory` to its own sessionmaker (see
+`adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`).
+
 ### Stream cleanup must be shielded (#421)
 
 Starlette cancels a streaming response's task on client disconnect (and on

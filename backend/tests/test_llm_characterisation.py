@@ -563,7 +563,7 @@ async def test_generate_and_persist_meters_summary(db_session, seeded, fake_llm)
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_generate_and_persist_record_cost_failure_falls_back(
+async def test_generate_and_persist_record_cost_failure_keeps_summary(
     db_session, seeded, fake_llm, ledger_down
 ):
     _seed_messages(db_session, 2)
@@ -573,12 +573,11 @@ async def test_generate_and_persist_record_cost_failure_falls_back(
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
 
-    # #411 changes this: today a failed ledger write throws the paid summary
-    # away for the mechanical one. After #411 settlement never raises and the
-    # LLM summary is kept.
-    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
+    # Changed by #411: settlement never raises, so a failed ledger write no
+    # longer throws the paid summary away for the mechanical one.
+    assert len(fake_llm.acompletion_calls) == 1
     assert fake_llm.costs == []
-    assert summary.startswith("[auto] ")
+    assert summary == "Covered joins."
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
     assert _log_rows(db_session) == []
@@ -601,7 +600,7 @@ async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded,
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_update_rolling_summary_record_cost_failure_returns_none(
+async def test_update_rolling_summary_record_cost_failure_keeps_summary(
     db_session, seeded, fake_llm, ledger_down
 ):
     _seed_messages(db_session, 31)
@@ -610,14 +609,14 @@ async def test_update_rolling_summary_record_cost_failure_returns_none(
 
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
-    # #411 changes this: today a failed ledger write discards the paid
-    # rolling summary. After #411 settlement never raises and it is kept.
-    assert len(fake_llm.acompletion_calls) == 1  # paid for, then discarded
+    # Changed by #411: settlement never raises, so a failed ledger write no
+    # longer discards the paid rolling summary.
+    assert len(fake_llm.acompletion_calls) == 1
     assert fake_llm.costs == []
-    assert result is None
+    assert result == "Earlier the learner practised joins."
     session = db_session.get(SessionModel, SESSION_ID)
-    assert session.rolling_summary is None
-    assert session.rolling_summary_count is None
+    assert session.rolling_summary == result
+    assert session.rolling_summary_count == 11
     assert _log_rows(db_session) == []
 
 
@@ -626,7 +625,7 @@ async def test_update_rolling_summary_record_cost_failure_returns_none(
 # ---------------------------------------------------------------------------
 
 
-def test_prepare_failure_after_prefetch_rerecords_embedding(
+def test_prepare_failure_after_prefetch_keeps_embedding_spend(
     client, db_session, seeded, fake_llm, monkeypatch
 ):
     message = "explain foreign keys"
@@ -660,12 +659,13 @@ def test_prepare_failure_after_prefetch_rerecords_embedding(
         select(ChatMessage.content).where(ChatMessage.role == "user")
     ).scalars()
     assert list(user_msgs) == [message]
-    # Reservation released; the rolled-back embedding spend re-recorded once.
+    # Reservation released; the embedding spend recorded once, by the
+    # adapter, in its own transaction.
     assert _ledger(db_session) == Decimal("0.0005")
-    # #411 changes this: the embedding's LlmCallLog row is lost with the
-    # rollback today (only the ledger amount is re-recorded). After #411
-    # settlement commits in its own transaction and the row survives.
-    assert _log_rows(db_session) == []
+    # Changed by #411: the embedding's LlmCallLog row used to be lost with
+    # the rollback (only the ledger amount was re-recorded); now it survives.
+    assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))]
+    assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
 
 
 # ---------------------------------------------------------------------------

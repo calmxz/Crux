@@ -22,13 +22,10 @@ def test_prompt_without_prefetch_keeps_required_label():
     assert "RETRIEVAL: REQUIRED" in out
 
 
-def test_prefetch_returns_none_on_failure(db_session, monkeypatch):
+def test_prefetch_returns_none_on_failure(db_session, monkeypatch, fake_llm):
     from services import retrieval_service
 
-    async def boom(**kwargs):
-        raise RuntimeError("embed down")
-
-    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", boom)
+    fake_llm.embed_errors = [RuntimeError("embed down")]
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: True,
