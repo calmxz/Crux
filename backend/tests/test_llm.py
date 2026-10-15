@@ -499,6 +499,41 @@ async def test_stream_429_before_the_first_event_retries_and_bills_once(db_sessi
     assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
 
 
+async def test_stream_cancelled_during_retry_backoff_bills_nothing(
+    db_session, user, fake_llm, monkeypatch
+):
+    """Between attempts no request is in flight: the refused attempt cost
+    nothing and the next was never sent, so a cancel there settles $0."""
+    fake_llm.streams = [_rate_limited(), ["never"]]
+    fake_llm.timeout_cost = Decimal("0.5")
+    fake_llm.partial_cost = Decimal("0.5")
+    backing_off = asyncio.Event()
+
+    async def parked_sleep(_s):
+        backing_off.set()
+        await asyncio.Event().wait()
+
+    monkeypatch.setattr(llm.asyncio, "sleep", parked_sleep)
+    holder = {}
+
+    async def consume():
+        async with _stream() as s:
+            holder["s"] = s
+            await _drain(s)
+
+    task = asyncio.create_task(consume())
+    await asyncio.wait_for(backing_off.wait(), timeout=5)
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await asyncio.gather(task)
+
+    assert holder["s"].cost == Decimal("0")
+    assert len(fake_llm.stream_calls) == 1
+    assert fake_llm.estimates == []
+    assert _log_rows(db_session) == []
+    fake_llm.streams.clear()
+
+
 async def test_stream_gives_up_after_the_configured_attempts_and_bills_nothing(
     db_session, user, fake_llm
 ):

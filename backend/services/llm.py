@@ -530,7 +530,8 @@ class LlmStream:
         }
         self._ps: ProviderStream | None = None
         self._gen: AsyncGenerator[TextDelta, None] | None = None
-        self._started = False
+        # True while an attempt's request may be in flight or answered.
+        self._attempt_open = False
         self._finished = False
         self._provider_error: Exception | None = None
         self.cost: Decimal | None = None
@@ -552,10 +553,10 @@ class LlmStream:
         return self._gen
 
     async def _events(self) -> AsyncGenerator[TextDelta, None]:
-        self._started = True
         attempts = max(0, settings.llm_retry_attempts)
         for i in range(attempts + 1):
             try:
+                self._attempt_open = True
                 self._ps = await self._provider.stream(self._messages, **self._open_kwargs)
                 async for token in self._ps:
                     yield TextDelta(token)
@@ -567,6 +568,9 @@ class LlmStream:
                 if received or not retry or i == attempts:
                     self._provider_error = e
                     raise
+                # Nothing received: this attempt cost nothing, and until the
+                # next opens no request is in flight.
+                self._attempt_open = False
                 self._ps = None
             await asyncio.sleep(_backoff(i))
 
@@ -574,7 +578,7 @@ class LlmStream:
         ps = self._ps
         if self._finished and ps is not None:
             return ps.priced()
-        if not self._started:
+        if not self._attempt_open:
             return Decimal("0"), {}
         err = self._provider_error
         if err is not None and not (

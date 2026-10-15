@@ -150,8 +150,8 @@ there, `BLOCK` to park until cancelled), `embed_errors`, `vector`, `cost`,
 `timeout_cost` and `partial_cost` (a cut-short stream). `stream_calls`
 copies each sent message, so later pruning cannot rewrite a capture; the
 tutor still needs `llm_stub` off until #413. litellm's chunk parsing is the
-provider's and is tested against litellm-shaped chunks in `test_llm.py`. `db_session`
-binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
+provider's and is tested against litellm-shaped chunks in `test_llm.py`.
+`db_session` binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits
 the caller's pending writes; isolation is only provable on Postgres. A
 Postgres test must bind `llm.session_factory` to its own sessionmaker (see

@@ -50,7 +50,7 @@ PROMPT_TOKENS = 1000
 TOKENS_PER_WORD = 200
 FIRST_TEXT = "Let me note that. "  # iteration 1, billed at its real price
 TAIL_TEXT = "partial answer "  # iteration 2, cut short
-# Cancel bills one snapshot plus the unbilled tail (2 words):
+# Cancel bills the cut-short call's own prompt plus the 2 words it streamed:
 # (1000 * 0.0003 + 400 * 0.0025) / 1000.
 CANCEL_TAIL_ESTIMATE = Decimal("0.0013")
 # Changed by #412: an error bills only the failed call, the same math as the
@@ -446,8 +446,9 @@ async def test_transient_429_before_the_first_token_retries(
 
 
 async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch):
-    """Iteration 1's real cost reaches the hard cap; the loop-top cap check
-    before iteration 2 stops the turn without another provider call."""
+    """Iteration 1's real cost reaches the hard cap; the adapter gate on
+    iteration 2's stream refuses, stopping the turn without another provider
+    call."""
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.0005)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 0.001)
     fake_litellm.responses = [
