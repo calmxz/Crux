@@ -66,13 +66,20 @@ def test_settings_disabled_when_neither_set(monkeypatch):
 
 @pytest.fixture
 def no_litellm(monkeypatch):
-    """Any litellm network call fails the test."""
+    """Records any litellm network call; the test's teardown asserts none."""
+    calls: list[str] = []
 
-    def refuse(*_a, **_k):
-        raise AssertionError("stub mode called litellm")
+    def record(name):
+        def call(*_a, **_k):
+            calls.append(name)
+            raise AssertionError("stub mode called litellm")
+
+        return call
 
     for name in ("completion", "acompletion", "embedding", "aembedding"):
-        monkeypatch.setattr(litellm, name, refuse)
+        monkeypatch.setattr(litellm, name, record(name))
+    yield calls
+    assert calls == []
 
 
 async def _stream_text(system_prompt: str, user: str) -> tuple[str, list[str], object]:
@@ -128,10 +135,7 @@ async def test_stub_provider_embeddings_raise_unavailable(no_litellm):
 
 def test_unavailable_carries_a_non_cap_code():
     assert llm.LlmUnavailable().code == error_codes.LLM_UNAVAILABLE
-    assert error_codes.LLM_UNAVAILABLE not in {
-        error_codes.DAILY_COST_CAP_REACHED,
-        error_codes.GLOBAL_COST_CAP_REACHED,
-    }
+    assert llm.LlmUnavailable().cap is None
 
 
 def test_get_returns_the_stub_whenever_stub_mode_is_on(monkeypatch):
@@ -150,3 +154,29 @@ def test_summary_label_renders_the_line_the_stub_reads():
         f"\n{prompts.LAST_SESSION_SUMMARY_LABEL}: <untrusted_summary>x</untrusted_summary>\n" in ctx
     )
     assert prompts.LAST_SESSION_SUMMARY_LABEL == "LAST_SESSION_SUMMARY"
+
+
+async def test_stub_stream_skips_the_cost_gate(db_session, monkeypatch, no_litellm):
+    # The stub never spends, so a capped user's stub turn still echoes and
+    # leaves no ledger or call-log row.
+    from db.models import LlmCallLog
+    from services import cost_meter
+
+    monkeypatch.setattr(settings, "llm_stub", True)
+    cost_meter.record_cost(db_session, "u-capped", Decimal(str(settings.llm_hard_cap_usd)))
+    db_session.commit()
+    meter = llm.Meter("u-capped", "s1", "chat")
+    messages = [
+        {"role": "system", "content": prompts.build_system_prompt({})},
+        {"role": "user", "content": "hi"},
+    ]
+
+    async with llm.get().stream(messages, meter=meter, temperature=0.2, timeout=5) as s:
+        text = "".join([ev.text async for ev in s])
+
+    assert text == "[STUB:fresh] Echo: hi"
+    assert s.cost == Decimal("0")
+    assert cost_meter.current_spend(db_session, "u-capped") == Decimal(
+        str(settings.llm_hard_cap_usd)
+    )
+    assert db_session.query(LlmCallLog).count() == 0

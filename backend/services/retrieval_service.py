@@ -76,12 +76,12 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
         )
     except llm.CallRefused as e:
-        # A cap or stub-mode refusal (#413) is a tool result, not an
-        # exception, so the turn does not fail: the model sees the refusal,
-        # and if the turn continues the tutor's next call is refused by the
-        # adapter gate with the cap event. A turn
-        # ended by a bundled terminal tool (a check or topic card) ends
-        # without one; the route's admission gate refuses the next turn.
+        # A refusal is a tool result, not an exception, so the turn does not
+        # fail: the model sees the code. On a cap, if the turn continues the
+        # tutor's next call is refused by the adapter gate with the cap
+        # event; a turn ended by a bundled terminal tool (a check or topic
+        # card) ends without one, and the route's admission gate refuses the
+        # next turn. A stub-mode refusal (llm_unavailable, #413) caps nothing.
         return ToolResult(ok=False, status="failed", error=e.code)
     except Exception as e:
         log.error(

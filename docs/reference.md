@@ -82,7 +82,7 @@ and the stream start releases in `_prepare_turn`'s `except BaseException` arm.
 Consequences: the usage ledger reads `reserve` high for the duration of a turn,
 and a process crash mid-turn leaves the reserve on the ledger until UTC midnight.
 
-### LLM adapter (#411, #412)
+### LLM adapter (#411, #412, #413)
 
 `backend/services/llm.py` is the one place that calls the model; only it and
 `cost_meter`'s pricing helpers import `litellm` (the offline eval script
@@ -93,8 +93,20 @@ excepted). `llm.get()` returns the shell around the active provider:
 `LlmCallLog` row in its own short session, so spend survives any caller
 rollback. Settlement never raises; a failure is an error-level log line
 carrying user, session, purpose, cost and usage. `CallRefused` (base of
-`CostCapExceeded`) lives in `lib/llm_errors.py` so `cost_meter` can subclass
-it without importing the adapter.
+`CostCapExceeded` and `LlmUnavailable`) lives in `lib/llm_errors.py` so
+`cost_meter` can subclass it without importing the adapter. Catch
+`CallRefused` and report its `code`; `cap` is set only on a cost cap.
+
+Stub mode: `llm.get()` is the only reader of `settings.llm_stub_enabled`;
+when it is on, `get()` returns `StubProvider` even over a test's installed
+provider. Never branch on the flag elsewhere: handle `LlmUnavailable`
+instead. The stub streams the deterministic `[STUB:...]` echo
+(`agent/_stub.py`, which finds the prior summary by
+`prompts.LAST_SESSION_SUMMARY_LABEL`) with no tool calls; `complete`,
+`embed` and `aembed` raise `LlmUnavailable` (code `llm_unavailable`). It
+never spends, so the shell skips the gate for it. Callers fall back as
+without a model: mechanical session and rolling summaries, no retrieval
+escalation or prefetch, and stub-mode ingestion fails the document.
 
 Caller rule: never hold an uncommitted ledger write (`record_cost`,
 `reserve_cost`, `adjust_cost`) in your session across an adapter call. The
@@ -129,7 +141,7 @@ holding an idle one.
 
 Streams: `async with llm.get().stream(messages, meter=..., tools=...,
 tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
-refusal raises `CostCapExceeded` before the block runs), then
+refusal raises a `CallRefused` before the block runs), then
 `async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
 (`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete
 once iteration ends; `s.cost` is set when the block exits and stays readable
@@ -151,8 +163,9 @@ attempt), `streams` (per `stream` open: an exception raised on open, or a
 list of steps -- str text, `tool_call(name, args, id=)`, an exception raised
 there, `BLOCK` to park until cancelled), `embed_errors`, `vector`, `cost`,
 `timeout_cost` and `partial_cost` (a cut-short stream). `stream_calls`
-copies each sent message, so later pruning cannot rewrite a capture; the
-tutor still needs `llm_stub` off until #413. litellm's chunk parsing is the
+copies each sent message, so later pruning cannot rewrite a capture.
+`fake_llm` pins stub mode off (the test key `"test"` turns it on); set
+`settings.llm_stub = True` after it to get the stub. litellm's chunk parsing is the
 provider's and is tested against litellm-shaped chunks in `test_llm.py`.
 `db_session` binds `llm.session_factory` to the sqlite test engine. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits

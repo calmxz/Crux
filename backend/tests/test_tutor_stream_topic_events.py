@@ -12,7 +12,6 @@ import pytest
 
 from agent import tutor
 from agent.types import ToolContext
-from config import settings
 from contracts import TopicProfile
 from db.models import ChatMessage
 from db.models import Session as SessionModel
@@ -22,9 +21,8 @@ from tests.conftest import tool_call
 
 
 @pytest.fixture(autouse=True)
-def _real_llm_path(monkeypatch, fake_llm):
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
+def _real_llm_path(fake_llm):
+    """Every test runs the real loop against the scripted fake."""
 
 
 async def _drain(agen):

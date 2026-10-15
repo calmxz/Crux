@@ -215,13 +215,11 @@ async def update_rolling_summary(db: Session, session_id: str) -> str | None:
             )
         except llm.LlmUnavailable:
             # Stub mode: no provider, so the mechanical summary is written.
-            completion = None
+            summary = mechanical
         except llm.CallRefused:
             # F-03: capped users skip the rolling summary entirely; count
             # stays untouched so the next uncapped trigger retries.
             return None
-        if completion is None:
-            summary = mechanical
         else:
             # An empty reply was still paid for; the adapter settled it.
             content = completion.text.strip()

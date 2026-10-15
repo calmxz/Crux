@@ -45,19 +45,3 @@ def stub_response(messages: list[dict], system_prompt: str) -> str:
         digest = hashlib.sha256(summary.encode("utf-8"), usedforsecurity=False).hexdigest()[:8]
         return f"[STUB:resumed:{digest}] Echo: {last_user}"
     return f"[STUB:fresh] Echo: {last_user}"
-
-
-def chunk_text(text: str, parts: int = 3) -> list[str]:
-    """Split text into ~`parts` word-boundary chunks, so stub streaming still
-    exercises the delta path."""
-    words = text.split(" ")
-    if len(words) <= 1:
-        return [text]
-    parts = max(1, min(parts, len(words)))
-    size = -(-len(words) // parts)  # ceil division
-    out: list[str] = []
-    for i in range(0, len(words), size):
-        group = words[i : i + size]
-        sep = " " if (i + size) < len(words) else ""
-        out.append(" ".join(group) + sep)
-    return out

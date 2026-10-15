@@ -12,7 +12,6 @@ import pytest
 
 from agent import tutor
 from agent.types import ToolContext
-from config import settings
 from db.models import ChatMessage
 from db.models import Session as SessionModel
 from db.models import User as UserModel
@@ -27,11 +26,6 @@ def _ctx(db_session, session_id="s1"):
         user_id="u1",
         turn_started_at=datetime.now(timezone.utc),
     )
-
-
-def _disable_stub(monkeypatch):
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
 
 
 async def _drain(agen):
@@ -69,7 +63,6 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session, f
     turn1: LLM calls ask_check_questions tool.
     turn2: supplied but must NEVER be consumed (loop terminates after ask).
     """
-    _disable_stub(monkeypatch)
 
     _insert_session(db_session, session_id=SESSION_ID)
     ctx = _ctx(db_session, session_id=SESSION_ID)
@@ -138,7 +131,6 @@ async def test_stream_emits_check_question_and_breaks(monkeypatch, db_session, f
 @pytest.mark.asyncio
 async def test_stream_check_question_event_shape(monkeypatch, db_session, fake_llm):
     """check_question event carries gap, items, and total keys."""
-    _disable_stub(monkeypatch)
 
     sid = "sc2"
     _insert_session(db_session, session_id=sid)
@@ -215,7 +207,6 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
     So the hoist is a correct defensive measure even if its effect is only
     observable via the NameError guard (this test).
     """
-    _disable_stub(monkeypatch)
 
     sid = "sc_cancel_text"
     _insert_session(db_session, session_id=sid)
@@ -264,7 +255,6 @@ async def test_bundled_profile_patch_dispatched_before_ask(monkeypatch, db_sessi
     one iteration dispatches BOTH -- the patch first, the ask last -- instead
     of dropping the patch. The ask still terminates the turn.
     """
-    _disable_stub(monkeypatch)
 
     sid = "sc_bundle"
     _insert_session(db_session, session_id=sid)
@@ -330,7 +320,6 @@ async def test_second_bundled_ask_is_dropped(monkeypatch, db_session, fake_llm):
     """Only ONE ask_check_questions may run per turn: if the model streams two
     asks in the same response, the first is dispatched and the second is
     dropped (not two check_question events / two registered batches)."""
-    _disable_stub(monkeypatch)
 
     sid = "sc_double_ask"
     _insert_session(db_session, session_id=sid)

@@ -7,7 +7,12 @@ session:
 - Gate: before every call, cost_meter.assert_within_caps (user cap plus the
   global ceiling) runs in the adapter's own short session. A refusal raises
   CostCapExceeded; a failing spend read propagates. Either way the model is
-  not called. A Meter without a user skips the gate and the ledger.
+  not called. A Meter without a user skips the gate and the ledger, and so
+  does the stub provider, which never spends.
+- Providers: LiteLlmProvider in production; StubProvider whenever stub mode
+  is on (get() is the only reader of settings.llm_stub_enabled). The stub
+  refuses completions and embeddings with LlmUnavailable, a CallRefused that
+  is not a cap; callers fall back as they would without a model.
 - Settlement: after each attempt that cost something, one short session
   writes the ledger upsert and the LlmCallLog row and commits, so spend is
   permanent whatever the caller's transaction does next. It never raises. If
@@ -388,7 +393,7 @@ class StubProvider:
         system_prompt = next(
             (m.get("content") or "" for m in messages if m.get("role") == "system"), ""
         )
-        return _StubStream(_stub.chunk_text(_stub.stub_response(messages, system_prompt)))
+        return _StubStream(_chunk_text(_stub.stub_response(messages, system_prompt)))
 
     def embed(self, texts) -> Embedding:
         raise LlmUnavailable()
@@ -401,6 +406,22 @@ class StubProvider:
 
     def embedding_prompt_cost(self, texts) -> Decimal:
         return Decimal("0")
+
+
+def _chunk_text(text: str, parts: int = 3) -> list[str]:
+    """Split text into ~`parts` word-boundary chunks, so stub streaming still
+    exercises the delta path."""
+    words = text.split(" ")
+    if len(words) <= 1:
+        return [text]
+    parts = max(1, min(parts, len(words)))
+    size = -(-len(words) // parts)  # ceil division
+    out: list[str] = []
+    for i in range(0, len(words), size):
+        group = words[i : i + size]
+        sep = " " if (i + size) < len(words) else ""
+        out.append(" ".join(group) + sep)
+    return out
 
 
 class _StubStream:
@@ -429,8 +450,8 @@ class _StubStream:
         return None
 
 
-def _gate(meter: Meter) -> None:
-    if meter.user_id is None:
+def _gate(meter: Meter, provider: Provider) -> None:
+    if meter.user_id is None or isinstance(provider, StubProvider):
         return
     with session_factory() as db:
         cost_meter.assert_within_caps(db, meter.user_id)
@@ -617,7 +638,7 @@ class LlmStream:
         return self._ps.tool_calls if self._ps is not None else []
 
     async def __aenter__(self) -> "LlmStream":
-        await run_in_threadpool(_gate, self._meter)
+        await run_in_threadpool(_gate, self._meter, self._provider)
         return self
 
     def __aiter__(self) -> AsyncIterator[TextDelta]:
@@ -753,7 +774,7 @@ class Llm:
     async def complete(
         self, messages: list[dict], *, meter: Meter, temperature: float, timeout: float
     ) -> Completion:
-        await run_in_threadpool(_gate, meter)
+        await run_in_threadpool(_gate, meter, self.provider)
         model = self.provider.chat_model
         result = await self._run_async(
             lambda: self.provider.complete(messages, temperature=temperature, timeout=timeout),
@@ -766,7 +787,7 @@ class Llm:
         return result
 
     def embed(self, texts: list[str], *, meter: Meter) -> Embedding:
-        _gate(meter)
+        _gate(meter, self.provider)
         model = self.provider.embedding_model
         result = self._run_sync(
             lambda: self.provider.embed(texts),
@@ -779,7 +800,7 @@ class Llm:
         return result
 
     async def aembed(self, texts: list[str], *, meter: Meter) -> Embedding:
-        await run_in_threadpool(_gate, meter)
+        await run_in_threadpool(_gate, meter, self.provider)
         model = self.provider.embedding_model
         result = await self._run_async(
             lambda: self.provider.aembed(texts),
