@@ -20,9 +20,10 @@ def grade_if_diagnostic(
     (learner stop, session end) grades whatever was answered so far, with or
     without an open set.
 
-    Safe to call from any route that may resolve an item (answer or skip) -
-    re-grading is a no-op because knowledge_level is only ever written from
-    None (see the guard below), never overwritten once set.
+    answer() and skip() call it with commit=False inside their own locked
+    transaction, so a click that resolves the final set grades in that one
+    commit (#419). Re-grading is a no-op because knowledge_level is only ever
+    written from None (see the guard below), never overwritten once set.
 
     Reads the batch through the leaf pending_check_store, never
     check_question_service: check_question_service.stop_open_check calls this
