@@ -31,7 +31,14 @@ class _NotLoaded:
 # this role: an ingestion status of None means the session has no documents.
 NOT_LOADED: Final = _NotLoaded()
 
-_PREF_COLS = (User.feedback_pref, User.check_ins, User.reply_length)
+# #356: the User columns behind LEARNER PREFERENCES. Chat's guard SELECT reads
+# them too, so both build the prefs dict with learner_prefs_from.
+LEARNER_PREF_COLUMNS = (User.feedback_pref, User.check_ins, User.reply_length)
+
+
+def learner_prefs_from(values) -> dict[str, Any]:
+    """Map LEARNER_PREF_COLUMNS-ordered values to the prefs dict."""
+    return {col.key: v for col, v in zip(LEARNER_PREF_COLUMNS, values, strict=True)}
 
 
 @dataclass(frozen=True)
@@ -96,10 +103,11 @@ def gather_session_inputs(
     """Read the session's prompt inputs. Columns come off `session` (which
     may be detached); only what the caller did not inject is queried."""
     if isinstance(learner_prefs, _NotLoaded):
-        row = db.execute(select(*_PREF_COLS).where(User.id == session.user_id)).first()
+        row = db.execute(select(*LEARNER_PREF_COLUMNS).where(User.id == session.user_id)).first()
         # A missing user reads all-NULL preferences, rendered as defaults.
-        values = tuple(row) if row is not None else (None,) * len(_PREF_COLS)
-        learner_prefs = {col.key: v for col, v in zip(_PREF_COLS, values, strict=True)}
+        learner_prefs = learner_prefs_from(
+            tuple(row) if row is not None else (None,) * len(LEARNER_PREF_COLUMNS)
+        )
     if isinstance(ingestion_status, _NotLoaded):
         ingestion_status = documents_service.session_ingestion_status(db, session.id)
 

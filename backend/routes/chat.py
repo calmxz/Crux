@@ -122,15 +122,17 @@ def _prepare_turn_guards(
     # preferences for the prompt (#356), one statement. A missing user reads
     # all-NULL preferences, which the prompt renders as defaults.
     exists_subq = select(literal(True)).where(User.id == user_id).exists()
-    pref_cols = (User.feedback_pref, User.check_ins, User.reply_length)
     spend_raw, user_exists, *pref_values = db.execute(
         select(
             cost_meter.spend_subquery(user_id),
             exists_subq,
-            *(select(col).where(User.id == user_id).scalar_subquery() for col in pref_cols),
+            *(
+                select(col).where(User.id == user_id).scalar_subquery()
+                for col in prompt_state.LEARNER_PREF_COLUMNS
+            ),
         )
     ).one()
-    learner_prefs = {col.key: value for col, value in zip(pref_cols, pref_values, strict=True)}
+    learner_prefs = prompt_state.learner_prefs_from(pref_values)
 
     cost_status = cost_meter.check_cap_from_spend(Decimal(str(spend_raw or 0)))
     if not cost_status.allowed:

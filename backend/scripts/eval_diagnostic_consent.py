@@ -111,6 +111,8 @@ async def _run_turn(db, session_id: str, user_id: str, messages: list[dict]):
         session_id=session_id,
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
+        # As in chat: a check posed under DIAGNOSTIC: REQUIRED is a diagnostic.
+        diagnostic_required=state.diagnostic_required,
     )
 
     text_parts: list[str] = []

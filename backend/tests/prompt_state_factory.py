@@ -8,30 +8,31 @@ dict (including legacy string-element lists); the renderer accepts either.
 from contracts import TopicProfile
 from services.prompt_state import PromptState, SessionPromptInputs
 
-_DEFAULTS = {
-    "topic": "",
-    "profile": {},
-    "ingestion_status": None,
-    "retrieval_required": False,
-    "diagnostic_required": False,
-    "diagnostic_accepted": False,
-    "seed_mode": None,
-    "last_session_summary": None,
-    "rolling_summary": None,
-    "pending_check": None,
-    "current_check": None,
-    "quiz_cooldown": None,
-    "gap_accuracy": {},
-    "learner_prefs": {},
-    "topic_suggest_state": None,
-    "review_gaps_target": None,
-    "review_gaps_retention": False,
-    "prefetched_excerpts": [],
-}
-
 
 def make_prompt_state(**overrides) -> PromptState:
-    return PromptState(**{**_DEFAULTS, **overrides})
+    # Built per call: the renderer mutates a dict profile in place, so shared
+    # mutable defaults would leak between tests.
+    defaults = {
+        "topic": "",
+        "profile": {},
+        "ingestion_status": None,
+        "retrieval_required": False,
+        "diagnostic_required": False,
+        "diagnostic_accepted": False,
+        "seed_mode": None,
+        "last_session_summary": None,
+        "rolling_summary": None,
+        "pending_check": None,
+        "current_check": None,
+        "quiz_cooldown": None,
+        "gap_accuracy": {},
+        "learner_prefs": {},
+        "topic_suggest_state": None,
+        "review_gaps_target": None,
+        "review_gaps_retention": False,
+        "prefetched_excerpts": [],
+    }
+    return PromptState(**{**defaults, **overrides})
 
 
 def make_session_inputs(**overrides) -> SessionPromptInputs:

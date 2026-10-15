@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import json
 import os
 import sys
@@ -100,9 +101,14 @@ async def _run_fixture(SessionLocal, fixture: dict) -> bool:
         for turn_idx, user_turn in enumerate(fixture["user_turns"], start=1):
             messages.append({"role": "user", "content": user_turn})
 
-            state = prompt_state.assemble(
-                prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
-                prompt_state.TurnInputs(retrieval_required=False),
+            # The seed has no level; keep the diagnostic off so the eval
+            # measures focus clearing, as it was calibrated.
+            state = dataclasses.replace(
+                prompt_state.assemble(
+                    prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+                    prompt_state.TurnInputs(retrieval_required=False),
+                ),
+                diagnostic_required=False,
             )
             system_prompt = prompts.build_system_prompt(state)
 
