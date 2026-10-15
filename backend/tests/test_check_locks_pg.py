@@ -302,19 +302,6 @@ def _follow_ups(Session, sid: str, msg_id: int) -> int:
         ).scalar_one()
 
 
-def _xfail_if_recap_overwritten(recap: dict, after_answer: list[str]) -> None:
-    """Lock bug found by this file, reported on #418: the answer route writes
-    the Recap after its commit, outside the row lock, so a Close (Stop or
-    session end) that freezes the Recap in that gap is overwritten with the
-    Set as the answer left it (`after_answer`, still holding a "pending"
-    Item). Only that exact snapshot xfails, and callers first assert what
-    proves the Close itself skipped the rest (cooldown, grade), so a Close
-    that stops skipping still fails red. #419 removes the write and this
-    guard."""
-    if [it["status"] for it in recap["items"]] == after_answer:
-        pytest.xfail("#419: unlocked Recap write after the answer commit overwrote the Close")
-
-
 def test_two_answers_on_one_set_serialize(app_on_postgres, hold, pool):
     Session, uid, sid, msg_id = app_on_postgres
     _seed_set(Session, sid, [_item(0), _item(1), _item(2)], message_id=msg_id)
@@ -409,7 +396,6 @@ def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool, an
         assert events == []
         expected = ["skipped", "skipped"]
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap, ["answered", "pending"])
     assert [it["status"] for it in recap["items"]] == expected
     skipped = {it["question"] for it in recap["items"] if it["status"] == "skipped"}
     assert not any(e.question in skipped for e in events)
@@ -516,5 +502,4 @@ def test_session_end_racing_a_diagnostic_answer(app_on_postgres, hold, pool):
         assert profile.knowledge_level == "beginner"
         expected = ["answered", "skipped", "skipped"]
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap, ["answered", "answered", "pending"])
     assert [it["status"] for it in recap["items"]] == expected

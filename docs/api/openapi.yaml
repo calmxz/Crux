@@ -529,7 +529,7 @@ paths:
   /api/sessions/{session_id}/check/answer:
     post:
       tags: [sessions]
-      summary: Answer the current item of the open check batch.
+      summary: Answer a pending item of the open check batch.
       operationId: answerCheck
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -562,7 +562,7 @@ paths:
   /api/sessions/{session_id}/check/skip:
     post:
       tags: [sessions]
-      summary: Skip the current item of the open check batch (no LearningEvent).
+      summary: Skip a pending item of the open check batch (no LearningEvent).
       operationId: skipCheck
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -2161,7 +2161,8 @@ components:
 # ---------------------------------------------------------------------------
 # SSE event contract reference (vendor extension — not processed by codegen)
 # Describes the Server-Sent Events emitted by POST /chat/stream and the
-# sessions check/complete and check/stop streams.
+# sessions check/complete and check/stop streams. followup_skipped comes only
+# from /check/complete and /check/stop.
 # Backend tests validate every emitted StreamEvent against this block
 # (backend/tests/conftest.py); an unlisted field fails.
 # ---------------------------------------------------------------------------

@@ -737,10 +737,6 @@ def skip_check(
         raise HTTPException(
             status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
         ) from e
-    check_question_service.write_check_batch(
-        db, check_question_service.get_pending_check(db, session_id)
-    )
-    diagnostic_service.grade_if_diagnostic(db, session_id)
     return CheckSkipResponse(**prog)
 
 
@@ -765,10 +761,6 @@ def answer_check(
         raise HTTPException(
             status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
         ) from e
-    check_question_service.write_check_batch(
-        db, check_question_service.get_pending_check(db, session_id)
-    )
-    diagnostic_service.grade_if_diagnostic(db, session_id)
     return CheckAnswerResponse(**result)
 
 

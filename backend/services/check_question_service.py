@@ -297,7 +297,9 @@ def _advance(pc: dict) -> None:
 def answer(db: Session, session_id: str, index: int, selected_index: int) -> dict:
     """Grade pending item `index`, record the LearningEvent + profile effect,
     mark the item answered, move current_index to the first unresolved item,
-    persist - all in ONE commit. Does NOT clear the batch."""
+    save the set, and grade a Diagnostic whose final set this resolves - all
+    under the session row lock, in ONE commit. Does NOT clear the batch or
+    freeze the Recap; only a Close does (#419)."""
     from services import learning_event_service, profile_service  # local import avoids circular
 
     # F-24: serialize concurrent submits on the session row; the loser then
@@ -334,6 +336,7 @@ def answer(db: Session, session_id: str, index: int, selected_index: int) -> dic
     item["correct"] = correct
     _advance(pc)
     _save(db, session_id, pc, commit=False)
+    diagnostic_service.grade_if_diagnostic(db, session_id, commit=False)
     db.commit()
 
     prog = _progress(pc)
@@ -346,6 +349,9 @@ def answer(db: Session, session_id: str, index: int, selected_index: int) -> dic
 
 
 def skip(db: Session, session_id: str, index: int) -> dict:
+    """Mark pending item `index` skipped, save the set, and grade a Diagnostic
+    whose final set this resolves, under the session row lock, in ONE commit.
+    No LearningEvent; the Recap freezes only on Close (#419)."""
     from services import profile_service  # local import avoids circular
 
     # F-24: serialize concurrent submits on the session row; the loser then
@@ -358,7 +364,9 @@ def skip(db: Session, session_id: str, index: int) -> dict:
     item = _pending_item(pc, index)
     item["status"] = "skipped"
     _advance(pc)
-    _save(db, session_id, pc)
+    _save(db, session_id, pc, commit=False)
+    diagnostic_service.grade_if_diagnostic(db, session_id, commit=False)
+    db.commit()
     return _progress(pc)
 
 
