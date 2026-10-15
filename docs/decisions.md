@@ -897,11 +897,12 @@ a test fake).
   kind has arrived, not merely no text event. A tool-call fragment is output
   the vendor bills, so an attempt that received one settles its estimate
   (prompt plus text plus tool-call arguments) and is not retried. "A failed
-  attempt with no output settles $0" is narrowed to an attempt refused on
-  open: once the stream has opened the vendor has accepted the request and
-  processed the prompt, so an attempt that fails before its first chunk
-  settles a prompt estimate before the retry. Overcounting is the accepted
-  direction. The tutor and the `retrieve` tool now
+  attempt with no output settles $0" stands, including an attempt whose
+  stream opened and then failed before its first chunk; that stream is
+  closed before the retry. Billing such an attempt (on the premise that the
+  vendor processed the prompt) was tried in review and reverted: the premise
+  is unverified, and it charged learners during an outage with no reply.
+  #561 checks whether Gemini bills these attempts. The tutor and the `retrieve` tool now
   write no ledger row themselves (every call settles in the adapter), so the
   previous amendment's "commits each iteration's `record_cost`" and
   "commits its embedding metering" no longer apply. The retrieve tool's

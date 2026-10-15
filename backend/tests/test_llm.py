@@ -500,34 +500,30 @@ async def test_stream_429_before_the_first_event_retries_and_bills_once(db_sessi
     assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
 
 
-async def test_stream_failing_after_open_settles_its_prompt_then_retries(
+async def test_stream_failing_after_open_with_no_output_bills_nothing_and_closes(
     db_session, user, fake_llm
 ):
-    """An attempt the vendor accepted (the stream opened) processed the
-    prompt even if it failed before any chunk: it settles a prompt estimate,
-    is closed, and the retry is billed on its own."""
+    """An attempt that opened but failed before any chunk produced no output:
+    it costs nothing, its stream is closed, and only the retry is billed.
+    (Whether the vendor bills such an attempt is unverified; see the B3
+    amendment of 2026-10-15.)"""
     fake_llm.streams = [[_rate_limited()], ["ok"]]
     fake_llm.cost = Decimal("0.002")
-    fake_llm.partial_cost = Decimal("0.0003")
+    fake_llm.partial_cost = Decimal("0.5")
 
     async with _stream() as s:
         assert await _drain(s) == ["ok"]
 
     assert len(fake_llm.stream_calls) == 2
     assert fake_llm.opened[0].closed
-    assert fake_llm.estimates == [("stream", MESSAGES, "")]
-    assert [cost for _, _, cost in _log_rows(db_session)] == [
-        Decimal("0.0003"),
-        Decimal("0.0020"),
-    ]
-    assert s.cost == Decimal("0.0023")
+    assert fake_llm.estimates == []
+    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0020"))]
+    assert s.cost == Decimal("0.002")
 
 
-async def test_stream_failing_after_open_on_every_attempt_settles_each_once(
-    db_session, user, fake_llm
-):
+async def test_stream_failing_after_open_on_every_attempt_bills_nothing(db_session, user, fake_llm):
     fake_llm.streams = [[_rate_limited()], [_rate_limited()], [_rate_limited()]]
-    fake_llm.partial_cost = Decimal("0.0003")
+    fake_llm.partial_cost = Decimal("0.5")
 
     with pytest.raises(litellm.RateLimitError):
         async with _stream() as s:
@@ -535,25 +531,23 @@ async def test_stream_failing_after_open_on_every_attempt_settles_each_once(
 
     assert len(fake_llm.stream_calls) == 3
     assert all(opened.closed for opened in fake_llm.opened)
-    assert [cost for _, _, cost in _log_rows(db_session)] == [Decimal("0.0003")] * 3
-    assert s.cost == Decimal("0.0009")
+    assert _log_rows(db_session) == []
+    assert s.cost == Decimal("0")
 
 
-async def test_stream_non_transient_error_after_open_settles_an_estimate(
+async def test_stream_non_transient_error_with_no_output_is_not_retried_or_billed(
     db_session, user, fake_llm
 ):
-    """The vendor accepted the request, so even a non-retryable failure
-    before any chunk bills the prompt; it is not retried."""
     fake_llm.streams = [[ValueError("bad response")], ["never"]]
-    fake_llm.partial_cost = Decimal("0.0003")
+    fake_llm.partial_cost = Decimal("0.5")
 
     with pytest.raises(ValueError):
         async with _stream() as s:
             await _drain(s)
 
     assert len(fake_llm.stream_calls) == 1
-    assert s.cost == Decimal("0.0003")
-    assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0003"))]
+    assert s.cost == Decimal("0")
+    assert _log_rows(db_session) == []
     fake_llm.streams.clear()
 
 

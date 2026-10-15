@@ -503,22 +503,19 @@ class LlmStream:
     """One streamed completion: `async with llm.get().stream(...) as s`.
 
     Entering runs the gate. Iterating yields TextDelta events; `s.text` and
-    `s.tool_calls` are complete once the iteration ends. Each attempt settles
-    exactly once; leaving the block settles the last one, and `s.cost` then
-    holds the total settled across attempts. The last attempt settles:
+    `s.tool_calls` are complete once the iteration ends. Leaving the block
+    settles exactly once, and `s.cost` holds what was settled:
 
     - normal end: the provider's price of the built response (token math if
       pricing fails);
-    - a provider error: $0 if the request was refused on open (anything but
-      a Timeout), otherwise an estimate of the prompt plus the output
-      received;
+    - a provider error: an estimate of the prompt plus the output received if
+      any chunk arrived or the error was a Timeout, otherwise $0;
     - any other exit (cancellation, the caller's generator closed, an error in
       the caller's block): always the estimate.
 
     A 429, 503, 500 or connection error before any chunk arrives retries with
-    backoff. An attempt refused on open costs nothing; one that failed after
-    the stream opened settles its prompt estimate before the retry. Timeout is
-    never retried.
+    backoff; a failed attempt with nothing received costs nothing, and its
+    stream (if it opened) is closed. Timeout is never retried.
     """
 
     def __init__(
@@ -547,7 +544,6 @@ class LlmStream:
         self._attempt_open = False
         self._finished = False
         self._provider_error: Exception | None = None
-        self._retry_cost = Decimal("0")  # settled by attempts before the last
         self.cost: Decimal | None = None
 
     @property
@@ -583,26 +579,13 @@ class LlmStream:
                 if received or not retry or i == attempts:
                     self._provider_error = e
                     raise
-                # Until the next attempt opens no request is in flight. Cleared
-                # first, so a cancel below cannot make the exit settle it again.
+                # Nothing received: this attempt cost nothing, and until the
+                # next opens no request is in flight.
                 self._attempt_open = False
                 self._ps = None
                 if ps is not None:
-                    # The vendor accepted this attempt before it failed, so it
-                    # processed the prompt: settle that (the thread finishes
-                    # even if this await is cancelled), and release the response.
-                    try:
-                        await run_in_threadpool(self._settle_attempt, ps)
-                    finally:
-                        await _close_quietly(ps)
+                    await _close_quietly(ps)
             await asyncio.sleep(_backoff(i))
-
-    def _settle_attempt(self, ps: ProviderStream) -> None:
-        """Settle a failed, retried attempt's estimate. Tokenizes the prompt,
-        so it runs on a worker thread."""
-        cost = ps.estimate()
-        self._retry_cost += cost
-        _settle(self._meter, self._provider.chat_model, cost, {})
 
     def _exit_cost(self) -> tuple[Decimal, dict]:
         ps = self._ps
@@ -611,8 +594,9 @@ class LlmStream:
         if not self._attempt_open:
             return Decimal("0"), {}
         err = self._provider_error
-        if err is not None and ps is None and not isinstance(err, litellm.Timeout):
-            # Refused on open (429, 503, ...): the vendor never processed it.
+        if err is not None and not (
+            isinstance(err, litellm.Timeout) or (ps is not None and ps.received)
+        ):
             return Decimal("0"), {}
         if ps is None:
             # The request went out but no stream object came back yet.
@@ -624,7 +608,7 @@ class LlmStream:
         # synchronous write, so the spend is on record whatever happens next.
         cost, usage = self._exit_cost()
         _settle(self._meter, self._provider.chat_model, cost, usage)
-        self.cost = cost + self._retry_cost
+        self.cost = cost
         try:
             if self._gen is not None:
                 await self._gen.aclose()
