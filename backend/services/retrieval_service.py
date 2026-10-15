@@ -193,6 +193,8 @@ async def prefetch_for_prompt(
         hits = pgvector_store.query_chunks(
             db, session_id=session_id, query_embedding=query_vec, k=k
         )
+    except llm.LlmUnavailable:
+        return None  # stub mode (#413): no model, so no retrieval; not a failure
     except Exception as e:
         log.warning("prefetch_for_prompt failed; falling back to advisory flag: %s", e)
         return None
@@ -244,6 +246,8 @@ async def semantic_fallback_required(
         # identical embed (2x cost + one extra round-trip on every
         # fallback-required turn otherwise).
         return sim >= settings.retrieval_fallback_threshold, list(query_vec)
+    except llm.LlmUnavailable:
+        return False, None  # stub mode (#413): no model, so no escalation
     except Exception as e:
         log.warning("semantic fallback check failed; keeping OPTIONAL: %s", e)
         return False, None

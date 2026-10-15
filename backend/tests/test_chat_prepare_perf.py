@@ -53,12 +53,11 @@ USER_ID = "perf-user"
 
 @pytest.fixture(autouse=True)
 def _stub_semantic_fallback(monkeypatch):
-    # D2.2: this budget measures _prepare_turn's own statements. In an
-    # environment where settings.llm_stub_enabled is False (e.g. a real
-    # gemini_api_key in .env), the real semantic_fallback_required would add
-    # one has_ready_document SELECT (lexical gate is False by default here,
-    # since seeded_session has no kw_index_json entries). Pin it off so this
-    # test measures _prepare_turn regardless of ambient LLM-stub config.
+    # D2.2: this budget measures _prepare_turn's own statements. The real
+    # semantic_fallback_required adds one has_ready_document SELECT, in stub
+    # mode too since #413 (lexical gate is False by default here, since
+    # seeded_session has no kw_index_json entries). Replace it so this test
+    # measures _prepare_turn alone.
     async def _fake_fallback(*a, **kw):
         return False, None
 

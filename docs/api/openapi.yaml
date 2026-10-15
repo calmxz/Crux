@@ -2390,4 +2390,4 @@ x-error-codes:
   llm_unavailable:
     sse: true
     via: tool_call_done.error
-    when: No LLM provider can serve the call (stub mode refuses completions and embeddings), mid-turn (SSE) or on a retrieve_chunks embedding (tool_call_done.error).
+    when: No LLM provider can serve the call (the stub provider refuses completions and embeddings). Mapped mid-turn (SSE) and on a retrieve_chunks embedding (tool_call_done.error), but not sent today, since stub turns make no tool calls and the stub stream never refuses.
