@@ -866,6 +866,20 @@ a test fake).
   retry was rejected because a streamed call settles synchronously in its
   exit, where a pause would either block the event loop or need a shield;
   `pool_pre_ping` already absorbs stale connections.
+  **Amended 2026-10-15 (#411):** the "no deferred retry" line is reversed;
+  the inline-retry rejection stands. A failed settlement now commits the
+  `LlmCallLog` row on its own and retries the ledger write once on a daemon
+  timer 5 s later (`_defer_ledger`), off the request path and off the event
+  loop, so it hits neither objection to an inline retry. Why: dropping the
+  spend undercounts the cap for the rest of the day, and the retry is
+  cheap. Bounds: at most 2 retries waiting per process (each holds a pooled
+  connection), booked to the original day, and every deferral logs at
+  error level so a retry lost to a restart is still on record. Durable
+  reconciliation (a pending flag plus a sweep) was rejected in #558; see
+  `.out-of-scope/llm-settlement-reconciliation.md`. Lock timeouts, also
+  #411: `SETTLE_LOCK_TIMEOUT` is 5 s. The tutor commits each iteration's
+  `record_cost` before tool dispatch, and the `retrieve` tool commits its
+  embedding metering, so no ledger row is held across slow work.
 - **A streamed call settles itself exactly once on every exit.**
   `async with stream()` yields typed events. The exit settles the real
   price, or an estimate on cancel (always) and on error (if output arrived or
