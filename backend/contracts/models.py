@@ -203,7 +203,7 @@ class AskCheckQuestionsArgs(BaseModel):
     Per-item correct_index must be < len(options), set_index must be
     <= set_total, and a later set must continue the current check
     (same set_total, set_index = previous + 1); those cross-field rules are
-    enforced in check_question_service, not here.
+    enforced in check_service, not here.
 
     """
 

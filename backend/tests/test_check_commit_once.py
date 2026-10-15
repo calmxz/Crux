@@ -11,7 +11,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service, profile_service
+from services import check_service, profile_service
 
 USER_ID = "u_commit_once"
 SID = "s_commit_once"
@@ -43,7 +43,7 @@ def _open_set(db, *, diagnostic):
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
         diagnostic_required=diagnostic,
     )
-    result = check_question_service.register(
+    result = check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(set_index=1, set_total=1, session_id=SID, gap="atp", items=ITEMS),
@@ -53,7 +53,7 @@ def _open_set(db, *, diagnostic):
     db.add(m)
     db.commit()
     db.refresh(m)
-    check_question_service.attach_message_id(db, SID, m.id)
+    check_service.stamp_message_id(db, SID, m.id)
     db.commit()
     return m
 
@@ -96,7 +96,7 @@ def test_answer_commits_once(client, db_session, check_set, commits):
 def test_final_diagnostic_answer_commits_once_and_grades(
     client, db_session, diagnostic_set, commits
 ):
-    check_question_service.answer(db_session, SID, index=0, selected_index=0)
+    check_service.answer(db_session, SID, index=0, selected_index=0)
     commits.clear()
     r = client.post(
         f"/api/sessions/{SID}/check/answer",
@@ -110,7 +110,7 @@ def test_final_diagnostic_answer_commits_once_and_grades(
 
 
 def test_final_diagnostic_skip_commits_once_and_grades(client, db_session, diagnostic_set, commits):
-    check_question_service.answer(db_session, SID, index=0, selected_index=0)
+    check_service.answer(db_session, SID, index=0, selected_index=0)
     commits.clear()
     r = client.post(f"/api/sessions/{SID}/check/skip", json={"index": 1, "user_id": USER_ID})
     assert r.status_code == 200
@@ -137,9 +137,7 @@ def test_click_leaves_recap_unfrozen_until_close(client, db_session, check_set, 
     db_session.refresh(m)
     assert m.check_batch_json is None
 
-    resolved = check_question_service.public_view(
-        check_question_service.get_pending_check(db_session, SID)
-    )
+    resolved = check_service._public_view(check_service.open_set(db_session.get(SessionModel, SID)))
 
     async def fake(messages, system_prompt, ctx):
         reply = ChatMessage(session_id=SID, role="assistant", content="ok")

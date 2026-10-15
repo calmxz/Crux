@@ -3,12 +3,13 @@
 from datetime import datetime, timezone
 
 import pytest
+from sqlalchemy import event
 
 from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, ConceptEntry, TopicProfile
+from db.models import LearningEvent, User
 from db.models import Session as SessionModel
-from db.models import User
-from services import check_question_service as cq
+from services import check_service as cq
 from services import learning_event_service, profile_service
 from services.profile_service import concept_names
 
@@ -37,7 +38,7 @@ def session_row(db_session):
 # --- record_from_answer tests (Task 3: deterministic click path) ---
 
 
-def test_record_from_answer_correct_adds_mastered_and_clears(session_row, db_session):
+def test_record_from_answer_correct_adds_mastered(session_row, db_session):
     seed_ctx = ToolContext(
         db=db_session,
         session_id=SESSION_ID,
@@ -67,7 +68,6 @@ def test_record_from_answer_correct_adds_mastered_and_clears(session_row, db_ses
     assert event.correct is True
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert "atp" in concept_names(profile.mastered_concepts)
-    assert cq.get_pending_check(db_session, SESSION_ID) is None
 
 
 def test_record_from_answer_incorrect_demotes_mastered(session_row, db_session):
@@ -115,7 +115,6 @@ def test_record_from_answer_incorrect_demotes_into_confirmed_gaps(session_row, d
         gap="atp",
         question="q?",
         correct=False,
-        clear_pending=False,
     )
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert "atp" not in concept_names(profile.mastered_concepts)
@@ -132,7 +131,6 @@ def test_record_from_answer_repeated_demotion_does_not_duplicate_gap(session_row
         gap="atp",
         question="q?",
         correct=False,
-        clear_pending=False,
     )
     learning_event_service.record_from_answer(
         db_session,
@@ -140,7 +138,6 @@ def test_record_from_answer_repeated_demotion_does_not_duplicate_gap(session_row
         gap="atp",
         question="q2?",
         correct=False,
-        clear_pending=False,
     )
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert concept_names(profile.confirmed_gaps).count("atp") == 1
@@ -154,7 +151,6 @@ def test_record_from_answer_diagnostic_incorrect_leaves_profile_untouched(db, se
         gap="atp",
         question="q?",
         correct=False,
-        clear_pending=False,
         apply_profile_effects=False,
     )
     profile = profile_service.load_profile(db, session_id)
@@ -193,16 +189,10 @@ def test_record_from_answer_incorrect_non_mastered_is_noop_on_profile(session_ro
     assert "krebs" not in (profile.mastered_concepts or [])
 
 
-# --- Task 3 new tests: clear_pending / commit opt-out ---
+# --- #420: joins the caller's transaction, never touches Check state ---
 
 
-def test_record_from_answer_clear_pending_false_keeps_pending(session_row, db_session):
-    from datetime import datetime, timezone
-
-    from agent.types import ToolContext
-    from contracts import AskCheckQuestionsArgs
-    from services import check_question_service as cq
-
+def test_record_from_answer_never_commits_or_touches_the_open_set(session_row, db_session):
     ctx = ToolContext(
         db=db_session,
         session_id=session_row.id,
@@ -222,49 +212,20 @@ def test_record_from_answer_clear_pending_false_keeps_pending(session_row, db_se
             ],
         ),
     )
-    learning_event_service.record_from_answer(
-        db_session,
-        session_row.id,
-        gap="g",
-        question="q",
-        correct=True,
-        clear_pending=False,
-        commit=False,
-    )
-    db_session.commit()
-    assert cq.get_pending_check(db_session, session_row.id) is not None
+    commits = []
 
+    def on_commit(session):
+        commits.append(session)
 
-def test_record_from_answer_defaults_still_clear(session_row, db_session):
-    from datetime import datetime, timezone
-
-    from agent.types import ToolContext
-    from contracts import AskCheckQuestionsArgs
-    from services import check_question_service as cq
-
-    ctx = ToolContext(
-        db=db_session,
-        session_id=session_row.id,
-        user_id=session_row.user_id,
-        turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
-    )
-    cq.register(
-        db_session,
-        ctx,
-        AskCheckQuestionsArgs(
-            set_index=1,
-            set_total=1,
-            session_id=session_row.id,
-            gap="g",
-            items=[
-                {"question": "q", "options": ["a", "b"], "correct_index": 0, "explanation": "e"}
-            ],
-        ),
-    )
+    event.listen(db_session, "after_commit", on_commit)
     learning_event_service.record_from_answer(
         db_session, session_row.id, gap="g", question="q", correct=True
     )
-    assert cq.get_pending_check(db_session, session_row.id) is None
+    event.remove(db_session, "after_commit", on_commit)
+    assert commits == []
+    assert cq.open_set(db_session.get(SessionModel, session_row.id)) is not None
+    db_session.rollback()
+    assert db_session.query(LearningEvent).count() == 0
 
 
 # --- Task 5: apply_profile_effects bypass (diagnostic profile-pollution guard) ---
@@ -292,7 +253,6 @@ def test_record_from_answer_skips_mastery_when_disabled(db, session_id):
         gap="warmup",
         question="q",
         correct=True,
-        clear_pending=False,
         apply_profile_effects=False,
     )
     prof = profile_service.load_profile(db, session_id)
@@ -303,9 +263,7 @@ def test_record_from_answer_applies_mastery_by_default(db, session_id):
     from services import learning_event_service as les
     from services import profile_service
 
-    les.record_from_answer(
-        db, session_id, gap="loops", question="q", correct=True, clear_pending=False
-    )
+    les.record_from_answer(db, session_id, gap="loops", question="q", correct=True)
     prof = profile_service.load_profile(db, session_id)
     assert "loops" in concept_names(prof.mastered_concepts)
 
@@ -321,7 +279,6 @@ def test_gap_accuracy_groups_by_gap(db, session_id):
             gap=gap,
             question="q",
             correct=correct,
-            clear_pending=False,
             apply_profile_effects=False,
         )
     acc = learning_event_service.gap_accuracy(db, session_id)
@@ -394,7 +351,6 @@ def test_record_from_answer_takes_the_lock_when_applying_profile_effects(
         gap="atp",
         question="q?",
         correct=True,
-        clear_pending=False,
         apply_profile_effects=True,
     )
     assert calls == [session_row.id]
@@ -416,7 +372,6 @@ def test_record_from_answer_skips_lock_when_profile_effects_disabled(
         gap="atp",
         question="q?",
         correct=True,
-        clear_pending=False,
         apply_profile_effects=False,
     )
     assert calls == []

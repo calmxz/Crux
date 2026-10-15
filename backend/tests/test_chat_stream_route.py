@@ -27,6 +27,7 @@ a running server; it is not reliably testable under TestClient.
 """
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -216,11 +217,10 @@ def test_chat_stream_cancelled_event_terminates_stream(client, monkeypatch):
 
 
 def test_chat_stream_includes_quiz_readiness(client, db_session, monkeypatch):
-    from services import check_question_service
-
-    check_question_service.set_quiz_cooldown(
-        db_session, SESSION_ID, {"gap": "joins", "last_score": "0/1", "missed": ["q0"]}
+    db_session.get(SessionModel, SESSION_ID).quiz_cooldown_json = json.dumps(
+        {"gap": "joins", "last_score": "0/1", "missed": ["q0"]}
     )
+    db_session.commit()
 
     captured = {}
 

@@ -5,7 +5,7 @@ check-question batch was still open. On resume via "Review my gaps", the tutor
 called ask_check_questions, hit the "a batch is already open" guard, and
 surfaced a confusing "Could not ask questions" on a read-only ended session.
 
-abandon_open_batch resolves the dangling batch on end: remaining pending items
+abandon_in_caller_transaction resolves the dangling batch on end: remaining pending items
 become "skipped", the batch is frozen onto its message for honest history, and
 the pending pointer is cleared -- no learning events and no mastery effects
 (the only profile write is grading an in-progress diagnostic, #340). A later
@@ -21,7 +21,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service, pending_check_store
+from services import check_service
 
 USER_ID = "u_abandon_1"
 
@@ -47,7 +47,7 @@ def _open_batch(db, session_id, n=2):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    return check_question_service.register(
+    return check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -71,10 +71,10 @@ def _open_batch(db, session_id, n=2):
 def test_abandon_clears_pending_pointer(db_session, seeded_session):
     sid = seeded_session.id
     _open_batch(db_session, sid)
-    assert pending_check_store.get_pending_check(db_session, sid) is not None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is not None
 
-    assert check_question_service.abandon_open_batch(db_session, sid) is True
-    assert pending_check_store.get_pending_check(db_session, sid) is None
+    assert check_service.abandon_in_caller_transaction(db_session, sid) is True
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
 
 
 def test_abandon_unblocks_a_fresh_batch(db_session, seeded_session):
@@ -86,7 +86,7 @@ def test_abandon_unblocks_a_fresh_batch(db_session, seeded_session):
     blocked = _open_batch(db_session, sid)
     assert blocked.ok is False and "already open" in (blocked.error or "")
 
-    check_question_service.abandon_open_batch(db_session, sid)
+    check_service.abandon_in_caller_transaction(db_session, sid)
 
     unblocked = _open_batch(db_session, sid)
     assert unblocked.ok is True
@@ -98,9 +98,10 @@ def test_abandon_freezes_pending_items_as_skipped(db_session, seeded_session):
     msg = ChatMessage(session_id=sid, role="assistant", content="q")
     db_session.add(msg)
     db_session.commit()
-    check_question_service.attach_message_id(db_session, sid, msg.id)
+    check_service.stamp_message_id(db_session, sid, msg.id)
 
-    check_question_service.abandon_open_batch(db_session, sid)
+    check_service.abandon_in_caller_transaction(db_session, sid)
+    db_session.commit()
 
     db_session.refresh(msg)
     frozen = json.loads(msg.check_batch_json)
@@ -111,7 +112,7 @@ def test_abandon_freezes_pending_items_as_skipped(db_session, seeded_session):
 
 def test_abandon_is_noop_without_a_batch(db_session, seeded_session):
     sid = seeded_session.id
-    assert check_question_service.abandon_open_batch(db_session, sid) is False
+    assert check_service.abandon_in_caller_transaction(db_session, sid) is False
 
 
 def test_end_route_abandons_open_batch(
@@ -126,11 +127,11 @@ def test_end_route_abandons_open_batch(
 
     sid = seeded_session.id
     _open_batch(db_session, sid)
-    assert pending_check_store.get_pending_check(db_session, sid) is not None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is not None
 
     r = client.post(f"/api/sessions/{sid}/end?user_id={USER_ID}")
     assert r.status_code == 200, r.text
-    assert pending_check_store.get_pending_check(db_session, sid) is None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
 
 
 def test_abandon_clears_a_done_but_uncleared_batch(db_session, seeded_session):
@@ -140,12 +141,12 @@ def test_abandon_clears_a_done_but_uncleared_batch(db_session, seeded_session):
     sid = seeded_session.id
     _open_batch(db_session, sid)
     # Resolve the whole batch so it is done, but leave the pointer dangling.
-    check_question_service.skip(db_session, sid, 0)
-    check_question_service.skip(db_session, sid, 1)
-    pc_done = pending_check_store.get_pending_check(db_session, sid)
-    assert pending_check_store.is_done(pc_done) is True
+    check_service.skip(db_session, sid, 0)
+    check_service.skip(db_session, sid, 1)
+    pc_done = check_service.open_set(db_session.get(SessionModel, sid))
+    assert check_service._is_done(pc_done) is True
 
-    assert check_question_service.abandon_open_batch(db_session, sid) is True
-    assert pending_check_store.get_pending_check(db_session, sid) is None
+    assert check_service.abandon_in_caller_transaction(db_session, sid) is True
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
     # And a fresh batch can now be opened (the actual unblock).
     assert _open_batch(db_session, sid).ok is True

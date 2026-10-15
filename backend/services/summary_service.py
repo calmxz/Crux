@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from db.models import ChatMessage
 from db.models import Session as SessionModel
-from services import check_question_service, cost_meter, profile_service
+from services import check_service, cost_meter, profile_service
 
 log = logging.getLogger(__name__)
 
@@ -138,7 +138,7 @@ async def generate_and_persist(
     # session ends with no summary -- an honest state, since later end calls
     # take the idempotent replay path (F-33).
     row = profile_service.lock_session_row(db, session.id)
-    check_question_service.abandon_open_batch(db, session.id, commit=False)
+    check_service.abandon_in_caller_transaction(db, session.id)
     fresh = profile_service.profile_from_row(row)
     fresh.last_session_summary = summary
     profile_service.save_profile(db, session.id, fresh, commit=False)

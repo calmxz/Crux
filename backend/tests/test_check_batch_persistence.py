@@ -10,7 +10,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, LearningEvent, User
 from db.models import Session as SessionModel
-from services import check_question_service
+from services import check_service
 
 USER_ID = "u_batch_1"
 SID = "s_batch_1"
@@ -47,7 +47,7 @@ def _register_batch(db, gap="atp"):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -70,40 +70,41 @@ def _register_batch(db, gap="atp"):
 def test_register_pc_has_null_message_id(seeded):
     db = seeded
     _register_batch(db)
-    pc = check_question_service.get_pending_check(db, SID)
+    pc = check_service.open_set(db.get(SessionModel, SID))
     assert pc["message_id"] is None
 
 
-def test_attach_message_id_stamps_open_pc(seeded):
+def test_stamp_message_id_stamps_open_pc(seeded):
     db = seeded
     _register_batch(db)
     m = ChatMessage(session_id=SID, role="assistant", content="")
     db.add(m)
     db.commit()
     db.refresh(m)
-    check_question_service.attach_message_id(db, SID, m.id)
-    pc = check_question_service.get_pending_check(db, SID)
+    check_service.stamp_message_id(db, SID, m.id)
+    pc = check_service.open_set(db.get(SessionModel, SID))
     assert pc["message_id"] == m.id
 
 
-def test_attach_message_id_noop_when_no_pc(seeded):
+def test_stamp_message_id_noop_when_no_pc(seeded):
     db = seeded
     # No open batch - must not raise.
-    check_question_service.attach_message_id(db, SID, 999)
-    assert check_question_service.get_pending_check(db, SID) is None
+    check_service.stamp_message_id(db, SID, 999)
+    assert check_service.open_set(db.get(SessionModel, SID)) is None
 
 
-def test_write_check_batch_persists_public_view(seeded):
+def test_freeze_recap_persists_public_view(seeded):
     db = seeded
     _register_batch(db)
     m = ChatMessage(session_id=SID, role="assistant", content="")
     db.add(m)
     db.commit()
     db.refresh(m)
-    check_question_service.attach_message_id(db, SID, m.id)
-    check_question_service.answer(db, SID, index=0, selected_index=0)
-    pc = check_question_service.get_pending_check(db, SID)
-    check_question_service.write_check_batch(db, pc)
+    check_service.stamp_message_id(db, SID, m.id)
+    check_service.answer(db, SID, index=0, selected_index=0)
+    pc = check_service.open_set(db.get(SessionModel, SID))
+    check_service._freeze_recap(db, pc)
+    db.commit()
     db.refresh(m)
     import json
 
@@ -113,12 +114,12 @@ def test_write_check_batch_persists_public_view(seeded):
     assert data["items"][0]["correct"] is True
 
 
-def test_write_check_batch_noop_without_message_id(seeded):
+def test_freeze_recap_noop_without_message_id(seeded):
     db = seeded
     _register_batch(db)
-    pc = check_question_service.get_pending_check(db, SID)
+    pc = check_service.open_set(db.get(SessionModel, SID))
     # message_id is None - must be a no-op, no raise.
-    check_question_service.write_check_batch(db, pc)
+    check_service._freeze_recap(db, pc)
 
 
 def test_reconstruct_from_tool_calls_and_event(seeded):
@@ -161,7 +162,7 @@ def test_reconstruct_from_tool_calls_and_event(seeded):
     )
     db.commit()
 
-    batch = check_question_service.reconstruct_check_batch(db, m)
+    batch = check_service._rebuild_recap(db, m)
     assert batch["gap"] == "atp"
     item = batch["items"][0]
     assert item["status"] == "answered"
@@ -208,7 +209,7 @@ def test_reconstruct_pre_0013_event_without_selected_index(seeded):
     db.add(LearningEvent(session_id=SID, gap_tested="atp", question="Q1?", correct=False))
     db.commit()
 
-    item = check_question_service.reconstruct_check_batch(db, m)["items"][0]
+    item = check_service._rebuild_recap(db, m)["items"][0]
     assert item["status"] == "answered"
     assert item["selected_index"] is None
 
@@ -244,7 +245,7 @@ def test_reconstruct_skipped_when_no_event(seeded):
     db.add(m)
     db.commit()
     db.refresh(m)
-    batch = check_question_service.reconstruct_check_batch(db, m)
+    batch = check_service._rebuild_recap(db, m)
     item = batch["items"][0]
     assert item["status"] == "skipped"
     assert item["correct"] is None
@@ -257,10 +258,10 @@ def test_reconstruct_none_without_ask_tool_call(seeded):
     db.add(m)
     db.commit()
     db.refresh(m)
-    assert check_question_service.reconstruct_check_batch(db, m) is None
+    assert check_service._rebuild_recap(db, m) is None
 
 
-def test_load_check_batch_prefers_column(seeded):
+def test_recap_for_message_prefers_column(seeded):
     db = seeded
     m = ChatMessage(
         session_id=SID,
@@ -271,7 +272,7 @@ def test_load_check_batch_prefers_column(seeded):
     db.add(m)
     db.commit()
     db.refresh(m)
-    assert check_question_service.load_check_batch(db, m)["gap"] == "stored"
+    assert check_service.recap_for_message(db, m)["gap"] == "stored"
 
 
 def test_reconstruct_none_on_malformed_tool_calls_json(seeded):
@@ -280,10 +281,10 @@ def test_reconstruct_none_on_malformed_tool_calls_json(seeded):
     db.add(m)
     db.commit()
     db.refresh(m)
-    assert check_question_service.reconstruct_check_batch(db, m) is None
+    assert check_service._rebuild_recap(db, m) is None
 
 
-def test_load_check_batch_falls_through_on_malformed(seeded):
+def test_recap_for_message_falls_through_on_malformed(seeded):
     db = seeded
     m = ChatMessage(
         session_id=SID,
@@ -296,7 +297,7 @@ def test_load_check_batch_falls_through_on_malformed(seeded):
     db.commit()
     db.refresh(m)
     # Malformed column -> None, no ask tool call -> reconstruct returns None.
-    assert check_question_service.load_check_batch(db, m) is None
+    assert check_service.recap_for_message(db, m) is None
 
 
 def test_streaming_ask_attaches_message_id(seeded):
@@ -307,7 +308,7 @@ def test_streaming_ask_attaches_message_id(seeded):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -322,7 +323,7 @@ def test_streaming_ask_attaches_message_id(seeded):
     )
 
     msg_id = tutor._persist_assistant_message(ctx, "", "complete")
-    check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+    check_service.stamp_message_id(ctx.db, ctx.session_id, msg_id)
 
-    pc = check_question_service.get_pending_check(db, SID)
+    pc = check_service.open_set(db.get(SessionModel, SID))
     assert pc["message_id"] == msg_id

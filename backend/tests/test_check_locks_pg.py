@@ -9,10 +9,10 @@ Reaching the waiter count is what proves each request blocked; no sleeps
 order anything.
 
 State is seeded as raw JSON on the session row (shapes documented in
-services/check_question_service.py and services/pending_check_store.py), not
-through service functions, so this file survives the check-module refactor
-(#419, #420). test_message_id_stamp_and_answer_both_land is the only test
-that calls a service by name (attach_message_id).
+services/check_service.py), not through service functions, so this file
+survives the check-module refactor (#419, #420).
+test_message_id_stamp_and_answer_both_land is the only test that calls a
+service by name (stamp_message_id).
 
 **Opt-in**: skipped unless `TEST_DATABASE_URL` is set, same as
 test_pgvector_retrieval.py (CI sets it and runs `alembic upgrade head`
@@ -41,7 +41,7 @@ from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, U
 from db.models import Session as SessionModel
 from lib.error_codes import CHECK_CONFLICT, NO_OPEN_CHECK, NO_RESOLVED_BATCH
 from main import app
-from services import check_question_service, velocity_limit
+from services import check_service, velocity_limit
 from services.auth import current_user_id
 from tests.conftest import _fake_current_user_id
 
@@ -432,7 +432,7 @@ def test_message_id_stamp_and_answer_both_land(app_on_postgres, hold, pool):
 
     def stamp():
         with Session() as db:
-            check_question_service.attach_message_id(db, sid, msg_id)
+            check_service.stamp_message_id(db, sid, msg_id)
 
     lock = hold(sid)
     answer = pool.submit(
@@ -489,17 +489,11 @@ def test_session_end_racing_a_diagnostic_answer(app_on_postgres, hold, pool):
     assert pc is None and cc is None
     assert profile.last_session_summary
 
-    events = _events(Session, sid)
-    if ra.status_code == 200:
-        # The answer landed: its event exists and the forced grade counts it
-        # (2 of 3 correct).
-        assert [e.question for e in events] == ["Q0?", "Q1?"]
-        assert profile.knowledge_level == "intermediate"
-        expected = ["answered", "answered", "skipped"]
-    else:
-        assert ra.status_code == 409
-        assert [e.question for e in events] == ["Q0?"]
-        assert profile.knowledge_level == "beginner"
-        expected = ["answered", "skipped", "skipped"]
+    # #420: the answer queued behind the end's claim rechecks ended_at under
+    # the lock and is refused, so the end grades from item 0 alone (1 of 3).
+    assert ra.status_code == 409
+    assert ra.json()["detail"] == {"code": "session_ended"}
+    assert [e.question for e in _events(Session, sid)] == ["Q0?"]
+    assert profile.knowledge_level == "beginner"
     recap = _recap(Session, msg_id)
-    assert [it["status"] for it in recap["items"]] == expected
+    assert [it["status"] for it in recap["items"]] == ["answered", "skipped", "skipped"]

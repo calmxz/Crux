@@ -1,4 +1,4 @@
-"""TDD: check_question_service — pending-check batch state machine."""
+"""Check Set state machine: register, answer, skip, abandon (check_service)."""
 
 from datetime import datetime, timezone
 
@@ -8,7 +8,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import Session as SessionModel
 from db.models import User
-from services import check_question_service as cq
+from services import check_service as cq
 from services import profile_service
 
 SESSION_ID = "sess_1"
@@ -154,7 +154,7 @@ def test_register_batch_persists_items_pending(db, ctx, session_id):
             {"question": "Q2?", "options": ["yes", "no", "maybe"]},
         ],
     }
-    pc = cq.get_pending_check(db, session_id)
+    pc = cq.open_set(db.get(SessionModel, session_id))
     assert pc["current_index"] == 0
     assert pc["items"][0]["status"] == "pending"
     assert pc["items"][1]["correct_index"] == 1
@@ -183,7 +183,7 @@ def test_register_rejects_bad_correct_index(db, ctx, session_id):
 def test_public_view_hides_pending_reveals_answered(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.answer(db, session_id, index=0, selected_index=1)  # wrong on Q1
-    view = cq.public_view(cq.get_pending_check(db, session_id))
+    view = cq._public_view(cq.open_set(db.get(SessionModel, session_id)))
     assert view["current_index"] == 1
     assert view["total"] == 2
     answered, pending = view["items"][0], view["items"][1]
@@ -223,7 +223,7 @@ def test_answer_any_pending_item_first(db, ctx, session_id):
     assert r["correct"] is True
     assert r["current_index"] == 0
     assert r["done"] is False
-    pc = cq.get_pending_check(db, session_id)
+    pc = cq.open_set(db.get(SessionModel, session_id))
     assert pc["items"][0]["status"] == "pending"
     assert pc["items"][1]["status"] == "answered"
 
@@ -231,42 +231,42 @@ def test_answer_any_pending_item_first(db, ctx, session_id):
 def test_done_only_once_every_item_resolved_in_any_order(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.skip(db, session_id, index=1)
-    assert cq.is_done(cq.get_pending_check(db, session_id)) is False
+    assert cq._is_done(cq.open_set(db.get(SessionModel, session_id))) is False
     r = cq.answer(db, session_id, index=0, selected_index=0)
     assert r["current_index"] == 2
     assert r["done"] is True
-    assert cq.is_done(cq.get_pending_check(db, session_id)) is True
+    assert cq._is_done(cq.open_set(db.get(SessionModel, session_id))) is True
 
 
 def test_answer_resolved_item_rejected(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.answer(db, session_id, index=1, selected_index=0)
-    with pytest.raises(cq.CheckStateError):
+    with pytest.raises(cq.CheckError):
         cq.answer(db, session_id, index=1, selected_index=1)
-    with pytest.raises(cq.CheckStateError):
+    with pytest.raises(cq.CheckError):
         cq.skip(db, session_id, index=1)
 
 
 def test_answer_index_out_of_range_rejected(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     for bad in (-1, 2):
-        with pytest.raises(cq.CheckStateError):
+        with pytest.raises(cq.CheckError):
             cq.answer(db, session_id, index=bad, selected_index=0)
-        with pytest.raises(cq.CheckStateError):
+        with pytest.raises(cq.CheckError):
             cq.skip(db, session_id, index=bad)
 
 
 def test_answer_does_not_clear_batch(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.answer(db, session_id, index=0, selected_index=0)
-    assert cq.get_pending_check(db, session_id) is not None
+    assert cq.open_set(db.get(SessionModel, session_id)) is not None
 
 
 def test_skip_advances_no_event(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     r = cq.skip(db, session_id, index=0)
     assert r == {"current_index": 1, "total": 2, "has_next": True, "done": False}
-    pc = cq.get_pending_check(db, session_id)
+    pc = cq.open_set(db.get(SessionModel, session_id))
     assert pc["items"][0]["status"] == "skipped"
 
 
@@ -274,14 +274,14 @@ def test_is_done_true_after_last(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.skip(db, session_id, index=0)
     cq.skip(db, session_id, index=1)
-    assert cq.is_done(cq.get_pending_check(db, session_id)) is True
+    assert cq._is_done(cq.open_set(db.get(SessionModel, session_id))) is True
 
 
 def test_build_results_summary_mentions_misses_and_skips(db, ctx, session_id):
     cq.register(db, ctx, _batch_args(session_id))
     cq.answer(db, session_id, index=0, selected_index=1)  # wrong
     cq.skip(db, session_id, index=1)
-    summary = cq.build_results_summary(cq.get_pending_check(db, session_id))
+    summary = cq._results_summary(cq.open_set(db.get(SessionModel, session_id)))
     assert "gap=atp" in summary
     assert "0/1 correct" in summary or "0/2" in summary
     assert "skipped" in summary.lower()
@@ -290,13 +290,13 @@ def test_build_results_summary_mentions_misses_and_skips(db, ctx, session_id):
 def test_register_tags_diagnostic_when_level_unknown(db, ctx_fresh_session):
     # profile.knowledge_level is None on a fresh session
     cq.register(db, ctx_fresh_session, one_item_args(gap="warmup"))
-    pc = cq.get_pending_check(db, ctx_fresh_session.session_id)
+    pc = cq.open_set(db.get(SessionModel, ctx_fresh_session.session_id))
     assert pc["purpose"] == "diagnostic"
 
 
 def test_register_tags_check_when_level_known(db, ctx_session_with_level):
     cq.register(db, ctx_session_with_level, one_item_args(gap="loops"))
-    pc = cq.get_pending_check(db, ctx_session_with_level.session_id)
+    pc = cq.open_set(db.get(SessionModel, ctx_session_with_level.session_id))
     assert pc["purpose"] == "check"
 
 
@@ -317,7 +317,7 @@ def test_register_purpose_follows_turn_state_not_live_level(db_session):
     )
     result = cq.register(db_session, ctx, one_item_args(gap="osmosis"))
     assert result.ok
-    pc = cq.get_pending_check(db_session, s.id)
+    pc = cq.open_set(db_session.get(SessionModel, s.id))
     assert pc["purpose"] == "check"
 
 
@@ -332,9 +332,9 @@ def test_diagnostic_correct_answer_does_not_master(db, ctx_fresh_session):
 
 def test_public_view_does_not_leak_purpose(db, ctx_fresh_session):
     cq.register(db, ctx_fresh_session, one_item_args(gap="warmup"))
-    pc = cq.get_pending_check(db, ctx_fresh_session.session_id)
+    pc = cq.open_set(db.get(SessionModel, ctx_fresh_session.session_id))
     assert pc["purpose"] == "diagnostic"
-    view = cq.public_view(pc)
+    view = cq._public_view(pc)
     assert "purpose" not in view
 
 
@@ -362,17 +362,17 @@ def test_skip_takes_row_lock(db, ctx, session_id, monkeypatch):
     assert session_id in calls
 
 
-def test_abandon_open_batch_commit_false_leaves_writes_pending(db, ctx, session_id):
-    """F-33: with commit=False nothing is committed -- a rollback restores the
-    open batch, proving the writes joined the caller's transaction."""
+def test_abandon_leaves_writes_pending(db, ctx, session_id):
+    """F-33: abandon commits nothing -- a rollback restores the open batch,
+    proving the writes joined the caller's transaction."""
     cq.register(db, ctx, _batch_args(session_id))
-    assert cq.get_pending_check(db, session_id) is not None
+    assert cq.open_set(db.get(SessionModel, session_id)) is not None
 
-    cleared = cq.abandon_open_batch(db, session_id, commit=False)
+    cleared = cq.abandon_in_caller_transaction(db, session_id)
     assert cleared is True
 
     db.rollback()
-    assert cq.get_pending_check(db, session_id) is not None
+    assert cq.open_set(db.get(SessionModel, session_id)) is not None
 
 
 def test_register_takes_the_lock(db, ctx, session_id, monkeypatch):
@@ -387,7 +387,7 @@ def test_register_takes_the_lock(db, ctx, session_id, monkeypatch):
     assert session_id in calls
 
 
-def test_attach_message_id_takes_the_lock(db, ctx, session_id, monkeypatch):
+def test_stamp_message_id_takes_the_lock(db, ctx, session_id, monkeypatch):
     cq.register(db, ctx, _batch_args(session_id))
     calls = []
     real = profile_service.lock_session_row
@@ -396,5 +396,5 @@ def test_attach_message_id_takes_the_lock(db, ctx, session_id, monkeypatch):
         "lock_session_row",
         lambda db_, sid: calls.append(sid) or real(db_, sid),
     )
-    cq.attach_message_id(db, session_id, 123)
+    cq.stamp_message_id(db, session_id, 123)
     assert calls == [session_id]

@@ -759,7 +759,7 @@ async def test_run_streaming_ask_check_question_dispatches_sibling_first(db_sess
     )
     monkeypatch.setattr("agent.tutor.tools.dispatch", dispatch)
 
-    # Seed user and session row for attach_message_id lock to succeed
+    # Seed user and session row for stamp_message_id lock to succeed
     db_session.add(User(id="u1"))
     db_session.flush()
     db_session.add(

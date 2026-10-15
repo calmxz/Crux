@@ -21,7 +21,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service
+from services import check_service
 
 USER_ID = "u_tp_1"
 SESSION_ID = "s_tp_1"
@@ -87,7 +87,7 @@ def test_complete_check_uses_threadpool(client, db_session, seeded_session, spy,
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -105,7 +105,7 @@ def test_complete_check_uses_threadpool(client, db_session, seeded_session, spy,
             ],
         ),
     )
-    check_question_service.answer(db_session, SESSION_ID, index=0, selected_index=0)
+    check_service.answer(db_session, SESSION_ID, index=0, selected_index=0)
 
     async def fake_run_streaming(messages, system_prompt, tool_ctx):
         msg = ChatMessage(session_id=SESSION_ID, role="assistant", content="Nice work")

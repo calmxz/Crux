@@ -22,7 +22,7 @@ from contracts import Citation, ToolCallRecord, ToolResult
 from db.models import ChatMessage
 from lib.citations import chunks_to_citations
 from lib.error_codes import DAILY_COST_CAP_REACHED, LLM_FAILED, MAX_ITERS_REACHED
-from services import check_question_service, cost_meter, topic_suggest_service
+from services import check_service, cost_meter, topic_suggest_service
 
 log = logging.getLogger(__name__)
 
@@ -76,7 +76,7 @@ def _persist_partial_on_abort(ctx, accumulated_text, tool_calls, citations, aske
             citations=citations,
         )
         if asked_check:
-            check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+            check_service.stamp_message_id(ctx.db, ctx.session_id, msg_id)
         return msg_id
     except Exception:
         log.exception(
@@ -519,7 +519,7 @@ async def run_streaming(
                     citations=citations,
                 )
                 if asked_check:
-                    check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+                    check_service.stamp_message_id(ctx.db, ctx.session_id, msg_id)
                 yield StreamEvent("done", {"message_id": str(msg_id)})
                 return
 
@@ -532,7 +532,7 @@ async def run_streaming(
         # The shielded dispatch (see above) keeps running after this arm is
         # entered. Drain it FIRST, before any ctx.db use below: the worker
         # thread may still be mid-commit (profile_service.apply_patch,
-        # check_question_service.register, retrieval_service.retrieve), and
+        # check_service.register, retrieval_service.retrieve), and
         # SQLAlchemy's Session is not thread-safe.
         if dispatch_task is not None and not dispatch_task.done():
             try:
@@ -568,7 +568,7 @@ async def run_streaming(
                 citations=citations,
             )
             if asked_check:
-                check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+                check_service.stamp_message_id(ctx.db, ctx.session_id, msg_id)
         except Exception:
             log.exception(
                 "failed to persist assistant message on cancel session_id=%s user_id=%s",
@@ -629,7 +629,7 @@ async def run_streaming(
                 citations=citations,
             )
             if asked_check:
-                check_question_service.attach_message_id(ctx.db, ctx.session_id, msg_id)
+                check_service.stamp_message_id(ctx.db, ctx.session_id, msg_id)
         except Exception:
             log.exception(
                 "failed to persist assistant message after agent-loop failure "
