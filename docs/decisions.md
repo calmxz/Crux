@@ -1093,6 +1093,17 @@ a pure `assemble`. The renderer accepts only `PromptState`.
   inputs (retrieval, prefetch, review target, `diagnostic_accepted`) differ
   from a chat turn. Part 1 passes the omitted values as explicit blanks so
   the refactor itself stays byte-identical.
+  **Amended 2026-10-15 (#395):** the blanks include the Check pointer
+  (`current_check`), which the follow-up also omitted; the golden's set-1-of-2
+  case fails if it leaks. Gap accuracy is injectable too, and the follow-up
+  passes `{}`: a query it then discarded would also, on Postgres, abort the
+  follow-up's transaction whenever it failed.
+- **Injectable inputs default to `NOT_LOADED`, not None (#395).**
+  `gather_session_inputs` queries only what the caller did not pass, but an
+  ingestion status of None is a real value (no documents). With None as the
+  "not passed" marker, a document-less chat turn would re-query and break the
+  statement budget, so the injectable inputs (learner prefs, ingestion
+  status, gap accuracy) use a sentinel.
 - **The follow-up's `ToolContext.diagnostic_required` moves in #396, not
   #395.** In part 1 the follow-up's prompt state carries a blanked
   `diagnostic_required = False` to keep the rendered prompt identical (the

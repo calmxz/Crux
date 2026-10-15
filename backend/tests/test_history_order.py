@@ -95,7 +95,9 @@ def test_prepare_turn_context_orders_by_id_within_a_created_at_tie(db_session, t
     db_session.expunge(sess)
 
     with capture_statements(db_session) as stmts:
-        messages, _profile, _gap_accuracy, _retrieval = _prepare_turn_context(req, db_session, sess)
+        messages, _session_inputs, _retrieval = _prepare_turn_context(
+            req, db_session, sess, None, {}
+        )
 
     sql = " ".join(_message_select(stmts).split())
     assert "chat_messages.id DESC" in sql, sql

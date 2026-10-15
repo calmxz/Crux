@@ -92,7 +92,7 @@ def test_prepare_turn_context_leaves_no_open_transaction(db_session, seeded_sess
     db_session.expunge(sess)
     req = ChatRequest(session_id=session_id, message="explain factoring")
 
-    _prepare_turn_context(req, db_session, sess)
+    _prepare_turn_context(req, db_session, sess, None, {})
 
     assert db_session.in_transaction() is False
 

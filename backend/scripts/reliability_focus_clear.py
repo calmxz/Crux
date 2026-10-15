@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import json
 import os
 import sys
@@ -47,7 +48,7 @@ from contracts import TopicProfile  # noqa: E402
 from db.database import Base  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
 from db.models import User  # noqa: E402
-from services import profile_service  # noqa: E402
+from services import profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "focus_patterns"
 PATTERNS = ("linear", "topic_shift", "tangent", "vague_signal")
@@ -100,17 +101,16 @@ async def _run_fixture(SessionLocal, fixture: dict) -> bool:
         for turn_idx, user_turn in enumerate(fixture["user_turns"], start=1):
             messages.append({"role": "user", "content": user_turn})
 
-            profile = profile_service.load_profile(db, session_id)
-            session_row = db.get(SessionModel, session_id)
-            prompt_state = {
-                "topic": session_row.topic,
-                "profile": profile,
-                "ingestion_status": None,
-                "retrieval_required": False,
-                "seed_mode": None,
-                "last_session_summary": None,
-            }
-            system_prompt = prompts.build_system_prompt(prompt_state)
+            # The seed has no level; keep the diagnostic off so the eval
+            # measures focus clearing, as it was calibrated.
+            state = dataclasses.replace(
+                prompt_state.assemble(
+                    prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+                    prompt_state.TurnInputs(retrieval_required=False),
+                ),
+                diagnostic_required=False,
+            )
+            system_prompt = prompts.build_system_prompt(state)
 
             ctx = ToolContext(
                 db=db,

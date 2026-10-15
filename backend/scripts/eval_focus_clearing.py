@@ -165,7 +165,8 @@ async def _run_one(pattern: Pattern, model: str | None) -> dict:
     from agent.types import ToolContext
     from config import settings
     from db.database import SessionLocal
-    from services import profile_service
+    from db.models import Session as SessionModel
+    from services import prompt_state
 
     if model:
         settings.model = model
@@ -174,16 +175,11 @@ async def _run_one(pattern: Pattern, model: str | None) -> dict:
     user_id, session_id = _seed_session(focus_gap="recursion")
 
     with SessionLocal() as db:
-        profile = profile_service.load_profile(db, session_id)
-        prompt_state = {
-            "topic": "Recursion",
-            "profile": profile,
-            "ingestion_status": None,
-            "retrieval_required": False,
-            "seed_mode": None,
-            "last_session_summary": None,
-        }
-        system_prompt = prompts.build_system_prompt(prompt_state)
+        state = prompt_state.assemble(
+            prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+            prompt_state.TurnInputs(retrieval_required=False),
+        )
+        system_prompt = prompts.build_system_prompt(state)
         ctx = ToolContext(
             db=db,
             session_id=session_id,

@@ -15,6 +15,7 @@ import litellm
 
 from agent import context_budget, prompts
 from config import settings
+from tests.prompt_state_factory import make_prompt_state
 
 # Set in Step 2 from the measured baseline (printed value * 1.10, rounded up
 # to the nearest 100). Do not raise casually: an increase here means every
@@ -34,12 +35,12 @@ TOKEN_BUDGET = 9700
 
 
 def _assembled_turn():
-    state = {
-        "topic": "photosynthesis",
-        "profile": {"knowledge_level": "beginner", "confirmed_gaps": ["light reactions"]},
-        "ingestion_status": "ready",
-        "retrieval_required": True,
-    }
+    state = make_prompt_state(
+        topic="photosynthesis",
+        profile={"knowledge_level": "beginner", "confirmed_gaps": ["light reactions"]},
+        ingestion_status="ready",
+        retrieval_required=True,
+    )
     system_prompt = prompts.build_system_prompt(state)
     long_answer = "The light-dependent reactions occur in the thylakoid membrane. " * 150
     history = [

@@ -287,7 +287,7 @@ def test_stream_schedules_rolling_summary(client, monkeypatch):
 def test_semantic_fallback_escalates_gate(client, monkeypatch):
     """D2.2: lexical gate is False (default empty kw_index_json), so the
     semantic fallback runs and its True result escalates retrieval_required
-    all the way through to _build_prompt_state."""
+    all the way through to prompt_state.assemble."""
     message = "hello"
     calls = {}
 
@@ -301,13 +301,13 @@ def test_semantic_fallback_escalates_gate(client, monkeypatch):
     captured = {}
     from routes import chat as chat_module
 
-    real_build = chat_module._build_prompt_state
+    real_assemble = chat_module.prompt_state.assemble
 
-    def spy_build(**kwargs):
-        captured["retrieval_required"] = kwargs.get("retrieval_required")
-        return real_build(**kwargs)
+    def spy_assemble(session_inputs, turn_inputs):
+        captured["retrieval_required"] = turn_inputs.retrieval_required
+        return real_assemble(session_inputs, turn_inputs)
 
-    monkeypatch.setattr(chat_module, "_build_prompt_state", spy_build)
+    monkeypatch.setattr(chat_module.prompt_state, "assemble", spy_assemble)
 
     fake = _make_fake_run_streaming(StreamEvent("done", {"message_id": "1"}))
     monkeypatch.setattr("agent.tutor.run_streaming", fake)

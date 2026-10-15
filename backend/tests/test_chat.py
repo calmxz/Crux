@@ -1,5 +1,4 @@
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 from sqlalchemy import select
@@ -9,7 +8,8 @@ from contracts import TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
 from lib.error_codes import DAILY_CAP_REACHED
-from routes.chat import _build_prompt_state
+from services import prompt_state
+from tests.prompt_state_factory import make_session_inputs
 
 SESSION_ID = "s1"
 USER_ID = "u1"
@@ -79,7 +79,7 @@ def test_gap_accuracy_failure_does_not_kill_turn(client, db_session, monkeypatch
     def _boom(db, sid):
         raise RuntimeError("db exploded")
 
-    monkeypatch.setattr("routes.chat.learning_event_service.gap_accuracy", _boom)
+    monkeypatch.setattr("services.learning_event_service.gap_accuracy", _boom)
 
     status, body = _post_stream(client, message="hi")
     assert status == 200
@@ -275,10 +275,6 @@ def test_empty_message_rejected_by_contract(client, db_session):
     assert msgs == []
 
 
-def _fake_session(topic="sql"):
-    return SimpleNamespace(topic=topic)
-
-
 def _fake_profile(**overrides):
     defaults = {"knowledge_level": "intermediate", "confirmed_gaps": []}
     defaults.update(overrides)
@@ -288,32 +284,20 @@ def _fake_profile(**overrides):
     return TopicProfile(**defaults)
 
 
-def _call_build_prompt_state(profile, review_gaps, review_gap=None):
-    return _build_prompt_state(
-        session=_fake_session(),
-        profile=profile,
-        ingestion_status="none",
-        retrieval_required=False,
-        review_gaps=review_gaps,
-        review_gap=review_gap,
-        pending_check=None,
-        quiz_cooldown=None,
+def _assemble(profile, *, retrieval_required=False, ingestion_status="none", **turn):
+    session_kw = {k: turn.pop(k) for k in ("learner_prefs", "rolling_summary") if k in turn}
+    return prompt_state.assemble(
+        make_session_inputs(
+            topic="sql", profile=profile, ingestion_status=ingestion_status, **session_kw
+        ),
+        prompt_state.TurnInputs(retrieval_required=retrieval_required, **turn),
     )
 
 
-def test_build_prompt_state_carries_learner_prefs():
+def test_assemble_carries_learner_prefs():
     prefs = {"feedback_pref": "direct_answers", "check_ins": "often", "reply_length": "brief"}
-    state = _build_prompt_state(
-        session=_fake_session(),
-        profile=_fake_profile(),
-        ingestion_status="none",
-        retrieval_required=False,
-        review_gaps=False,
-        pending_check=None,
-        quiz_cooldown=None,
-        learner_prefs=prefs,
-    )
-    assert state["learner_prefs"] == prefs
+    state = _assemble(_fake_profile(), learner_prefs=prefs)
+    assert state.learner_prefs == prefs
 
 
 def test_prepare_turn_prompt_uses_users_row_preferences(db_session):
@@ -337,150 +321,135 @@ def test_prepare_turn_prompt_uses_users_row_preferences(db_session):
     assert "- reply length: thorough" in system_prompt
 
 
-def test_build_prompt_state_review_gaps_picks_first_gap():
+def test_assemble_review_gaps_picks_first_gap():
     profile = _fake_profile(confirmed_gaps=["photosynthesis", "krebs cycle"])
-    state = _call_build_prompt_state(profile, review_gaps=True)
-    assert state["review_gaps_target"] == "photosynthesis"
+    state = _assemble(profile, review_gaps=True)
+    assert state.review_gaps_target == "photosynthesis"
 
 
-def test_build_prompt_state_review_gaps_suppresses_diagnostic():
+def test_assemble_review_gaps_suppresses_diagnostic():
     profile = _fake_profile(knowledge_level=None, confirmed_gaps=["a"])
-    state = _call_build_prompt_state(profile, review_gaps=True)
-    assert state["review_gaps_target"] == "a"
-    assert state["diagnostic_required"] is False
+    state = _assemble(profile, review_gaps=True)
+    assert state.review_gaps_target == "a"
+    assert state.diagnostic_required is False
 
 
-def test_build_prompt_state_review_gaps_off_when_no_gaps():
+def test_assemble_review_gaps_off_when_no_gaps():
     profile = _fake_profile(confirmed_gaps=[])
-    state = _call_build_prompt_state(profile, review_gaps=True)
-    assert "review_gaps_target" not in state
+    state = _assemble(profile, review_gaps=True)
+    assert state.review_gaps_target is None
 
 
-def test_build_prompt_state_review_gaps_off_when_flag_false():
+def test_assemble_review_gaps_off_when_flag_false():
     profile = _fake_profile(confirmed_gaps=["photosynthesis"])
-    state = _call_build_prompt_state(profile, review_gaps=False)
-    assert "review_gaps_target" not in state
+    state = _assemble(profile, review_gaps=False)
+    assert state.review_gaps_target is None
 
 
-def test_build_prompt_state_preserves_other_keys():
+def test_assemble_preserves_other_fields():
     profile = _fake_profile(confirmed_gaps=[], last_session_summary="summary text")
-    state = _call_build_prompt_state(profile, review_gaps=False)
-    assert state["topic"] == "sql"
-    assert state["profile"] is profile
-    assert state["ingestion_status"] == "none"
-    assert state["retrieval_required"] is False
-    assert state["diagnostic_required"] is False
-    assert state["seed_mode"] is None
-    assert state["last_session_summary"] == "summary text"
-    assert state["pending_check"] is None
-    assert state["quiz_cooldown"] is None
+    state = _assemble(profile, review_gaps=False)
+    assert state.topic == "sql"
+    assert state.profile is profile
+    assert state.ingestion_status == "none"
+    assert state.retrieval_required is False
+    assert state.diagnostic_required is False
+    assert state.seed_mode is None
+    assert state.last_session_summary == "summary text"
+    assert state.pending_check is None
+    assert state.quiz_cooldown is None
 
 
 def test_review_gap_targets_named_gap():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="gap-b")
-    assert state["review_gaps_target"] == "gap-b"
+    state = _assemble(profile, review_gaps=True, review_gap="gap-b")
+    assert state.review_gaps_target == "gap-b"
 
 
 def test_review_gap_invalid_falls_back_to_first():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="not-a-gap")
-    assert state["review_gaps_target"] == "gap-a"
+    state = _assemble(profile, review_gaps=True, review_gap="not-a-gap")
+    assert state.review_gaps_target == "gap-a"
 
 
 def test_review_gap_none_falls_back_to_first():
     profile = _fake_profile(confirmed_gaps=["gap-a", "gap-b", "gap-c"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap=None)
-    assert state["review_gaps_target"] == "gap-a"
+    state = _assemble(profile, review_gaps=True, review_gap=None)
+    assert state.review_gaps_target == "gap-a"
 
 
-def test_build_prompt_state_carries_rolling_summary():
+def test_assemble_carries_rolling_summary():
     """P2 AC3: rolling_summary flows from the session onto the prompt state
     so build_dynamic_context can render it."""
-    session = _fake_session()
-    session.rolling_summary = "covered limits and continuity"
-    profile = _fake_profile()
-    state = _build_prompt_state(
-        session=session,
-        profile=profile,
-        ingestion_status="none",
-        retrieval_required=False,
-        review_gaps=False,
-        pending_check=None,
-        quiz_cooldown=None,
-    )
-    assert state["rolling_summary"] == "covered limits and continuity"
+    state = _assemble(_fake_profile(), rolling_summary="covered limits and continuity")
+    assert state.rolling_summary == "covered limits and continuity"
 
 
-def test_build_prompt_state_rolling_summary_defaults_none():
-    state = _call_build_prompt_state(_fake_profile(), review_gaps=False)
-    assert state["rolling_summary"] is None
+def test_assemble_rolling_summary_defaults_none():
+    state = _assemble(_fake_profile(), review_gaps=False)
+    assert state.rolling_summary is None
 
 
-def test_build_prompt_state_prefetched_chunks_wraps_excerpts():
+def test_assemble_prefetched_chunks_wraps_excerpts():
     """F-56: prefetched_chunks (server force-retrieve, Task 11) is wrapped
     via agent.excerpt.wrap_chunk into prefetched_excerpts on the prompt
     state, which prompts.build_dynamic_context renders as PROVIDED."""
-    state = _build_prompt_state(
-        session=_fake_session(),
-        profile=_fake_profile(),
+    state = _assemble(
+        _fake_profile(),
         ingestion_status="ready",
         retrieval_required=True,
-        review_gaps=False,
-        pending_check=None,
-        quiz_cooldown=None,
         prefetched_chunks=[{"doc_id": "d1", "text": "leaves convert light"}],
     )
-    assert len(state["prefetched_excerpts"]) == 1
-    excerpt = state["prefetched_excerpts"][0]
+    assert len(state.prefetched_excerpts) == 1
+    excerpt = state.prefetched_excerpts[0]
     assert "leaves convert light" in excerpt
     assert "document_excerpt" in excerpt
 
 
-def test_build_prompt_state_no_prefetched_chunks_omits_key():
-    state = _call_build_prompt_state(_fake_profile(), review_gaps=False)
-    assert "prefetched_excerpts" not in state
+def test_assemble_without_prefetched_chunks_has_no_excerpts():
+    state = _assemble(_fake_profile(), review_gaps=False)
+    assert state.prefetched_excerpts == []
 
 
 def test_review_gap_mastered_target_accepted():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="photosynthesis")
-    assert state["review_gaps_target"] == "photosynthesis"
-    assert state["review_gaps_retention"] is True
+    state = _assemble(profile, review_gaps=True, review_gap="photosynthesis")
+    assert state.review_gaps_target == "photosynthesis"
+    assert state.review_gaps_retention is True
 
 
 def test_review_gap_gap_target_not_retention():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="gap-a")
-    assert state["review_gaps_target"] == "gap-a"
-    assert state["review_gaps_retention"] is False
+    state = _assemble(profile, review_gaps=True, review_gap="gap-a")
+    assert state.review_gaps_target == "gap-a"
+    assert state.review_gaps_retention is False
 
 
 def test_review_gaps_activates_with_only_mastered():
     profile = _fake_profile(confirmed_gaps=[], mastered_concepts=["photosynthesis"])
-    state = _call_build_prompt_state(profile, review_gaps=True)
-    assert state["review_gaps_target"] == "photosynthesis"
-    assert state["review_gaps_retention"] is True
-    assert state["diagnostic_required"] is False
+    state = _assemble(profile, review_gaps=True)
+    assert state.review_gaps_target == "photosynthesis"
+    assert state.review_gaps_retention is True
+    assert state.diagnostic_required is False
 
 
 def test_review_gap_invalid_still_falls_back_to_first_gap():
     profile = _fake_profile(confirmed_gaps=["gap-a"], mastered_concepts=["photosynthesis"])
-    state = _call_build_prompt_state(profile, review_gaps=True, review_gap="junk")
-    assert state["review_gaps_target"] == "gap-a"
-    assert state["review_gaps_retention"] is False
+    state = _assemble(profile, review_gaps=True, review_gap="junk")
+    assert state.review_gaps_target == "gap-a"
+    assert state.review_gaps_retention is False
 
 
 def test_review_gaps_off_when_both_lists_empty():
     profile = _fake_profile(confirmed_gaps=[], mastered_concepts=[])
-    state = _call_build_prompt_state(profile, review_gaps=True)
-    assert "review_gaps_target" not in state
-    assert "review_gaps_retention" not in state
+    state = _assemble(profile, review_gaps=True)
+    assert state.review_gaps_target is None
+    assert state.review_gaps_retention is False
 
 
 def test_resumed_profile_skips_diagnostic():
     """R1.1 AC2: a resume-seeded profile carries a non-null knowledge_level,
     so the 3Q diagnostic branch must not be taken."""
     profile = _fake_profile(knowledge_level="intermediate", confirmed_gaps=["gap-a"])
-    state = _call_build_prompt_state(profile, review_gaps=False)
-    assert state["diagnostic_required"] is False
+    state = _assemble(profile, review_gaps=False)
+    assert state.diagnostic_required is False

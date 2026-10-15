@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 import logging
 import time
@@ -54,6 +55,7 @@ from services import (
     cost_meter,
     documents_service,
     profile_service,
+    prompt_state,
     rate_limit,
     summary_service,
     topic_suggest_service,
@@ -835,33 +837,34 @@ def _followup_context(
     if not allowed:
         return False, None, None, None
 
-    profile = profile_service.load_profile(db, session_id)
-    ingestion_status = documents_service.session_ingestion_status(db, session_id)
+    # The follow-up prompt has always left out the learner prefs, rolling
+    # summary, gap accuracy, Check pointer and diagnostic; they are blanked
+    # here so the prompt is unchanged (#396 fills the real values).
+    # #354: topic_suggest_state still flows through, since a graded diagnostic
+    # makes this follow-up the first at-level reply, where the topic card falls due.
+    session_inputs = dataclasses.replace(
+        prompt_state.gather_session_inputs(db, row, learner_prefs={}, gap_accuracy={}),
+        rolling_summary=None,
+        pending_check=None,
+        current_check=None,
+        quiz_cooldown=cooldown,
+    )
+    state = dataclasses.replace(
+        prompt_state.assemble(session_inputs, prompt_state.TurnInputs(retrieval_required=False)),
+        diagnostic_required=False,
+    )
 
     messages = _recent_history(db, session_id)
     messages.append({"role": "user", "content": summary})
 
-    prompt_state = {
-        "topic": row.topic,
-        "profile": profile,
-        "ingestion_status": ingestion_status,
-        "retrieval_required": False,
-        "seed_mode": None,
-        "last_session_summary": profile.last_session_summary,
-        "pending_check": None,
-        "quiz_cooldown": cooldown,
-        # #354: a graded diagnostic makes this follow-up the first at-level
-        # reply, so it is where the topic card falls due.
-        "topic_suggest_state": row.topic_suggest_state,
-    }
-    system_prompt = prompts.build_system_prompt(prompt_state)
+    system_prompt = prompts.build_system_prompt(state)
     ctx = ToolContext(
         db=db,
         session_id=session_id,
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
         suppress_check=True,
-        diagnostic_required=(profile.knowledge_level is None),
+        diagnostic_required=(session_inputs.profile.knowledge_level is None),
     )
     return True, messages, system_prompt, ctx
 
