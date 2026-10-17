@@ -86,12 +86,9 @@ def seeded(pg_seed):
 def app_on_postgres(seeded, monkeypatch):
     """The real app on a Postgres session, authenticated as the seeded user.
     The LLM adapter's gate and settlement open their own sessions on the same
-    database (#412: the tutor's spend settles there). Yields the seeded
-    (Session, uid, sid)."""
-    from services import llm
-
+    database (#412: the tutor's spend settles there; pg_seed binds
+    SessionLocal). Yields the seeded (Session, uid, sid)."""
     Session, uid, _ = seeded
-    monkeypatch.setattr(llm, "session_factory", Session)
 
     def override_get_db():
         db = Session()
@@ -169,7 +166,7 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
     )
 
-    # The response's BackgroundTask opens SessionLocal() on the default URL.
+    # Skip the post-response rolling summary: it would make an extra LLM call.
     async def no_rolling_summary(db, session_id):
         return None
 
@@ -271,11 +268,8 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
 @pytest.fixture
 def adapter_on_postgres(seeded, monkeypatch, fake_llm):
     """The LLM adapter's gate and settlement on the seeded Postgres, behind
-    the scripted fake provider. Yields the seeded (Session, uid, sid)."""
-    from services import llm
-
-    Session, _, _ = seeded
-    monkeypatch.setattr(llm, "session_factory", Session)
+    the scripted fake provider (pg_seed binds SessionLocal). Yields the
+    seeded (Session, uid, sid)."""
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
     monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)

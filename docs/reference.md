@@ -167,15 +167,15 @@ copies each sent message, so later pruning cannot rewrite a capture.
 `fake_llm` pins stub mode off (the test key `"test"` turns it on); set
 `settings.llm_stub = True` after it to get the stub. litellm's chunk parsing is the
 provider's and is tested against litellm-shaped chunks in `test_llm.py`.
-`db_session` binds `llm.session_factory` (and the chat route's `SessionLocal`, for the
-rolling-summary task) to the sqlite test engine. On sqlite that engine
+`db_session` binds `db.database.SessionLocal` (see the default-engine entry below)
+to the sqlite test engine, so the adapter's settlement and the rolling-summary task
+land there. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits
 the caller's pending writes, and so does the rolling-summary task's (which on a
 due summary also makes a `fake_llm` call); isolation is only provable on
-Postgres. A Postgres test must bind `llm.session_factory` to the seed's
-sessionmaker, `pg_seed.Session` (see `adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`),
-and one that streams a chat turn stubs `summary_service.update_rolling_summary`
-(or the guard below fails it). An autouse
+Postgres. `pg_seed` binds `SessionLocal` to the Postgres engine the same way; a
+Postgres test that streams a chat turn still stubs `summary_service.update_rolling_summary`,
+to skip its extra LLM call. An autouse
 conftest fixture runs the deferred retry inline (it replaces `llm._schedule`)
 and gives each test fresh retry slots; a test that needs to observe the
 deferred state captures the scheduled call instead (`test_llm.py`).
@@ -339,11 +339,16 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   refuses every such connection, so the file is never opened, and records it; the
   test that made it fails at teardown, named, even if app code swallowed the
   refusal. Hits outside a test fail the next test, or the run if none follows
-  (`tests/test_default_engine_guard.py` pins the hook). App
-  code that opens its own session (`SessionLocal()`, `engine.begin()`) needs its
-  factory bound to the test engine: `db_session` does this for `llm.session_factory`
-  and `routes.chat.SessionLocal`; tests that run the app lifespan stub
-  `main.create_tables`.
+  (`tests/test_default_engine_guard.py` pins the hook). Every session app code
+  opens on its own (LLM gate and settlement, rolling-summary task, ingestion,
+  worker) comes from the one `db.database.SessionLocal`, and one binding points it
+  at the test engine (#580): `bind_session_local(engine)` in the conftest calls
+  `SessionLocal.configure(bind=...)` and restores the previous bind on exit, even
+  after an exception. `db_session` and `pg_seed` hold it for the test, so no test
+  patches a module's `SessionLocal` just to rebind it. New app code that opens its
+  own session must use `db.database.SessionLocal` itself: a sessionmaker of its
+  own escapes the binding, and this guard then fails it. Tests that run the app lifespan stub `main.create_tables`
+  (`engine.begin()`).
 - Unexpected app logs (#577): an autouse fixture in `backend/tests/conftest.py`
   fails a test, at teardown, that logs a record at WARNING or above from an app
   logger (`agent`, `config`, `db`, `lib`, `main`, `routes`, `services`, `worker`),

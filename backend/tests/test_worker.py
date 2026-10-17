@@ -47,15 +47,8 @@ def test_main_loop_recovers_stale_claim_mid_run_without_restart(db_session, monk
     that claims a doc and then dies leaves it "processing" with a stale
     claimed_at; the SAME running loop (no restart) must eventually recover
     it once it goes stale, not just at process start."""
-    from sqlalchemy.orm import sessionmaker
-
     d = _seed_doc(db_session, status="pending")
 
-    test_engine = db_session.get_bind()
-    monkeypatch.setattr(
-        "worker.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
-    )
     monkeypatch.setattr("worker.time", type("T", (), {"sleep": staticmethod(lambda s: None)}))
     monkeypatch.setattr("worker.RECOVER_EVERY_ITERATIONS", 2)
 
@@ -87,13 +80,6 @@ def test_main_loop_processes_then_exits(db_session, monkeypatch):
         "worker.ingestion_service",
         type("M", (), {"run": staticmethod(lambda doc_id: processed.append(doc_id))}),
     )
-    from sqlalchemy.orm import sessionmaker
-
-    test_engine = db_session.get_bind()
-    monkeypatch.setattr(
-        "worker.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
-    )
     monkeypatch.setattr("worker.time", type("T", (), {"sleep": staticmethod(lambda s: None)}))
     worker.main_loop(max_iterations=2)
     assert processed == [d.id]
@@ -104,14 +90,7 @@ def test_main_loop_exits_when_stop_event_already_set(db_session, monkeypatch):
     anything, even with max_iterations=None (the in-process mode)."""
     import threading
 
-    from sqlalchemy.orm import sessionmaker
-
     d = _seed_doc(db_session, status="pending")
-    test_engine = db_session.get_bind()
-    monkeypatch.setattr(
-        "worker.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
-    )
     ev = threading.Event()
     ev.set()
     worker.main_loop(stop_event=ev)  # must return, not hang
@@ -123,13 +102,6 @@ def test_main_loop_idle_wait_uses_stop_event_not_sleep(db_session, monkeypatch):
     """With a stop_event provided, idle waiting must go through
     stop_event.wait(POLL_INTERVAL_S) so shutdown interrupts the wait.
     time.sleep must not be touched on this path."""
-    from sqlalchemy.orm import sessionmaker
-
-    test_engine = db_session.get_bind()
-    monkeypatch.setattr(
-        "worker.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=test_engine),
-    )
 
     def _boom(_s):
         raise AssertionError("time.sleep must not be used when stop_event given")
