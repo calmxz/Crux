@@ -9,6 +9,7 @@ from config import settings
 from contracts import ConceptEntry, TopicProfile
 from db.models import Session as SessionModel
 from services import profile_service
+from tests.prompt_state_factory import make_prompt_state
 
 
 def _entries(n, prefix):
@@ -57,7 +58,7 @@ def test_cap_never_evicts_focused_gap(db_session):
 
 def test_prompt_renders_newest_with_older_count():
     profile = TopicProfile(confirmed_gaps=_entries(prompts.PROMPT_LIST_MAX + 7, "gap"))
-    out = prompts.build_dynamic_context({"profile": profile})
+    out = prompts.build_dynamic_context(make_prompt_state(profile=profile))
     line = next(ln for ln in out.splitlines() if ln.startswith("CURRENT TOPIC PROFILE:"))
     rendered = json.loads(line[len("CURRENT TOPIC PROFILE: ") :])
     assert len(rendered["confirmed_gaps"]) == prompts.PROMPT_LIST_MAX

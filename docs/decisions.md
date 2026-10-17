@@ -3,6 +3,28 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-17 - A failed tool rolls back the turn's session (#569)
+
+On Postgres a tool that raised left `ctx.db` aborted, so a valid write later
+in the same batch failed with InFailedSqlTransaction, and a failed flush made
+the loop's next commit raise and end the turn `llm_failed`.
+
+- **A rollback in `dispatch`, not a savepoint around the call.** Every write
+  tool commits its own work, and a commit ends the transaction a savepoint
+  lives in. The loop commits each iteration and each write tool commits
+  itself, so the rollback discards no other tool's write.
+- **Only on an exception.** Ok and refused returns are untouched, so the
+  happy path issues no extra statements. Rejected: ending the transaction
+  after every call (closes the gap for any future swallowing tool, but adds a
+  round trip per tool and was outside the brief).
+- **A tool that swallows its own SQL error rolls back itself.** `retrieve`
+  catches its failures and returns `retrieval_failed`, so it rolls back in
+  that except arm. Rejected: a `core_savepoint` around the vector query, as
+  the pre-flight reads use (#567). It leaves the embed's commit and the
+  connection reopened after the embed uncovered, and costs two statements on
+  every successful call; the arm rollback costs nothing on success and
+  discards nothing, since the embed committed and the query only reads.
+
 ## 2026-10-14 - The card-look spec is a required check of its own (#453)
 
 #453's spec is the card refactor's only check that a move keeps the look,
@@ -721,6 +743,11 @@ terms (Check, Set, Item, Close, Recap, Diagnostic) are now in `CONTEXT.md`.
   (commit, then raise). Never by rollback: register and the message-id stamp
   run inside the tutor turn, whose flushed ledger writes must survive. No
   public function takes `commit=`.
+
+  **Amended 2026-10-17 (#569):** the ledger reason went stale with #411
+  (spend settles in the adapter's own transaction). The module still never
+  rolls back, but when register raises, the tool dispatcher now rolls the
+  turn's session back.
 - **Session end is the one named exception.** Abandon joins the caller's
   transaction and takes the lock itself, so F-33's single write window in
   `generate_and_persist` stays. Rejected: callers always commit (moves B-02's
@@ -866,6 +893,20 @@ a test fake).
   retry was rejected because a streamed call settles synchronously in its
   exit, where a pause would either block the event loop or need a shield;
   `pool_pre_ping` already absorbs stale connections.
+  **Amended 2026-10-15 (#411):** the "no deferred retry" line is reversed;
+  the inline-retry rejection stands. A failed settlement now commits the
+  `LlmCallLog` row on its own and retries the ledger write once on a daemon
+  timer 5 s later (`_defer_ledger`), off the request path and off the event
+  loop, so it hits neither objection to an inline retry. Why: dropping the
+  spend undercounts the cap for the rest of the day, and the retry is
+  cheap. Bounds: at most 2 retries waiting per process (each holds a pooled
+  connection), booked to the original day, and every deferral logs at
+  error level so a retry lost to a restart is still on record. Durable
+  reconciliation (a pending flag plus a sweep) was rejected in #558; see
+  `.out-of-scope/llm-settlement-reconciliation.md`. Lock timeouts, also
+  #411: `SETTLE_LOCK_TIMEOUT` is 5 s. The tutor commits each iteration's
+  `record_cost` before tool dispatch, and the `retrieve` tool commits its
+  embedding metering, so no ledger row is held across slow work.
 - **A streamed call settles itself exactly once on every exit.**
   `async with stream()` yields typed events. The exit settles the real
   price, or an estimate on cancel (always) and on error (if output arrived or
@@ -879,6 +920,29 @@ a test fake).
   user. Completions do not retry timeouts (a 30 s timeout retried twice
   would keep the user waiting 90 s or more); embeddings still do. A failed
   attempt with no output settles $0, except a timeout.
+  **Amended 2026-10-15 (#412):** a stream retries only while no chunk of any
+  kind has arrived, not merely no text event. A tool-call fragment is output
+  the vendor bills, so an attempt that received one settles its estimate
+  (prompt plus text plus tool-call arguments) and is not retried. "A failed
+  attempt with no output settles $0" stands, including an attempt whose
+  stream opened and then failed before its first chunk; that stream is
+  closed before the retry. Billing such an attempt (on the premise that the
+  vendor processed the prompt) was tried in review and reverted: it charged
+  learners during an outage with no reply. #561 settled the premise: the
+  Gemini API billing FAQ ("Am I charged for failed requests?") says a request
+  that fails with a 400 or 500 error is not charged for its tokens, though it
+  counts against quota, so $0 matches the bill for 429, 503 and 500. A
+  connection dropped mid-stream with no error status is not covered by the
+  FAQ; it is left at $0, a bounded undercount the daily budget absorbs
+  (`.out-of-scope/llm-settlement-reconciliation.md`). The tutor and the `retrieve` tool now
+  write no ledger row themselves (every call settles in the adapter), so the
+  previous amendment's "commits each iteration's `record_cost`" and
+  "commits its embedding metering" no longer apply. The retrieve tool's
+  embedding goes through `llm.get().embed`; a `CostCapExceeded` there is a
+  tool error result (code in `error`), and the next stream's gate emits the
+  cap event. The tutor's mid-turn refusal carries the exception's code, so a
+  global-ceiling refusal reports `global_cost_cap_reached` and the frontend
+  keeps the streamed text as `partial`.
 - **One module-level active adapter, one test fake.** `llm.get()` resolves
   per call. Tests install a fake provider under the real shell, so the gate,
   retry and settlement run in every test. Explicit injection was rejected
@@ -899,6 +963,13 @@ a test fake).
   **Amended 2026-09-30 (B5):** #435 makes the stub's `embed` and `aembed`
   return deterministic fake vectors (cost 0, no network); `complete` still
   raises. Stub-mode ingestion now reaches ready.
+  **Amended 2026-10-15 (#413):** stub mode wins over a provider a test
+  installs, so `llm.get()` alone reads the flag; the `fake_llm` fixture pins
+  stub mode off instead. The shell skips the cost gate for the stub, which
+  never spends, so stub-mode output does not depend on ledger state (a capped
+  user still gets the mechanical rolling summary, not the cap's None).
+  `LlmUnavailable` carries its own code, `llm_unavailable`, so the tutor and
+  `retrieve` catch `CallRefused` without mistaking it for a cap.
 - **Tracer-bullet order.** #410 characterisation, then #411 (core plus
   summary, retrieval and ingestion), #412 (streaming and the tutor), #413
   (stub). The core is proven on low-risk callers before `run_streaming` is
@@ -1049,6 +1120,17 @@ a pure `assemble`. The renderer accepts only `PromptState`.
   inputs (retrieval, prefetch, review target, `diagnostic_accepted`) differ
   from a chat turn. Part 1 passes the omitted values as explicit blanks so
   the refactor itself stays byte-identical.
+  **Amended 2026-10-15 (#395):** the blanks include the Check pointer
+  (`current_check`), which the follow-up also omitted; the golden's set-1-of-2
+  case fails if it leaks. Gap accuracy is injectable too, and the follow-up
+  passes `{}`: a query it then discarded would also, on Postgres, abort the
+  follow-up's transaction whenever it failed.
+- **Injectable inputs default to `NOT_LOADED`, not None (#395).**
+  `gather_session_inputs` queries only what the caller did not pass, but an
+  ingestion status of None is a real value (no documents). With None as the
+  "not passed" marker, a document-less chat turn would re-query and break the
+  statement budget, so the injectable inputs (learner prefs, ingestion
+  status, gap accuracy) use a sentinel.
 - **The follow-up's `ToolContext.diagnostic_required` moves in #396, not
   #395.** In part 1 the follow-up's prompt state carries a blanked
   `diagnostic_required = False` to keep the rendered prompt identical (the

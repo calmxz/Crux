@@ -362,12 +362,13 @@ def test_focus_clear_user_redirected_ok(session_row, ctx, db_session):
     assert profile.focus_target_gap is None
 
 
-def test_load_profile_tolerates_legacy_fields(session_row, db_session):
+def test_load_profile_tolerates_legacy_fields(session_row, db_session, expect_app_log):
     """Regression (review #2): a topic_profile_json written under an older schema
     (carrying since-removed fields) must not raise ValidationError -> 500 on load.
     Unknown keys are dropped; known data is preserved. TopicProfile has
     extra="forbid", and load_profile re-parses the stored column, so without the
     tolerant parser this row would 500 every read (and the /profile aggregate)."""
+    expect_app_log("repaired topic_profile on load")
     row = db_session.get(SessionModel, SESSION_ID)
     row.topic_profile_json = json.dumps(
         {
@@ -420,9 +421,10 @@ def test_mastered_concept_with_declared_promotes(session_row, ctx, db_session):
     )
 
 
-def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
+def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session, expect_app_log):
     """Regression (review #2): a non-JSON / corrupt blob degrades to an empty
     profile rather than raising."""
+    expect_app_log("unparseable topic_profile_json")
     row = db_session.get(SessionModel, SESSION_ID)
     row.topic_profile_json = "not valid json {"
     db_session.commit()
@@ -448,7 +450,10 @@ def _seed_one_bad_entry(db_session):
     db_session.commit()
 
 
-def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session):
+def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(
+    session_row, db_session, expect_app_log
+):
+    expect_app_log("repaired topic_profile on load")
     _seed_one_bad_entry(db_session)
 
     profile = profile_service.load_profile(db_session, SESSION_ID)
@@ -458,7 +463,10 @@ def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_ses
     assert profile.last_session_summary == "covered joins"
 
 
-def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session):
+def test_write_after_salvaged_read_does_not_wipe_the_profile(
+    session_row, db_session, expect_app_log
+):
+    expect_app_log("repaired topic_profile on load")
     _seed_one_bad_entry(db_session)
 
     profile_service.apply_user_patch(db_session, SESSION_ID, add_gap="subqueries")
@@ -470,18 +478,21 @@ def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_ses
     assert stored["last_session_summary"] == "covered joins"
 
 
-def test_invalid_level_is_dropped_lists_are_kept():
+def test_invalid_level_is_dropped_lists_are_kept(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile('{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}')
     assert p.knowledge_level is None
     assert concept_names(p.mastered_concepts) == ["joins"]
 
 
-def test_bad_subtopic_level_dropped_others_kept():
+def test_bad_subtopic_level_dropped_others_kept(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile('{"subtopic_levels": {"a": "beginner", "b": "wizard"}}')
     assert p.subtopic_levels == {"a": "beginner"}
 
 
-def test_salvage_drops_bad_elements_and_unlistable_fields():
+def test_salvage_drops_bad_elements_and_unlistable_fields(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile(
         json.dumps(
             {
@@ -500,9 +511,10 @@ def test_salvage_drops_bad_elements_and_unlistable_fields():
     [("Views", None), ("indexes", "indexes"), ("unlisted", "unlisted")],
     ids=["on-dropped-gap", "on-kept-gap", "outside-gaps"],
 )
-def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected):
+def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected, expect_app_log):
     """F-22: dropping the focused gap would leave focus dangling. A focus
     outside confirmed_gaps is legal on its own and survives."""
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile(
         json.dumps(
             {
@@ -518,7 +530,8 @@ def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expecte
     assert p.focus_target_gap == expected
 
 
-def test_salvage_warning_carries_no_learner_text(caplog):
+def test_salvage_warning_carries_no_learner_text(caplog, expect_app_log):
+    expect_app_log("salvaged")
     with caplog.at_level("WARNING", logger="services.profile_service"):
         _parse_profile(
             json.dumps(
@@ -533,7 +546,7 @@ def test_salvage_warning_carries_no_learner_text(caplog):
             )
         )
     text = caplog.text
-    assert "salvaged" in text
+    assert "salvaged" in text  # caplog saw the record, so the absence checks bite
     for secret in ("secret-concept", "secret-gap", "secret summary", "secret-sub"):
         assert secret not in text
 
@@ -743,7 +756,9 @@ def test_parse_accepts_mixed_legacy_and_new_elements():
     assert p.mastered_concepts[1].evidence_type == "tested"
 
 
-def test_parse_still_drops_unknown_keys_and_never_raises():
+def test_parse_still_drops_unknown_keys_and_never_raises(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
+    expect_app_log("unparseable topic_profile_json")
     raw = '{"mastered_concepts": ["limits"], "retired_field": 1}'
     p = _parse_profile(raw)
     assert concept_names(p.mastered_concepts) == ["limits"]

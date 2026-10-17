@@ -1,76 +1,28 @@
 """TDD: run_streaming handles suggest_topics (#354) -- emits topic_suggestions,
 ends the turn, and rejects a tool-only call.
 
-Harness mirrors test_tutor_stream_check_events.py (helpers copied so this
-module is self-contained).
+The model is the scripted fake provider (conftest fake_llm) behind the real
+adapter.
 """
 
 import json
 from datetime import datetime, timezone
-from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
 from agent import tutor
 from agent.types import ToolContext
-from config import settings
 from contracts import TopicProfile
 from db.models import ChatMessage
 from db.models import Session as SessionModel
 from db.models import User as UserModel
 from services import profile_service, topic_suggest_service
-from services.cost_meter import CapStatus
-
-
-def _content_chunk(token):
-    delta = SimpleNamespace(content=token, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _tool_fragment(index, id=None, name=None, arguments=None):
-    fn = SimpleNamespace()
-    fn.name = name
-    fn.arguments = arguments
-    frag = SimpleNamespace()
-    frag.index = index
-    frag.id = id
-    frag.function = fn
-    return frag
-
-
-def _tool_chunk(*fragments):
-    delta = SimpleNamespace(content=None, tool_calls=list(fragments))
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _make_stream(*chunks):
-    async def _gen():
-        for c in chunks:
-            yield c
-
-    return _gen()
-
-
-def _allow_cap(monkeypatch):
-    cap = CapStatus(
-        allowed=True,
-        used=Decimal("0.0"),
-        soft_breached=False,
-        urgent_breached=False,
-        soft_cap=Decimal("2.0"),
-        urgent_cap=Decimal("2.70"),
-        hard_cap=Decimal("3.0"),
-    )
-    monkeypatch.setattr("agent.tutor.cost_meter.check_cap", MagicMock(return_value=cap))
+from tests.conftest import tool_call
 
 
 @pytest.fixture(autouse=True)
-def _real_llm_path(monkeypatch):
-    monkeypatch.setattr(settings, "llm_stub", False)
-    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
-    _allow_cap(monkeypatch)
+def _real_llm_path(fake_llm):
+    """Every test runs the real loop against the scripted fake."""
 
 
 async def _drain(agen):
@@ -110,8 +62,8 @@ def _session(db, sid, level=None, state=topic_suggest_service.AWAITING_LEVEL):
     )
 
 
-def _suggest(id="tc_s", index=0):
-    return _tool_fragment(index=index, id=id, name="suggest_topics", arguments=json.dumps(SUGGEST))
+def _suggest(id="tc_s"):
+    return tool_call("suggest_topics", SUGGEST, id=id)
 
 
 def _run(ctx):
@@ -119,11 +71,9 @@ def _run(ctx):
 
 
 @pytest.mark.asyncio
-async def test_suggest_topics_emits_card_and_ends_turn(monkeypatch, db_session):
+async def test_suggest_topics_emits_card_and_ends_turn(db_session, fake_llm):
     ctx = _session(db_session, "ts1", level="beginner")
-    turn1 = _make_stream(_content_chunk("Thermodynamics is about energy."), _tool_chunk(_suggest()))
-    turn2 = _make_stream(_content_chunk("SHOULD-NOT-APPEAR"))
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1, turn2]))
+    fake_llm.streams = [["Thermodynamics is about energy.", _suggest()], ["SHOULD-NOT-APPEAR"]]
 
     events = await _drain(_run(ctx))
     types = [e.type for e in events]
@@ -150,11 +100,12 @@ async def test_suggest_topics_emits_card_and_ends_turn(monkeypatch, db_session):
 
 
 @pytest.mark.asyncio
-async def test_tool_only_suggest_is_rejected_until_prose_is_written(monkeypatch, db_session):
+async def test_tool_only_suggest_is_rejected_until_prose_is_written(db_session, fake_llm):
     ctx = _session(db_session, "ts2", level="beginner")
-    turn1 = _make_stream(_tool_chunk(_suggest(id="tc_bare")))
-    turn2 = _make_stream(_content_chunk("Here is the overview."), _tool_chunk(_suggest(id="tc_ok")))
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1, turn2]))
+    fake_llm.streams = [
+        [_suggest(id="tc_bare")],
+        ["Here is the overview.", _suggest(id="tc_ok")],
+    ]
 
     events = await _drain(_run(ctx))
 
@@ -166,21 +117,16 @@ async def test_tool_only_suggest_is_rejected_until_prose_is_written(monkeypatch,
 
 
 @pytest.mark.asyncio
-async def test_declared_level_patch_then_suggest_in_one_turn(monkeypatch, db_session):
+async def test_declared_level_patch_then_suggest_in_one_turn(db_session, fake_llm):
     # DIAGNOSTIC REQUIRED turn: the learner states a level; the model records
     # it and offers the card in the same response.
     ctx = _session(db_session, "ts3", level=None)
-    patch = _tool_fragment(
-        index=0,
+    patch = tool_call(
+        "update_topic_profile",
+        {"knowledge_level": "intermediate", "evidence_type": "declared"},
         id="tc_lvl",
-        name="update_topic_profile",
-        arguments=json.dumps({"knowledge_level": "intermediate", "evidence_type": "declared"}),
     )
-    turn1 = _make_stream(
-        _content_chunk("Intermediate it is."),
-        _tool_chunk(patch, _suggest(index=1)),
-    )
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1]))
+    fake_llm.streams = [["Intermediate it is.", patch, _suggest()]]
 
     events = await _drain(_run(ctx))
 
@@ -190,30 +136,21 @@ async def test_declared_level_patch_then_suggest_in_one_turn(monkeypatch, db_ses
 
 
 @pytest.mark.asyncio
-async def test_ask_and_suggest_bundled_only_the_first_terminal_runs(monkeypatch, db_session):
+async def test_ask_and_suggest_bundled_only_the_first_terminal_runs(db_session, fake_llm):
     ctx = _session(db_session, "ts4", level="beginner")
-    ask = _tool_fragment(
-        index=0,
+    ask = tool_call(
+        "ask_check_questions",
+        {
+            "gap": "entropy",
+            "set_index": 1,
+            "set_total": 1,
+            "items": [
+                {"question": "Q?", "options": ["a", "b"], "correct_index": 0, "explanation": "e."}
+            ],
+        },
         id="tc_ask",
-        name="ask_check_questions",
-        arguments=json.dumps(
-            {
-                "gap": "entropy",
-                "set_index": 1,
-                "set_total": 1,
-                "items": [
-                    {
-                        "question": "Q?",
-                        "options": ["a", "b"],
-                        "correct_index": 0,
-                        "explanation": "e.",
-                    }
-                ],
-            }
-        ),
     )
-    turn1 = _make_stream(_content_chunk("Quick check:"), _tool_chunk(ask, _suggest(index=1)))
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", AsyncMock(side_effect=[turn1]))
+    fake_llm.streams = [["Quick check:", ask, _suggest()]]
 
     events = await _drain(_run(ctx))
     types = [e.type for e in events]

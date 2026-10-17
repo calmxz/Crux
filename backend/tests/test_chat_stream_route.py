@@ -27,6 +27,7 @@ a running server; it is not reliably testable under TestClient.
 """
 
 import asyncio
+import json
 from datetime import datetime, timezone
 from decimal import Decimal
 
@@ -216,11 +217,10 @@ def test_chat_stream_cancelled_event_terminates_stream(client, monkeypatch):
 
 
 def test_chat_stream_includes_quiz_readiness(client, db_session, monkeypatch):
-    from services import check_question_service
-
-    check_question_service.set_quiz_cooldown(
-        db_session, SESSION_ID, {"gap": "joins", "last_score": "0/1", "missed": ["q0"]}
+    db_session.get(SessionModel, SESSION_ID).quiz_cooldown_json = json.dumps(
+        {"gap": "joins", "last_score": "0/1", "missed": ["q0"]}
     )
+    db_session.commit()
 
     captured = {}
 
@@ -287,11 +287,11 @@ def test_stream_schedules_rolling_summary(client, monkeypatch):
 def test_semantic_fallback_escalates_gate(client, monkeypatch):
     """D2.2: lexical gate is False (default empty kw_index_json), so the
     semantic fallback runs and its True result escalates retrieval_required
-    all the way through to _build_prompt_state."""
+    all the way through to prompt_state.assemble."""
     message = "hello"
     calls = {}
 
-    async def fake_fallback(db, session_id, query, *, user_id=None, cost_holder=None):
+    async def fake_fallback(db, session_id, query, *, user_id=None):
         calls["args"] = (session_id, query)
         calls["user_id"] = user_id
         return True, None
@@ -301,13 +301,13 @@ def test_semantic_fallback_escalates_gate(client, monkeypatch):
     captured = {}
     from routes import chat as chat_module
 
-    real_build = chat_module._build_prompt_state
+    real_assemble = chat_module.prompt_state.assemble
 
-    def spy_build(**kwargs):
-        captured["retrieval_required"] = kwargs.get("retrieval_required")
-        return real_build(**kwargs)
+    def spy_assemble(session_inputs, turn_inputs):
+        captured["retrieval_required"] = turn_inputs.retrieval_required
+        return real_assemble(session_inputs, turn_inputs)
 
-    monkeypatch.setattr(chat_module, "_build_prompt_state", spy_build)
+    monkeypatch.setattr(chat_module.prompt_state, "assemble", spy_assemble)
 
     fake = _make_fake_run_streaming(StreamEvent("done", {"message_id": "1"}))
     monkeypatch.setattr("agent.tutor.run_streaming", fake)
@@ -360,10 +360,11 @@ def test_semantic_fallback_not_called_when_lexical_gate_true(client, db_session,
             pass
 
 
-def test_stream_rolling_summary_failure_does_not_break_turn(client, monkeypatch):
+def test_stream_rolling_summary_failure_does_not_break_turn(client, monkeypatch, expect_app_log):
     """A raising update_rolling_summary must not surface to the client: the
     chat turn already completed and sent its response before the background
     task runs. The helper's try/except/finally is what's under test here."""
+    expect_app_log("rolling summary task failed")
     fake = _make_fake_run_streaming(
         StreamEvent("assistant_delta", {"text": "Hi"}),
         StreamEvent("done", {"message_id": "1"}),
@@ -543,7 +544,7 @@ async def test_disconnect_drains_producer_before_releasing_reserve(db_session, m
     )
 
     async def consume():
-        async for _chunk in resp.body_iterator:
+        async for _ in resp.body_iterator:
             pass
 
     async with anyio.create_task_group() as tg:

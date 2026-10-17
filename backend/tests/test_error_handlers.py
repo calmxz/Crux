@@ -52,13 +52,15 @@ def _client_whose_auth_raises(exc: Exception):
 
 
 @pytest.fixture
-def unhandled_response():
+def unhandled_response(expect_app_log):
+    expect_app_log("unhandled error")
     with _client_whose_auth_raises(RuntimeError(SECRET)) as c:
         yield c.get(PATH, headers={"Origin": ORIGIN})
 
 
 @pytest.fixture
-def value_error_response():
+def value_error_response(expect_app_log):
+    expect_app_log("invalid value")
     with _client_whose_auth_raises(ValueError("topic must not be blank")) as c:
         yield c.get(PATH, headers={"Origin": ORIGIN})
 
@@ -89,9 +91,10 @@ def test_unhandled_500_request_id_matches_the_header(unhandled_response):
     assert unhandled_response.json()["detail"]["request_id"] == header_id
 
 
-def test_value_error_subclass_is_a_500_not_a_422():
+def test_value_error_subclass_is_a_500_not_a_422(expect_app_log):
     """json.JSONDecodeError is a ValueError subclass but signals corrupt stored
     data, not a rejected input: it must fall through to internal_error."""
+    expect_app_log("unhandled error")
     import json
 
     exc = json.JSONDecodeError("corrupt kw_index_json", SECRET, 0)
@@ -150,10 +153,11 @@ async def _never_receives():  # pragma: no cover - never awaited by these apps
     raise AssertionError("receive() should not be called")
 
 
-async def test_exception_after_response_start_is_reraised():
+async def test_exception_after_response_start_is_reraised(expect_app_log):
     """A stream that dies mid-body already has its status line on the wire, so
     there is no way to answer 500. Re-raise rather than write a second
     response (an ASGI protocol violation) or silently truncate."""
+    expect_app_log("unhandled error")
     from lib.error_handlers import UnhandledErrorMiddleware
 
     sent = []

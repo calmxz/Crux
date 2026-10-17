@@ -2,9 +2,6 @@
 
 import asyncio
 from datetime import datetime, timezone
-from decimal import Decimal
-from types import SimpleNamespace
-from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -14,25 +11,11 @@ from contracts import TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
 from services import summary_service
-from services.cost_meter import CapStatus
 
 
 def test_temperature_defaults():
     assert settings.llm_temperature == 0.3
     assert settings.summary_temperature == 0.0
-
-
-def _content_chunk(token):
-    delta = SimpleNamespace(content=token, tool_calls=None)
-    return SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
-
-
-def _make_stream(*chunks):
-    async def _gen():
-        for c in chunks:
-            yield c
-
-    return _gen()
 
 
 def _ctx(db_session, session_id="s1"):
@@ -49,41 +32,23 @@ def _disable_stub(monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "real-key")
 
 
-def _allow_cap(monkeypatch):
-    cap = CapStatus(
-        allowed=True,
-        used=Decimal("0.0"),
-        soft_breached=False,
-        urgent_breached=False,
-        soft_cap=Decimal("2.0"),
-        urgent_cap=Decimal("2.70"),
-        hard_cap=Decimal("3.0"),
-    )
-    monkeypatch.setattr("agent.tutor.cost_meter.check_cap", MagicMock(return_value=cap))
-
-
 async def _drain(agen):
     return [ev async for ev in agen]
 
 
 @pytest.mark.asyncio
-async def test_tutor_acompletion_gets_llm_temperature(db_session, monkeypatch):
-    # Mirror the setup of the first plain-content test in
-    # backend/tests/test_tutor_stream.py (ToolContext construction, session
-    # seeding, event draining) -- only the assertion below is new.
+async def test_tutor_stream_gets_llm_temperature(db_session, monkeypatch, fake_llm):
     _disable_stub(monkeypatch)
-    _allow_cap(monkeypatch)
 
     from agent import tutor
 
-    mock = AsyncMock(side_effect=[_make_stream(_content_chunk("hi"))])
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", mock)
+    fake_llm.streams = [["hi"]]
 
     ctx = _ctx(db_session, session_id="s1")
     events = await _drain(tutor.run_streaming([{"role": "user", "content": "explain"}], "sys", ctx))
 
     assert events[-1].type == "done"
-    assert mock.call_args.kwargs["temperature"] == settings.llm_temperature
+    assert fake_llm.stream_calls[0]["temperature"] == settings.llm_temperature
 
 
 USER_ID = "u_temp"
@@ -109,30 +74,18 @@ def session_with_messages(db_session):
     return session
 
 
-def test_summary_acompletion_gets_summary_temperature(
-    session_with_messages, db_session, monkeypatch
-):
-    # Mirror backend/tests/test_summary_service.py's fake_acompletion test
-    # (session + messages seeding, generate_and_persist call), capturing
-    # kwargs on the fake.
-    captured = {}
-
-    async def fake_acompletion(**kwargs):
-        captured.update(kwargs)
-        msg = SimpleNamespace(content="a summary")
-        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
-
-    monkeypatch.setattr("services.summary_service.litellm.acompletion", fake_acompletion)
+def test_summary_call_gets_summary_temperature(session_with_messages, db_session, fake_llm):
+    fake_llm.replies = ["a summary"]
 
     summary = asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
     assert summary == "a summary"
-    assert captured["temperature"] == settings.summary_temperature
+    assert fake_llm.complete_calls[0]["temperature"] == settings.summary_temperature
 
 
 @pytest.mark.asyncio
-async def test_rolling_summary_acompletion_gets_summary_temperature(db_session, monkeypatch):
+async def test_rolling_summary_call_gets_summary_temperature(db_session, monkeypatch, fake_llm):
     # Mirror backend/tests/test_rolling_summary.py's session_with_messages
-    # factory and update_rolling_summary drive, capturing kwargs on the fake.
+    # factory and update_rolling_summary drive; the fake provider records the call.
     db_session.add(User(id="u_roll_temp"))
     db_session.flush()
     session = SessionModel(
@@ -149,16 +102,8 @@ async def test_rolling_summary_acompletion_gets_summary_temperature(db_session, 
     db_session.commit()
 
     monkeypatch.setattr(summary_service.settings, "llm_stub", False)
-
-    captured = {}
-
-    async def fake_acompletion(**kwargs):
-        captured.update(kwargs)
-        msg = SimpleNamespace(content="a rolling summary")
-        return SimpleNamespace(choices=[SimpleNamespace(message=msg)])
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", fake_acompletion)
+    fake_llm.replies = ["a rolling summary"]
 
     result = await summary_service.update_rolling_summary(db_session, "s_roll_temp")
     assert result == "a rolling summary"
-    assert captured["temperature"] == settings.summary_temperature
+    assert fake_llm.complete_calls[0]["temperature"] == settings.summary_temperature

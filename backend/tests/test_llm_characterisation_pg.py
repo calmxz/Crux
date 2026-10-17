@@ -1,5 +1,10 @@
-"""#410: characterisation of the real /chat/stream cancel path on Postgres
-(llm-adapter 1/4).
+"""#410/#411: LLM paths on Postgres (llm-adapter 1/4 and 2/4).
+
+The #411 section at the end proves the adapter's settlement is isolated
+from the caller's transaction, through the conftest FakeLlmProvider; the
+rest of this docstring describes the #410 cancel-path test.
+
+#410: characterisation of the real /chat/stream cancel path on Postgres.
 
 Drives the real route and the real run_streaming against a streaming
 `litellm.acompletion` fake, disconnects the client mid-stream, and pins what
@@ -24,20 +29,17 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import uuid
 from decimal import Decimal
 from types import SimpleNamespace
 
 import litellm
 import pytest
-from sqlalchemy import create_engine, delete, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
 from config import settings
 from contracts import TopicProfile
-from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, LlmCallLog, UsageCounter, User
-from db.models import Session as SessionModel
+from db.database import get_db
+from db.models import ChatMessage, LlmCallLog
 from main import app
 from routes import chat as chat_route
 from services import cost_meter, summary_service, velocity_limit
@@ -73,50 +75,19 @@ async def _litellm_stream(*chunks, block: asyncio.Event):
     await block.wait()
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(_normalized_url(TEST_DB), connect_args={"prepare_threshold": None})
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine):
-    """A unique user + session per run; every row the turn writes is deleted
-    on teardown (Postgres enforces the FKs, so children go first)."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"char-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"char-pg-s-{uuid.uuid4().hex[:12]}"
-    with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(
-                id=sid,
-                user_id=uid,
-                topic="sql",
-                topic_profile_json=TopicProfile().model_dump_json(),
-            )
-        )
-        db.commit()
-    try:
-        yield Session, uid, sid
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+def seeded(pg_seed):
+    """A unique user + session per run, removed by the shared teardown
+    (conftest pg_seed)."""
+    return pg_seed("char-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json())
 
 
 @pytest.fixture
 def app_on_postgres(seeded):
     """The real app on a Postgres session, authenticated as the seeded user.
-    Yields the seeded (Session, uid, sid)."""
+    The LLM adapter's gate and settlement open their own sessions on the same
+    database (#412: the tutor's spend settles there; pg_seed binds
+    SessionLocal). Yields the seeded (Session, uid, sid)."""
     Session, uid, _ = seeded
 
     def override_get_db():
@@ -195,7 +166,7 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
     )
 
-    # The response's BackgroundTask opens SessionLocal() on the default URL.
+    # Skip the post-response rolling summary: it would make an extra LLM call.
     async def no_rolling_summary(db, session_id):
         return None
 
@@ -287,3 +258,157 @@ async def test_disconnect_mid_stream_persists_cancel_and_releases_reserve_once(
         assert [(p, m, s, Decimal(str(c))) for p, m, s, c in rows] == [
             ("chat", MODEL, sid, CANCEL_ESTIMATE)
         ]
+
+
+# ---------------------------------------------------------------------------
+# #411: the adapter settles in its own transaction
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def adapter_on_postgres(seeded, monkeypatch, fake_llm):
+    """The LLM adapter's gate and settlement on the seeded Postgres, behind
+    the scripted fake provider (pg_seed binds SessionLocal). Yields the
+    seeded (Session, uid, sid)."""
+    monkeypatch.setattr(settings, "llm_soft_cap_usd", 2.00)
+    monkeypatch.setattr(settings, "llm_hard_cap_usd", 3.00)
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", None)
+    fake_llm.cost = Decimal("0.0005")
+    return seeded
+
+
+def _call_log(db, uid):
+    rows = db.execute(
+        select(LlmCallLog.purpose, LlmCallLog.cost_usd).where(LlmCallLog.user_id == uid)
+    ).all()
+    return [(p, Decimal(str(c))) for p, c in rows]
+
+
+async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+
+    with Session() as caller:
+        caller.add(ChatMessage(session_id=sid, role="user", content="rolled back"))
+        caller.flush()
+        await llm.get().aembed(
+            ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+        )
+        caller.rollback()
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+        assert db.execute(select(ChatMessage).where(ChatMessage.session_id == sid)).first() is None
+
+
+def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
+    adapter_on_postgres, caplog, monkeypatch, expect_app_log
+):
+    """A caller holding an uncommitted ledger write across a call violates the
+    adapter's invariant. Settlement waits on that row lock only until
+    lock_timeout, keeps the LlmCallLog row, and returns the result instead of
+    hanging; the deferred ledger write lands once the lock is released."""
+    expect_app_log("llm settlement deferred")
+    import logging
+    import threading
+    import time
+
+    from services import llm
+
+    Session, uid, sid = adapter_on_postgres
+    # Shorter than the production value to keep the test quick.
+    monkeypatch.setattr(llm, "SETTLE_LOCK_TIMEOUT", "1s")
+    scheduled = []
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
+
+    with Session() as caller:
+        cost_meter.record_cost(caller, uid, Decimal("0.01"))  # holds the ledger row
+        # On a worker thread so a broken lock_timeout fails this test at the
+        # join instead of deadlocking it against the caller's lock.
+        outcome: dict = {}
+
+        def call():
+            outcome["result"] = llm.get().embed(
+                ["q"], meter=llm.Meter(user_id=uid, session_id=sid, purpose="embedding")
+            )
+
+        worker = threading.Thread(target=call)
+        started = time.monotonic()
+        with caplog.at_level(logging.WARNING, logger="services.llm"):
+            worker.start()
+            worker.join(timeout=10)
+        elapsed = time.monotonic() - started
+        hung = worker.is_alive()
+        with Session() as db:
+            # Committed while the caller still holds the ledger row.
+            assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+        caller.rollback()  # releases the lock, so a hung worker can finish
+        worker.join(timeout=10)
+
+    assert not hung, f"settlement hung for {elapsed:.1f}s"
+    assert len(outcome["result"].vectors) == 1
+    [record] = [r for r in caplog.records if r.name == "services.llm"]
+    assert (record.user_id, record.purpose, record.cost_usd) == (uid, "embedding", "0.0005")
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0")
+
+    [(fn, args)] = scheduled
+    fn(*args)  # the background retry, now that the row is free
+
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0005")
+        assert _call_log(db, uid) == [("embedding", Decimal("0.0005"))]
+
+
+# ---------------------------------------------------------------------------
+# #412: the tutor streams through the adapter
+# ---------------------------------------------------------------------------
+
+
+async def test_tool_turn_with_retrieve_settles_every_call_without_lock_waits(
+    adapter_on_postgres, fake_llm, monkeypatch, caplog
+):
+    """The tutor holds no ledger write across tool dispatch, so the retrieve
+    tool's embedding settles at once: chat, embedding and chat each land on
+    the ledger, and no settlement is deferred behind a held row lock."""
+    from datetime import datetime, timezone
+
+    from agent import tutor
+    from agent.types import ToolContext
+    from db.models import Document
+    from tests.conftest import tool_call
+
+    Session, uid, sid = adapter_on_postgres
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "real-key")
+    with Session() as db:
+        db.add(Document(session_id=sid, filename="ref.txt", status="ready"))
+        db.commit()
+    fake_llm.streams = [
+        ["Let me look. ", tool_call("retrieve_chunks", {"session_id": sid, "query": "joins"})],
+        ["Here it is."],
+    ]
+
+    with Session() as db:
+        ctx = ToolContext(
+            db=db, session_id=sid, user_id=uid, turn_started_at=datetime.now(timezone.utc)
+        )
+        events = [
+            ev
+            async for ev in tutor.run_streaming(
+                [{"role": "user", "content": "explain joins"}], "sys", ctx
+            )
+        ]
+
+    assert events[-1].type == "done"
+    assert fake_llm.embed_calls == [["joins"]]
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0015")
+        assert sorted(_call_log(db, uid)) == [
+            ("chat", Decimal("0.0005")),
+            ("chat", Decimal("0.0005")),
+            ("embedding", Decimal("0.0005")),
+        ]
+    assert not [r for r in caplog.records if "settlement" in r.getMessage()]

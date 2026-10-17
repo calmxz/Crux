@@ -14,7 +14,6 @@ from starlette.background import BackgroundTask
 from starlette.concurrency import run_in_threadpool
 
 from agent import context_budget, prompts, tutor
-from agent.excerpt import wrap_chunk
 from agent.types import ToolContext
 from config import settings
 from contracts import ChatRequest
@@ -31,12 +30,9 @@ from lib.error_codes import (
     SESSION_ENDED,
 )
 from services import (
-    check_question_service,
     cost_meter,
     documents_service,
-    learning_event_service,
-    pending_check_store,
-    profile_service,
+    prompt_state,
     rate_limit,
     retrieval_service,
     summary_service,
@@ -61,73 +57,6 @@ async def _rolling_summary_task(session_id: str) -> None:
         log.warning("rolling summary task failed: %s", e)
     finally:
         db.close()
-
-
-def _build_prompt_state(
-    *,
-    session: SessionModel,
-    profile,
-    ingestion_status,
-    retrieval_required: bool,
-    review_gaps: bool,
-    review_gap: str | None = None,
-    diagnostic_accepted: bool = False,
-    pending_check,
-    quiz_cooldown,
-    gap_accuracy: dict | None = None,
-    prefetched_chunks=None,
-    learner_prefs: dict | None = None,
-) -> dict:
-    """Build the prompt_state dict consumed by prompts.build_system_prompt.
-
-    Pure function (no DB access) so it can be unit-tested directly.
-    """
-    prompt_state = {
-        "topic": session.topic,
-        "profile": profile,
-        "ingestion_status": ingestion_status,
-        "retrieval_required": retrieval_required,
-        "diagnostic_required": profile.knowledge_level is None,
-        "seed_mode": None,
-        "last_session_summary": profile.last_session_summary,
-        "rolling_summary": getattr(session, "rolling_summary", None),
-        "pending_check": pending_check,
-        # #340: lets the prompt tell "between sets" from "no check".
-        "current_check": (
-            pending_check_store.get_current_check_from_row(session)
-            if getattr(session, "current_check_json", None)
-            else None
-        ),
-        "quiz_cooldown": quiz_cooldown,
-        "gap_accuracy": gap_accuracy or {},
-        "learner_prefs": learner_prefs or {},
-        # #354: gates the once-per-session topic card.
-        "topic_suggest_state": getattr(session, "topic_suggest_state", None),
-    }
-    if diagnostic_accepted and profile.knowledge_level is None:
-        prompt_state["diagnostic_accepted"] = True
-    if review_gaps:
-        gaps = profile_service.concept_names(profile.confirmed_gaps)
-        mastered = [
-            c for c in profile_service.concept_names(profile.mastered_concepts) if c not in gaps
-        ]
-        pool = gaps + mastered
-        if pool:
-            if review_gap in pool:
-                target = review_gap
-            else:
-                # Requested review_gap isn't in the pool (e.g. resolved/renamed
-                # since the queue was fetched): fall back to the first
-                # confirmed gap, deliberately preferring gaps over mastered
-                # retention concepts as the substitute target.
-                target = gaps[0] if gaps else pool[0]
-            prompt_state["review_gaps_target"] = target
-            prompt_state["review_gaps_retention"] = target in mastered
-            prompt_state["diagnostic_required"] = False
-            prompt_state["diagnostic_accepted"] = False
-    if prefetched_chunks:
-        prompt_state["prefetched_excerpts"] = [wrap_chunk(ch) for ch in prefetched_chunks]
-    return prompt_state
 
 
 def _turn_reserve() -> Decimal:
@@ -193,15 +122,17 @@ def _prepare_turn_guards(
     # preferences for the prompt (#356), one statement. A missing user reads
     # all-NULL preferences, which the prompt renders as defaults.
     exists_subq = select(literal(True)).where(User.id == user_id).exists()
-    pref_cols = (User.feedback_pref, User.check_ins, User.reply_length)
     spend_raw, user_exists, *pref_values = db.execute(
         select(
             cost_meter.spend_subquery(user_id),
             exists_subq,
-            *(select(col).where(User.id == user_id).scalar_subquery() for col in pref_cols),
+            *(
+                select(col).where(User.id == user_id).scalar_subquery()
+                for col in prompt_state.LEARNER_PREF_COLUMNS
+            ),
         )
     ).one()
-    learner_prefs = {col.key: value for col, value in zip(pref_cols, pref_values, strict=True)}
+    learner_prefs = prompt_state.learner_prefs_from(pref_values)
 
     cost_status = cost_meter.check_cap_from_spend(Decimal(str(spend_raw or 0)))
     if not cost_status.allowed:
@@ -291,11 +222,17 @@ def _prepare_turn_guards(
     return session, ingestion_status, learner_prefs
 
 
-def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
-    """Synchronous history/profile/lexical-gate segment of _prepare_turn.
+def _prepare_turn_context(
+    req: ChatRequest,
+    db: Session,
+    session: SessionModel,
+    ingestion_status,
+    learner_prefs: dict,
+):
+    """Synchronous history/prompt-inputs/lexical-gate segment of _prepare_turn.
 
     F-11: split out so the caller can run it via run_in_threadpool. Returns
-    (messages, profile, gap_accuracy, retrieval_required).
+    (messages, session_inputs, retrieval_required).
     """
     history = (
         db.execute(
@@ -319,17 +256,11 @@ def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
     ]
     messages.append({"role": "user", "content": req.message})
 
-    profile = profile_service.profile_from_row(session)
-
-    # D1.2: per-gap accuracy, best-effort. Only run when there is something
-    # to enrich (confirmed_gaps non-empty) to keep the no-gaps path inside
-    # the P3.1 budget; a failure here must never kill the turn.
-    gap_accuracy: dict[str, dict] = {}
-    if profile.confirmed_gaps:
-        try:
-            gap_accuracy = learning_event_service.gap_accuracy(db, req.session_id)
-        except Exception as e:  # noqa: BLE001 - best-effort prompt enrichment
-            log.warning("gap_accuracy failed; continuing without it: %s", e)
+    # The guard SELECTs already loaded the prefs (#356) and ingestion counts,
+    # so only gap accuracy can cost a statement here.
+    session_inputs = prompt_state.gather_session_inputs(
+        db, session, learner_prefs=learner_prefs, ingestion_status=ingestion_status
+    )
 
     retrieval_required = keyword_index.match_required(
         req.message, json.loads(session.kw_index_json or "[]")
@@ -341,7 +272,7 @@ def _prepare_turn_context(req: ChatRequest, db: Session, session: SessionModel):
     # one. `session` was already expunged by the guards and everything read
     # afterwards is a plain local, so commit-expiry costs no refresh SELECT.
     db.commit()
-    return messages, profile, gap_accuracy, retrieval_required
+    return messages, session_inputs, retrieval_required
 
 
 def _persist_user_turn(req: ChatRequest, db: Session) -> None:
@@ -350,19 +281,13 @@ def _persist_user_turn(req: ChatRequest, db: Session) -> None:
     db.commit()
 
 
-def _persist_user_turn_after_failure(
-    req: ChatRequest, db: Session, user_id: str, embed_cost_holder: list
-) -> None:
+def _persist_user_turn_after_failure(req: ChatRequest, db: Session) -> None:
     """F-11: synchronous failure-path persist segment.
 
-    Rollback discarded metered embedding spend flushed by the retrieval calls;
-    re-record it on the fresh transaction so real vendor cost is never lost.
-    The user-message commit publishes both (B-08/F-19).
+    The rollback cannot erase embedding spend: the LLM adapter settled it in
+    its own transaction (B-08/F-19).
     """
     db.rollback()
-    total_embed = sum(embed_cost_holder, Decimal("0"))
-    if total_embed > 0:
-        cost_meter.record_cost(db, user_id, total_embed)
     db.add(ChatMessage(session_id=req.session_id, role="user", content=req.message))
     db.commit()
 
@@ -384,10 +309,9 @@ async def _prepare_turn_after_guards(
     # 6) History through prompt build. An unexpected crash here must not lose
     # the user's message: persist it, then re-raise. Happy path pays no extra
     # statement.
-    embed_cost_holder: list = []
     try:
-        messages, profile, gap_accuracy, retrieval_required = await run_in_threadpool(
-            _prepare_turn_context, req, db, session
+        messages, session_inputs, retrieval_required = await run_in_threadpool(
+            _prepare_turn_context, req, db, session, ingestion_status, learner_prefs
         )
         query_vec = None
         if not retrieval_required:
@@ -396,7 +320,6 @@ async def _prepare_turn_after_guards(
                 req.session_id,
                 req.message,
                 user_id=user_id,
-                cost_holder=embed_cost_holder,
             )
 
         prefetched_chunks = None
@@ -407,28 +330,21 @@ async def _prepare_turn_after_guards(
                 user_id,
                 req.message,
                 query_vec=query_vec,
-                cost_holder=embed_cost_holder,
             )
 
-        prompt_state = _build_prompt_state(
-            session=session,
-            profile=profile,
-            ingestion_status=ingestion_status,
-            retrieval_required=retrieval_required,
-            review_gaps=getattr(req, "review_gaps", False),
-            review_gap=getattr(req, "review_gap", None),
-            diagnostic_accepted=getattr(req, "diagnostic_accepted", False),
-            pending_check=pending_check_store.get_pending_check_from_row(session),
-            quiz_cooldown=check_question_service.get_quiz_cooldown_from_row(session),
-            gap_accuracy=gap_accuracy,
-            prefetched_chunks=prefetched_chunks,
-            learner_prefs=learner_prefs,
+        state = prompt_state.assemble(
+            session_inputs,
+            prompt_state.TurnInputs(
+                retrieval_required=retrieval_required,
+                review_gaps=bool(req.review_gaps),
+                review_gap=req.review_gap,
+                diagnostic_accepted=bool(req.diagnostic_accepted),
+                prefetched_chunks=prefetched_chunks,
+            ),
         )
-        system_prompt = prompts.build_system_prompt(prompt_state)
+        system_prompt = prompts.build_system_prompt(state)
     except Exception:
-        await run_in_threadpool(
-            _persist_user_turn_after_failure, req, db, user_id, embed_cost_holder
-        )
+        await run_in_threadpool(_persist_user_turn_after_failure, req, db)
         raise
 
     # 7) Persist the user turn LAST (still committed before returning, so it
@@ -441,7 +357,7 @@ async def _prepare_turn_after_guards(
         session_id=req.session_id,
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
-        diagnostic_required=bool(prompt_state.get("diagnostic_required", False)),
+        diagnostic_required=state.diagnostic_required,
         # G-11: floor applies to the surfaced citations only; the prefetched
         # chunks themselves already went into the prompt above, unfiltered.
         prefetched_citations=(

@@ -7,7 +7,6 @@ dropped since.
 """
 
 from decimal import Decimal
-from types import SimpleNamespace
 
 import pytest
 
@@ -84,15 +83,12 @@ async def test_update_rolling_summary_writes_summary_and_count(
 
 
 async def test_update_rolling_summary_llm_failure_skips(
-    db_session, session_with_messages, monkeypatch
+    db_session, session_with_messages, monkeypatch, fake_llm, expect_app_log
 ):
+    expect_app_log("rolling summary skipped")
     s = session_with_messages(n=30)
     monkeypatch.setattr(summary_service.settings, "llm_stub", False)
-
-    async def boom(*a, **k):
-        raise RuntimeError("llm down")
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", boom)
+    fake_llm.replies = [RuntimeError("llm down")]
     assert await summary_service.update_rolling_summary(db_session, s.id) is None
     db_session.refresh(s)
     assert s.rolling_summary is None
@@ -100,7 +96,7 @@ async def test_update_rolling_summary_llm_failure_skips(
 
 
 async def test_update_rolling_summary_capped_user_skips_llm(
-    db_session, session_with_messages, monkeypatch
+    db_session, session_with_messages, monkeypatch, fake_llm
 ):
     # F-03: at the hard cap, skip (return None, debounce untouched) instead of spending.
     s = session_with_messages(n=31)  # due: 31-20=11 dropped >= 10
@@ -108,46 +104,30 @@ async def test_update_rolling_summary_capped_user_skips_llm(
     monkeypatch.setattr(settings, "gemini_api_key", "real")
     cost_meter.record_cost(db_session, s.user_id, Decimal(str(settings.llm_hard_cap_usd)))
     db_session.commit()
-    called = []
-
-    async def _boom(**kwargs):
-        called.append(1)
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", _boom)
     result = await summary_service.update_rolling_summary(db_session, s.id)
     assert result is None
-    assert called == []
+    assert fake_llm.complete_calls == []
     db_session.refresh(s)
     assert s.rolling_summary is None
     assert s.rolling_summary_count is None
 
 
 async def test_update_rolling_summary_success_records_ledger_and_timeout(
-    db_session, session_with_messages, monkeypatch
+    db_session, session_with_messages, monkeypatch, fake_llm
 ):
     s = session_with_messages(n=31)
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real")
-    captured = {}
-
-    async def _fake(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(
-            choices=[
-                SimpleNamespace(message=SimpleNamespace(content="Earlier the learner studied X."))
-            ]
-        )
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", _fake)
-    monkeypatch.setattr(summary_service.litellm, "completion_cost", lambda **kwargs: 0.001)
+    fake_llm.replies = ["Earlier the learner studied X."]
+    fake_llm.cost = Decimal("0.001")
     result = await summary_service.update_rolling_summary(db_session, s.id)
     assert result == "Earlier the learner studied X."
-    assert captured["timeout"] == settings.summary_timeout_s
+    assert fake_llm.complete_calls[0]["timeout"] == settings.summary_timeout_s
     assert cost_meter.current_spend(db_session, s.user_id) == Decimal("0.0010")
 
 
 async def test_rolling_transcript_newlines_cannot_forge_a_turn(
-    db_session, session_with_messages, monkeypatch
+    db_session, session_with_messages, monkeypatch, fake_llm
 ):
     """G-02: a newline inside learner-controlled message content must not be
     able to forge an extra "role: content" line in the rolling transcript."""
@@ -165,17 +145,10 @@ async def test_rolling_transcript_newlines_cannot_forge_a_turn(
 
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real")
-    captured = {}
-
-    async def _fake(**kwargs):
-        captured.update(kwargs)
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="ok"))])
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", _fake)
-    monkeypatch.setattr(summary_service.litellm, "completion_cost", lambda **kwargs: 0.0)
+    fake_llm.replies = ["ok"]
     await summary_service.update_rolling_summary(db_session, s.id)
 
-    prompt = captured["messages"][1]["content"]
+    prompt = fake_llm.complete_calls[0]["messages"][1]["content"]
     assert "forged turn" in prompt  # content preserved
     assert not any(line.startswith("assistant: forged") for line in prompt.split("\n"))
 
@@ -249,7 +222,7 @@ def test_rolling_transcript_capped_to_newest(db_session, monkeypatch):
 
 
 async def test_update_rolling_summary_empty_content_still_meters_before_returning_none(
-    db_session, session_with_messages, monkeypatch
+    db_session, session_with_messages, monkeypatch, fake_llm
 ):
     # F-related fix wave: an empty-content response is still a paid
     # acompletion call and must be metered before the early return, not
@@ -257,12 +230,8 @@ async def test_update_rolling_summary_empty_content_still_meters_before_returnin
     s = session_with_messages(n=31)
     monkeypatch.setattr(settings, "llm_stub", False)
     monkeypatch.setattr(settings, "gemini_api_key", "real")
-
-    async def _fake_empty(**kwargs):
-        return SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content=""))])
-
-    monkeypatch.setattr(summary_service.litellm, "acompletion", _fake_empty)
-    monkeypatch.setattr(summary_service.litellm, "completion_cost", lambda **kwargs: 0.002)
+    fake_llm.replies = [""]
+    fake_llm.cost = Decimal("0.002")
     result = await summary_service.update_rolling_summary(db_session, s.id)
     assert result is None
     assert cost_meter.current_spend(db_session, s.user_id) == Decimal("0.0020")
@@ -270,3 +239,38 @@ async def test_update_rolling_summary_empty_content_still_meters_before_returnin
     # empty-content debounce behavior unchanged: neither field is written
     assert s.rolling_summary is None
     assert s.rolling_summary_count is None
+
+
+async def test_rolling_summary_holds_no_db_transaction_during_the_llm_call(
+    db_session, session_with_messages, monkeypatch, fake_llm
+):
+    """#411: the caller releases its pooled connection before the call."""
+    s = session_with_messages(n=31)
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "real")
+    seen = []
+    real_complete = fake_llm.complete
+
+    async def spy(messages, **kwargs):
+        seen.append(db_session.in_transaction())
+        return await real_complete(messages, **kwargs)
+
+    fake_llm.complete = spy
+    await summary_service.update_rolling_summary(db_session, s.id)
+    assert seen == [False]
+
+
+async def test_stub_mode_capped_user_still_gets_the_mechanical_summary(
+    db_session, session_with_messages, monkeypatch
+):
+    # #413: stub mode writes the mechanical summary whatever the spend; None
+    # is the cap reaction of a real provider, not the stub's.
+    s = session_with_messages(n=31)
+    monkeypatch.setattr(settings, "llm_stub", True)
+    cost_meter.record_cost(db_session, s.user_id, Decimal(str(settings.llm_hard_cap_usd)))
+    db_session.commit()
+    result = await summary_service.update_rolling_summary(db_session, s.id)
+    assert result is not None and result.startswith("[auto-rolling]")
+    db_session.refresh(s)
+    assert s.rolling_summary == result
+    assert s.rolling_summary_count == 11

@@ -14,15 +14,19 @@ be applied.
 Usage:
     GEMINI_API_KEY=... python backend/scripts/reliability_focus_clear.py --runs 10
 
-Each run hits the live LLM and is metered against your daily cap; the default
-10 runs across 9 fixtures = 90 sessions, ~3-6 turns each = a few hundred
-calls. Use --runs 3 for a quick smoke check.
+Each run hits the live LLM and is billed by the provider. Metering lands in
+the script's in-memory DB with a fresh user per run: the per-user cap never
+trips, only GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) can
+stop a long run, and none of it reaches your real ledger. The default 10 runs across
+9 fixtures = 90 sessions, ~3-6 turns each = a few hundred calls. Use --runs 3
+for a quick smoke check.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
 import json
 import os
 import sys
@@ -31,10 +35,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Force an in-memory DB before importing anything that touches db.database.
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Assigned, not defaulted: an exported DATABASE_URL must not reach it (#596).
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -44,10 +48,10 @@ if str(ROOT) not in sys.path:
 from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
-from db.database import Base  # noqa: E402
+from db.database import Base, SessionLocal  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
 from db.models import User  # noqa: E402
-from services import profile_service  # noqa: E402
+from services import profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "focus_patterns"
 PATTERNS = ("linear", "topic_shift", "tangent", "vague_signal")
@@ -63,7 +67,10 @@ def _make_session_factory():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # The LLM adapter opens its own sessions (cap gate, settlement, call log)
+    # from db.database.SessionLocal; bind it here so they reach this DB too.
+    SessionLocal.configure(bind=engine)
+    return SessionLocal
 
 
 def _seed_session(SessionLocal, fixture: dict) -> tuple[str, str]:
@@ -100,17 +107,16 @@ async def _run_fixture(SessionLocal, fixture: dict) -> bool:
         for turn_idx, user_turn in enumerate(fixture["user_turns"], start=1):
             messages.append({"role": "user", "content": user_turn})
 
-            profile = profile_service.load_profile(db, session_id)
-            session_row = db.get(SessionModel, session_id)
-            prompt_state = {
-                "topic": session_row.topic,
-                "profile": profile,
-                "ingestion_status": None,
-                "retrieval_required": False,
-                "seed_mode": None,
-                "last_session_summary": None,
-            }
-            system_prompt = prompts.build_system_prompt(prompt_state)
+            # The seed has no level; keep the diagnostic off so the eval
+            # measures focus clearing, as it was calibrated.
+            state = dataclasses.replace(
+                prompt_state.assemble(
+                    prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+                    prompt_state.TurnInputs(retrieval_required=False),
+                ),
+                diagnostic_required=False,
+            )
+            system_prompt = prompts.build_system_prompt(state)
 
             ctx = ToolContext(
                 db=db,

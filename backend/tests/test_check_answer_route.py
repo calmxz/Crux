@@ -1,6 +1,5 @@
 """TDD: POST /sessions/{id}/check/answer over a batch."""
 
-import json
 from datetime import datetime, timezone
 
 import pytest
@@ -9,7 +8,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service, profile_service
+from services import check_service, profile_service
 
 USER_ID = "u_ans_1"
 
@@ -38,7 +37,7 @@ def _open_batch(db, session_id):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -72,7 +71,7 @@ def test_answer_first_item_advances(client, db_session, seeded_session):
     assert body["current_index"] == 1
     assert body["has_next"] is True
     assert body["done"] is False
-    assert check_question_service.get_pending_check(db_session, sid) is not None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is not None
     assert "atp" in profile_service.concept_names(
         profile_service.load_profile(db_session, sid).mastered_concepts
     )
@@ -151,24 +150,25 @@ def test_answer_on_ended_session_is_409(client, db_session, seeded_session):
     assert r.json()["detail"]["code"] == "session_ended"
 
 
-def test_answer_writes_check_batch_to_message(client, db_session, seeded_session):
+def test_answer_leaves_check_batch_unfrozen(client, db_session, seeded_session):
+    """#419: a click never writes the Recap; only a Close freezes it."""
     sid = seeded_session.id
     _open_batch(db_session, sid)
     m = ChatMessage(session_id=sid, role="assistant", content="")
     db_session.add(m)
     db_session.commit()
     db_session.refresh(m)
-    check_question_service.attach_message_id(db_session, sid, m.id)
+    check_service.stamp_message_id(db_session, sid, m.id)
     r = client.post(
         f"/api/sessions/{sid}/check/answer",
         json={"index": 0, "selected_index": 0, "user_id": USER_ID},
     )
     assert r.status_code == 200
     db_session.refresh(m)
-    assert m.check_batch_json is not None
-    data = json.loads(m.check_batch_json)
-    assert data["items"][0]["status"] == "answered"
-    assert data["items"][0]["selected_index"] == 0
+    assert m.check_batch_json is None
+    pc = check_service.open_set(db_session.get(SessionModel, sid))
+    assert pc["items"][0]["status"] == "answered"
+    assert pc["items"][0]["selected_index"] == 0
 
 
 @pytest.fixture

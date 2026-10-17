@@ -1,23 +1,29 @@
+import logging
 import os
 
 # Q-01: must run before anything imports `config`, or the real .env loads
 # into the test process. Do not move below the imports.
 os.environ["CRUX_SKIP_DOTENV"] = "1"
+# litellm's bundled pricing table, not one fetched at import: embedding fakes
+# are priced by it, and a remote table dropping the model would log (#577).
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
-import json
-from types import SimpleNamespace
+import threading
+from collections.abc import Callable, Iterator
+from contextlib import contextmanager
+from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.pool import StaticPool
 
 import main as main_module
-from db.database import Base, get_db
+from db.database import Base, SessionLocal, get_db
+from db.database import engine as default_engine
 from main import app
 from services.auth import current_user_id
 
@@ -131,7 +137,27 @@ def pytest_deselected(items):
         items[0].config.stash[_sse_deselected_key] = True
 
 
+def _fail_run(session, message: str) -> None:
+    """Fail a run that would otherwise pass, with a red banner. A run already
+    failing, interrupted or broken keeps its own exit code."""
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.ensure_newline()
+        reporter.write_sep("=", message, red=True)
+    if session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 def pytest_sessionfinish(session, exitstatus):
+    # Default-engine hits after the last test's teardown (#579): no test is
+    # left to fail, so they fail the run.
+    if _default_engine_hits:
+        _fail_run(
+            session,
+            "connected on the default engine (db.database.engine) after the last test: "
+            + ", ".join(sorted(set(_default_engine_hits))),
+        )
+        return
     # Only a clean run is judged: after a failure (or -x) the missing list
     # would be noise over the real error.
     if exitstatus != pytest.ExitCode.OK:
@@ -142,15 +168,170 @@ def pytest_sessionfinish(session, exitstatus):
 
     missing = sorted(set(sse_event_schemas()) - session.config.stash[_sse_seen_key])
     if missing:
-        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if reporter is not None:
-            reporter.ensure_newline()
-            reporter.write_sep(
-                "=",
-                "SSE event types never emitted by non-test code: " + ", ".join(missing),
-                red=True,
-            )
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        _fail_run(session, "SSE event types never emitted by non-test code: " + ", ".join(missing))
+
+
+@pytest.fixture(autouse=True)
+def _inline_settle_retry(monkeypatch):
+    """The adapter retries a failed ledger write on a background timer. Run it
+    inline instead, so a test sees its outcome and leaves no thread behind
+    to touch a closed engine."""
+    from services import llm
+
+    monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *args: fn(*args))
+    # Fresh slots, so a test that captures a retry and never runs it cannot
+    # starve the next test's retries.
+    monkeypatch.setattr(
+        llm, "_retry_slots", threading.BoundedSemaphore(llm.SETTLE_RETRY_MAX_IN_FLIGHT)
+    )
+
+
+# --- Default-engine guard (#579) -------------------------------------------
+# No test may connect on the app's default engine (settings.database_url, a
+# developer's real data/app.db locally). The connect hook records the test
+# and refuses the connection, so the file is never opened; the refusal alone
+# could be swallowed by a best-effort path, so the record fails the test.
+
+_default_engine_hits: list[str] = []
+_current_test: list[str | None] = [None]
+
+
+@event.listens_for(default_engine, "do_connect")
+def _refuse_default_engine(dialect, conn_rec, cargs, cparams):
+    _default_engine_hits.append(_current_test[0] or "<outside a test>")
+    raise RuntimeError("tests must not connect on the default engine (db.database.engine)")
+
+
+@pytest.fixture(autouse=True)
+def _no_default_engine(request):
+    # Hits from outside any test (collection, a session fixture) are kept
+    # and reported by the next test's teardown; pytest_sessionfinish reports
+    # any left after the last one.
+    _current_test[0] = request.node.nodeid
+    yield
+    _current_test[0] = None
+    if _default_engine_hits:
+        hits = sorted(set(_default_engine_hits))
+        _default_engine_hits.clear()
+        pytest.fail(
+            "connected on the default engine (db.database.engine): "
+            + ", ".join(hits)
+            + "; bind the session factory it used to the test engine. A hit"
+            " can also come from a thread or fixture an earlier test left behind.",
+            pytrace=False,
+        )
+
+
+# --- Unexpected app log guard (#577) ---------------------------------------
+# A best-effort path catches a fake's failure, logs it and returns the very
+# fallback the test expects, so the test passes vacuously. Every app record at
+# WARNING or above must contain the text of an expectation the test or one of
+# its fixtures declared with expect_app_log, and every expectation must match
+# a record (#594). Requesting caplog does not opt out, but caplog.at_level or
+# set_level above WARNING on an app logger stops its warnings being logged at
+# all, so the guard cannot see them: keep those at WARNING or below.
+
+_APP_LOGGER_ROOTS = frozenset(
+    {"agent", "config", "db", "lib", "main", "routes", "services", "worker"}
+)
+_call_report_key = pytest.StashKey[pytest.TestReport]()
+
+
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    report = yield
+    if report.when == "call":
+        item.stash[_call_report_key] = report
+    return report
+
+
+class _AppLogGuard(logging.Handler):
+    """One test's records and declared expectations. Each test gets its own,
+    so a pytester run nested inside a test cannot touch the outer test's."""
+
+    def __init__(self) -> None:
+        super().__init__(logging.WARNING)
+        self.records: list[logging.LogRecord] = []
+        self.expectations: list[str] = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        self.records.append(record)
+
+
+@pytest.fixture(autouse=True)
+def _no_unexpected_app_logs(request) -> Iterator[_AppLogGuard]:
+    # On the app's own parent loggers, not root: a test that resets root
+    # (configure_logging's dictConfig) would drop it. Their level is pinned
+    # at WARNING or below, so neither LOG_LEVEL nor a root level raised
+    # mid-test hides the records.
+    guard = _AppLogGuard()
+    loggers = [logging.getLogger(name) for name in _APP_LOGGER_ROOTS]
+    levels = [lg.level for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(min(lg.getEffectiveLevel(), logging.WARNING))
+        lg.addHandler(guard)
+    try:
+        yield guard
+    finally:
+        for lg, level in zip(loggers, levels, strict=True):
+            lg.removeHandler(guard)
+            lg.setLevel(level)
+    expectations = guard.expectations
+    messages = [r.getMessage() for r in guard.records]
+    unmatched = [
+        f"{r.levelname} {r.name}: {message}"
+        for r, message in zip(guard.records, messages, strict=True)
+        if not any(text in message for text in expectations)
+    ]
+    # A test that failed, skipped or xfailed may stop before its expected
+    # record fires; it already reports that outcome.
+    call = request.node.stash.get(_call_report_key, None)
+    passed = call is not None and call.passed
+    unfired = [text for text in expectations if passed and not any(text in m for m in messages)]
+    problems = []
+    if unmatched:
+        problems.append(
+            "unexpected app log records (declare the message with"
+            " expect_app_log if the test drives this on purpose; otherwise fix"
+            " the cause):\n  " + "\n  ".join(unmatched)
+        )
+    if unfired:
+        problems.append(
+            "expected app log records that never fired (expect_app_log only"
+            " sees app records at WARNING or above):\n  " + "\n  ".join(unfired)
+        )
+    if problems:
+        pytest.fail("\n".join(problems), pytrace=False)
+
+
+@pytest.fixture
+def expect_app_log(_no_unexpected_app_logs: _AppLogGuard) -> Callable[[str], None]:
+    """Declare that an app record at WARNING or above containing `text` is
+    logged during this test. Tests and fixtures call it the same way; a fixture
+    that drives a logged failure declares it, so its tests need not (#594)."""
+
+    def declare(text: str) -> None:
+        if not text.strip():
+            raise ValueError("expect_app_log text is blank; it would match every record")
+        _no_unexpected_app_logs.expectations.append(text)
+
+    return declare
+
+
+@contextmanager
+def bind_session_local(engine: Engine) -> Iterator[None]:
+    """Bind db.database.SessionLocal, the factory every session app code opens
+    on its own comes from (LLM gate and settlement, rolling-summary task,
+    ingestion, worker), to `engine`; restore the default bind on exit (#580).
+    One binding at a time: a second would silently send background sessions
+    to whichever engine bound last."""
+    if SessionLocal.kw["bind"] is not default_engine:
+        raise RuntimeError("SessionLocal is already bound to a test engine")
+    SessionLocal.configure(bind=engine)
+    try:
+        yield
+    finally:
+        SessionLocal.configure(bind=default_engine)
 
 
 @pytest.fixture
@@ -161,14 +342,53 @@ def db_session():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = Session()
+    # The test's session and every background one come from SessionLocal on
+    # this engine. StaticPool shares one connection, so the adapter's
+    # settlement commit also commits the caller's pending writes on sqlite
+    # (#411).
     try:
-        yield db
+        with bind_session_local(engine):
+            db = SessionLocal()
+            try:
+                yield db
+            finally:
+                db.close()
     finally:
-        db.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
+
+
+# --- Opt-in Postgres harness (#574) ------------------------------------------
+# Used only by the modules that skip without TEST_DATABASE_URL, so a SQLite
+# run never builds a Postgres engine.
+
+
+@pytest.fixture(scope="module")
+def pg_engine(request):
+    """One engine per module. prepare_threshold=None matches prod (Supabase
+    pooler); a module adds connect_args with a PG_CONNECT_ARGS dict."""
+    from db.database import _normalized_url
+
+    if not os.environ.get("TEST_DATABASE_URL"):
+        pytest.skip("TEST_DATABASE_URL not set")
+    connect_args = {"prepare_threshold": None, **getattr(request.module, "PG_CONNECT_ARGS", {})}
+    eng = create_engine(_normalized_url(os.environ["TEST_DATABASE_URL"]), connect_args=connect_args)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def pg_seed(pg_engine):
+    """A tests.pg_harness.PgSeeder. A fixture that holds a connection or open
+    transaction on seeded rows must depend on this one, so it is torn down
+    first and cannot block the teardown's deletes."""
+    from tests.pg_harness import PgSeeder
+
+    seeder = PgSeeder(pg_engine)
+    # Background sessions (LLM settlement, rolling summary) on the same database.
+    with bind_session_local(pg_engine):
+        yield seeder
+    seeder.teardown()
 
 
 class _AuthInjectingClient(TestClient):
@@ -237,58 +457,201 @@ def client(db_session, monkeypatch):
     app.dependency_overrides.clear()
 
 
-def _text(content: str) -> SimpleNamespace:
-    """Build a fake LiteLLM completion response with a plain text reply."""
-    return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=content, tool_calls=None))]
+# Stream script step: park the stream here until the consumer is cancelled.
+BLOCK = object()
+
+
+def tool_call(name: str, args: dict | str | None = None, id: str | None = None):
+    """A stream script step: one assembled tool call. A str `args` is passed
+    through raw (to script malformed JSON)."""
+    import json
+
+    from services.llm import ToolCall
+
+    raw = args if isinstance(args, str) else json.dumps(args or {})
+    return ToolCall(id=id or f"call_{name}", name=name, arguments=raw)
+
+
+def embedding_response(vectors: list[list[float]]):
+    """A litellm.embedding response the cost meter can price. A bare
+    SimpleNamespace(data=...) has no model, so completion_cost fails and
+    cost_meter logs a warning on every embed."""
+    import litellm
+    from litellm.types.utils import Usage
+
+    from config import settings
+
+    return litellm.EmbeddingResponse(
+        model=settings.embedding_model,
+        data=[{"embedding": v, "index": i, "object": "embedding"} for i, v in enumerate(vectors)],
+        usage=Usage(prompt_tokens=len(vectors), total_tokens=len(vectors)),
     )
 
 
-def _tool_call(name: str, args: dict[str, Any], tool_call_id: str = "tc_1") -> SimpleNamespace:
-    """Build a fake LiteLLM completion response with a single tool call."""
-    return SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(
-                    content=None,
-                    tool_calls=[
-                        SimpleNamespace(
-                            id=tool_call_id,
-                            type="function",
-                            function=SimpleNamespace(
-                                name=name,
-                                arguments=json.dumps(args),
-                            ),
-                        )
-                    ],
-                )
-            )
-        ]
-    )
+class _FakeProviderStream:
+    """One scripted stream (see FakeLlmProvider.streams)."""
+
+    def __init__(self, provider: "FakeLlmProvider", steps: list, messages: list[dict]):
+        self._provider = provider
+        self._steps = steps
+        self._messages = messages
+        self._tool_calls: list = []
+        self.received = False
+        self.text = ""
+        self.closed = False
+
+    @property
+    def tool_calls(self):
+        return list(self._tool_calls)
+
+    async def __aiter__(self):
+        import asyncio
+
+        from services.llm import ToolCall
+
+        for step in self._steps:
+            if step is BLOCK:
+                await asyncio.Event().wait()
+            elif isinstance(step, asyncio.Event):
+                await step.wait()
+            elif isinstance(step, BaseException):
+                raise step
+            elif isinstance(step, ToolCall):
+                self.received = True
+                self._tool_calls.append(step)
+            else:
+                self.received = True
+                self.text += step
+                yield step
+
+    def priced(self):
+        return self._provider.cost, self._provider._usage()
+
+    def estimate(self):
+        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], self.text))
+        return self._provider.partial_cost
+
+    async def aclose(self):
+        self.closed = True
+
+
+class FakeLlmProvider:
+    """Scripted stand-in for the LLM adapter's provider (#411).
+
+    Tests swap the provider, not the shell, so the cost gate, retry and
+    settlement run for real. `replies` feeds complete() attempts in order: a
+    str is the reply text, an exception instance is raised. `embed_errors`
+    likewise raises on the next embed attempts; `vector` (default 0.1s at
+    embedding_dim) is returned for every embedded text. Every successful
+    call costs `cost`; a timed-out attempt settles `timeout_cost`, and
+    `estimates` records which estimator priced it and from what input.
+
+    `streams` feeds stream() opens in order (#412). An exception instance is
+    raised on open; a list is a script of steps: a str is a text token, a
+    `tool_call(...)` is an assembled tool call, an exception is raised at that
+    point, BLOCK parks until cancelled and an asyncio.Event parks until set.
+    An unscripted open streams `default_reply`. A finished stream costs
+    `cost`; a cut-short one settles `partial_cost`.
+    """
+
+    chat_model = "fake/chat"
+    embedding_model = "fake/embedding"
+
+    def __init__(self):
+        self.replies: list[Any] = []
+        self.streams: list[Any] = []
+        self.default_reply = "This is a fake reply."
+        self.embed_errors: list[BaseException] = []
+        self.vector: list[float] | None = None
+        self.cost = Decimal("0")
+        self.timeout_cost = Decimal("0")
+        self.partial_cost = Decimal("0")
+        self.estimates: list[tuple] = []
+        self.complete_calls: list[dict] = []
+        self.stream_calls: list[dict] = []
+        self.opened: list[_FakeProviderStream] = []
+        self.embed_calls: list[list[str]] = []
+        self.aembed_calls: list[list[str]] = []
+
+    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+        # Copy each message: the tutor appends to and prunes its list later.
+        self.stream_calls.append(
+            {
+                "messages": [dict(m) for m in messages],
+                "tools": tools,
+                "tool_choice": tool_choice,
+                "temperature": temperature,
+                "timeout": timeout,
+            }
+        )
+        script = self.streams.pop(0) if self.streams else [self.default_reply]
+        if isinstance(script, BaseException):
+            raise script
+        s = _FakeProviderStream(self, list(script), messages)
+        self.opened.append(s)
+        return s
+
+    def _usage(self) -> dict:
+        return {"prompt_tokens": None, "completion_tokens": None, "cached_tokens": None}
+
+    async def complete(self, messages, *, temperature, timeout):
+        from services.llm import Completion
+
+        self.complete_calls.append(
+            {"messages": messages, "temperature": temperature, "timeout": timeout}
+        )
+        reply = self.replies.pop(0) if self.replies else "This is a fake reply."
+        if isinstance(reply, BaseException):
+            raise reply
+        return Completion(text=reply, cost=self.cost, usage=self._usage())
+
+    def _embedding(self, texts):
+        from config import settings
+        from services.llm import Embedding
+
+        if self.embed_errors:
+            raise self.embed_errors.pop(0)
+        vector = self.vector if self.vector is not None else [0.1] * settings.embedding_dim
+        vectors = [list(vector) for _ in texts]
+        return Embedding(vectors=vectors, cost=self.cost, usage=self._usage())
+
+    def embed(self, texts):
+        self.embed_calls.append(list(texts))
+        return self._embedding(texts)
+
+    async def aembed(self, texts):
+        self.aembed_calls.append(list(texts))
+        return self._embedding(texts)
+
+    def completion_prompt_cost(self, messages) -> Decimal:
+        self.estimates.append(("completion", messages))
+        return self.timeout_cost
+
+    def embedding_prompt_cost(self, texts) -> Decimal:
+        self.estimates.append(("embedding", list(texts)))
+        return self.timeout_cost
 
 
 @pytest.fixture
-def mock_litellm(monkeypatch):
-    """Scriptable response queue. Append SimpleNamespace items via _text/_tool_call.
-    Empty queue returns a default text response so existing tests keep working."""
-    queue: list[Any] = []
+def fake_llm(monkeypatch):
+    """Install a FakeLlmProvider behind the real adapter shell. Retries do
+    not sleep. The adapter's sessions already land on the test engine
+    (db_session or pg_seed binds SessionLocal).
 
-    async def fake_acompletion(**kwargs):
-        if not queue:
-            return _text("This is a mocked tutor response.")
-        return queue.pop(0)
+    Stub mode wins over an installed provider (#413), and the test env's
+    "test" key turns it on, so this pins it off; a test that wants the stub
+    sets `settings.llm_stub = True` after."""
+    from config import settings
+    from services import llm
 
-    monkeypatch.setattr("agent.tutor.litellm.acompletion", fake_acompletion)
-    return queue
+    monkeypatch.setattr(settings, "llm_stub", False)
+    monkeypatch.setattr(settings, "gemini_api_key", "fake-llm-key")
+    provider = FakeLlmProvider()
+    monkeypatch.setattr(llm, "_provider", provider)
+    monkeypatch.setattr(llm.time, "sleep", lambda _s: None)
 
+    async def no_sleep(_s):
+        return None
 
-@pytest.fixture
-def llm_text():
-    """Helper exposed for tests to build text responses."""
-    return _text
-
-
-@pytest.fixture
-def llm_tool_call():
-    """Helper exposed for tests to build tool-call responses."""
-    return _tool_call
+    monkeypatch.setattr(llm.asyncio, "sleep", no_sleep)
+    return provider

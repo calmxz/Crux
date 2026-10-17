@@ -283,7 +283,10 @@ def test_delete_me_removes_all_caller_rows_and_objects_only(client, db_session, 
     assert admin["deleted"] == [VICTIM]
 
 
-def test_delete_me_503_names_auth_step_when_admin_call_fails(client, db_session, store, admin):
+def test_delete_me_503_names_auth_step_when_admin_call_fails(
+    client, db_session, store, admin, expect_app_log
+):
+    expect_app_log("app data deleted; auth user removal failed")
     from services.object_store import ObjectNotFound
 
     admin["fail"] = True

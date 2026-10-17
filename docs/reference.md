@@ -82,6 +82,104 @@ and the stream start releases in `_prepare_turn`'s `except BaseException` arm.
 Consequences: the usage ledger reads `reserve` high for the duration of a turn,
 and a process crash mid-turn leaves the reserve on the ledger until UTC midnight.
 
+### LLM adapter (#411, #412, #413)
+
+`backend/services/llm.py` is the one place that calls the model; only it and
+`cost_meter`'s pricing helpers import `litellm` (the offline eval script
+excepted). `llm.get()` returns the shell around the active provider:
+`complete`, `stream`, `embed`, `aembed`, each taking a
+`Meter(user_id, session_id, purpose)`. The shell gates on
+`cost_meter.assert_within_caps` and settles the ledger row plus the
+`LlmCallLog` row in its own short session, so spend survives any caller
+rollback. Settlement never raises; a failure is an error-level log line
+carrying user, session, purpose, cost and usage. `CallRefused` (base of
+`CostCapExceeded` and `LlmUnavailable`) lives in `lib/llm_errors.py` so
+`cost_meter` can subclass it without importing the adapter. Catch
+`CallRefused` and report its `code`; `cap` is set only on a cost cap.
+
+Stub mode: `llm.get()` is the only reader of `settings.llm_stub_enabled`;
+when it is on, `get()` returns `StubProvider` even over a test's installed
+provider. Never branch on the flag elsewhere: handle `LlmUnavailable`
+instead. The stub streams the deterministic `[STUB:...]` echo
+(`agent/_stub.py`, which finds the prior summary by
+`prompts.LAST_SESSION_SUMMARY_LABEL`) with no tool calls; `complete`,
+`embed` and `aembed` raise `LlmUnavailable` (code `llm_unavailable`). It
+never spends, so the shell skips the gate for it. Callers fall back as
+without a model: mechanical session and rolling summaries, no retrieval
+escalation or prefetch, and stub-mode ingestion fails the document.
+
+Caller rule: never hold an uncommitted ledger write (`record_cost`,
+`reserve_cost`, `adjust_cost`) in your session across an adapter call. The
+settlement upserts the same row; on Postgres it waits at most
+`SETTLE_LOCK_TIMEOUT` (5 s), then defers the ledger write (`_defer_ledger`):
+
+- The LlmCallLog row is committed on its own (it never waits on the ledger
+  row), except after a pool timeout, when the retry writes it instead of
+  queueing a second checkout on the request path.
+- `llm settlement deferred` logs at error level with the reconciliation
+  fields (`call_logged`, `date_utc`). It is the record that survives if the
+  retry never runs, e.g. a restart within the delay.
+- One retry runs on a daemon thread after `SETTLE_RETRY_DELAY_S`, waits up to
+  `SETTLE_RETRY_LOCK_TIMEOUT` (30 s), and books to the day the call was
+  settled, not the day it runs. It logs `llm deferred settlement landed`
+  (info) or `llm settlement failed` (error).
+- At most `SETTLE_RETRY_MAX_IN_FLIGHT` (2) retries wait per process, since
+  each holds a pooled connection; past that the spend is logged as
+  `llm settlement failed: retry capacity full`.
+- A connection lost mid-COMMIT can leave the first write committed; the
+  retry then counts it twice, the accepted (overcounting) direction.
+
+Reconcile from the logs: a deferral with no matching `landed` line is spend
+missing from the ledger. Until a deferred write lands the cap undercounts, so
+any ledger write still commits before the next slow step, not just before
+adapter calls. The tutor and the `retrieve` tool write no ledger rows
+themselves; the chat route's B-05 reservation is the one caller-side write,
+published by its admission commit. The adapter's gate and settlement each
+take their own pooled connection, so callers commit before the call (the
+tutor before each stream, the retrieve tool before its embed) instead of
+holding an idle one.
+
+Streams: `async with llm.get().stream(messages, meter=..., tools=...,
+tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
+refusal raises a `CallRefused` before the block runs), then
+`async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
+(`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete
+once iteration ends; `s.cost` is set when the block exits and stays readable
+after a cancel. The exit settles once, synchronously, before any await: the
+provider's price on a normal end (token math if pricing fails), an estimate
+of the prompt plus the output received (text and tool-call arguments) on
+cancel or on the caller's generator closing, and on a provider error the
+estimate only if a chunk arrived or it was a `Timeout` ($0 otherwise).
+Retry (429, 503, 500, connection) happens only while no chunk has arrived;
+a retried attempt costs nothing and its stream, if it opened, is closed
+(whether Gemini bills such an attempt is open, #561). The tutor keeps the
+stream it is inside in `inflight` until its iteration finishes, so its
+cancel event reports what the cut-short call settled, or $0 for a cancel
+during tool dispatch or while a finished stream closes.
+
+Tests: the `fake_llm` fixture (conftest) installs `FakeLlmProvider` under the
+real shell; script it with `replies` (str or exception per `complete`
+attempt), `streams` (per `stream` open: an exception raised on open, or a
+list of steps -- str text, `tool_call(name, args, id=)`, an exception raised
+there, `BLOCK` to park until cancelled), `embed_errors`, `vector`, `cost`,
+`timeout_cost` and `partial_cost` (a cut-short stream). `stream_calls`
+copies each sent message, so later pruning cannot rewrite a capture.
+`fake_llm` pins stub mode off (the test key `"test"` turns it on); set
+`settings.llm_stub = True` after it to get the stub. litellm's chunk parsing is the
+provider's and is tested against litellm-shaped chunks in `test_llm.py`.
+`db_session` binds `db.database.SessionLocal` (see the default-engine entry below)
+to the sqlite test engine, so the adapter's settlement and the rolling-summary task
+land there. On sqlite that engine
+is one shared connection (`StaticPool`), so the adapter's commit also commits
+the caller's pending writes, and so does the rolling-summary task's (which on a
+due summary also makes a `fake_llm` call); isolation is only provable on
+Postgres. `pg_seed` binds `SessionLocal` to the Postgres engine the same way; a
+Postgres test that streams a chat turn still stubs `summary_service.update_rolling_summary`,
+to skip its extra LLM call. An autouse
+conftest fixture runs the deferred retry inline (it replaces `llm._schedule`)
+and gives each test fresh retry slots; a test that needs to observe the
+deferred state captures the scheduled call instead (`test_llm.py`).
+
 ### Stream cleanup must be shielded (#421)
 
 Starlette cancels a streaming response's task on client disconnect (and on
@@ -93,6 +191,24 @@ must finish (draining the producer, releasing the B-05 reserve) runs inside
 `anyio.CancelScope(shield=True)`: `chat_stream`'s finally, the check follow-up
 pump in `routes/sessions.py`, and `_prepare_turn`'s release-on-failure. Drain
 before release, in one shield, because both touch the same `Session`.
+
+### Postgres test harness (#574)
+
+Opt-in Postgres modules (`tests/*_pg.py`, `test_pgvector_retrieval.py`) keep
+their own `TEST_DATABASE_URL` skipif and take two conftest fixtures: `pg_engine`
+(module-scoped; a module adds connect args through a module-level
+`PG_CONNECT_ARGS` dict) and `pg_seed`, a `tests/pg_harness.py` `PgSeeder` whose
+call seeds a unique user + session and returns `(Session, uid, sid)`. No module
+writes its own teardown: `teardown_plan` derives children-first deletes from
+`Base.metadata`, by `user_id`/`session_id`, so a new table with either column
+is covered. A table that FKs `users`, `sessions` or another keyed table (even
+transitively) with neither column makes plan-building raise; give it one of
+the columns. Teardown errors are never swallowed: every seed is torn down,
+then the failures are raised. A fixture that holds a connection, row lock or
+open transaction on seeded rows must depend on `pg_seed`, so it is torn down
+first; otherwise the teardown's deletes wait on it and fail at their 5s
+`lock_timeout`. A test that makes another session as the seeded user needs no
+cleanup of its own: session-keyed deletes match every session that user owns.
 
 ### Proving a row lock in a test (#418)
 
@@ -112,6 +228,55 @@ Activity stats are snapshotted once per transaction, and the holder's stays
 open, so each poll must run `SELECT pg_stat_clear_snapshot()` first or the
 waiters never appear.
 
+### Check module owns its transaction (#420)
+
+`services/check_service.py` is the only code that reads or writes
+`pending_check_json`, `current_check_json`, `quiz_cooldown_json` and
+`ChatMessage.check_batch_json`; everything else goes through its row reads.
+Its actions commit themselves, on early exits and `CheckError` too, and
+never release the lock by rollback. An unexpected exception leaves the
+transaction to the caller; for `register`, `agent.tools.dispatch` rolls it
+back (#569). `abandon_in_caller_transaction` is the exception: it
+joins the session end's single commit. So a caller never commits after an
+action, and must commit after abandon.
+
+Ending a session takes two transactions. `_claim_end` commits `ended_at`
+first. Abandon runs in the second, after the multi-second summary LLM call.
+An `ended_at` check made before taking the row lock can pass, and the Set can
+still be open, in the window between the two. That is why every Check action,
+`register` included, rechecks `ended_at` under the lock.
+
+### Prompt state (#395)
+
+The tutor's dynamic context is rendered from a `PromptState`
+(`services/prompt_state.py`), never a dict. Build it in two steps:
+`gather_session_inputs(db, row, ...)` reads the session's inputs and
+`assemble(session_inputs, TurnInputs(...))` adds the turn's. Every
+`PromptState` field is required. Pass `learner_prefs`, `ingestion_status` or
+`gap_accuracy` when the caller already has them (chat loads the first two in
+its guard SELECTs) or wants them blank; the default `NOT_LOADED` makes gather
+query for them. gather reads columns off the
+row it is given, so a detached row costs no refresh SELECT. To override one
+value, use `dataclasses.replace` on either dataclass (the check follow-up
+does this).
+
+The gap-accuracy read is best-effort, and on Postgres a swallowed SQL error
+still aborts the request's transaction. So the read runs in a Core-level
+SAVEPOINT (`db.connection().begin_nested()`), which rolls back only itself;
+`Session.begin_nested()` would flush pending ORM state first (#565). Any
+best-effort read on the request session needs the same: wrap it in
+`services.savepoint.core_savepoint(db)` and catch outside it (the chat
+pre-flight's retrieval reads do, #567). Never put a commit inside one, such
+as the embed's connection-releasing commit.
+
+`tests/test_prompt_golden.py` pins the full system prompt of three chat turns
+and two check follow-ups (`/check/complete`, `/check/stop`), byte for byte,
+against
+`tests/fixtures/prompt_golden/`. A deliberate prompt change rewrites them
+with `UPDATE_PROMPT_GOLDEN=1`; review the fixture diff as the change. Renderer
+tests build state with `tests/prompt_state_factory.make_prompt_state`, whose
+defaults are the old renderer fallbacks.
+
 ### Liveness vs readiness (G-07)
 
 `/health` and `/healthz` are liveness-only and must keep returning 200 while the
@@ -126,6 +291,14 @@ not part of the openapi contract.
 exceptions; the real exception text is only in the server WARNING log.
 `pydantic.ValidationError` is the deliberate exception and passes through: the
 model needs the field detail to repair its own call.
+
+Both arms also roll back `ctx.db` (#569): on Postgres a failed statement aborts
+the transaction, which would fail the next tool in the batch and the loop's
+next commit. Two rules follow for any tool. A write tool commits its own work
+before returning, since a later tool's failure rolls back anything left
+uncommitted. A tool that swallows its own SQL error (as `retrieve` does,
+returning `retrieval_failed`) rolls back itself in that except arm, since
+`dispatch` rolls back only on an exception.
 
 ### Ingestion error strings (C-11)
 
@@ -161,6 +334,50 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   real emitter. Runs that are narrowed (paths, `-k`, `-m`, `--ignore`, or
   anything that deselects, such as `--lf` or `--sw`), collect-only, or already
   failing skip this check.
+- Default engine (#579): no test may connect on `db.database.engine` (a developer's
+  real `data/app.db` locally). A `do_connect` hook in `backend/tests/conftest.py`
+  refuses every such connection, so the file is never opened, and records it; the
+  test that made it fails at teardown, named, even if app code swallowed the
+  refusal. Hits outside a test fail the next test, or the run if none follows
+  (`tests/test_default_engine_guard.py` pins the hook). Every session app code
+  opens on its own (LLM gate and settlement, rolling-summary task, ingestion,
+  worker) comes from the one `db.database.SessionLocal`, and one binding points it
+  at the test engine (#580): `bind_session_local(engine)` in the conftest calls
+  `SessionLocal.configure(bind=...)` and restores `db.database.engine` on exit, even
+  after an exception. It refuses a second binding while one is active, so a test
+  cannot hold both `db_session` and `pg_seed`. `db_session` (whose own session
+  also comes from `SessionLocal`) and `pg_seed` hold it for the test, so no test
+  patches a module's `SessionLocal` just to rebind it. New app code that opens its
+  own session must use `db.database.SessionLocal` itself: a sessionmaker of its
+  own escapes the binding, and this guard then fails it. A script that seeds its
+  own database (the live eval scripts, #596) binds `SessionLocal` to that engine
+  the same way, or the LLM adapter's sessions miss it. `get_db` draws from the
+  same `SessionLocal`, so inside the binding a request that the test did not route
+  through a `get_db` override also lands on the test engine instead of being refused. Tests that run the app lifespan stub `main.create_tables`
+  (`engine.begin()`).
+- Unexpected app logs (#577, #594): an autouse fixture in `backend/tests/conftest.py`
+  fails a test, at teardown, that logs a record at WARNING or above from an app
+  logger (`agent`, `config`, `db`, `lib`, `main`, `routes`, `services`, `worker`)
+  that no declared expectation covers, listing each record's logger and message.
+  It catches a fake whose failure a best-effort path swallowed and logged. A test
+  that drives a failure on purpose declares it with the `expect_app_log` fixture:
+  `expect_app_log("unhandled error")` covers every record whose message contains
+  that text, and an expectation that matched no record fails the test too, so the
+  declaration replaces a hand-written `assert ... in caplog.text`. The unfired
+  check applies only to a test whose body passed: one that failed or skipped
+  first already reports that. A fixture that logs during its setup declares the
+  expectation itself. Requesting `caplog` does not opt out; keep it only for
+  checks the declaration cannot make (level, record fields, absence of learner
+  text, INFO records). `caplog.at_level` / `set_level` above WARNING on an app
+  logger stops its warnings being logged at all, hiding them from the guard;
+  `test_no_test_raises_an_app_logger_above_warning` fails on any such call. An incidental record is fixed at its cause: an
+  embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
+  `SimpleNamespace`, so the cost meter can price it against litellm's bundled
+  pricing table (conftest sets `LITELLM_LOCAL_MODEL_COST_MAP`). The recorder sits on
+  the app's parent loggers at WARNING or below, so a test that resets the root
+  logger or raises its level does not blind it. Third-party loggers and Python
+  `warnings` are not covered. `tests/test_app_log_guard.py` pins the fixture, and
+  fails when a new top-level backend module or package is missing from the list.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).

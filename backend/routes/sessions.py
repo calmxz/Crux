@@ -1,4 +1,5 @@
 import asyncio
+import dataclasses
 import json
 import logging
 import time
@@ -45,20 +46,16 @@ from db.database import get_db
 from db.models import ChatMessage
 from db.models import Session as SessionModel
 from lib.error_codes import (
-    CHECK_CONFLICT,
     DUPLICATE_TOPIC,
     EMPTY_TOPIC,
-    NO_OPEN_CHECK,
-    NO_RESOLVED_BATCH,
     SESSION_ENDED,
 )
 from services import (
-    check_question_service,
+    check_service,
     cost_meter,
-    diagnostic_service,
     documents_service,
-    pending_check_store,
     profile_service,
+    prompt_state,
     rate_limit,
     summary_service,
     topic_suggest_service,
@@ -293,13 +290,12 @@ def _load_messages(
     window = list(db.execute(q.order_by(ChatMessage.id.desc()).limit(limit + 1)).scalars().all())
     has_more = len(window) > limit
     rows = list(reversed(window[:limit]))
-    # Preload LearningEvents once iff some message may need reconstruction
-    # (no persisted check_batch_json and not the open message). Avoids the
-    # former per-item N+1 entirely; skipped when every batch is persisted.
-    needs_events = any(m.check_batch_json is None and m.id != open_message_id for m in rows)
-    events = (
-        check_question_service.load_session_learning_events(db, session_id) if needs_events else []
+    # Preload LearningEvents once iff some message's Recap must be rebuilt
+    # (not frozen, and not the open Set's message).
+    needs_events = any(
+        not check_service.recap_is_frozen(m) and m.id != open_message_id for m in rows
     )
+    events = check_service.load_session_learning_events(db, session_id) if needs_events else []
     out: list[Message] = []
     for m in rows:
         try:
@@ -316,7 +312,7 @@ def _load_messages(
         if m.id == open_message_id:
             check_batch = None
         else:
-            check_batch = check_question_service.load_check_batch(db, m, events)
+            check_batch = check_service.recap_for_message(db, m, events)
         out.append(
             Message(
                 id=m.id,
@@ -479,11 +475,10 @@ def get_session(
     row = db.get(SessionModel, session_id)
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
-    pc = check_question_service.get_pending_check(db, row.id)
-    # message_id is None until attach_message_id runs (non-streaming run()
+    # message_id is None until stamp_message_id runs (non-streaming run()
     # path, or a narrow race). When None, suppression below cannot fire; the
     # read-time backfill is best-effort and any co-render window is transient.
-    open_msg_id = pc.get("message_id") if pc else None
+    open_view, open_msg_id = check_service.open_set_view(row)
     messages, has_more = _load_messages(db, row.id, open_msg_id)
     return SessionDetail(
         id=row.id,
@@ -496,7 +491,7 @@ def get_session(
         messages=messages,
         has_more_messages=has_more,
         pinned=row.pinned,
-        pending_check=check_question_service.public_view(pc),
+        pending_check=open_view,
     )
 
 
@@ -513,8 +508,7 @@ def get_session_messages(
         raise HTTPException(status_code=404, detail="session not found")
     # Same open-batch recap suppression as get_session: if the open check
     # message ever lands in an older page, the live card still owns it.
-    pc = check_question_service.get_pending_check(db, row.id)
-    open_msg_id = pc.get("message_id") if pc else None
+    _, open_msg_id = check_service.open_set_view(row)
     items, has_more = _load_messages(db, row.id, open_msg_id, before=before, limit=limit)
     return MessagePage(items=items, has_more=has_more)
 
@@ -719,6 +713,15 @@ def update_session(
     return _session_response(db, row)
 
 
+def _check_409(e: check_service.CheckError) -> HTTPException:
+    """A refused Check action as a 409 (C-14: the status is route-owned).
+    Only check_conflict carries a message."""
+    detail = {"code": e.code}
+    if e.message is not None:
+        detail["message"] = e.message
+    return HTTPException(status_code=409, detail=detail)
+
+
 @router.post("/sessions/{session_id}/check/skip", response_model=CheckSkipResponse)
 def skip_check(
     session_id: str,
@@ -732,15 +735,9 @@ def skip_check(
     if row.ended_at is not None:
         raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     try:
-        prog = check_question_service.skip(db, session_id, req.index)
-    except check_question_service.CheckStateError as e:
-        raise HTTPException(
-            status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
-        ) from e
-    check_question_service.write_check_batch(
-        db, check_question_service.get_pending_check(db, session_id)
-    )
-    diagnostic_service.grade_if_diagnostic(db, session_id)
+        prog = check_service.skip(db, session_id, req.index)
+    except check_service.CheckError as e:
+        raise _check_409(e) from e
     return CheckSkipResponse(**prog)
 
 
@@ -760,15 +757,9 @@ def answer_check(
     if row.ended_at is not None:
         raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
     try:
-        result = check_question_service.answer(db, session_id, req.index, req.selected_index)
-    except check_question_service.CheckStateError as e:
-        raise HTTPException(
-            status_code=409, detail={"code": CHECK_CONFLICT, "message": str(e)}
-        ) from e
-    check_question_service.write_check_batch(
-        db, check_question_service.get_pending_check(db, session_id)
-    )
-    diagnostic_service.grade_if_diagnostic(db, session_id)
+        result = check_service.answer(db, session_id, req.index, req.selected_index)
+    except check_service.CheckError as e:
+        raise _check_409(e) from e
     return CheckAnswerResponse(**result)
 
 
@@ -791,10 +782,10 @@ def _recent_history(db: Session, session_id: str) -> list[dict]:
 def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     """F-11: the entire synchronous segment of complete_check.
 
-    Guard/lock/claim order is load-bearing and unchanged. lock_session_row's
-    FOR UPDATE and every statement below run on the same Session and the same
-    connection, so running the whole segment in one worker thread is
-    equivalent to running it inline. Returns
+    check_service.complete() claims the Set under the row lock and commits
+    before the LLM stream starts (B-02). Every statement below runs on the
+    same Session and connection, so running the whole segment in one worker
+    thread is equivalent to running it inline. Returns
     (allowed, messages, system_prompt, ctx); on `allowed is False` the caller
     emits the daily-cap skip stream and nothing else.
     """
@@ -804,46 +795,26 @@ def _complete_check_prepare(session_id: str, user_id: str, db: Session):
     if row.ended_at is not None:
         raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
 
-    # B-02: claim the batch under the session row lock, so two concurrent
-    # /check/complete calls cannot both pass the is_done guard and both fire
-    # the paid follow-up turn. The loser blocks until the winner's
-    # clear_pending_check commit below, then re-reads an empty batch and 409s;
-    # that same commit releases the lock, well before the LLM stream starts.
-    profile_service.lock_session_row(db, session_id)
-    pc = pending_check_store.get_pending_check(db, session_id)
-    if pc is None or not pending_check_store.is_done(pc):
-        raise HTTPException(status_code=409, detail={"code": NO_RESOLVED_BATCH})
-
-    summary = check_question_service.build_results_summary(pc)
-    # F-24 crash-window backstop: if the per-item grade call never ran (crash
-    # between the answer commit and grade), grade the diagnostic NOW, while
-    # the resolved batch still exists -- clearing below would otherwise leave
-    # knowledge_level None and re-trigger the diagnostic. commit=False: the
-    # grade lands in close_set's single commit, so the B-02 row lock holds
-    # until the set is closed.
-    diagnostic_service.grade_if_diagnostic(db, session_id, commit=False)
-    # #340: between sets the current-check pointer survives this close, and
-    # register() lets the suppressed follow-up turn pose the next set.
-    cooldown = check_question_service.close_set(db, session_id, pc)
+    try:
+        summary, cooldown = check_service.complete(db, session_id)
+    except check_service.CheckError as e:
+        raise _check_409(e) from e
     return _followup_context(db, row, session_id, user_id, summary, cooldown)
 
 
 def _stop_check_prepare(session_id: str, user_id: str, db: Session):
     """F-11: synchronous segment of stop_check (#340 Stop button).
 
-    stop_open_check claims the check under the session row lock and commits
-    before returning, so a double click's loser re-reads no check in progress
-    and 409s, well before any LLM stream starts (same shape as B-02 for
-    /check/complete)."""
+    stop() commits before the LLM stream starts (B-02)."""
     row = db.get(SessionModel, session_id)
     if row is None or row.user_id != user_id:
         raise HTTPException(status_code=404, detail="session not found")
     if row.ended_at is not None:
         raise HTTPException(status_code=409, detail={"code": SESSION_ENDED})
-    summary = check_question_service.stop_open_check(db, session_id)
-    if summary is None:
-        raise HTTPException(status_code=409, detail={"code": NO_OPEN_CHECK})
-    cooldown = check_question_service.get_quiz_cooldown(db, session_id)
+    try:
+        summary, cooldown = check_service.stop(db, session_id)
+    except check_service.CheckError as e:
+        raise _check_409(e) from e
     return _followup_context(db, row, session_id, user_id, summary, cooldown)
 
 
@@ -866,33 +837,34 @@ def _followup_context(
     if not allowed:
         return False, None, None, None
 
-    profile = profile_service.load_profile(db, session_id)
-    ingestion_status = documents_service.session_ingestion_status(db, session_id)
+    # The follow-up prompt has always left out the learner prefs, rolling
+    # summary, gap accuracy, Check pointer and diagnostic; they are blanked
+    # here so the prompt is unchanged (#396 fills the real values).
+    # #354: topic_suggest_state still flows through, since a graded diagnostic
+    # makes this follow-up the first at-level reply, where the topic card falls due.
+    session_inputs = dataclasses.replace(
+        prompt_state.gather_session_inputs(db, row, learner_prefs={}, gap_accuracy={}),
+        rolling_summary=None,
+        pending_check=None,
+        current_check=None,
+        quiz_cooldown=cooldown,
+    )
+    state = dataclasses.replace(
+        prompt_state.assemble(session_inputs, prompt_state.TurnInputs(retrieval_required=False)),
+        diagnostic_required=False,
+    )
 
     messages = _recent_history(db, session_id)
     messages.append({"role": "user", "content": summary})
 
-    prompt_state = {
-        "topic": row.topic,
-        "profile": profile,
-        "ingestion_status": ingestion_status,
-        "retrieval_required": False,
-        "seed_mode": None,
-        "last_session_summary": profile.last_session_summary,
-        "pending_check": None,
-        "quiz_cooldown": cooldown,
-        # #354: a graded diagnostic makes this follow-up the first at-level
-        # reply, so it is where the topic card falls due.
-        "topic_suggest_state": row.topic_suggest_state,
-    }
-    system_prompt = prompts.build_system_prompt(prompt_state)
+    system_prompt = prompts.build_system_prompt(state)
     ctx = ToolContext(
         db=db,
         session_id=session_id,
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
         suppress_check=True,
-        diagnostic_required=(profile.knowledge_level is None),
+        diagnostic_required=(session_inputs.profile.knowledge_level is None),
     )
     return True, messages, system_prompt, ctx
 

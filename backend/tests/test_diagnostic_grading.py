@@ -8,8 +8,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import Session as SessionModel
 from db.models import User
-from services import check_question_service, diagnostic_service, profile_service
-from services.diagnostic_service import level_for_score
+from services import check_service, profile_service
 
 # Default auth identity from conftest's _fake_current_user_id when no
 # Authorization header (and no user_id in the request body) is sent.
@@ -27,7 +26,7 @@ def db(db_session):
     "n,expected", [(0, "beginner"), (1, "beginner"), (2, "intermediate"), (3, "advanced")]
 )
 def test_level_for_score_3q(n, expected):
-    assert level_for_score(n, 3) == expected
+    assert check_service._level_for_score(n, 3) == expected
 
 
 @pytest.fixture
@@ -54,7 +53,7 @@ def fresh_session_with_diagnostic_batch(db_session):
         diagnostic_required=True,
     )
     correct_indices = [0, 1, 0]
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -103,7 +102,7 @@ def session_with_level_and_check_batch(db_session):
     db_session.commit()
 
     ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0)
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -134,12 +133,12 @@ def session_with_diagnostic_batch(fresh_session_with_diagnostic_batch):
 
 
 def _correct_choice(db, session_id, index):
-    pc = check_question_service.get_pending_check(db, session_id)
+    pc = check_service.open_set(db.get(SessionModel, session_id))
     return pc["items"][index]["correct_index"]
 
 
 def _wrong_choice(db, session_id, index):
-    pc = check_question_service.get_pending_check(db, session_id)
+    pc = check_service.open_set(db.get(SessionModel, session_id))
     item = pc["items"][index]
     for i in range(len(item["options"])):
         if i != item["correct_index"]:
@@ -150,8 +149,7 @@ def _wrong_choice(db, session_id, index):
 def test_all_skip_diagnostic_leaves_level_none(db, session_with_diagnostic_batch):
     sid = session_with_diagnostic_batch
     for i in range(3):
-        check_question_service.skip(db, sid, i)
-    diagnostic_service.grade_if_diagnostic(db, sid)
+        check_service.skip(db, sid, i)
     assert profile_service.load_profile(db, sid).knowledge_level is None
 
 
@@ -161,11 +159,10 @@ def test_user_set_level_not_clobbered_by_diagnostic(db, session_with_diagnostic_
     # mid-batch PATCH ("advanced") -- a genuine clobber scenario, not a
     # same-value coincidence.
     sid = session_with_diagnostic_batch
-    check_question_service.answer(db, sid, 0, _correct_choice(db, sid, 0))
+    check_service.answer(db, sid, 0, _correct_choice(db, sid, 0))
     profile_service.apply_user_patch(db, sid, knowledge_level="advanced")
-    check_question_service.answer(db, sid, 1, _wrong_choice(db, sid, 1))
-    check_question_service.answer(db, sid, 2, _wrong_choice(db, sid, 2))
-    diagnostic_service.grade_if_diagnostic(db, sid)
+    check_service.answer(db, sid, 1, _wrong_choice(db, sid, 1))
+    check_service.answer(db, sid, 2, _wrong_choice(db, sid, 2))
     assert profile_service.load_profile(db, sid).knowledge_level == "advanced"
 
 

@@ -1,15 +1,27 @@
 """P3.1 statement-count budget for the chat prepare path.
 
 Counts SQL statements issued by _prepare_turn via before_cursor_execute.
-Budget (spec P3.1): <=7 happy path, <=8 when the gap-accuracy aggregate
-runs (non-empty confirmed_gaps). Uses an existing user: the first-turn-ever
-user-create path is excluded from the budget by design.
+Budget: originally (P3.1) 6 happy path / 7 when the gap-accuracy aggregate
+runs (non-empty confirmed_gaps), raised by the notes below to <=7 / <=10. Uses an existing user: the
+first-turn-ever user-create path is excluded from the budget by design.
 
 B-05 raised both numbers by exactly 1: the cost gate no longer reads today's
 spend and compares, it reserves it (one INSERT .. ON CONFLICT DO UPDATE ..
 RETURNING against daily_cost_ledger) so concurrent turns serialize on the
 ledger row. The step-1 combined read still issues its single statement (it
 keeps the user-existence probe), hence +1 rather than +0.
+
+#565 raised the gaps-path number by 2: the gap-accuracy aggregate now runs
+inside a SAVEPOINT (SAVEPOINT + RELEASE around its single SELECT), so a
+failed read on Postgres rolls back only itself instead of aborting the
+turn's transaction. Those are cheap round-trips on a path that only runs
+when confirmed_gaps is non-empty; the no-gaps budget is unchanged.
+
+#567 raised the doc-bearing semantic-fallback number by 2 the same way:
+semantic_fallback_required's reads (has_ready_document and the centroid)
+now run inside one SAVEPOINT, so a failed read on Postgres no longer aborts
+the transaction the user-message persist then needs. The other budgets
+stub the fallback out and are unchanged.
 """
 
 import asyncio
@@ -53,12 +65,11 @@ USER_ID = "perf-user"
 
 @pytest.fixture(autouse=True)
 def _stub_semantic_fallback(monkeypatch):
-    # D2.2: this budget measures _prepare_turn's own statements. In an
-    # environment where settings.llm_stub_enabled is False (e.g. a real
-    # gemini_api_key in .env), the real semantic_fallback_required would add
-    # one has_ready_document SELECT (lexical gate is False by default here,
-    # since seeded_session has no kw_index_json entries). Pin it off so this
-    # test measures _prepare_turn regardless of ambient LLM-stub config.
+    # D2.2: this budget measures _prepare_turn's own statements. The real
+    # semantic_fallback_required adds one has_ready_document SELECT, in stub
+    # mode too since #413 (lexical gate is False by default here, since
+    # seeded_session has no kw_index_json entries). Replace it so this test
+    # measures _prepare_turn alone.
     async def _fake_fallback(*a, **kw):
         return False, None
 
@@ -93,7 +104,7 @@ def test_prepare_turn_context_leaves_no_open_transaction(db_session, seeded_sess
     db_session.expunge(sess)
     req = ChatRequest(session_id=session_id, message="explain factoring")
 
-    _prepare_turn_context(req, db_session, sess)
+    _prepare_turn_context(req, db_session, sess, None, {})
 
     assert db_session.in_transaction() is False
 
@@ -127,8 +138,9 @@ def test_prepare_turn_budget_with_gaps(db_session, seeded_session):
     session_id = seeded_session.id
     with count_queries(db_session) as q:
         messages, system_prompt, ctx = _run_prepare(db_session, session_id)
-    # 7 (pre-B-05 budget) + 1 (the reserve_cost upsert; see the module docstring).
-    assert q["n"] <= 8, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
+    # 7 (pre-B-05 budget) + 1 (the reserve_cost upsert) + 2 (#565's SAVEPOINT
+    # and RELEASE around the aggregate); see the module docstring.
+    assert q["n"] <= 10, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
     # Functional proof the aggregate actually ran on this branch (not just
     # that the statement count happened to fit).
     assert "GAP_ACCURACY:" in system_prompt and "factoring" in system_prompt
@@ -143,9 +155,9 @@ def test_prepare_turn_budget_doc_bearing_semantic_fallback(db_session, seeded_se
     is what gets measured).
 
     Sqlite path is deterministic and network-free: semantic_fallback_required
-    -> has_ready_document SELECT (True) -> _session_centroid's dialect guard
-    (bind dialect != "postgresql") returns None immediately -> function
-    returns False. litellm.embedding is never reached on this dialect; the
+    -> SAVEPOINT -> has_ready_document SELECT (True) -> _session_centroid's
+    dialect guard (bind dialect != "postgresql") returns None immediately ->
+    RELEASE -> function returns False. litellm.embedding is never reached on this dialect; the
     embedding call itself is Postgres-only and is covered by the owed live
     perf re-measure, not by this statement-count test.
     """
@@ -181,8 +193,10 @@ def test_prepare_turn_budget_doc_bearing_semantic_fallback(db_session, seeded_se
     # 7 (base no-gaps budget, see test_prepare_turn_budget_no_gaps) + 1
     # (has_ready_document SELECT inside semantic_fallback_required; on
     # sqlite, _session_centroid's dialect guard short-circuits before any
-    # further query -- litellm.embedding is unreachable here -- so this is
-    # the fallback's entire statement cost on this dialect). Tight, not <=:
-    # this test's whole point is to prove the fallback's real SQL cost is
-    # exactly one extra SELECT, not to leave headroom for it to grow.
-    assert q["n"] == 8, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
+    # further query -- litellm.embedding is unreachable here) + 2 (#567's
+    # SAVEPOINT and RELEASE around those reads; see the module docstring),
+    # so this is the fallback's entire statement cost on this dialect.
+    # Tight, not <=: this test's whole point is to prove the fallback's real
+    # SQL cost is exactly one SELECT in one savepoint, not to leave headroom
+    # for it to grow.
+    assert q["n"] == 10, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])

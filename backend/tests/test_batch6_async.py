@@ -11,23 +11,13 @@ def test_semantic_fallback_is_async():
     assert inspect.iscoroutinefunction(retrieval_service.semantic_fallback_required)
 
 
-def test_fallback_uses_aembedding(monkeypatch, db_session):
+def test_fallback_uses_aembedding(monkeypatch, db_session, fake_llm):
     """Drives the fallback all the way to the embedding call (mirrors the
     has_ready_document / _session_centroid monkeypatch pattern used by the
-    fallback tests in test_retrieval_service.py) so `called["hit"]` actually
-    proves `aembedding` was invoked, not just that the early-return path
+    fallback tests in test_retrieval_service.py) so the recorded call actually
+    proves the async embed was invoked, not just that the early-return path
     short-circuited before reaching it."""
-    called = {}
-
-    async def fake_aembedding(**kwargs):
-        called["hit"] = True
-
-        class R:
-            data = [{"embedding": [0.0] * 768}]
-
-        return R()
-
-    monkeypatch.setattr("services.retrieval_service.litellm.aembedding", fake_aembedding)
+    fake_llm.vector = [0.0] * 768
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: True,
@@ -39,7 +29,8 @@ def test_fallback_uses_aembedding(monkeypatch, db_session):
     result, vec = asyncio.run(
         retrieval_service.semantic_fallback_required(db_session, "nosuch", "q")
     )
-    assert called.get("hit") is True
+    assert fake_llm.aembed_calls == [["q"]]
+    assert fake_llm.embed_calls == []
     # Zero query vector vs zero centroid -> cosine similarity is 0.0 (the
     # zero-norm guard), which is below the fallback threshold -> False.
     assert result is False

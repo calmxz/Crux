@@ -12,11 +12,19 @@ IMMUTABLE_RULES prefix.
 """
 
 import json
+from typing import TYPE_CHECKING
 
 from agent.excerpt import wrap_untrusted
 from contracts import TopicProfile
 
+if TYPE_CHECKING:
+    # Type-only, so this module stays a leaf.
+    from services.prompt_state import PromptState
+
 _SUMMARY_TAG = "untrusted_summary"
+# The dynamic-context line carrying the prior session's summary. The stub
+# provider (agent/_stub.py) finds the summary by this label (#413).
+LAST_SESSION_SUMMARY_LABEL = "LAST_SESSION_SUMMARY"
 
 IMMUTABLE_RULES = """You are Crux's tutor AI.
 Your job is to help the learner understand their study material. Ask clarifying
@@ -387,9 +395,9 @@ def _learner_prefs_block(prefs: dict | None) -> str:
     return "\n".join(lines)
 
 
-def build_dynamic_context(state: dict) -> str:
-    topic = state.get("topic", "") or ""
-    profile_dict = _profile_to_dict(state.get("profile"))
+def build_dynamic_context(state: "PromptState") -> str:
+    topic = state.topic or ""
+    profile_dict = _profile_to_dict(state.profile)
     # F-35: render only the newest PROMPT_LIST_MAX entries per concept list;
     # an *_older_count key tells the model truncation happened.
     for _key in ("confirmed_gaps", "mastered_concepts"):
@@ -397,29 +405,28 @@ def build_dynamic_context(state: dict) -> str:
         if isinstance(_items, list) and len(_items) > PROMPT_LIST_MAX:
             profile_dict[f"{_key}_older_count"] = len(_items) - PROMPT_LIST_MAX
             profile_dict[_key] = _items[-PROMPT_LIST_MAX:]
-    ingestion_status = state.get("ingestion_status") or "none"
-    retrieval_required = bool(state.get("retrieval_required", False))
-    seed_mode = state.get("seed_mode") or "none"
+    ingestion_status = state.ingestion_status or "none"
+    seed_mode = state.seed_mode or "none"
     # G-01: summaries are generated from learner-influenced transcripts and
     # seed forward across sessions, so they are fenced as untrusted content
     # (see the UNTRUSTED SUMMARIES rule block). "none" stays a bare sentinel.
-    _last = state.get("last_session_summary")
+    _last = state.last_session_summary
     last_session_summary = wrap_untrusted(_SUMMARY_TAG, _last) if _last else "none"
-    _rolling = state.get("rolling_summary")
+    _rolling = state.rolling_summary
     rolling_summary = wrap_untrusted(_SUMMARY_TAG, _rolling) if _rolling else "none"
-    retrieval_label = "REQUIRED" if retrieval_required else "OPTIONAL"
-    prefetched = state.get("prefetched_excerpts") or []
+    retrieval_label = "REQUIRED" if state.retrieval_required else "OPTIONAL"
+    prefetched = state.prefetched_excerpts
     if prefetched:
         retrieval_label = "PROVIDED"
-    diagnostic_required = bool(state.get("diagnostic_required", False))
-    if diagnostic_required and state.get("diagnostic_accepted"):
+    diagnostic_required = state.diagnostic_required
+    if diagnostic_required and state.diagnostic_accepted:
         diagnostic_label = "ACCEPTED"
     elif diagnostic_required:
         diagnostic_label = "REQUIRED"
     else:
         diagnostic_label = "OFF"
 
-    pending_check = state.get("pending_check")
+    pending_check = state.pending_check
     if pending_check:
         items = pending_check.get("items", [])
         answered = sum(1 for it in items if it.get("status") != "pending")
@@ -440,14 +447,14 @@ def build_dynamic_context(state: dict) -> str:
         pc_label = json.dumps(pc)
     else:
         pc_label = "none"
-        current_check = state.get("current_check") or {}
+        current_check = state.current_check or {}
         last, total = current_check.get("last_set_index"), current_check.get("set_total")
         if last and total and last < total:
             pc_label = json.dumps(
                 {"between_sets": True, "last_set_index": int(last), "set_total": int(total)}
             )
 
-    quiz_cooldown = state.get("quiz_cooldown")
+    quiz_cooldown = state.quiz_cooldown
     if quiz_cooldown:
         qr = {
             "gap": quiz_cooldown.get("gap"),
@@ -461,10 +468,10 @@ def build_dynamic_context(state: dict) -> str:
     else:
         qr_label = "ready"
 
-    review_gaps_target = state.get("review_gaps_target")
+    review_gaps_target = state.review_gaps_target
     # G-03: the gap name is learner-influenced; json.dumps keeps it on one
     # line so a stored newline cannot forge a directive line in the prompt.
-    if review_gaps_target and state.get("review_gaps_retention"):
+    if review_gaps_target and state.review_gaps_retention:
         review_gaps_label = (
             f"{json.dumps(review_gaps_target)} (retention check: previously "
             "mastered; verify with check questions, do not re-teach from scratch)"
@@ -476,7 +483,7 @@ def build_dynamic_context(state: dict) -> str:
 
     # #354: "awaiting_level" is set at create only for a session that started
     # without a level (topic_suggest_service), so seeded sessions stay OFF.
-    if state.get("topic_suggest_state") != "awaiting_level" or review_gaps_target:
+    if state.topic_suggest_state != "awaiting_level" or review_gaps_target:
         topic_suggest_label = "OFF"
     elif profile_dict.get("knowledge_level"):
         topic_suggest_label = "DUE"
@@ -486,15 +493,15 @@ def build_dynamic_context(state: dict) -> str:
     out = (
         f"TOPIC: {topic}\n"
         f"CURRENT TOPIC PROFILE: {json.dumps(profile_dict)}\n"
-        f"{_learner_prefs_block(state.get('learner_prefs'))}\n"
+        f"{_learner_prefs_block(state.learner_prefs)}\n"
         f"INGESTION_STATUS: {ingestion_status}\n"
         f"RETRIEVAL: {retrieval_label}\n"
         f"DIAGNOSTIC: {diagnostic_label}\n"
         f"SEED_MODE: {seed_mode}\n"
-        f"LAST_SESSION_SUMMARY: {last_session_summary}\n"
+        f"{LAST_SESSION_SUMMARY_LABEL}: {last_session_summary}\n"
         f"ROLLING_SUMMARY: {rolling_summary}\n"
         f"PENDING_CHECK: {pc_label}\n"
-        f"GAP_ACCURACY: {_gap_accuracy_label(profile_dict, state.get('gap_accuracy') or {})}\n"
+        f"GAP_ACCURACY: {_gap_accuracy_label(profile_dict, state.gap_accuracy)}\n"
         f"QUIZ_READINESS: {qr_label}\n"
         f"REVIEW_GAPS: {review_gaps_label}\n"
         f"TOPIC_SUGGEST: {topic_suggest_label}"
@@ -504,7 +511,5 @@ def build_dynamic_context(state: dict) -> str:
     return out
 
 
-def build_system_prompt(state: dict | None = None) -> str:
-    if state is None:
-        state = {}
+def build_system_prompt(state: "PromptState") -> str:
     return f"{IMMUTABLE_RULES}\n\n{build_dynamic_context(state)}"
