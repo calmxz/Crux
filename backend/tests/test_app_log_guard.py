@@ -34,7 +34,25 @@ def test_requesting_caplog_opts_out_of_the_guard(caplog):
     assert "expected" in caplog.text
 
 
-def test_an_unrequested_app_warning_fails_the_test_and_names_it(pytester):
+def test_guard_survives_a_root_logger_reset_and_a_raised_level():
+    from lib.logging_config import configure_logging
+
+    root = logging.getLogger()
+    handlers, level = root.handlers[:], root.level
+    try:
+        configure_logging()  # dictConfig replaces root's handlers
+        root.setLevel(logging.ERROR)
+        logging.getLogger("services.retrieval_service").warning("still seen")
+    finally:
+        root.handlers[:] = handlers
+        root.setLevel(level)
+
+    assert [r.getMessage() for r in conftest._app_log_records] == ["still seen"]
+    conftest._app_log_records.clear()
+
+
+def test_an_unrequested_app_warning_fails_the_test_and_names_it(pytester, caplog):
+    # caplog opts this outer test out: the inner run's record is its own.
     pytester.makepyfile(
         """
         import logging
@@ -51,6 +69,7 @@ def test_an_unrequested_app_warning_fails_the_test_and_names_it(pytester):
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*WARNING services.retrieval_service: prefetch failed: boom*"])
+    assert "prefetch failed: boom" in caplog.text
 
 
 def test_logger_roots_cover_every_top_level_app_module():

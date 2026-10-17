@@ -4,6 +4,9 @@ import os
 # Q-01: must run before anything imports `config`, or the real .env loads
 # into the test process. Do not move below the imports.
 os.environ["CRUX_SKIP_DOTENV"] = "1"
+# litellm's bundled pricing table, not one fetched at import: embedding fakes
+# are priced by it, and a remote table dropping the model would log (#577).
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
 import threading
 from decimal import Decimal
@@ -232,8 +235,7 @@ _app_log_records: list[logging.LogRecord] = []
 
 class _AppLogRecorder(logging.Handler):
     def emit(self, record: logging.LogRecord) -> None:
-        if record.name.split(".", 1)[0] in _APP_LOGGER_ROOTS:
-            _app_log_records.append(record)
+        _app_log_records.append(record)
 
 
 @pytest.fixture(autouse=True)
@@ -242,13 +244,22 @@ def _no_unexpected_app_logs(request):
         yield
         return
     _app_log_records.clear()
-    root = logging.getLogger()
+    # On the app's own parent loggers, not root: a test that resets root
+    # (configure_logging's dictConfig) would drop it. Their level is pinned
+    # at WARNING or below, so neither LOG_LEVEL nor a root level raised
+    # mid-test hides the records.
     handler = _AppLogRecorder(logging.WARNING)
-    root.addHandler(handler)
+    loggers = [logging.getLogger(name) for name in _APP_LOGGER_ROOTS]
+    levels = [lg.level for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(min(lg.getEffectiveLevel(), logging.WARNING))
+        lg.addHandler(handler)
     try:
         yield
     finally:
-        root.removeHandler(handler)
+        for lg, level in zip(loggers, levels, strict=True):
+            lg.removeHandler(handler)
+            lg.setLevel(level)
     if _app_log_records:
         lines = [f"{r.levelname} {r.name}: {r.getMessage()}" for r in _app_log_records]
         _app_log_records.clear()

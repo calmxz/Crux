@@ -764,9 +764,11 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
 
     assert cost > Decimal("0")
     assert cost == ps.estimate()
-    assert [(r.name, r.getMessage()) for r in caplog.records] == [
-        ("services.llm", "completion_cost failed: unknown model")
-    ]
+    assert [
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "services.llm" and r.levelno >= logging.WARNING
+    ] == ["completion_cost failed: unknown model"]
 
 
 async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stream, monkeypatch):

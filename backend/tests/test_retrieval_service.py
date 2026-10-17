@@ -217,10 +217,6 @@ def _stub_off(monkeypatch):
     monkeypatch.setattr(settings, "gemini_api_key", "")
 
 
-def _fake_embedding_resp(vec):
-    return embedding_response([vec])
-
-
 def test_semantic_fallback_true_above_threshold(db_session, monkeypatch, fake_llm):
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
@@ -524,7 +520,7 @@ def test_semantic_fallback_calls_pass_timeout(db_session, monkeypatch):
 
     async def _fake_aembedding(**kw):
         captured.update(kw)
-        return _fake_embedding_resp([1.0, 0.0, 0.0])
+        return embedding_response([[1.0, 0.0, 0.0]])
 
     # Through the real LiteLlmProvider: the timeout kwarg is the provider's job.
     monkeypatch.setattr(litellm, "aembedding", _fake_aembedding)
