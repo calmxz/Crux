@@ -90,6 +90,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             extra={"err_type": type(e).__name__, "session_id": ctx.session_id},
             exc_info=settings.env != "prod",
         )
+        # #569: a swallowed SQL error still aborts the transaction on
+        # Postgres, and dispatch only rolls back what raises. _embed_query
+        # committed and the vector query only reads, so this discards
+        # nothing. If the rollback itself raises, dispatch handles it.
+        db.rollback()
         return ToolResult(ok=False, status="failed", error="retrieval_failed")
 
     chunks = [

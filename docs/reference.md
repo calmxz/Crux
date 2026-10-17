@@ -270,6 +270,14 @@ exceptions; the real exception text is only in the server WARNING log.
 `pydantic.ValidationError` is the deliberate exception and passes through: the
 model needs the field detail to repair its own call.
 
+Both arms also roll back `ctx.db` (#569): on Postgres a failed statement aborts
+the transaction, which would fail the next tool in the batch and the loop's
+next commit. Two rules follow for any tool. A write tool commits its own work
+before returning, since a later tool's failure rolls back anything left
+uncommitted. A tool that swallows its own SQL error (as `retrieve` does,
+returning `retrieval_failed`) rolls back itself, since `dispatch` rolls back
+only on an exception.
+
 ### Ingestion error strings (C-11)
 
 `documents.error` is rendered verbatim by the frontend, so it only ever holds a

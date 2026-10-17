@@ -1,12 +1,14 @@
-"""#569: a tool that raises cannot poison the rest of the turn on Postgres.
+"""#569: a failed tool cannot poison the rest of the turn on Postgres.
 
-tools.dispatch turns any exception into a `tool_failed` ToolResult. On
-Postgres a failed statement aborts the transaction, so without a rollback a
-valid write later in the same batch fails with InFailedSqlTransaction, and a
-failed flush makes the next iteration's commit() raise PendingRollbackError,
-which ends the whole turn with `llm_failed`. Here scripted-model turns run
-through tutor.run_streaming with patched tools that fail inside Postgres on
-the turn's own session.
+On Postgres a failed statement aborts the transaction. Unless it is rolled
+back, a valid write later in the same batch fails with
+InFailedSqlTransaction, and a failed flush makes the next iteration's
+commit() raise PendingRollbackError, which ends the whole turn with
+`llm_failed`. A tool fails either by raising (tools.dispatch turns that into
+`tool_failed`) or by swallowing the error itself (retrieve_chunks returns
+`retrieval_failed`). Here scripted-model turns run through
+tutor.run_streaming with patched code that fails inside Postgres on the
+turn's own session.
 
 **Opt-in**: skipped unless `TEST_DATABASE_URL` is set. Run locally with
 `scripts/pg_tests.sh tests/test_tool_failure_rollback_pg.py --no-cov`. Never
@@ -31,6 +33,7 @@ from db.database import _normalized_url
 from db.models import (
     ChatMessage,
     DailyCostLedger,
+    Document,
     LearningEvent,
     LlmCallLog,
     UsageCounter,
@@ -38,7 +41,7 @@ from db.models import (
 )
 from db.models import Session as SessionModel
 from lib import error_codes
-from services import profile_service, retrieval_service
+from services import pgvector_store, profile_service, retrieval_service
 from tests.conftest import tool_call
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
@@ -89,6 +92,7 @@ def seeded(engine, fake_llm, monkeypatch):
             db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
             db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
             db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
+            db.execute(delete(Document).where(Document.session_id == sid))
             db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
             db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
             db.execute(delete(SessionModel).where(SessionModel.id == sid))
@@ -96,9 +100,14 @@ def seeded(engine, fake_llm, monkeypatch):
             db.commit()
 
 
-def _failing_retrieve(db, ctx, args):
-    """A retrieval that fails inside Postgres on the turn's own session."""
-    db.execute(text("SELECT 1 / 0"))
+def _failing(calls: list):
+    """A stand-in that fails inside Postgres on the caller's session."""
+
+    def _fail(db, *a, **kw):
+        calls.append(True)
+        db.execute(text("SELECT 1 / 0"))
+
+    return _fail
 
 
 async def _run_turn(Session, uid, sid):
@@ -137,13 +146,14 @@ def _assistant_status(Session, sid) -> str:
         ).scalar_one()
 
 
-async def test_failed_read_does_not_fail_a_later_write_in_the_same_batch(
-    seeded, fake_llm, monkeypatch
-):
-    """Case A: the profile patch after a failed retrieval still lands."""
-    Session, uid, sid = seeded
-    monkeypatch.setattr(retrieval_service, "retrieve", _failing_retrieve)
-    fake_llm.streams = [
+def _confirmed_gaps(Session, sid) -> list[str]:
+    with Session() as db:
+        profile = profile_service.load_profile(db, sid)
+    return profile_service.concept_names(profile.confirmed_gaps)
+
+
+def _retrieve_then_patch_batch():
+    return [
         [
             tool_call("retrieve_chunks", {"query": "joins"}, id="c_ret"),
             tool_call("update_topic_profile", {"add_confirmed_gap": GAP}, id="c_prof"),
@@ -151,24 +161,58 @@ async def test_failed_read_does_not_fail_a_later_write_in_the_same_batch(
         ["Noted."],
     ]
 
+
+async def test_raising_read_does_not_fail_a_later_write_in_the_same_batch(
+    seeded, fake_llm, monkeypatch
+):
+    """Case A: the profile patch after a retrieval that raises still lands."""
+    Session, uid, sid = seeded
+    calls: list = []
+    monkeypatch.setattr(retrieval_service, "retrieve", _failing(calls))
+    fake_llm.streams = _retrieve_then_patch_batch()
+
     events = await _run_turn(Session, uid, sid)
 
+    assert calls == [True]
     done = _done_by_id(events)
     assert done["c_ret"]["status"] == "error"
     assert done["c_prof"]["status"] == "ok"
     assert events[-1].type == "done"
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == error_codes.TOOL_FAILED
+    assert _confirmed_gaps(Session, sid) == [GAP]
+
+
+async def test_swallowed_retrieval_error_does_not_fail_a_later_write(seeded, fake_llm, monkeypatch):
+    """Case A through the real retrieve: it catches its own vector-query
+    failure and returns `retrieval_failed`, so dispatch never sees it."""
+    Session, uid, sid = seeded
     with Session() as db:
-        profile = profile_service.load_profile(db, sid)
-    assert profile_service.concept_names(profile.confirmed_gaps) == [GAP]
+        db.add(Document(session_id=sid, filename="ref.txt", status="ready"))
+        db.commit()
+    calls: list = []
+    monkeypatch.setattr(pgvector_store, "query_chunks", _failing(calls))
+    fake_llm.streams = _retrieve_then_patch_batch()
+
+    events = await _run_turn(Session, uid, sid)
+
+    assert calls == [True]
+    done = _done_by_id(events)
+    assert (done["c_ret"]["status"], done["c_ret"]["error"]) == ("error", "retrieval_failed")
+    assert done["c_prof"]["status"] == "ok"
+    assert events[-1].type == "done"
+    assert _assistant_status(Session, sid) == "complete"
+    assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == "retrieval_failed"
+    assert _confirmed_gaps(Session, sid) == [GAP]
 
 
 async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, monkeypatch):
     """Case B: a write tool's flush error is a tool failure, not a turn failure."""
     Session, uid, sid = seeded
+    calls: list = []
 
     def duplicate_pk_patch(db, ctx, args):
+        calls.append(args.add_confirmed_gap)
         db.add(User(id=ctx.user_id))
         db.flush()
 
@@ -180,6 +224,7 @@ async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, mon
 
     events = await _run_turn(Session, uid, sid)
 
+    assert calls == [GAP]
     done = _done_by_id(events)
     assert (done["c_prof"]["status"], done["c_prof"]["error"]) == (
         "error",
@@ -191,9 +236,12 @@ async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, mon
 
 
 async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):
-    """Case C: a failed read alone in its batch ends the turn `done`."""
+    """Case C, already correct before #569 and pinned so it stays so: a
+    failed read alone in its batch ends the turn `done` (the loop's next
+    commit ends the aborted transaction)."""
     Session, uid, sid = seeded
-    monkeypatch.setattr(retrieval_service, "retrieve", _failing_retrieve)
+    calls: list = []
+    monkeypatch.setattr(retrieval_service, "retrieve", _failing(calls))
     fake_llm.streams = [
         [tool_call("retrieve_chunks", {"query": "joins"}, id="c_ret")],
         ["No sources."],
@@ -201,6 +249,7 @@ async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):
 
     events = await _run_turn(Session, uid, sid)
 
+    assert calls == [True]
     assert events[-1].type == "done"
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == error_codes.TOOL_FAILED
