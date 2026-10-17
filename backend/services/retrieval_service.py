@@ -19,6 +19,7 @@ from contracts import RetrieveChunksArgs, ToolResult
 from db.models import ChunkEmbedding
 from db.models import Session as SessionModel
 from services import documents_service, llm, pgvector_store
+from services.savepoint import core_savepoint
 
 log = logging.getLogger(__name__)
 
@@ -136,7 +137,9 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     The write-back flushes but never commits here; the caller's next commit
     (semantic_fallback_required releases the connection before embedding)
     publishes it. A write-back that is rolled back instead just means the
-    next turn recomputes.
+    next turn recomputes. That includes #567's savepoint rollback, which
+    discards nothing else: chat commits right before the fallback runs, so
+    no other write is pending in it.
     """
     if not _is_postgres(db):
         return None
@@ -153,6 +156,15 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     )
     db.flush()
     return centroid
+
+
+def _fallback_centroid(db: Session, session_id: str) -> list[float] | None:
+    """semantic_fallback_required's reads, in one savepoint: None when the
+    session has no ready document or no centroid."""
+    with core_savepoint(db):
+        if not documents_service.has_ready_document(db, session_id):
+            return None
+        return _session_centroid(db, session_id)
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -184,15 +196,22 @@ async def prefetch_for_prompt(
     query_vec, if given, is the vector already embedded for this same query
     by semantic_fallback_required -- reuse it instead of embedding again,
     since that spend was already metered (B-09).
+
+    #567: each read runs in its own SAVEPOINT, so a failed one rolls back
+    only itself instead of aborting the turn's transaction. The embed
+    commits, so it sits between them, never inside one.
     """
     try:
-        if not documents_service.has_ready_document(db, session_id):
+        with core_savepoint(db):
+            ready = documents_service.has_ready_document(db, session_id)
+        if not ready:
             return None
         if query_vec is None:
             query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
-        hits = pgvector_store.query_chunks(
-            db, session_id=session_id, query_embedding=query_vec, k=k
-        )
+        with core_savepoint(db):
+            hits = pgvector_store.query_chunks(
+                db, session_id=session_id, query_embedding=query_vec, k=k
+            )
     except llm.LlmUnavailable:
         return None  # stub mode (#413): no model, so no retrieval; not a failure
     except Exception as e:
@@ -221,8 +240,8 @@ async def semantic_fallback_required(
     """Escalate the OPTIONAL lexical gate when the query is semantically
     close to the session's uploaded material -- paraphrase/acronym misses
     the stem overlap cannot catch (D2.2). Best-effort by design: any failure
-    keeps the gate OPTIONAL. Unlike gap_accuracy in services/prompt_state.py
-    (#565), the reads here run without a savepoint.
+    keeps the gate OPTIONAL. The reads run in a SAVEPOINT (#567), so a failed
+    one rolls back only itself, centroid write-back included.
 
     The adapter gates and settles the embedding call against `user_id`;
     callers that cannot attribute the call to a user may omit it and skip
@@ -234,11 +253,10 @@ async def semantic_fallback_required(
     it back in and skip a second, identical embed for the same query (B-09).
     """
     try:
-        if not documents_service.has_ready_document(db, session_id):
-            return False, None
-        # F-05: sync DB work on an async handler's event loop; the centroid
-        # read (and the one-off recompute) go to the threadpool.
-        centroid = await run_in_threadpool(_session_centroid, db, session_id)
+        # F-05: sync DB work on an async handler's event loop; the ready
+        # check, the centroid read (and the one-off recompute) go to the
+        # threadpool.
+        centroid = await run_in_threadpool(_fallback_centroid, db, session_id)
         if centroid is None:
             return False, None
         query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)

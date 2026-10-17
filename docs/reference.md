@@ -241,7 +241,10 @@ The gap-accuracy read is best-effort, and on Postgres a swallowed SQL error
 still aborts the request's transaction. So the read runs in a Core-level
 SAVEPOINT (`db.connection().begin_nested()`), which rolls back only itself;
 `Session.begin_nested()` would flush pending ORM state first (#565). Any
-best-effort read on the request session needs the same.
+best-effort read on the request session needs the same: wrap it in
+`services.savepoint.core_savepoint(db)` and catch outside it (the chat
+pre-flight's retrieval reads do, #567). Never put a commit inside one, such
+as the embed's connection-releasing commit.
 
 `tests/test_prompt_golden.py` pins the full system prompt of three chat turns
 and two check follow-ups (`/check/complete`, `/check/stop`), byte for byte,
