@@ -227,54 +227,67 @@ def _no_default_engine(request):
 # fallback the test expects, so the test passes vacuously. Every app record at
 # WARNING or above must contain the text of an expectation the test or one of
 # its fixtures declared with expect_app_log, and every expectation must match
-# a record (#594). caplog has no effect on the guard.
+# a record (#594). Requesting caplog does not opt out, but caplog.at_level or
+# set_level above WARNING on an app logger stops its warnings being logged at
+# all, so the guard cannot see them: keep those at WARNING or below.
 
 _APP_LOGGER_ROOTS = frozenset(
     {"agent", "config", "db", "lib", "main", "routes", "services", "worker"}
 )
-# The running guard's records. Each guard records into its own list, so a
-# pytester run nested inside a test cannot clear the outer test's records.
-_app_log_records: list[logging.LogRecord] = []
+_call_report_key = pytest.StashKey[pytest.TestReport]()
 
 
-class _AppLogRecorder(logging.Handler):
+@pytest.hookimpl(wrapper=True)
+def pytest_runtest_makereport(item, call):
+    report = yield
+    if report.when == "call":
+        item.stash[_call_report_key] = report
+    return report
+
+
+class _AppLogGuard(logging.Handler):
+    """One test's records and declared expectations. Each test gets its own,
+    so a pytester run nested inside a test cannot touch the outer test's."""
+
     def __init__(self) -> None:
         super().__init__(logging.WARNING)
         self.records: list[logging.LogRecord] = []
+        self.expectations: list[str] = []
 
     def emit(self, record: logging.LogRecord) -> None:
         self.records.append(record)
 
 
 @pytest.fixture(autouse=True)
-def _no_unexpected_app_logs() -> Iterator[list[str]]:
-    global _app_log_records
+def _no_unexpected_app_logs(request) -> Iterator[_AppLogGuard]:
     # On the app's own parent loggers, not root: a test that resets root
     # (configure_logging's dictConfig) would drop it. Their level is pinned
     # at WARNING or below, so neither LOG_LEVEL nor a root level raised
     # mid-test hides the records.
-    handler = _AppLogRecorder()
-    outer_records, _app_log_records = _app_log_records, handler.records
-    expectations: list[str] = []
+    guard = _AppLogGuard()
     loggers = [logging.getLogger(name) for name in _APP_LOGGER_ROOTS]
     levels = [lg.level for lg in loggers]
     for lg in loggers:
         lg.setLevel(min(lg.getEffectiveLevel(), logging.WARNING))
-        lg.addHandler(handler)
+        lg.addHandler(guard)
     try:
-        yield expectations
+        yield guard
     finally:
         for lg, level in zip(loggers, levels, strict=True):
-            lg.removeHandler(handler)
+            lg.removeHandler(guard)
             lg.setLevel(level)
-        _app_log_records = outer_records
-    messages = [r.getMessage() for r in handler.records]
+    expectations = guard.expectations
+    messages = [r.getMessage() for r in guard.records]
     unmatched = [
         f"{r.levelname} {r.name}: {message}"
-        for r, message in zip(handler.records, messages, strict=True)
+        for r, message in zip(guard.records, messages, strict=True)
         if not any(text in message for text in expectations)
     ]
-    unfired = [text for text in expectations if not any(text in m for m in messages)]
+    # A test that failed, skipped or xfailed may stop before its expected
+    # record fires; it already reports that outcome.
+    call = request.node.stash.get(_call_report_key, None)
+    passed = call is not None and call.passed
+    unfired = [text for text in expectations if passed and not any(text in m for m in messages)]
     problems = []
     if unmatched:
         problems.append(
@@ -292,7 +305,7 @@ def _no_unexpected_app_logs() -> Iterator[list[str]]:
 
 
 @pytest.fixture
-def expect_app_log(_no_unexpected_app_logs: list[str]) -> Callable[[str], None]:
+def expect_app_log(_no_unexpected_app_logs: _AppLogGuard) -> Callable[[str], None]:
     """Declare that an app record at WARNING or above containing `text` is
     logged during this test. Tests and fixtures call it the same way; a fixture
     that drives a logged failure declares it, so its tests need not (#594)."""
@@ -300,7 +313,7 @@ def expect_app_log(_no_unexpected_app_logs: list[str]) -> Callable[[str], None]:
     def declare(text: str) -> None:
         if not text.strip():
             raise ValueError("expect_app_log text is blank; it would match every record")
-        _no_unexpected_app_logs.append(text)
+        _no_unexpected_app_logs.expectations.append(text)
 
     return declare
 

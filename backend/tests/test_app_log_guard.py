@@ -13,34 +13,50 @@ from tests import conftest
 BACKEND = Path(__file__).resolve().parent.parent
 # Top-level code that is not the app: codegen output, one-off scripts, tests.
 NOT_APP = {"contracts", "scripts", "tests"}
-# The inner runs share the outer test's loggers, so the outer guard sees their
-# records too and the outer test declares them.
 PYTESTER_ARGS = ("-p", "no:cacheprovider", "-p", "no:asyncio")
-INNER_IMPORTS = """
+# A conftest is a plugin, so the guard's report hook registers there too.
+INNER_CONFTEST = """
+from tests.conftest import (
+    _no_unexpected_app_logs,
+    expect_app_log,
+    pytest_runtest_makereport,
+)
+"""
+INNER_HEADER = """
 import logging
 
 import pytest
-
-from tests.conftest import _no_unexpected_app_logs, expect_app_log
 """
 
 
-def test_app_warnings_and_errors_are_recorded_third_party_and_info_are_not():
+def _run_inner(pytester, source: str):
+    """Run `source` as a test file under the guard. The inner run shares the
+    outer test's loggers, so the outer guard sees its records too and the
+    outer test declares them."""
+    pytester.makeconftest(INNER_CONFTEST)
+    pytester.makepyfile(INNER_HEADER + source)
+    return pytester.runpytest_inprocess(*PYTESTER_ARGS)
+
+
+def test_app_warnings_and_errors_are_recorded_third_party_and_info_are_not(
+    _no_unexpected_app_logs,
+):
     logging.getLogger("services.retrieval_service").error("query failed")
     logging.getLogger("main").warning("startup degraded")
     logging.getLogger("services.llm").info("settled")
     logging.getLogger("litellm").warning("third party")
     logging.getLogger("servicesx").warning("not an app package")
 
-    assert [(r.name, r.getMessage()) for r in conftest._app_log_records] == [
+    records = _no_unexpected_app_logs.records
+    assert [(r.name, r.getMessage()) for r in records] == [
         ("services.retrieval_service", "query failed"),
         ("main", "startup degraded"),
     ]
     # Cleared, so this test's own teardown check passes.
-    conftest._app_log_records.clear()
+    records.clear()
 
 
-def test_guard_survives_a_root_logger_reset_and_a_raised_level():
+def test_guard_survives_a_root_logger_reset_and_a_raised_level(_no_unexpected_app_logs):
     from lib.logging_config import configure_logging
 
     root = logging.getLogger()
@@ -53,21 +69,21 @@ def test_guard_survives_a_root_logger_reset_and_a_raised_level():
         root.handlers[:] = handlers
         root.setLevel(level)
 
-    assert [r.getMessage() for r in conftest._app_log_records] == ["still seen"]
-    conftest._app_log_records.clear()
+    records = _no_unexpected_app_logs.records
+    assert [r.getMessage() for r in records] == ["still seen"]
+    records.clear()
 
 
 def test_an_undeclared_app_warning_fails_the_test_and_names_it(pytester, expect_app_log):
     expect_app_log("prefetch failed: boom")
-    pytester.makepyfile(
-        INNER_IMPORTS
-        + """
+
+    result = _run_inner(
+        pytester,
+        """
 def test_swallowed_fake():
     logging.getLogger("services.retrieval_service").warning("prefetch failed: boom")
-"""
+""",
     )
-
-    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*WARNING services.retrieval_service: prefetch failed: boom*"])
@@ -76,16 +92,15 @@ def test_swallowed_fake():
 
 def test_requesting_caplog_does_not_opt_out_of_the_guard(pytester, expect_app_log):
     expect_app_log("asserted by hand")
-    pytester.makepyfile(
-        INNER_IMPORTS
-        + """
+
+    result = _run_inner(
+        pytester,
+        """
 def test_hand_assert(caplog):
     logging.getLogger("services.llm").warning("asserted by hand")
     assert "asserted by hand" in caplog.text
-"""
+""",
     )
-
-    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*WARNING services.llm: asserted by hand*"])
@@ -106,34 +121,50 @@ def test_a_blank_expectation_is_refused(expect_app_log, text):
 
 
 def test_an_expectation_that_never_fired_fails_and_names_it(pytester):
-    pytester.makepyfile(
-        INNER_IMPORTS
-        + """
+    result = _run_inner(
+        pytester,
+        """
 def test_nothing_logged(expect_app_log):
     expect_app_log("never logged")
-"""
+""",
     )
-
-    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*never fired*", "*never logged*"])
 
 
+def test_a_failed_or_skipped_test_is_not_also_failed_for_an_unfired_expectation(pytester):
+    result = _run_inner(
+        pytester,
+        """
+def test_fails_first(expect_app_log):
+    expect_app_log("never logged")
+    assert False
+
+
+def test_skips_first(expect_app_log):
+    expect_app_log("never logged")
+    pytest.skip("not here")
+""",
+    )
+
+    result.assert_outcomes(failed=1, skipped=1)
+    result.stdout.no_fnmatch_line("*never fired*")
+
+
 def test_only_the_undeclared_record_is_listed(pytester, expect_app_log):
     expect_app_log("declared one")
     expect_app_log("stray one")
-    pytester.makepyfile(
-        INNER_IMPORTS
-        + """
+
+    result = _run_inner(
+        pytester,
+        """
 def test_two_records(expect_app_log):
     expect_app_log("declared one")
     logging.getLogger("services.llm").warning("declared one")
     logging.getLogger("routes.chat").error("stray one")
-"""
+""",
     )
-
-    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*ERROR routes.chat: stray one*"])
@@ -143,9 +174,10 @@ def test_two_records(expect_app_log):
 
 def test_an_expectation_declared_by_a_fixture_covers_its_setup_record(pytester, expect_app_log):
     expect_app_log("seed failed")
-    pytester.makepyfile(
-        INNER_IMPORTS
-        + """
+
+    result = _run_inner(
+        pytester,
+        """
 @pytest.fixture
 def failing_seed(expect_app_log):
     expect_app_log("seed failed")
@@ -154,10 +186,8 @@ def failing_seed(expect_app_log):
 
 def test_uses_the_fixture(failing_seed):
     pass
-"""
+""",
     )
-
-    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1)
 

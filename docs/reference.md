@@ -361,10 +361,14 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   that drives a failure on purpose declares it with the `expect_app_log` fixture:
   `expect_app_log("unhandled error")` covers every record whose message contains
   that text, and an expectation that matched no record fails the test too, so the
-  declaration replaces a hand-written `assert ... in caplog.text`. A fixture that
-  logs during its setup declares the expectation itself. Requesting `caplog` has
-  no effect on the guard; keep it only for checks the declaration cannot make
-  (level, record fields, absence of learner text, INFO records). An incidental record is fixed at its cause: an
+  declaration replaces a hand-written `assert ... in caplog.text`. The unfired
+  check applies only to a test whose body passed: one that failed or skipped
+  first already reports that. A fixture that logs during its setup declares the
+  expectation itself. Requesting `caplog` does not opt out; keep it only for
+  checks the declaration cannot make (level, record fields, absence of learner
+  text, INFO records). `caplog.at_level` / `set_level` above WARNING on an app
+  logger stops its warnings being logged at all, hiding them from the guard, so
+  keep those at WARNING or below. An incidental record is fixed at its cause: an
   embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
   `SimpleNamespace`, so the cost meter can price it against litellm's bundled
   pricing table (conftest sets `LITELLM_LOCAL_MODEL_COST_MAP`). The recorder sits on

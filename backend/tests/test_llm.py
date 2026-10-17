@@ -219,7 +219,7 @@ async def test_failed_retry_logs_at_error_with_the_receipt_kept(
     fake_llm.replies = ["kept"]
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         result = await _complete()
 
     assert result.text == "kept"
@@ -259,7 +259,7 @@ async def test_full_retry_capacity_logs_the_spend_unsettled(
     llm._retry_slots.acquire()  # another retry already waiting
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         await _complete()
 
     assert scheduled == []
@@ -314,7 +314,7 @@ async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(
     monkeypatch.setattr(cost_meter, "log_call", lambda *a, **k: False)
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         await _complete()
 
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
