@@ -69,7 +69,9 @@ def test_chat_stream_stub_persists_both_roles(client, db_session, monkeypatch):
 
 
 def test_gap_accuracy_failure_does_not_kill_turn(client, db_session, monkeypatch):
-    """gap_accuracy is best-effort (D1.2): a failure must not kill the turn."""
+    """gap_accuracy is best-effort (D1.2): a failure must not kill the turn.
+    This raises before any SQL runs; a real SQL failure on Postgres is
+    covered by tests/test_gap_accuracy_pg.py (#565)."""
     monkeypatch.setattr(settings, "llm_stub", True)
 
     sess = db_session.get(SessionModel, SESSION_ID)

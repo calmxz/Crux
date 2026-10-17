@@ -1,8 +1,8 @@
 """P3.1 statement-count budget for the chat prepare path.
 
 Counts SQL statements issued by _prepare_turn via before_cursor_execute.
-Budget (spec P3.1): <=7 happy path, <=10 when the gap-accuracy aggregate
-runs (non-empty confirmed_gaps). Uses an existing user: the first-turn-ever
+Budget: spec P3.1's 6 happy path / 7 when the gap-accuracy aggregate runs
+(non-empty confirmed_gaps), raised by the notes below to <=7 / <=10. Uses an existing user: the first-turn-ever
 user-create path is excluded from the budget by design.
 
 B-05 raised both numbers by exactly 1: the cost gate no longer reads today's
