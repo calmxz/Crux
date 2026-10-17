@@ -1,7 +1,7 @@
 """P3.1 statement-count budget for the chat prepare path.
 
 Counts SQL statements issued by _prepare_turn via before_cursor_execute.
-Budget (spec P3.1): <=7 happy path, <=8 when the gap-accuracy aggregate
+Budget (spec P3.1): <=7 happy path, <=10 when the gap-accuracy aggregate
 runs (non-empty confirmed_gaps). Uses an existing user: the first-turn-ever
 user-create path is excluded from the budget by design.
 
@@ -10,6 +10,12 @@ spend and compares, it reserves it (one INSERT .. ON CONFLICT DO UPDATE ..
 RETURNING against daily_cost_ledger) so concurrent turns serialize on the
 ledger row. The step-1 combined read still issues its single statement (it
 keeps the user-existence probe), hence +1 rather than +0.
+
+#565 raised the gaps-path number by 2: the gap-accuracy aggregate now runs
+inside a SAVEPOINT (SAVEPOINT + RELEASE around its single SELECT), so a
+failed read on Postgres rolls back only itself instead of aborting the
+turn's transaction. Those are cheap round-trips on a path that only runs
+when confirmed_gaps is non-empty; the no-gaps budget is unchanged.
 """
 
 import asyncio
@@ -126,8 +132,9 @@ def test_prepare_turn_budget_with_gaps(db_session, seeded_session):
     session_id = seeded_session.id
     with count_queries(db_session) as q:
         messages, system_prompt, ctx = _run_prepare(db_session, session_id)
-    # 7 (pre-B-05 budget) + 1 (the reserve_cost upsert; see the module docstring).
-    assert q["n"] <= 8, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
+    # 7 (pre-B-05 budget) + 1 (the reserve_cost upsert) + 2 (#565's SAVEPOINT
+    # and RELEASE around the aggregate); see the module docstring.
+    assert q["n"] <= 10, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
     # Functional proof the aggregate actually ran on this branch (not just
     # that the statement count happened to fit).
     assert "GAP_ACCURACY:" in system_prompt and "factoring" in system_prompt
