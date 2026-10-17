@@ -60,7 +60,7 @@ JOIN_TIMEOUT_S = 15.0
 @pytest.fixture
 def seeded(pg_seed):
     """A unique user + session + asking assistant message per test, removed
-    by the shared teardown (conftest pg_seed). Yields (Session factory, uid,
+    by the shared teardown (conftest pg_seed). Returns (Session factory, uid,
     sid, message id)."""
     Session, uid, sid = pg_seed(
         "lock-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json()
@@ -182,7 +182,9 @@ class _HeldRowLock:
 
 
 @pytest.fixture
-def pool():
+def pool(pg_seed):
+    """Depends on `pg_seed` so request threads finish before the seed
+    teardown deletes their rows."""
     with ThreadPoolExecutor(max_workers=2) as ex:
         yield ex
 

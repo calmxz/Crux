@@ -5,7 +5,6 @@ import os
 os.environ["CRUX_SKIP_DOTENV"] = "1"
 
 import threading
-import uuid
 from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -262,46 +261,13 @@ def pg_engine(request):
     eng.dispose()
 
 
-class PgSeeder:
-    """Call with an id prefix and Session fields to seed a unique user +
-    session; returns (Session factory, uid, sid). Every seed is removed by
-    the metadata-derived teardown in tests/pg_harness.py."""
-
-    def __init__(self, engine):
-        from tests.pg_harness import teardown_plan
-
-        self.engine = engine
-        self.Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-        self.plan = teardown_plan(Base.metadata)
-        self.seeds: list[tuple[str, str]] = []
-
-    def __call__(self, prefix: str, **session_fields):
-        from db.models import Session as SessionModel
-        from db.models import User
-
-        uid = f"{prefix}-{uuid.uuid4().hex[:12]}"
-        sid = f"{prefix}-s-{uuid.uuid4().hex[:12]}"
-        self.seeds.append((uid, sid))
-        with self.Session() as db:
-            db.add(User(id=uid))
-            db.flush()
-            db.add(SessionModel(id=sid, user_id=uid, **session_fields))
-            db.commit()
-        return self.Session, uid, sid
-
-    def teardown(self) -> None:
-        from tests.pg_harness import run_teardown
-
-        for uid, sid in self.seeds:
-            with self.Session() as db:
-                run_teardown(db, self.plan, uid, sid)
-
-
 @pytest.fixture
 def pg_seed(pg_engine):
-    """A fixture that holds a connection or open transaction on seeded rows
-    must depend on this one, so it is torn down first and cannot block the
-    teardown's deletes."""
+    """A tests.pg_harness.PgSeeder. A fixture that holds a connection or open
+    transaction on seeded rows must depend on this one, so it is torn down
+    first and cannot block the teardown's deletes."""
+    from tests.pg_harness import PgSeeder
+
     seeder = PgSeeder(pg_engine)
     yield seeder
     seeder.teardown()
