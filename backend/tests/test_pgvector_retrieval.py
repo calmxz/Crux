@@ -147,10 +147,10 @@ def test_cosine_query_returns_nearest_first(db, seeded_session):
 
 
 def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
-    """#567: prefetch_for_prompt's reads run in savepoints, with the HNSW
-    tuning's own savepoint nested in the search's. The search still returns
-    the nearest chunk, and the transaction-scoped tuning survives both
-    RELEASEs (query_vec is passed in, so nothing commits in between)."""
+    """#567: prefetch_for_prompt's search runs in a savepoint, with the HNSW
+    tuning's own savepoint nested in it. The search still returns the
+    nearest chunk, and the transaction-scoped tuning survives both RELEASEs
+    (query_vec is passed in, so nothing commits and no ready check runs, #571)."""
     chunks = asyncio.run(
         retrieval_service.prefetch_for_prompt(
             db,
@@ -164,6 +164,29 @@ def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
     assert chunks is not None and "joins" in chunks[0]["text"]
     ef_search = db.execute(text("SELECT current_setting('hnsw.ef_search')")).scalar_one()
     assert ef_search == str(int(settings.hnsw_ef_search))
+
+
+def test_prefetch_with_vector_skips_document_gone_non_ready(db, seeded_session, caplog):
+    """#571: with a query_vec there is no ready check, so the document going
+    non-ready after the fallback's check is caught only by the search's
+    status filter (F-27). Its chunks are never served, and no failure is
+    logged: the None comes from no hits, not from the except path."""
+    doc = db.get(Document, seeded_session["doc_id"])
+    doc.status = "pending"
+    db.commit()
+
+    chunks = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db,
+            seeded_session["session_id"],
+            seeded_session["user_id"],
+            "joins",
+            k=3,
+            query_vec=_vec(1),
+        )
+    )
+    assert chunks is None
+    assert "prefetch_for_prompt failed" not in caplog.text
 
 
 def test_query_respects_session_isolation(db, seeded_session):

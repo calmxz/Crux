@@ -534,10 +534,26 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
     otherwise every fallback-required turn pays for the same embedding twice
     (double cost + one extra round-trip)."""
     _seed_ready_doc(db_session)
-    _stub_query(monkeypatch, [])
+    searched = []
+
+    def fake_query(db, *, session_id, query_embedding, k):
+        searched.append(query_embedding)
+        return []
+
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query)
     monkeypatch.setattr(
         "services.retrieval_service._session_centroid",
         lambda db, sid: [1.0, 0.0, 0.0],
+    )
+    real_ready = retrieval_service.documents_service.has_ready_document
+    ready_calls = []
+
+    def counting_ready(db, sid):
+        ready_calls.append(sid)
+        return real_ready(db, sid)
+
+    monkeypatch.setattr(
+        "services.retrieval_service.documents_service.has_ready_document", counting_ready
     )
 
     fake_llm.vector = [1.0, 0.0, 0.0]
@@ -557,6 +573,36 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
         )
     )
     assert fake_llm.aembed_calls == [["query"]]
+    # #571: the prefetch searches with the fallback's vector and runs no
+    # ready check of its own.
+    assert searched == [vec]
+    assert ready_calls == [SESSION_ID]
+
+
+def test_prefetch_with_vector_and_no_hits_returns_none(db_session, monkeypatch, fake_llm):
+    """#571: with a query_vec the ready check is skipped and the search runs
+    directly; empty hits are None. The real ready filter on the search is
+    pinned on Postgres by test_prefetch_with_vector_skips_document_gone_non_ready."""
+    searched = []
+
+    def fake_query(db, *, session_id, query_embedding, k):
+        searched.append(session_id)
+        return []
+
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query)
+    monkeypatch.setattr(
+        "services.retrieval_service.documents_service.has_ready_document",
+        lambda db, sid: pytest.fail("ready check ran despite a query_vec"),
+    )
+
+    result = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db_session, SESSION_ID, USER_ID, "query", query_vec=[1.0, 0.0, 0.0]
+        )
+    )
+    assert result is None
+    assert searched == [SESSION_ID]
+    assert fake_llm.aembed_calls == []
 
 
 def test_session_centroid_returns_stored_column_without_querying(db_session, monkeypatch):

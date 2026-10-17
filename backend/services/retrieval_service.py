@@ -215,17 +215,21 @@ async def prefetch_for_prompt(
 
     query_vec, if given, is the vector already embedded for this same query
     by semantic_fallback_required -- reuse it instead of embedding again,
-    since that spend was already metered (B-09).
+    since that spend was already metered (B-09). The ready check only spares
+    a document-less session the embed, so with a query_vec it is skipped
+    (#571); the search's own ready filter (F-27) keeps non-ready documents
+    out on every path.
 
-    #567: each read runs in its own SAVEPOINT, so a failed one rolls back
-    only itself instead of aborting the turn's transaction. The embed
-    commits, so it sits between them, never inside one. F-05: both reads go
-    to the threadpool, off the event loop.
+    #567: each read (the ready check and the search, or just the search with
+    a query_vec) runs in its own SAVEPOINT, so a failed one rolls back only
+    itself instead of aborting the turn's transaction. The embed commits, so
+    it sits between them, never inside one. F-05: the reads go to the
+    threadpool, off the event loop.
     """
     try:
-        if not await run_in_threadpool(_prefetch_ready, db, session_id):
-            return None
         if query_vec is None:
+            if not await run_in_threadpool(_prefetch_ready, db, session_id):
+                return None
             query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
         hits = await run_in_threadpool(_prefetch_search, db, session_id, query_vec, k)
     except llm.LlmUnavailable:
