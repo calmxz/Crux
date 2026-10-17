@@ -28,6 +28,10 @@ A test that injects a failure patches the call that fails in production (the SQL
 
 For each test the diff adds or edits, name the product-code line whose breakage would turn it red. A test with no such line is vacuous: it sets state the component never reads, or asserts something true whatever the code does. Fix it or delete it. A rename that touches a test re-asks this, since renaming can leave a test pointing at nothing. (#532: a HomeView test set the sidebar list flag, which HomeView never reads; it passed the two-axis review and the bug-hunt review caught it.)
 
+## A removed guard names its backstop's test
+
+When a diff drops a check because another layer already enforces it, name the test that goes red if that layer's check is removed, and confirm it asserts behaviour: rows in, rows out. A test that inspects generated SQL text or a call's arguments is not a backstop. If no such test exists, the diff adds one. (#571: prefetch dropped its ready check on the strength of `test_query_chunks_filters_to_ready_documents`, which only checks the SQL string contains `documents.status`; the Spec review accepted it and the bug-hunt review caught it.)
+
 ## New writers check every reader
 
 When a diff adds a writer to existing shared state (a store ref, a module-level variable), find every reader of that state and confirm each reader's assumption still holds: "non-empty means loaded", "this total mirrors these rows", "only X ever sets this". A reader that infers something from the state's shape breaks silently when a new writer changes that shape. (#522: a create that inserted sidebar rows broke a `sessions.length` "loaded" check and an `activeTotal` count; both reached review.)
