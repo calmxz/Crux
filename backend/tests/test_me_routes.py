@@ -283,7 +283,9 @@ def test_delete_me_removes_all_caller_rows_and_objects_only(client, db_session, 
     assert admin["deleted"] == [VICTIM]
 
 
-def test_delete_me_503_names_auth_step_when_admin_call_fails(client, db_session, store, admin):
+def test_delete_me_503_names_auth_step_when_admin_call_fails(
+    client, db_session, store, admin, caplog
+):
     from services.object_store import ObjectNotFound
 
     admin["fail"] = True
@@ -297,6 +299,7 @@ def test_delete_me_503_names_auth_step_when_admin_call_fails(client, db_session,
     assert all(v == 0 for v in _counts(db_session, VICTIM).values())
     with pytest.raises(ObjectNotFound):
         store.get(seeded["key"])
+    assert "app data deleted; auth user removal failed" in caplog.text
 
 
 def test_delete_me_idempotent_for_user_with_no_rows(client, db_session, store, admin):

@@ -51,13 +51,14 @@ def test_dispatch_logs_validation_error(caplog, db_session, session_row, ctx):
     assert any("ask_check_questions" in r.message for r in caplog.records)
 
 
-def test_validation_error_message_still_reaches_the_model(db_session, session_row, ctx):
+def test_validation_error_message_still_reaches_the_model(db_session, session_row, ctx, caplog):
     """G-04: the coarse error code must NOT swallow ValidationError text --
     the model needs the field-level detail to repair its own tool call."""
     result = tools.dispatch("ask_check_questions", {"session_id": ctx.session_id}, ctx)
     assert result.ok is False
     assert result.error != "tool_failed"
     assert "gap" in result.error
+    assert "tool dispatch failed" in caplog.text
 
 
 def test_unexpected_exception_returns_coarse_code_and_logs_detail(

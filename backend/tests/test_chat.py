@@ -68,7 +68,7 @@ def test_chat_stream_stub_persists_both_roles(client, db_session, monkeypatch):
     assert assistant.content.startswith("[STUB:")
 
 
-def test_gap_accuracy_failure_does_not_kill_turn(client, db_session, monkeypatch):
+def test_gap_accuracy_failure_does_not_kill_turn(client, db_session, monkeypatch, caplog):
     """gap_accuracy is best-effort (D1.2): a failure must not kill the turn.
     This raises before any SQL runs; a real SQL failure on Postgres is
     covered by tests/test_gap_accuracy_pg.py (#565)."""
@@ -87,9 +87,10 @@ def test_gap_accuracy_failure_does_not_kill_turn(client, db_session, monkeypatch
     assert status == 200
     assert "event: assistant_delta" in body
     assert "event: done" in body
+    assert "gap_accuracy failed" in caplog.text
 
 
-def test_prompt_build_failure_still_persists_user_message(client, db_session, monkeypatch):
+def test_prompt_build_failure_still_persists_user_message(client, db_session, monkeypatch, caplog):
     """An unexpected crash while assembling the prompt must not lose the
     user's message: it is persisted before the exception propagates."""
     monkeypatch.setattr(settings, "llm_stub", True)
@@ -115,9 +116,12 @@ def test_prompt_build_failure_still_persists_user_message(client, db_session, mo
         .all()
     )
     assert [m.content for m in user_msgs] == ["save me"]
+    assert "unhandled error" in caplog.text
 
 
-def test_prepare_turn_failure_keeps_embedding_spend_once(client, db_session, monkeypatch, fake_llm):
+def test_prepare_turn_failure_keeps_embedding_spend_once(
+    client, db_session, monkeypatch, fake_llm, caplog
+):
     """B-08: when _prepare_turn crashes after retrieval already paid for an
     embedding, db.rollback() in the except arm must not discard that real
     vendor cost. The adapter settled it in its own transaction, so the
@@ -150,6 +154,7 @@ def test_prepare_turn_failure_keeps_embedding_spend_once(client, db_session, mon
     from services import cost_meter
 
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.5")
+    assert "unhandled error" in caplog.text
 
 
 def test_chat_stream_429_on_cap(client, db_session, monkeypatch):
@@ -221,7 +226,7 @@ def test_completed_turn_leaves_no_reserve_residue(client, db_session, monkeypatc
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000")
 
 
-def test_prepare_turn_failure_releases_the_reserve(client, db_session, monkeypatch):
+def test_prepare_turn_failure_releases_the_reserve(client, db_session, monkeypatch, caplog):
     """B-05: a crash after the guards (where the reserve is already committed)
     must still hand the reservation back."""
     monkeypatch.setattr(settings, "llm_stub", True)
@@ -239,6 +244,7 @@ def test_prepare_turn_failure_releases_the_reserve(client, db_session, monkeypat
     assert status == 500
 
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0000")
+    assert "unhandled error" in caplog.text
 
 
 def test_whitespace_only_message_rejected_with_422(client, db_session, monkeypatch):

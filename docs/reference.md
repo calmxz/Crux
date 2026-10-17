@@ -344,6 +344,21 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   factory bound to the test engine: `db_session` does this for `llm.session_factory`
   and `routes.chat.SessionLocal`; tests that run the app lifespan stub
   `main.create_tables`.
+- Unexpected app logs (#577): an autouse fixture in `backend/tests/conftest.py`
+  fails a test, at teardown, that logs a record at WARNING or above from an app
+  logger (`agent`, `config`, `db`, `lib`, `main`, `routes`, `services`, `worker`),
+  listing each record's logger and message. It catches a fake whose failure a
+  best-effort path swallowed and logged. A test that drives a failure on purpose
+  opts out by requesting `caplog` and must then assert the message it expects (a
+  review rule, not checked by the fixture); a record logged in a fixture's setup is
+  asserted in that fixture. An incidental record is fixed at its cause: an
+  embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
+  `SimpleNamespace`, so the cost meter can price it against litellm's bundled
+  pricing table (conftest sets `LITELLM_LOCAL_MODEL_COST_MAP`). The recorder sits on
+  the app's parent loggers at WARNING or below, so a test that resets the root
+  logger or raises its level does not blind it. Third-party loggers and Python
+  `warnings` are not covered. `tests/test_app_log_guard.py` pins the fixture, and
+  fails when a new top-level backend module or package is missing from the list.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).

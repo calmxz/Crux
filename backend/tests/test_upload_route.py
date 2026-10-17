@@ -423,7 +423,9 @@ def test_oversized_body_413_leaves_no_document_row(client, seeded, db_session, m
     assert db_session.query(Document).count() == 0
 
 
-def test_storage_write_failure_marks_failed_and_507(client, seeded, db_session, monkeypatch):
+def test_storage_write_failure_marks_failed_and_507(
+    client, seeded, db_session, monkeypatch, caplog
+):
     class FailingStore:
         def put(self, key, data):
             raise OSError("disk full")
@@ -436,10 +438,11 @@ def test_storage_write_failure_marks_failed_and_507(client, seeded, db_session, 
     doc = db_session.query(Document).one()
     assert doc.status == "failed"
     assert doc.error is not None
+    assert "upload storage write failed" in caplog.text
 
 
 def test_storage_write_failure_507_holds_even_if_mark_failed_commit_raises(
-    client, seeded, db_session, monkeypatch
+    client, seeded, db_session, monkeypatch, caplog
 ):
     """F-29 hardening: if the mark-failed commit itself raises (e.g. dropped
     connection), the 507 contract must still hold instead of leaking a 500
@@ -470,9 +473,13 @@ def test_storage_write_failure_507_holds_even_if_mark_failed_commit_raises(
     r = client.post("/api/upload", data={"user_id": USER_ID, "session_id": SESSION_ID}, files=files)
     assert r.status_code == 507
     assert r.json()["detail"]["code"] == "STORAGE_WRITE_FAILED"
+    assert "upload storage write failed" in caplog.text
+    assert "could not mark upload row failed" in caplog.text
 
 
-def test_store_construction_failure_marks_failed_and_507(client, seeded, db_session, monkeypatch):
+def test_store_construction_failure_marks_failed_and_507(
+    client, seeded, db_session, monkeypatch, caplog
+):
     """F-29: object_store.get_store() itself (not just store.put) can raise
     -- e.g. bad R2 config -- and must still hit the 507-plus-marked-failed
     contract, not a bare 500."""
@@ -488,6 +495,7 @@ def test_store_construction_failure_marks_failed_and_507(client, seeded, db_sess
     doc = db_session.query(Document).one()
     assert doc.status == "failed"
     assert doc.error is not None
+    assert "upload storage write failed" in caplog.text
 
 
 def test_upload_rejects_fake_pdf(client, seeded, db_session):

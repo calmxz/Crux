@@ -23,7 +23,7 @@ def test_prompt_without_prefetch_keeps_required_label():
     assert "RETRIEVAL: REQUIRED" in out
 
 
-def test_prefetch_returns_none_on_failure(db_session, monkeypatch, fake_llm):
+def test_prefetch_returns_none_on_failure(db_session, monkeypatch, fake_llm, caplog):
     from services import retrieval_service
 
     fake_llm.embed_errors = [RuntimeError("embed down")]
@@ -33,3 +33,4 @@ def test_prefetch_returns_none_on_failure(db_session, monkeypatch, fake_llm):
     )
     result = asyncio.run(retrieval_service.prefetch_for_prompt(db_session, "s1", "u1", "query"))
     assert result is None
+    assert "prefetch_for_prompt failed" in caplog.text

@@ -96,12 +96,15 @@ def test_successful_summary_logs_llm_call(session_with_messages, db_session, mon
     assert row.cached_tokens is None
 
 
-def test_llm_exception_uses_mechanical_fallback(session_with_messages, db_session, fake_llm):
+def test_llm_exception_uses_mechanical_fallback(
+    session_with_messages, db_session, fake_llm, caplog
+):
     fake_llm.replies = [RuntimeError("upstream down")]
 
     summary = asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
     assert summary.startswith("[auto]")
     assert "msg" in summary or "resp" in summary
+    assert "summary LLM failed, using mechanical fallback" in caplog.text
 
 
 def test_empty_messages_still_returns_string(db_session, fake_llm):
@@ -150,7 +153,7 @@ def test_summary_uses_last_30_messages(db_session, fake_llm):
 
 
 def test_summary_capped_user_gets_mechanical_no_llm_no_ledger(
-    session_with_messages, db_session, monkeypatch, fake_llm
+    session_with_messages, db_session, monkeypatch, fake_llm, caplog
 ):
     # F-03: at the hard cap the summary path must not spend.
     monkeypatch.setattr(settings, "llm_stub", False)
@@ -163,6 +166,7 @@ def test_summary_capped_user_gets_mechanical_no_llm_no_ledger(
     assert summary.startswith("[auto]")
     assert fake_llm.complete_calls == []
     assert db_session.query(LlmCallLog).count() == 0
+    assert "summary LLM failed, using mechanical fallback" in caplog.text
 
 
 def test_summary_allow_llm_false_gets_mechanical(

@@ -117,7 +117,7 @@ def _retrieve_then_patch_batch():
 
 
 async def test_raising_read_does_not_fail_a_later_write_in_the_same_batch(
-    seeded, fake_llm, monkeypatch
+    seeded, fake_llm, monkeypatch, caplog
 ):
     """Case A: the profile patch after a retrieval that raises still lands."""
     Session, uid, sid = seeded
@@ -135,9 +135,12 @@ async def test_raising_read_does_not_fail_a_later_write_in_the_same_batch(
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == error_codes.TOOL_FAILED
     assert _confirmed_gaps(Session, sid) == [GAP]
+    assert "tool dispatch failed" in caplog.text
 
 
-async def test_swallowed_retrieval_error_does_not_fail_a_later_write(seeded, fake_llm, monkeypatch):
+async def test_swallowed_retrieval_error_does_not_fail_a_later_write(
+    seeded, fake_llm, monkeypatch, caplog
+):
     """Case A through the real retrieve: it catches its own vector-query
     failure and returns `retrieval_failed`, so dispatch never sees it."""
     Session, uid, sid = seeded
@@ -158,9 +161,10 @@ async def test_swallowed_retrieval_error_does_not_fail_a_later_write(seeded, fak
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == "retrieval_failed"
     assert _confirmed_gaps(Session, sid) == [GAP]
+    assert "retrieval failed" in caplog.text
 
 
-async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, monkeypatch):
+async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, monkeypatch, caplog):
     """Case B: a write tool's flush error is a tool failure, not a turn failure."""
     Session, uid, sid = seeded
     calls: list = []
@@ -187,6 +191,7 @@ async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, mon
     assert events[-1].type == "done"
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_prof")["error"] == error_codes.TOOL_FAILED
+    assert "tool dispatch failed" in caplog.text
 
 
 async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_in_error(
@@ -243,7 +248,7 @@ async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_i
         assert (row.current_check_json, row.pending_check_json) == (None, None)
 
 
-async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):
+async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch, caplog):
     """Case C, already correct before #569 and pinned so it stays so: a
     failed read alone in its batch ends the turn `done` (the loop's next
     commit ends the aborted transaction)."""
@@ -261,3 +266,4 @@ async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):
     assert events[-1].type == "done"
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ret")["error"] == error_codes.TOOL_FAILED
+    assert "tool dispatch failed" in caplog.text

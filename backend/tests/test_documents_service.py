@@ -10,6 +10,7 @@ from contracts import TopicProfile
 from db.models import ChunkEmbedding, Document, User
 from db.models import Session as SessionModel
 from services import documents_service
+from tests.conftest import embedding_response
 
 SID = "sess_docs"
 UID = "u_docs"
@@ -85,10 +86,7 @@ def test_retrieval_gate_uses_any_ready_not_latest(db_session, monkeypatch):
     captured = {}
 
     def fake_embedding(model, input, **_):
-        from types import SimpleNamespace
-
-        data_item = {"embedding": [0.1] * 8}
-        return SimpleNamespace(data=[data_item])
+        return embedding_response([[0.1] * 8])
 
     def fake_query_chunks(db, *, session_id, query_embedding, k):
         captured["called"] = True

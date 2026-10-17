@@ -214,7 +214,7 @@ def test_chat_check_wrong_pick_persists_in_recap(client, db_session, monkeypatch
 
 @pytest.mark.asyncio
 async def test_failed_ask_does_not_clobber_prior_batch_message_id(
-    db_session, monkeypatch, fake_llm
+    db_session, monkeypatch, fake_llm, caplog
 ):
     """Gate correctness: a FAILED ask_check_questions must NOT attach the
     current message's id to an already-open pending_check.
@@ -294,3 +294,4 @@ async def test_failed_ask_does_not_clobber_prior_batch_message_id(
         f"(got {pc_after['message_id']!r}, expected 99999). "
         "stamp_message_id must only run when the ask dispatch result is ok."
     )
+    assert "tool dispatch failed" in caplog.text

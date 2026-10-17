@@ -237,7 +237,7 @@ def test_end_session_no_header_under_soft_cap(client, db_session, seed_user):
 
 @pytest.mark.asyncio
 async def test_tutor_short_circuits_on_mid_turn_hard_cap(
-    db_session, seed_user, real_loop, fake_llm, monkeypatch
+    db_session, seed_user, real_loop, fake_llm, monkeypatch, caplog
 ):
     """A call whose cost pushes spend past `llm_hard_cap_usd` makes the next
     iteration's gate refuse: a daily_cost_cap_reached error event, and no
@@ -265,11 +265,12 @@ async def test_tutor_short_circuits_on_mid_turn_hard_cap(
         "soft_cap_usd": "0.5",
         "hard_cap_usd": "1.0",
     }
+    assert "llm call refused mid-turn (stream)" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_tutor_mid_turn_global_ceiling_reports_its_own_code(
-    db_session, seed_user, real_loop, fake_llm, monkeypatch
+    db_session, seed_user, real_loop, fake_llm, monkeypatch, caplog
 ):
     """The tutor honours the global ceiling between calls (#412): the error
     event carries global_cost_cap_reached and the streamed text persists as
@@ -294,11 +295,12 @@ async def test_tutor_mid_turn_global_ceiling_reports_its_own_code(
     assert events[-1].data["code"] == GLOBAL_COST_CAP_REACHED
     assert _assistant_status(db_session) == "partial"
     fake_llm.streams.clear()
+    assert "llm call refused mid-turn (stream)" in caplog.text
 
 
 @pytest.mark.asyncio
 async def test_capped_retrieve_embed_is_a_tool_error_then_the_cap_event(
-    db_session, seed_user, real_loop, fake_llm, monkeypatch
+    db_session, seed_user, real_loop, fake_llm, monkeypatch, caplog
 ):
     """The retrieve tool's embedding is refused at the cap: the model gets a
     tool error result (not an exception, so not llm_failed), and the next
@@ -322,3 +324,4 @@ async def test_capped_retrieve_embed_is_a_tool_error_then_the_cap_event(
     assert events[-1].data["code"] == DAILY_COST_CAP_REACHED
     assert _assistant_status(db_session) == "partial"
     fake_llm.streams.clear()
+    assert "llm call refused mid-turn (stream)" in caplog.text

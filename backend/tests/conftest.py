@@ -1,8 +1,12 @@
+import logging
 import os
 
 # Q-01: must run before anything imports `config`, or the real .env loads
 # into the test process. Do not move below the imports.
 os.environ["CRUX_SKIP_DOTENV"] = "1"
+# litellm's bundled pricing table, not one fetched at import: embedding fakes
+# are priced by it, and a remote table dropping the model would log (#577).
+os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
 import threading
 from decimal import Decimal
@@ -217,6 +221,56 @@ def _no_default_engine(request):
         )
 
 
+# --- Unexpected app log guard (#577) ---------------------------------------
+# A best-effort path catches a fake's failure, logs it and returns the very
+# fallback the test expects, so the test passes vacuously. Any app record at
+# WARNING or above fails the test unless it requested caplog, which opts it
+# out: it must assert the message it expects instead.
+
+_APP_LOGGER_ROOTS = frozenset(
+    {"agent", "config", "db", "lib", "main", "routes", "services", "worker"}
+)
+_app_log_records: list[logging.LogRecord] = []
+
+
+class _AppLogRecorder(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        _app_log_records.append(record)
+
+
+@pytest.fixture(autouse=True)
+def _no_unexpected_app_logs(request):
+    if "caplog" in request.fixturenames:
+        yield
+        return
+    _app_log_records.clear()
+    # On the app's own parent loggers, not root: a test that resets root
+    # (configure_logging's dictConfig) would drop it. Their level is pinned
+    # at WARNING or below, so neither LOG_LEVEL nor a root level raised
+    # mid-test hides the records.
+    handler = _AppLogRecorder(logging.WARNING)
+    loggers = [logging.getLogger(name) for name in _APP_LOGGER_ROOTS]
+    levels = [lg.level for lg in loggers]
+    for lg in loggers:
+        lg.setLevel(min(lg.getEffectiveLevel(), logging.WARNING))
+        lg.addHandler(handler)
+    try:
+        yield
+    finally:
+        for lg, level in zip(loggers, levels, strict=True):
+            lg.removeHandler(handler)
+            lg.setLevel(level)
+    if _app_log_records:
+        lines = [f"{r.levelname} {r.name}: {r.getMessage()}" for r in _app_log_records]
+        _app_log_records.clear()
+        pytest.fail(
+            "unexpected app log records (request caplog and assert the message"
+            " if the test drives this on purpose; otherwise fix the cause):\n  "
+            + "\n  ".join(lines),
+            pytrace=False,
+        )
+
+
 @pytest.fixture
 def db_session(monkeypatch):
     engine = create_engine(
@@ -354,6 +408,22 @@ def tool_call(name: str, args: dict | str | None = None, id: str | None = None):
 
     raw = args if isinstance(args, str) else json.dumps(args or {})
     return ToolCall(id=id or f"call_{name}", name=name, arguments=raw)
+
+
+def embedding_response(vectors: list[list[float]]):
+    """A litellm.embedding response the cost meter can price. A bare
+    SimpleNamespace(data=...) has no model, so completion_cost fails and
+    cost_meter logs a warning on every embed."""
+    import litellm
+    from litellm.types.utils import Usage
+
+    from config import settings
+
+    return litellm.EmbeddingResponse(
+        model=settings.embedding_model,
+        data=[{"embedding": v, "index": i, "object": "embedding"} for i, v in enumerate(vectors)],
+        usage=Usage(prompt_tokens=len(vectors), total_tokens=len(vectors)),
+    )
 
 
 class _FakeProviderStream:
