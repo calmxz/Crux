@@ -15,17 +15,15 @@ at a production database.
 from __future__ import annotations
 
 import os
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, delete, select, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select, text
 
 from config import settings
 from contracts import TopicProfile
-from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, UsageCounter, User
+from db.database import get_db
+from db.models import ChatMessage
 from db.models import Session as SessionModel
 from main import app
 from services import prompt_state, summary_service, velocity_limit
@@ -42,38 +40,11 @@ pytestmark = pytest.mark.skipif(
 GAPS_PROFILE = TopicProfile(confirmed_gaps=[{"name": "joins"}]).model_dump_json()
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(_normalized_url(TEST_DB), connect_args={"prepare_threshold": None})
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine):
+def seeded(pg_seed):
     """A unique user + session with a confirmed gap, so the gap-accuracy read
-    runs. Every row a turn writes is deleted on teardown, children first."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"gap-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"gap-pg-s-{uuid.uuid4().hex[:12]}"
-    with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(SessionModel(id=sid, user_id=uid, topic="sql", topic_profile_json=GAPS_PROFILE))
-        db.commit()
-    try:
-        yield Session, uid, sid
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+    runs. Removed by the shared teardown (conftest pg_seed)."""
+    return pg_seed("gap-pg", topic="sql", topic_profile_json=GAPS_PROFILE)
 
 
 @pytest.fixture

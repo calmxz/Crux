@@ -17,25 +17,14 @@ from __future__ import annotations
 import json
 import logging
 import os
-import uuid
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, delete, select, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select, text
 
 from config import settings
-from db.database import _normalized_url, get_db
-from db.models import (
-    ChatMessage,
-    DailyCostLedger,
-    Document,
-    LearningEvent,
-    LlmCallLog,
-    UsageCounter,
-    User,
-)
-from db.models import Session as SessionModel
+from db.database import get_db
+from db.models import ChatMessage, Document
 from lib import keyword_index
 from main import app
 from services import pgvector_store, summary_service, velocity_limit
@@ -52,68 +41,31 @@ pytestmark = pytest.mark.skipif(
 MESSAGE = "explain photosynthesis"
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(_normalized_url(TEST_DB), connect_args={"prepare_threshold": None})
-    yield eng
-    eng.dispose()
-
-
-def _seed(engine, kw_stems: list[str]):
-    """A unique user + session with one ready document. Every row a turn
-    writes is deleted on teardown, children first."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"ret-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"ret-pg-s-{uuid.uuid4().hex[:12]}"
+def _seed(pg_seed, kw_stems: list[str]):
+    """A unique user + session with one ready document, removed by the
+    shared teardown (conftest pg_seed)."""
+    Session, uid, sid = pg_seed("ret-pg", topic="biology", kw_index_json=json.dumps(kw_stems))
     with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(id=sid, user_id=uid, topic="biology", kw_index_json=json.dumps(kw_stems))
-        )
-        db.flush()
         db.add(Document(session_id=sid, filename="notes.pdf", status="ready"))
         db.commit()
-
-    def cleanup():
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(Document).where(Document.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
-
-    return Session, uid, sid, cleanup
+    return Session, uid, sid
 
 
 @pytest.fixture
-def lexical_miss(engine):
+def lexical_miss(pg_seed):
     """kw index disjoint from MESSAGE: the lexical gate misses, so the
     semantic fallback runs."""
-    Session, uid, sid, cleanup = _seed(engine, ["chlorophyl"])
     assert not keyword_index.match_required(MESSAGE, ["chlorophyl"])
-    try:
-        yield Session, uid, sid
-    finally:
-        cleanup()
+    return _seed(pg_seed, ["chlorophyl"])
 
 
 @pytest.fixture
-def lexical_hit(engine):
+def lexical_hit(pg_seed):
     """kw index built from MESSAGE: the lexical gate hits, so the turn is
     REQUIRED and the prefetch runs."""
     stems = sorted(keyword_index.build_from_text(MESSAGE))
-    Session, uid, sid, cleanup = _seed(engine, stems)
     assert keyword_index.match_required(MESSAGE, stems)
-    try:
-        yield Session, uid, sid
-    finally:
-        cleanup()
+    return _seed(pg_seed, stems)
 
 
 def _failing(calls: list):

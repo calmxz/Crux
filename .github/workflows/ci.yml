@@ -69,10 +69,9 @@ jobs:
 
       - name: Test
         env:
-          # Only the Postgres modules (test_pgvector_retrieval.py,
-          # test_llm_characterisation_pg.py, test_check_locks_pg.py) read
-          # this; everything else stays on SQLite so the suite is unchanged
-          # apart from un-skipping them.
+          # Only the opt-in Postgres modules (tests/*_pg.py and
+          # test_pgvector_retrieval.py) read this; everything else stays on
+          # SQLite so the suite is unchanged apart from un-skipping them.
           TEST_DATABASE_URL: postgresql://crux:crux@localhost:5432/crux_test
         run: pytest -v --cov-report=xml
 
