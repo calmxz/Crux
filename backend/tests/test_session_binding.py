@@ -34,12 +34,23 @@ def test_binding_restores_after_an_exception_inside(test_engine):
     assert _bind() is default_engine
 
 
-def test_nested_binding_restores_the_outer_bind(test_engine):
-    inner = create_engine("sqlite:///:memory:")
+def test_a_second_binding_is_refused_and_keeps_the_first(test_engine):
+    other = create_engine("sqlite:///:memory:")
     try:
         with bind_session_local(test_engine):
-            with bind_session_local(inner):
-                assert _bind() is inner
+            with pytest.raises(RuntimeError, match="already bound"), bind_session_local(other):
+                pass
             assert _bind() is test_engine
+        assert _bind() is default_engine
     finally:
-        inner.dispose()
+        other.dispose()
+
+
+def test_every_background_session_module_uses_the_shared_session_local():
+    # One binding reaches them only while they all name this one object.
+    import worker
+    from routes import chat
+    from services import ingestion_service, llm
+
+    for module in (llm, chat, ingestion_service, worker):
+        assert module.SessionLocal is SessionLocal, module.__name__

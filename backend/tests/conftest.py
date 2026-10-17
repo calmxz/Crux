@@ -19,7 +19,6 @@ import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine, event
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import main as main_module
@@ -277,13 +276,16 @@ def _no_unexpected_app_logs(request):
 def bind_session_local(engine: Engine) -> Iterator[None]:
     """Bind db.database.SessionLocal, the factory every session app code opens
     on its own comes from (LLM gate and settlement, rolling-summary task,
-    ingestion, worker), to `engine`; restore the previous bind on exit (#580)."""
-    previous = SessionLocal.kw["bind"]
+    ingestion, worker), to `engine`; restore the default bind on exit (#580).
+    One binding at a time: a second would silently send background sessions
+    to whichever engine bound last."""
+    if SessionLocal.kw["bind"] is not default_engine:
+        raise RuntimeError("SessionLocal is already bound to a test engine")
     SessionLocal.configure(bind=engine)
     try:
         yield
     finally:
-        SessionLocal.configure(bind=previous)
+        SessionLocal.configure(bind=default_engine)
 
 
 @pytest.fixture
@@ -294,16 +296,18 @@ def db_session():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = Session()
-    # Background sessions land on this engine too. StaticPool shares one
-    # connection, so the adapter's settlement commit also commits the
-    # caller's pending writes on sqlite (#411).
+    # The test's session and every background one come from SessionLocal on
+    # this engine. StaticPool shares one connection, so the adapter's
+    # settlement commit also commits the caller's pending writes on sqlite
+    # (#411).
     try:
         with bind_session_local(engine):
-            yield db
+            db = SessionLocal()
+            try:
+                yield db
+            finally:
+                db.close()
     finally:
-        db.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
 

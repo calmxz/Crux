@@ -343,8 +343,10 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   opens on its own (LLM gate and settlement, rolling-summary task, ingestion,
   worker) comes from the one `db.database.SessionLocal`, and one binding points it
   at the test engine (#580): `bind_session_local(engine)` in the conftest calls
-  `SessionLocal.configure(bind=...)` and restores the previous bind on exit, even
-  after an exception. `db_session` and `pg_seed` hold it for the test, so no test
+  `SessionLocal.configure(bind=...)` and restores `db.database.engine` on exit, even
+  after an exception. It refuses a second binding while one is active, so a test
+  cannot hold both `db_session` and `pg_seed`. `db_session` (whose own session
+  also comes from `SessionLocal`) and `pg_seed` hold it for the test, so no test
   patches a module's `SessionLocal` just to rebind it. New app code that opens its
   own session must use `db.database.SessionLocal` itself: a sessionmaker of its
   own escapes the binding, and this guard then fails it. `get_db` draws from the
