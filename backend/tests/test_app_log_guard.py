@@ -3,6 +3,7 @@ WARNING or above it did not declare with expect_app_log, so a fake whose
 failure a best-effort path swallows and logs still fails its test. It also
 fails a declared expectation that matched no record."""
 
+import ast
 import logging
 from pathlib import Path
 
@@ -190,6 +191,56 @@ def test_uses_the_fixture(failing_seed):
     )
 
     result.assert_outcomes(passed=1)
+
+
+def _blinding_level_calls(source: str) -> list[int]:
+    """Lines of caplog.at_level / set_level calls that raise an app logger
+    above WARNING: its warnings are then never logged, so the guard cannot
+    see them. Root is fine; the guard pins the app's own loggers."""
+
+    def level(node: ast.expr) -> object:
+        # logging.ERROR, "ERROR" or 40
+        value = node.attr if isinstance(node, ast.Attribute) else getattr(node, "value", None)
+        return logging.getLevelName(value) if isinstance(value, str) else value
+
+    lines = []
+    for node in ast.walk(ast.parse(source)):
+        if not (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr in {"at_level", "set_level"}
+            and node.args
+        ):
+            continue
+        logger = node.args[1] if len(node.args) > 1 else None
+        logger = next((k.value for k in node.keywords if k.arg == "logger"), logger)
+        name = logger.value if isinstance(logger, ast.Constant) else None
+        is_app = isinstance(name, str) and name.split(".")[0] in conftest._APP_LOGGER_ROOTS
+        lvl = level(node.args[0])
+        if is_app and isinstance(lvl, int) and lvl > logging.WARNING:
+            lines.append(node.lineno)
+    return sorted(lines)
+
+
+def test_the_level_scan_flags_an_app_logger_raised_above_warning():
+    source = """
+with caplog.at_level(logging.ERROR, logger="services.llm"): pass
+caplog.set_level("CRITICAL", "routes.chat")
+with caplog.at_level(logging.WARNING, logger="services.llm"): pass
+with caplog.at_level(logging.ERROR): pass
+with caplog.at_level(logging.ERROR, logger="litellm"): pass
+"""
+    assert _blinding_level_calls(source) == [2, 3]
+
+
+def test_no_test_raises_an_app_logger_above_warning():
+    hits = [
+        f"{path.relative_to(BACKEND)}:{line}"
+        for path in sorted((BACKEND / "tests").rglob("*.py"))
+        for line in _blinding_level_calls(path.read_text(encoding="utf-8"))
+    ]
+
+    assert hits == [], "raise caplog's level on an app logger to WARNING at most"
 
 
 def test_logger_roots_cover_every_top_level_app_module():

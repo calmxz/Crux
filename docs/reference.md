@@ -367,8 +367,8 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   expectation itself. Requesting `caplog` does not opt out; keep it only for
   checks the declaration cannot make (level, record fields, absence of learner
   text, INFO records). `caplog.at_level` / `set_level` above WARNING on an app
-  logger stops its warnings being logged at all, hiding them from the guard, so
-  keep those at WARNING or below. An incidental record is fixed at its cause: an
+  logger stops its warnings being logged at all, hiding them from the guard;
+  `test_no_test_raises_an_app_logger_above_warning` fails on any such call. An incidental record is fixed at its cause: an
   embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
   `SimpleNamespace`, so the cost meter can price it against litellm's bundled
   pricing table (conftest sets `LITELLM_LOCAL_MODEL_COST_MAP`). The recorder sits on
