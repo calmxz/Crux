@@ -15,9 +15,12 @@ tutor.run_streaming with the profile reloaded after each turn.
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
 
-Each run hits the live LLM and is metered against your daily cap; the
-default 10 runs across 2 patterns x up to 3 turns each = a few dozen calls.
-Use --runs 3 for a quick smoke check.
+Each run hits the live LLM and is billed by the provider. Metering lands in
+the script's in-memory DB with a fresh user per run: the per-user cap never
+trips, only GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) can
+stop a long run, and none of it reaches your real ledger. The default 10 runs
+across 2 patterns x up to 3 turns each = a few dozen calls. Use --runs 3 for a
+quick smoke check.
 """
 
 from __future__ import annotations
@@ -33,10 +36,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 # Force an in-memory DB before importing anything that touches db.database.
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Assigned, not defaulted: an exported DATABASE_URL must not reach it (#596).
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
 from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,7 +49,7 @@ if str(ROOT) not in sys.path:
 from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
-from db.database import Base  # noqa: E402
+from db.database import Base, SessionLocal  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
 from db.models import User  # noqa: E402
 from services import profile_service, prompt_state  # noqa: E402
@@ -75,7 +78,10 @@ def _make_session_factory():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # The LLM adapter opens its own sessions (cap gate, settlement, call log)
+    # from db.database.SessionLocal; bind it here so they reach this DB too.
+    SessionLocal.configure(bind=engine)
+    return SessionLocal
 
 
 def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:

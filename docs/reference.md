@@ -349,7 +349,9 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   also comes from `SessionLocal`) and `pg_seed` hold it for the test, so no test
   patches a module's `SessionLocal` just to rebind it. New app code that opens its
   own session must use `db.database.SessionLocal` itself: a sessionmaker of its
-  own escapes the binding, and this guard then fails it. `get_db` draws from the
+  own escapes the binding, and this guard then fails it. A script that seeds its
+  own database (the live eval scripts, #596) binds `SessionLocal` to that engine
+  the same way, or the LLM adapter's sessions miss it. `get_db` draws from the
   same `SessionLocal`, so inside the binding a request that the test did not route
   through a `get_db` override also lands on the test engine instead of being refused. Tests that run the app lifespan stub `main.create_tables`
   (`engine.begin()`).
