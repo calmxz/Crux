@@ -539,6 +539,16 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
         "services.retrieval_service._session_centroid",
         lambda db, sid: [1.0, 0.0, 0.0],
     )
+    real_ready = retrieval_service.documents_service.has_ready_document
+    ready_calls = []
+
+    def counting_ready(db, sid):
+        ready_calls.append(sid)
+        return real_ready(db, sid)
+
+    monkeypatch.setattr(
+        "services.retrieval_service.documents_service.has_ready_document", counting_ready
+    )
 
     fake_llm.vector = [1.0, 0.0, 0.0]
     fake_llm.cost = Decimal("0.0005")
@@ -557,6 +567,24 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
         )
     )
     assert fake_llm.aembed_calls == [["query"]]
+    # #571: a returned vector already implies a ready document, so the
+    # prefetch does not check again.
+    assert ready_calls == [SESSION_ID]
+
+
+def test_prefetch_with_vector_and_no_hits_returns_none(db_session, monkeypatch, fake_llm):
+    """#571: with a query_vec the ready check is skipped, so a document that
+    went non-ready after the fallback's check reaches the search. The search
+    filters to ready documents and finds nothing, which is still None."""
+    _stub_query(monkeypatch, [])
+
+    result = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db_session, "no-doc-session", "u1", "query", query_vec=[1.0, 0.0, 0.0]
+        )
+    )
+    assert result is None
+    assert fake_llm.aembed_calls == []
 
 
 def test_session_centroid_returns_stored_column_without_querying(db_session, monkeypatch):
