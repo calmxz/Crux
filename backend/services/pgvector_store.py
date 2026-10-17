@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 
 from config import settings
 from db.models import ChunkEmbedding, Document
+from services.savepoint import core_savepoint
 from services.sql_dialect import dialect_insert
 
 log = logging.getLogger(__name__)
@@ -118,22 +119,16 @@ def _apply_hnsw_tuning(db: Session) -> None:
     the same transaction as the search, immediately before it. SET cannot take
     bind parameters, so `ef_search` goes through `set_config(name, value,
     is_local=true)` (the bind-safe equivalent of SET LOCAL); int() is the
-    validation. The pair runs inside a SAVEPOINT: on a pgvector < 0.8 server
-    `iterative_scan` is an unknown GUC and raises, which would otherwise abort
-    the whole transaction and take the search down with it.
-
-    The savepoint is taken at Core level (`db.connection().begin_nested()`)
-    rather than via `Session.begin_nested()`, which unconditionally flushes
-    pending ORM state regardless of autoflush. This session runs with
-    autoflush=False by design, and retrieval is invoked mid-turn with
-    profile/event rows potentially pending; forcing a flush here would
-    surface an unrelated write error as a retrieval failure.
+    validation. The pair runs inside a SAVEPOINT (savepoint.core_savepoint):
+    on a pgvector < 0.8 server `iterative_scan` is an unknown GUC and raises,
+    which would otherwise abort the whole transaction and take the search
+    down with it.
     """
     if db.get_bind().dialect.name != "postgresql":
         return
     ef_search = int(settings.hnsw_ef_search)
     try:
-        with db.connection().begin_nested():
+        with core_savepoint(db):
             db.execute(
                 text("SELECT set_config('hnsw.ef_search', :v, true)"),
                 {"v": str(ef_search)},

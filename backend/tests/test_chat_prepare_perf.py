@@ -16,6 +16,12 @@ inside a SAVEPOINT (SAVEPOINT + RELEASE around its single SELECT), so a
 failed read on Postgres rolls back only itself instead of aborting the
 turn's transaction. Those are cheap round-trips on a path that only runs
 when confirmed_gaps is non-empty; the no-gaps budget is unchanged.
+
+#567 raised the doc-bearing semantic-fallback number by 2 the same way:
+semantic_fallback_required's reads (has_ready_document and the centroid)
+now run inside one SAVEPOINT, so a failed read on Postgres no longer aborts
+the transaction the user-message persist then needs. The other budgets
+stub the fallback out and are unchanged.
 """
 
 import asyncio
@@ -149,9 +155,9 @@ def test_prepare_turn_budget_doc_bearing_semantic_fallback(db_session, seeded_se
     is what gets measured).
 
     Sqlite path is deterministic and network-free: semantic_fallback_required
-    -> has_ready_document SELECT (True) -> _session_centroid's dialect guard
-    (bind dialect != "postgresql") returns None immediately -> function
-    returns False. litellm.embedding is never reached on this dialect; the
+    -> SAVEPOINT -> has_ready_document SELECT (True) -> _session_centroid's
+    dialect guard (bind dialect != "postgresql") returns None immediately ->
+    RELEASE -> function returns False. litellm.embedding is never reached on this dialect; the
     embedding call itself is Postgres-only and is covered by the owed live
     perf re-measure, not by this statement-count test.
     """
@@ -187,8 +193,10 @@ def test_prepare_turn_budget_doc_bearing_semantic_fallback(db_session, seeded_se
     # 7 (base no-gaps budget, see test_prepare_turn_budget_no_gaps) + 1
     # (has_ready_document SELECT inside semantic_fallback_required; on
     # sqlite, _session_centroid's dialect guard short-circuits before any
-    # further query -- litellm.embedding is unreachable here -- so this is
-    # the fallback's entire statement cost on this dialect). Tight, not <=:
-    # this test's whole point is to prove the fallback's real SQL cost is
-    # exactly one extra SELECT, not to leave headroom for it to grow.
-    assert q["n"] == 8, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
+    # further query -- litellm.embedding is unreachable here) + 2 (#567's
+    # SAVEPOINT and RELEASE around those reads; see the module docstring),
+    # so this is the fallback's entire statement cost on this dialect.
+    # Tight, not <=: this test's whole point is to prove the fallback's real
+    # SQL cost is exactly one SELECT in one savepoint, not to leave headroom
+    # for it to grow.
+    assert q["n"] == 10, f"prepare path used {q['n']} statements:\n" + "\n".join(q["statements"])
