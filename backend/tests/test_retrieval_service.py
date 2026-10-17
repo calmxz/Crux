@@ -8,7 +8,6 @@ covered in tests/test_pgvector_retrieval.py against a live Postgres.
 import asyncio
 from datetime import datetime, timezone
 from decimal import Decimal
-from types import SimpleNamespace
 
 import litellm
 import pytest
@@ -19,6 +18,7 @@ from contracts import RetrieveChunksArgs, TopicProfile
 from db.models import Document, LlmCallLog, User
 from db.models import Session as SessionModel
 from services import cost_meter, pgvector_store, retrieval_service
+from tests.conftest import embedding_response
 
 SESSION_ID = "sess_ret"
 USER_ID = "u_ret"
@@ -54,7 +54,7 @@ def mock_embed(monkeypatch):
     def fake_embedding(model, input, **_):
         if isinstance(input, str):
             input = [input]
-        return SimpleNamespace(data=[{"embedding": [0.1] * 8} for _ in input])
+        return embedding_response([[0.1] * 8 for _ in input])
 
     # The retrieve tool still calls litellm directly until #412.
     monkeypatch.setattr(litellm, "embedding", fake_embedding)
@@ -113,7 +113,7 @@ def test_retrieve_requests_configured_dimension(session, ctx, db_session, monkey
         captured["dimensions"] = kw.get("dimensions")
         if isinstance(input, str):
             input = [input]
-        return SimpleNamespace(data=[{"embedding": [0.1] * settings.embedding_dim} for _ in input])
+        return embedding_response([[0.1] * settings.embedding_dim for _ in input])
 
     monkeypatch.setattr(litellm, "embedding", fake_embedding)
     _seed_ready_doc(db_session)
@@ -152,7 +152,9 @@ def test_empty_hits_returns_no_results(session, ctx, mock_embed, db_session, mon
     assert (result.data or {}).get("chunks", []) == []
 
 
-def test_pgvector_exception_returns_failed(session, ctx, mock_embed, db_session, monkeypatch):
+def test_pgvector_exception_returns_failed(
+    session, ctx, mock_embed, db_session, monkeypatch, caplog
+):
     _seed_ready_doc(db_session)
 
     def boom(*a, **k):
@@ -165,10 +167,11 @@ def test_pgvector_exception_returns_failed(session, ctx, mock_embed, db_session,
     assert result.ok is False
     assert result.status == "failed"
     assert result.error == "retrieval_failed"
+    assert "retrieval failed" in caplog.text
 
 
 def test_pgvector_exception_does_not_leak_internal_message(
-    session, ctx, mock_embed, db_session, monkeypatch
+    session, ctx, mock_embed, db_session, monkeypatch, caplog
 ):
     """H-5 regression: a future change that reintroduces str(e) into the
     error field would leak server internals (file paths, traceback fragments,
@@ -188,6 +191,7 @@ def test_pgvector_exception_does_not_leak_internal_message(
     assert result.error == "retrieval_failed"
     serialized = result.model_dump_json()
     assert sentinel not in serialized, "raw exception message leaked into ToolResult"
+    assert "retrieval failed" in caplog.text
 
 
 def test_session_id_mismatch_returns_failed(session, ctx, mock_embed, db_session):
@@ -214,9 +218,7 @@ def _stub_off(monkeypatch):
 
 
 def _fake_embedding_resp(vec):
-    from types import SimpleNamespace
-
-    return SimpleNamespace(data=[{"embedding": vec}])
+    return embedding_response([vec])
 
 
 def test_semantic_fallback_true_above_threshold(db_session, monkeypatch, fake_llm):
@@ -273,7 +275,7 @@ def test_semantic_fallback_false_on_sqlite_centroid_guard(db_session, monkeypatc
     assert vec is None
 
 
-def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch, fake_llm):
+def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch, fake_llm, caplog):
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: True,
@@ -287,6 +289,7 @@ def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch, fak
     result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
+    assert "semantic fallback check failed" in caplog.text
 
 
 def test_semantic_fallback_false_in_stub_mode(db_session, monkeypatch):
@@ -342,7 +345,7 @@ def test_retrieve_commits_its_metering_before_querying(
 
 
 def test_retrieve_rolls_back_the_error_it_swallows(
-    session, ctx, mock_embed, db_session, monkeypatch
+    session, ctx, mock_embed, db_session, monkeypatch, caplog
 ):
     """#569: retrieve returns `retrieval_failed` instead of raising, so
     dispatch never rolls back; on Postgres the aborted transaction would fail
@@ -367,6 +370,7 @@ def test_retrieve_rolls_back_the_error_it_swallows(
     )
     assert (result.ok, result.error) == (False, "retrieval_failed")
     assert rollbacks == [True]
+    assert "retrieval failed" in caplog.text
 
 
 def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch, fake_llm):
@@ -418,7 +422,7 @@ def test_embedding_calls_pass_timeout(session, ctx, db_session, monkeypatch):
 
     def _fake_embedding(**kw):
         captured.update(kw)
-        return SimpleNamespace(data=[{"embedding": [0.1] * 8}])
+        return embedding_response([[0.1] * 8])
 
     monkeypatch.setattr(litellm, "embedding", _fake_embedding)
     monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0)
@@ -486,7 +490,9 @@ def test_prefetch_for_prompt_no_ready_document_returns_none(db_session, fake_llm
     assert fake_llm.aembed_calls == []  # short-circuits before embedding when no ready doc
 
 
-def test_prefetch_cost_cap_refusal_is_no_retrieval(session, db_session, monkeypatch, fake_llm):
+def test_prefetch_cost_cap_refusal_is_no_retrieval(
+    session, db_session, monkeypatch, fake_llm, caplog
+):
     """A capped user gets no prefetch: the adapter refuses before embedding."""
     from config import settings
 
@@ -500,6 +506,7 @@ def test_prefetch_cost_cap_refusal_is_no_retrieval(session, db_session, monkeypa
     )
     assert result is None
     assert fake_llm.aembed_calls == []
+    assert "prefetch_for_prompt failed" in caplog.text
 
 
 def test_semantic_fallback_calls_pass_timeout(db_session, monkeypatch):

@@ -52,15 +52,19 @@ def _client_whose_auth_raises(exc: Exception):
 
 
 @pytest.fixture
-def unhandled_response():
+def unhandled_response(caplog):
     with _client_whose_auth_raises(RuntimeError(SECRET)) as c:
-        yield c.get(PATH, headers={"Origin": ORIGIN})
+        response = c.get(PATH, headers={"Origin": ORIGIN})
+        assert "unhandled error" in caplog.text
+        yield response
 
 
 @pytest.fixture
-def value_error_response():
+def value_error_response(caplog):
     with _client_whose_auth_raises(ValueError("topic must not be blank")) as c:
-        yield c.get(PATH, headers={"Origin": ORIGIN})
+        response = c.get(PATH, headers={"Origin": ORIGIN})
+        assert "invalid value" in caplog.text
+        yield response
 
 
 def test_unhandled_exception_returns_coded_500(unhandled_response):
@@ -89,7 +93,7 @@ def test_unhandled_500_request_id_matches_the_header(unhandled_response):
     assert unhandled_response.json()["detail"]["request_id"] == header_id
 
 
-def test_value_error_subclass_is_a_500_not_a_422():
+def test_value_error_subclass_is_a_500_not_a_422(caplog):
     """json.JSONDecodeError is a ValueError subclass but signals corrupt stored
     data, not a rejected input: it must fall through to internal_error."""
     import json
@@ -150,7 +154,7 @@ async def _never_receives():  # pragma: no cover - never awaited by these apps
     raise AssertionError("receive() should not be called")
 
 
-async def test_exception_after_response_start_is_reraised():
+async def test_exception_after_response_start_is_reraised(caplog):
     """A stream that dies mid-body already has its status line on the wire, so
     there is no way to answer 500. Re-raise rather than write a second
     response (an ASGI protocol violation) or silently truncate."""

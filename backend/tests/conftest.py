@@ -1,3 +1,4 @@
+import logging
 import os
 
 # Q-01: must run before anything imports `config`, or the real .env loads
@@ -217,6 +218,48 @@ def _no_default_engine(request):
         )
 
 
+# --- Unexpected app log guard (#577) ---------------------------------------
+# A best-effort path catches a fake's failure, logs it and returns the very
+# fallback the test expects, so the test passes vacuously. Any app record at
+# WARNING or above fails the test unless it requested caplog, which opts it
+# out: it must assert the message it expects instead.
+
+_APP_LOGGER_ROOTS = frozenset(
+    {"agent", "config", "db", "lib", "main", "routes", "services", "worker"}
+)
+_app_log_records: list[logging.LogRecord] = []
+
+
+class _AppLogRecorder(logging.Handler):
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.name.split(".", 1)[0] in _APP_LOGGER_ROOTS:
+            _app_log_records.append(record)
+
+
+@pytest.fixture(autouse=True)
+def _no_unexpected_app_logs(request):
+    if "caplog" in request.fixturenames:
+        yield
+        return
+    _app_log_records.clear()
+    root = logging.getLogger()
+    handler = _AppLogRecorder(logging.WARNING)
+    root.addHandler(handler)
+    try:
+        yield
+    finally:
+        root.removeHandler(handler)
+    if _app_log_records:
+        lines = [f"{r.levelname} {r.name}: {r.getMessage()}" for r in _app_log_records]
+        _app_log_records.clear()
+        pytest.fail(
+            "unexpected app log records (request caplog and assert the message"
+            " if the test drives this on purpose; otherwise fix the cause):\n  "
+            + "\n  ".join(lines),
+            pytrace=False,
+        )
+
+
 @pytest.fixture
 def db_session(monkeypatch):
     engine = create_engine(
@@ -354,6 +397,22 @@ def tool_call(name: str, args: dict | str | None = None, id: str | None = None):
 
     raw = args if isinstance(args, str) else json.dumps(args or {})
     return ToolCall(id=id or f"call_{name}", name=name, arguments=raw)
+
+
+def embedding_response(vectors: list[list[float]]):
+    """A litellm.embedding response the cost meter can price. A bare
+    SimpleNamespace(data=...) has no model, so completion_cost fails and
+    cost_meter logs a warning on every embed."""
+    import litellm
+    from litellm.types.utils import Usage
+
+    from config import settings
+
+    return litellm.EmbeddingResponse(
+        model=settings.embedding_model,
+        data=[{"embedding": v, "index": i, "object": "embedding"} for i, v in enumerate(vectors)],
+        usage=Usage(prompt_tokens=len(vectors), total_tokens=len(vectors)),
+    )
 
 
 class _FakeProviderStream:

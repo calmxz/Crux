@@ -362,7 +362,7 @@ def test_focus_clear_user_redirected_ok(session_row, ctx, db_session):
     assert profile.focus_target_gap is None
 
 
-def test_load_profile_tolerates_legacy_fields(session_row, db_session):
+def test_load_profile_tolerates_legacy_fields(session_row, db_session, caplog):
     """Regression (review #2): a topic_profile_json written under an older schema
     (carrying since-removed fields) must not raise ValidationError -> 500 on load.
     Unknown keys are dropped; known data is preserved. TopicProfile has
@@ -383,6 +383,7 @@ def test_load_profile_tolerates_legacy_fields(session_row, db_session):
     assert profile.knowledge_level == "intermediate"
     assert concept_names(profile.mastered_concepts) == ["joins"]
     assert not hasattr(profile, "mastered_candidates")
+    assert "repaired topic_profile on load" in caplog.text
 
 
 def test_focus_only_patch_without_evidence_type_succeeds(session_row, ctx, db_session):
@@ -420,7 +421,7 @@ def test_mastered_concept_with_declared_promotes(session_row, ctx, db_session):
     )
 
 
-def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
+def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session, caplog):
     """Regression (review #2): a non-JSON / corrupt blob degrades to an empty
     profile rather than raising."""
     row = db_session.get(SessionModel, SESSION_ID)
@@ -429,6 +430,7 @@ def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
 
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile == TopicProfile()
+    assert "unparseable topic_profile_json" in caplog.text
 
 
 def _seed_one_bad_entry(db_session):
@@ -448,7 +450,7 @@ def _seed_one_bad_entry(db_session):
     db_session.commit()
 
 
-def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session):
+def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session, caplog):
     _seed_one_bad_entry(db_session)
 
     profile = profile_service.load_profile(db_session, SESSION_ID)
@@ -456,9 +458,10 @@ def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_ses
     assert concept_names(profile.mastered_concepts) == ["joins"]
     assert concept_names(profile.confirmed_gaps) == ["indexes"]
     assert profile.last_session_summary == "covered joins"
+    assert "repaired topic_profile on load" in caplog.text
 
 
-def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session):
+def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session, caplog):
     _seed_one_bad_entry(db_session)
 
     profile_service.apply_user_patch(db_session, SESSION_ID, add_gap="subqueries")
@@ -468,20 +471,23 @@ def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_ses
     assert [e["name"] for e in stored["mastered_concepts"]] == ["joins"]
     assert [e["name"] for e in stored["confirmed_gaps"]] == ["indexes", "subqueries"]
     assert stored["last_session_summary"] == "covered joins"
+    assert "repaired topic_profile on load" in caplog.text
 
 
-def test_invalid_level_is_dropped_lists_are_kept():
+def test_invalid_level_is_dropped_lists_are_kept(caplog):
     p = _parse_profile('{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}')
     assert p.knowledge_level is None
     assert concept_names(p.mastered_concepts) == ["joins"]
+    assert "repaired topic_profile on load" in caplog.text
 
 
-def test_bad_subtopic_level_dropped_others_kept():
+def test_bad_subtopic_level_dropped_others_kept(caplog):
     p = _parse_profile('{"subtopic_levels": {"a": "beginner", "b": "wizard"}}')
     assert p.subtopic_levels == {"a": "beginner"}
+    assert "repaired topic_profile on load" in caplog.text
 
 
-def test_salvage_drops_bad_elements_and_unlistable_fields():
+def test_salvage_drops_bad_elements_and_unlistable_fields(caplog):
     p = _parse_profile(
         json.dumps(
             {
@@ -493,6 +499,7 @@ def test_salvage_drops_bad_elements_and_unlistable_fields():
     )
     assert concept_names(p.confirmed_gaps) == ["b"]
     assert p.mastered_concepts == []
+    assert "repaired topic_profile on load" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -500,7 +507,7 @@ def test_salvage_drops_bad_elements_and_unlistable_fields():
     [("Views", None), ("indexes", "indexes"), ("unlisted", "unlisted")],
     ids=["on-dropped-gap", "on-kept-gap", "outside-gaps"],
 )
-def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected):
+def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected, caplog):
     """F-22: dropping the focused gap would leave focus dangling. A focus
     outside confirmed_gaps is legal on its own and survives."""
     p = _parse_profile(
@@ -516,6 +523,7 @@ def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expecte
     )
     assert concept_names(p.confirmed_gaps) == ["indexes"]
     assert p.focus_target_gap == expected
+    assert "repaired topic_profile on load" in caplog.text
 
 
 def test_salvage_warning_carries_no_learner_text(caplog):
@@ -743,12 +751,14 @@ def test_parse_accepts_mixed_legacy_and_new_elements():
     assert p.mastered_concepts[1].evidence_type == "tested"
 
 
-def test_parse_still_drops_unknown_keys_and_never_raises():
+def test_parse_still_drops_unknown_keys_and_never_raises(caplog):
     raw = '{"mastered_concepts": ["limits"], "retired_field": 1}'
     p = _parse_profile(raw)
     assert concept_names(p.mastered_concepts) == ["limits"]
     assert _parse_profile("not json").mastered_concepts == []
     assert _parse_profile('{"mastered_concepts": [42]}').mastered_concepts == []
+    assert "repaired topic_profile on load" in caplog.text
+    assert "unparseable topic_profile_json" in caplog.text
 
 
 def test_parse_defaults_subtopic_levels_empty():

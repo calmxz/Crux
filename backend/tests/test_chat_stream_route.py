@@ -360,7 +360,7 @@ def test_semantic_fallback_not_called_when_lexical_gate_true(client, db_session,
             pass
 
 
-def test_stream_rolling_summary_failure_does_not_break_turn(client, monkeypatch):
+def test_stream_rolling_summary_failure_does_not_break_turn(client, monkeypatch, caplog):
     """A raising update_rolling_summary must not surface to the client: the
     chat turn already completed and sent its response before the background
     task runs. The helper's try/except/finally is what's under test here."""
@@ -383,6 +383,7 @@ def test_stream_rolling_summary_failure_does_not_break_turn(client, monkeypatch)
     assert resp.status_code == 200
     body = resp.text  # drain the SSE body; background task raises after this
     assert "event: done" in body
+    assert "rolling summary task failed" in caplog.text
 
 
 # ---------------------------------------------------------------------------

@@ -393,7 +393,7 @@ async def test_cancel_during_iteration_two(db_session, seeded, fake_litellm):
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
 
 
-async def test_provider_error_mid_stream(db_session, seeded, fake_litellm):
+async def test_provider_error_mid_stream(db_session, seeded, fake_litellm, caplog):
     fake_litellm.responses = [
         _litellm_stream(
             _text_chunk(FIRST_TEXT),
@@ -423,6 +423,7 @@ async def test_provider_error_mid_stream(db_session, seeded, fake_litellm):
         ("chat", ERROR_CALL_ESTIMATE),
     ]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
+    assert "agent loop failed (stream)" in caplog.text
 
 
 async def test_transient_429_before_the_first_token_retries(
@@ -446,7 +447,7 @@ async def test_transient_429_before_the_first_token_retries(
     assert _log_rows(db_session) == [("chat", Decimal("0.0010"))]
 
 
-async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch):
+async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch, caplog):
     """Iteration 1's real cost reaches the hard cap; the adapter gate on
     iteration 2's stream refuses, stopping the turn without another provider
     call."""
@@ -470,6 +471,7 @@ async def test_mid_turn_hard_cap(db_session, seeded, fake_litellm, monkeypatch):
     assert _ledger(db_session) == Decimal("0.0010")
     assert _log_rows(db_session) == [("chat", Decimal("0.0010"))]
     assert _log_attribution(db_session) == CHAT_ATTRIBUTION
+    assert "llm call refused mid-turn (stream)" in caplog.text
 
 
 async def test_max_iters_reached(db_session, seeded, fake_litellm):
@@ -589,7 +591,7 @@ async def test_generate_and_persist_meters_summary(db_session, seeded, fake_lite
 
 
 async def test_generate_and_persist_record_cost_failure_keeps_summary(
-    db_session, seeded, fake_litellm, ledger_down
+    db_session, seeded, fake_litellm, ledger_down, caplog
 ):
     _seed_messages(db_session, 2)
     fake_litellm.responses = [_completion("Covered joins.")]
@@ -607,6 +609,8 @@ async def test_generate_and_persist_record_cost_failure_keeps_summary(
     assert profile.last_session_summary == summary
     # The receipt row is kept even though the ledger write failed.
     assert _log_rows(db_session) == [("summary", Decimal("0.0020"))]
+    assert "llm settlement deferred" in caplog.text
+    assert "llm settlement failed" in caplog.text
 
 
 async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded, fake_litellm):
@@ -627,7 +631,7 @@ async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded,
 
 
 async def test_update_rolling_summary_record_cost_failure_keeps_summary(
-    db_session, seeded, fake_litellm, ledger_down
+    db_session, seeded, fake_litellm, ledger_down, caplog
 ):
     _seed_messages(db_session, 31)
     fake_litellm.responses = [_completion("Earlier the learner practised joins.")]
@@ -645,6 +649,8 @@ async def test_update_rolling_summary_record_cost_failure_keeps_summary(
     assert session.rolling_summary_count == 11
     # The receipt row is kept even though the ledger write failed.
     assert _log_rows(db_session) == [("rolling_summary", Decimal("0.0020"))]
+    assert "llm settlement deferred" in caplog.text
+    assert "llm settlement failed" in caplog.text
 
 
 # ---------------------------------------------------------------------------
@@ -653,7 +659,7 @@ async def test_update_rolling_summary_record_cost_failure_keeps_summary(
 
 
 def test_prepare_failure_after_prefetch_keeps_embedding_spend(
-    client, db_session, seeded, fake_litellm, monkeypatch
+    client, db_session, seeded, fake_litellm, monkeypatch, caplog
 ):
     message = "explain foreign keys"
     session = db_session.get(SessionModel, SESSION_ID)
@@ -693,6 +699,7 @@ def test_prepare_failure_after_prefetch_keeps_embedding_spend(
     # the rollback (only the ledger amount was re-recorded); now it survives.
     assert _log_rows(db_session) == [("embedding", Decimal("0.0005"))]
     assert _log_attribution(db_session) == EMBEDDING_ATTRIBUTION
+    assert "unhandled error" in caplog.text
 
 
 # ---------------------------------------------------------------------------

@@ -100,7 +100,7 @@ def test_blank_topic_returns_empty(client, db_session):
     assert body == {"active_match": None, "ended_match": None}
 
 
-def test_legacy_profile_shape_does_not_500(client, db_session):
+def test_legacy_profile_shape_does_not_500(client, db_session, caplog):
     """C-01: lookup must use the tolerant parser. TopicProfile is codegen'd
     with extra="forbid", so a row written under an older schema (retired
     field still present) would 500 every lookup on that topic under a strict
@@ -124,3 +124,4 @@ def test_legacy_profile_shape_does_not_500(client, db_session):
     assert body["active_match"]["session_id"] == "s8"
     assert body["active_match"]["gap_count"] == 1
     assert body["active_match"]["knowledge_level"] == "beginner"
+    assert "repaired topic_profile on load" in caplog.text

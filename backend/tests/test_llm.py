@@ -265,7 +265,7 @@ async def test_full_retry_capacity_logs_the_spend_unsettled(
 
 
 async def test_pool_timeout_leaves_the_receipt_to_the_retry(
-    db_session, user, fake_llm, monkeypatch
+    db_session, user, fake_llm, monkeypatch, caplog
 ):
     _ledger_down_once(monkeypatch, sqlalchemy.exc.TimeoutError("pool full"))
     scheduled = []
@@ -279,9 +279,12 @@ async def test_pool_timeout_leaves_the_receipt_to_the_retry(
     fn(*args)
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
+    assert "llm settlement deferred" in caplog.text
 
 
-async def test_retry_books_to_the_day_the_call_was_settled(db_session, user, fake_llm, monkeypatch):
+async def test_retry_books_to_the_day_the_call_was_settled(
+    db_session, user, fake_llm, monkeypatch, caplog
+):
     calls = _ledger_down_once(monkeypatch, RuntimeError("lock timeout"))
     scheduled = []
     monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
@@ -296,6 +299,7 @@ async def test_retry_books_to_the_day_the_call_was_settled(db_session, user, fak
     assert calls == [None, "2026-10-14"]
     row = db_session.execute(select(DailyCostLedger)).scalar_one()
     assert (row.date_utc, Decimal(str(row.cost_usd))) == ("2026-10-14", Decimal("0.0020"))
+    assert "llm settlement deferred" in caplog.text
 
 
 async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(
@@ -741,7 +745,9 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
     assert litellm_stream["counted"] == []  # P3.2: no tokenization on the happy path
 
 
-async def test_litellm_stream_pricing_gap_falls_back_to_token_math(litellm_stream, monkeypatch):
+async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
+    litellm_stream, monkeypatch, caplog
+):
     """F-19: a pricing-table gap must not register the call as $0."""
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
@@ -758,6 +764,7 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(litellm_strea
 
     assert cost > Decimal("0")
     assert cost == ps.estimate()
+    assert "completion_cost failed" in caplog.text
 
 
 async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stream, monkeypatch):
