@@ -325,19 +325,27 @@ def test_retrieve_commits_its_metering_before_querying(
 ):
     # A bundled sibling retrieve_chunks call can spend its whole embedding
     # retry window next; the user's ledger row must not stay locked across it.
+    # The query itself runs in a fresh transaction (#569's savepoint), so
+    # the order of commit and query is what proves it.
     _seed_ready_doc(db_session)
-    open_at_query: list[bool] = []
+    order: list[str] = []
+    real_commit = db_session.commit
+
+    def commit():
+        order.append("commit")
+        real_commit()
 
     def query(db, **_kw):
-        open_at_query.append(db.in_transaction())
+        order.append("query")
         return []
 
+    monkeypatch.setattr(db_session, "commit", commit)
     monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
     monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
-    assert open_at_query == [False]
+    assert order == ["commit", "query"]
 
 
 def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch, fake_llm):
