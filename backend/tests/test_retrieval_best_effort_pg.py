@@ -86,7 +86,7 @@ def _stream_turn(Session, uid, sid, monkeypatch) -> tuple[int, str]:
         finally:
             db.close()
 
-    # The response's BackgroundTask opens SessionLocal() on the default URL.
+    # Skip the post-response rolling summary: it would make an extra LLM call.
     async def no_rolling_summary(db, session_id):
         return None
 

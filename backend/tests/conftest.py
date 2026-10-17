@@ -9,6 +9,8 @@ os.environ["CRUX_SKIP_DOTENV"] = "1"
 os.environ["LITELLM_LOCAL_MODEL_COST_MAP"] = "True"
 
 import threading
+from collections.abc import Iterator
+from contextlib import contextmanager
 from decimal import Decimal
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
@@ -16,12 +18,11 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import Engine, create_engine, event
 from sqlalchemy.pool import StaticPool
 
 import main as main_module
-from db.database import Base, get_db
+from db.database import Base, SessionLocal, get_db
 from db.database import engine as default_engine
 from main import app
 from services.auth import current_user_id
@@ -271,29 +272,42 @@ def _no_unexpected_app_logs(request):
         )
 
 
+@contextmanager
+def bind_session_local(engine: Engine) -> Iterator[None]:
+    """Bind db.database.SessionLocal, the factory every session app code opens
+    on its own comes from (LLM gate and settlement, rolling-summary task,
+    ingestion, worker), to `engine`; restore the default bind on exit (#580).
+    One binding at a time: a second would silently send background sessions
+    to whichever engine bound last."""
+    if SessionLocal.kw["bind"] is not default_engine:
+        raise RuntimeError("SessionLocal is already bound to a test engine")
+    SessionLocal.configure(bind=engine)
+    try:
+        yield
+    finally:
+        SessionLocal.configure(bind=default_engine)
+
+
 @pytest.fixture
-def db_session(monkeypatch):
+def db_session():
     engine = create_engine(
         "sqlite:///:memory:",
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    Session = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    # The LLM adapter settles spend in its own session; point it at this
-    # engine. StaticPool shares one connection, so its commit also commits
-    # the caller's pending writes on sqlite (#411).
-    from routes import chat
-    from services import llm
-
-    monkeypatch.setattr(llm, "session_factory", Session)
-    # Likewise the post-response rolling-summary task (#579).
-    monkeypatch.setattr(chat, "SessionLocal", Session)
-    db = Session()
+    # The test's session and every background one come from SessionLocal on
+    # this engine. StaticPool shares one connection, so the adapter's
+    # settlement commit also commits the caller's pending writes on sqlite
+    # (#411).
     try:
-        yield db
+        with bind_session_local(engine):
+            db = SessionLocal()
+            try:
+                yield db
+            finally:
+                db.close()
     finally:
-        db.close()
         Base.metadata.drop_all(bind=engine)
         engine.dispose()
 
@@ -325,7 +339,9 @@ def pg_seed(pg_engine):
     from tests.pg_harness import PgSeeder
 
     seeder = PgSeeder(pg_engine)
-    yield seeder
+    # Background sessions (LLM settlement, rolling summary) on the same database.
+    with bind_session_local(pg_engine):
+        yield seeder
     seeder.teardown()
 
 
@@ -573,8 +589,8 @@ class FakeLlmProvider:
 @pytest.fixture
 def fake_llm(monkeypatch):
     """Install a FakeLlmProvider behind the real adapter shell. Retries do
-    not sleep. The adapter's session factory is already bound to the test
-    engine by db_session.
+    not sleep. The adapter's sessions already land on the test engine
+    (db_session or pg_seed binds SessionLocal).
 
     Stub mode wins over an installed provider (#413), and the test env's
     "test" key turns it on, so this pins it off; a test that wants the stub

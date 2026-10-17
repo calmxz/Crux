@@ -75,10 +75,6 @@ log = logging.getLogger(__name__)
 
 T = TypeVar("T")
 
-# Where the gate and settlement open their sessions. Tests bind it to the
-# test engine.
-session_factory = SessionLocal
-
 # Settlement waits at most this long for the ledger row lock, then defers the
 # ledger write. Every LLM spend settles through this adapter in a short
 # transaction of its own, and the chat route's turn reservation is published by
@@ -453,7 +449,7 @@ class _StubStream:
 def _gate(meter: Meter, provider: Provider) -> None:
     if meter.user_id is None or isinstance(provider, StubProvider):
         return
-    with session_factory() as db:
+    with SessionLocal() as db:
         cost_meter.assert_within_caps(db, meter.user_id)
 
 
@@ -495,7 +491,7 @@ def _settle(meter: Meter, model: str, cost: Decimal, usage: dict) -> None:
         "usage": usage,
     }
     try:
-        with session_factory() as db:
+        with SessionLocal() as db:
             _lock_timeout(db, SETTLE_LOCK_TIMEOUT)
             cost_meter.record_cost(db, meter.user_id, cost)
             logged = _log_call(db, meter, model, cost, usage)
@@ -528,7 +524,7 @@ def _defer_ledger(
     # checkout on the request path; the retry writes the row instead.
     if not isinstance(exc, sqlalchemy.exc.TimeoutError):
         try:
-            with session_factory() as db:
+            with SessionLocal() as db:
                 logged = _log_call(db, meter, model, cost, usage)
                 db.commit()
         except Exception:  # noqa: BLE001 - the retry writes the row instead
@@ -547,7 +543,7 @@ def _retry_ledger(
     meter: Meter, model: str, cost: Decimal, usage: dict, reconciliation: dict
 ) -> None:
     try:
-        with session_factory() as db:
+        with SessionLocal() as db:
             _lock_timeout(db, SETTLE_RETRY_LOCK_TIMEOUT)
             cost_meter.record_cost(db, meter.user_id, cost, date_utc=reconciliation["date_utc"])
             if not reconciliation["call_logged"]:

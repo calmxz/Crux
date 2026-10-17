@@ -45,12 +45,10 @@ GAP = "outer joins"
 
 
 @pytest.fixture
-def seeded(pg_seed, fake_llm, monkeypatch):
+def seeded(pg_seed, fake_llm):
     """A unique user + session, with the adapter's gate and settlement on the
-    same Postgres. Removed by the shared teardown (conftest pg_seed)."""
-    from services import llm
-
-    monkeypatch.setattr(llm, "session_factory", pg_seed.Session)
+    same Postgres (pg_seed binds SessionLocal). Removed by the shared
+    teardown (conftest pg_seed)."""
     return pg_seed("tool-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json())
 
 

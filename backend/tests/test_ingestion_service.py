@@ -11,6 +11,7 @@ import litellm
 import pytest
 
 from contracts import TopicProfile
+from db.database import SessionLocal
 from db.models import Document, User
 from db.models import Session as SessionModel
 from lib import chunking
@@ -21,8 +22,8 @@ USER_ID = "u_ing"
 
 
 @pytest.fixture
-def setup_doc(db_session, monkeypatch):
-    """Seed user, session, document; patch SessionLocal to reuse the test db session."""
+def setup_doc(db_session):
+    """Seed user, session, document."""
     db_session.add(User(id=USER_ID))
     db_session.flush()
     db_session.add(
@@ -38,15 +39,6 @@ def setup_doc(db_session, monkeypatch):
     db_session.add(doc)
     db_session.commit()
     db_session.refresh(doc)
-
-    # ingestion_service opens its own SessionLocal; redirect it to the in-memory test db
-    test_bind = db_session.get_bind()
-    from sqlalchemy.orm import sessionmaker
-
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=test_bind),
-    )
     return doc.id
 
 
@@ -254,8 +246,6 @@ def test_run_fails_over_chunk_cap_before_embedding(
 ):
     """F-03 enforcement: documents whose chunk count exceeds settings.max_chunks
     must fail before any embedding call -- no vendor spend for an oversized doc."""
-    from sqlalchemy.orm import sessionmaker
-
     from services import ingestion_service
 
     db_session.add(User(id="u_cap"))
@@ -274,10 +264,6 @@ def test_run_fails_over_chunk_cap_before_embedding(
     db_session.commit()
     db_session.refresh(doc)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
     monkeypatch.setattr("services.ingestion_service.settings.max_chunks", 1)
 
     # chunk=500 tokens, stride 450 -- 4000 words yields well over 1 chunk.
@@ -312,8 +298,6 @@ def test_merge_failure_keeps_already_committed_chunks(
     failed, but it must NOT undo the already-committed, already-paid-for
     chunk rows -- that's the whole point of per-batch commits (a retry can
     resume instead of re-embedding from scratch)."""
-    from sqlalchemy.orm import sessionmaker
-
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -336,10 +320,6 @@ def test_merge_failure_keeps_already_committed_chunks(
     monkeypatch.setattr("services.ingestion_service.settings.uploads_path", str(tmp_path))
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
-    )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
 
     def boom(db, session_id, stems):
@@ -365,8 +345,6 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
     keyword-merge step leaves those chunks committed. Re-running the same
     document must not re-embed any of them -- the provider must not be
     called again -- and must reach status=ready this time."""
-    from sqlalchemy.orm import sessionmaker
-
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -390,11 +368,6 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     embed_calls = fake_llm.embed_calls
     monkeypatch.setattr(
         "services.ingestion_service.keyword_index.merge_into_session",
@@ -434,8 +407,6 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
     So the vendor's real spend is durable on the daily cost ledger -- not
     via a post-rollback re-record -- even though the doc ends up 'failed'
     from a later merge_into_session error."""
-    from sqlalchemy.orm import sessionmaker
-
     from db.models import ChunkEmbedding
     from services import cost_meter, ingestion_service
 
@@ -459,11 +430,6 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     fake_llm.cost = Decimal("0.004")
 
     def boom(db, session_id, stems):
@@ -575,7 +541,6 @@ def test_ingestion_meters_embedding_spend(
     """F-19: ingestion is the largest embedding spender; its embedding calls
     must land on the same daily_cost_ledger as chat/retrieval spend."""
     from sqlalchemy import select
-    from sqlalchemy.orm import sessionmaker
 
     from services import cost_meter, ingestion_service
 
@@ -598,10 +563,6 @@ def test_ingestion_meters_embedding_spend(
     monkeypatch.setattr("services.ingestion_service.settings.uploads_path", str(tmp_path))
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
-    )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
     )
     mock_embed.cost = Decimal("0.004")
 
@@ -649,8 +610,6 @@ def test_run_fails_over_cost_cap_and_keeps_prior_spend(
     """B-01: a cap breach discovered mid-ingestion must fail the document
     with a friendly error, distinct from the generic embedding-failure
     message, and must not lose spend already paid for by earlier batches."""
-    from sqlalchemy.orm import sessionmaker
-
     from services import cost_meter as cm
     from services import ingestion_service
 
@@ -674,11 +633,6 @@ def test_run_fails_over_cost_cap_and_keeps_prior_spend(
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     # Over cap before ingestion even starts, so the very first batch trips it.
     monkeypatch.setattr("services.cost_meter.settings.llm_hard_cap_usd", 0.10)
     cm.record_cost(db_session, "u_cap_run", Decimal("0.2000"))
@@ -722,8 +676,6 @@ def test_legacy_bare_filename_fallback(
 ):
     """Pre-F-15 files were stored under the bare filename (no doc-id prefix).
     _load_blob must fall back to that layout so old uploads keep ingesting."""
-    from sqlalchemy.orm import sessionmaker
-
     from services import ingestion_service
 
     db_session.add(User(id="u_legacy"))
@@ -744,11 +696,6 @@ def test_legacy_bare_filename_fallback(
 
     monkeypatch.setattr("services.ingestion_service.settings.uploads_path", str(tmp_path))
     (tmp_path / doc.filename).write_bytes(b"legacy content")
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     ingestion_service.run(doc.id)
     db_session.expire_all()
     refreshed = db_session.get(Document, doc.id)
@@ -756,8 +703,6 @@ def test_legacy_bare_filename_fallback(
 
 
 def test_run_txt_success(db_session, insert_capture, mock_embed, monkeypatch, tmp_path):
-    from sqlalchemy.orm import sessionmaker
-
     from contracts import TopicProfile
     from db.models import Document, User
     from db.models import Session as SessionModel
@@ -783,11 +728,6 @@ def test_run_txt_success(db_session, insert_capture, mock_embed, monkeypatch, tm
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     ingestion_service.run(doc.id)
     db_session.expire_all()
     refreshed = db_session.get(Document, doc.id)
@@ -804,8 +744,6 @@ def test_run_logs_carry_document_and_session_ids(
     session_id so a failure can be correlated back to the upload without
     logging any message/document content (PII rule, logging_config.py)."""
     import logging
-
-    from sqlalchemy.orm import sessionmaker
 
     from contracts import TopicProfile
     from db.models import Document, User
@@ -832,11 +770,6 @@ def test_run_logs_carry_document_and_session_ids(
     (tmp_path / f"{doc.id}_ref.txt").write_text(
         "Indexes accelerate database queries. " * 20, encoding="utf-8"
     )
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
-
     with caplog.at_level(logging.INFO, logger="services.ingestion_service"):
         ingestion_service.run(doc.id)
 
@@ -930,8 +863,6 @@ def test_run_holds_no_db_transaction_during_blob_load_and_extract(
     of ingestion. Holding a pooled DB connection across them starves the pool
     under concurrent uploads, so run() must close its session first and
     re-acquire one only for the embed/persist phase."""
-    from sqlalchemy.orm import sessionmaker
-
     from services import ingestion_service
 
     db_session.add(User(id="u_notx"))
@@ -951,10 +882,11 @@ def test_run_holds_no_db_transaction_during_blob_load_and_extract(
     db_session.refresh(doc)
 
     created: list = []
-    real_factory = sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind())
 
+    # Records every session ingestion opens, so the spies can check whether
+    # it holds a transaction. Sessions still come from the shared SessionLocal.
     def recording_factory():
-        s = real_factory()
+        s = SessionLocal()
         created.append(s)
         return s
 
@@ -999,8 +931,6 @@ def test_run_marks_failed_when_extract_raises_outside_session(
     """F-02 regression: the failure arms run after the session was closed, so
     they must re-fetch the Document by id rather than touch a detached
     instance."""
-    from sqlalchemy.orm import sessionmaker
-
     from services import ingestion_service
 
     db_session.add(User(id="u_notx2"))
@@ -1019,10 +949,6 @@ def test_run_marks_failed_when_extract_raises_outside_session(
     db_session.commit()
     db_session.refresh(doc)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
     _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"hello there")
 
     def boom(*a, **kw):
@@ -1044,8 +970,6 @@ def test_run_invalidates_session_chunk_centroid(
 ):
     """F-05: new chunks move the session's mean embedding, so the materialised
     centroid must be dropped; the next chat turn recomputes it once."""
-    from sqlalchemy.orm import sessionmaker
-
     from config import settings
     from services import ingestion_service
 
@@ -1066,10 +990,6 @@ def test_run_invalidates_session_chunk_centroid(
     db_session.commit()
     db_session.refresh(doc)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
     _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"hello there")
 
     ingestion_service.run(doc.id)
@@ -1084,8 +1004,6 @@ def test_run_passes_max_chunks_and_fails_on_early_abort(
 ):
     """F-03: the cap is enforced inside the chunker (early abort), not by
     counting a fully materialised chunk list afterwards."""
-    from sqlalchemy.orm import sessionmaker
-
     from config import settings
     from services import ingestion_service
 
@@ -1105,10 +1023,6 @@ def test_run_passes_max_chunks_and_fails_on_early_abort(
     db_session.commit()
     db_session.refresh(doc)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
     _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 50)
 
     seen: dict = {}
@@ -1136,8 +1050,6 @@ def test_partial_ingest_failure_still_invalidates_centroid(
     """F-05: _embed_and_store commits per batch, so a failure mid-document
     leaves durable new chunks. The centroid must already be NULL by then --
     otherwise a stale mean survives with nothing left to refresh it."""
-    from sqlalchemy.orm import sessionmaker
-
     from config import settings
     from services import ingestion_service
 
@@ -1158,10 +1070,6 @@ def test_partial_ingest_failure_still_invalidates_centroid(
     db_session.commit()
     db_session.refresh(doc)
 
-    monkeypatch.setattr(
-        "services.ingestion_service.SessionLocal",
-        sessionmaker(autocommit=False, autoflush=False, bind=db_session.get_bind()),
-    )
     monkeypatch.setattr("services.ingestion_service.EMBED_BATCH", 1)
     _write_blob_stub(monkeypatch, tmp_path, doc.id, doc.filename, content=b"word " * 1200)
 
