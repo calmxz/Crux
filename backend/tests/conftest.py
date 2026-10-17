@@ -12,12 +12,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import main as main_module
 from db.database import Base, get_db
+from db.database import engine as default_engine
 from main import app
 from services.auth import current_user_id
 
@@ -131,7 +132,27 @@ def pytest_deselected(items):
         items[0].config.stash[_sse_deselected_key] = True
 
 
+def _fail_run(session, message: str) -> None:
+    """Fail a run that would otherwise pass, with a red banner. A run already
+    failing, interrupted or broken keeps its own exit code."""
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.ensure_newline()
+        reporter.write_sep("=", message, red=True)
+    if session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 def pytest_sessionfinish(session, exitstatus):
+    # Default-engine hits after the last test's teardown (#579): no test is
+    # left to fail, so they fail the run.
+    if _default_engine_hits:
+        _fail_run(
+            session,
+            "connected on the default engine (db.database.engine) after the last test: "
+            + ", ".join(sorted(set(_default_engine_hits))),
+        )
+        return
     # Only a clean run is judged: after a failure (or -x) the missing list
     # would be noise over the real error.
     if exitstatus != pytest.ExitCode.OK:
@@ -142,15 +163,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     missing = sorted(set(sse_event_schemas()) - session.config.stash[_sse_seen_key])
     if missing:
-        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if reporter is not None:
-            reporter.ensure_newline()
-            reporter.write_sep(
-                "=",
-                "SSE event types never emitted by non-test code: " + ", ".join(missing),
-                red=True,
-            )
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        _fail_run(session, "SSE event types never emitted by non-test code: " + ", ".join(missing))
 
 
 @pytest.fixture(autouse=True)
@@ -168,6 +181,42 @@ def _inline_settle_retry(monkeypatch):
     )
 
 
+# --- Default-engine guard (#579) -------------------------------------------
+# No test may connect on the app's default engine (settings.database_url, a
+# developer's real data/app.db locally). The connect hook records the test
+# and refuses the connection, so the file is never opened; the refusal alone
+# could be swallowed by a best-effort path, so the record fails the test.
+
+_default_engine_hits: list[str] = []
+_current_test: list[str | None] = [None]
+
+
+@event.listens_for(default_engine, "do_connect")
+def _refuse_default_engine(dialect, conn_rec, cargs, cparams):
+    _default_engine_hits.append(_current_test[0] or "<outside a test>")
+    raise RuntimeError("tests must not connect on the default engine (db.database.engine)")
+
+
+@pytest.fixture(autouse=True)
+def _no_default_engine(request):
+    # Hits from outside any test (collection, a session fixture) are kept
+    # and reported by the next test's teardown; pytest_sessionfinish reports
+    # any left after the last one.
+    _current_test[0] = request.node.nodeid
+    yield
+    _current_test[0] = None
+    if _default_engine_hits:
+        hits = sorted(set(_default_engine_hits))
+        _default_engine_hits.clear()
+        pytest.fail(
+            "connected on the default engine (db.database.engine): "
+            + ", ".join(hits)
+            + "; bind the session factory it used to the test engine. A hit"
+            " can also come from a thread or fixture an earlier test left behind.",
+            pytrace=False,
+        )
+
+
 @pytest.fixture
 def db_session(monkeypatch):
     engine = create_engine(
@@ -180,9 +229,12 @@ def db_session(monkeypatch):
     # The LLM adapter settles spend in its own session; point it at this
     # engine. StaticPool shares one connection, so its commit also commits
     # the caller's pending writes on sqlite (#411).
+    from routes import chat
     from services import llm
 
     monkeypatch.setattr(llm, "session_factory", Session)
+    # Likewise the post-response rolling-summary task (#579).
+    monkeypatch.setattr(chat, "SessionLocal", Session)
     db = Session()
     try:
         yield db

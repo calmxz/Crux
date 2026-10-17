@@ -17,6 +17,12 @@ def _reset_jwks_cache():
     auth._JWKS_CACHE["fetched_at"] = 0.0
 
 
+@pytest.fixture(autouse=True)
+def _no_create_tables(monkeypatch):
+    # The lifespan's create_tables runs on the default engine (#579).
+    monkeypatch.setattr(main, "create_tables", lambda: None)
+
+
 def test_startup_boots_when_auth_disabled(monkeypatch):
     # Disable auth by clearing supabase_url -> supabase_jwks_url becomes "".
     # F-61: startup now fail-fasts on unconfigured auth unless AUTH_OPTIONAL

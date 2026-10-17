@@ -26,7 +26,7 @@ DAILY_CAP=50
 
 Optional overrides: `EMBEDDING_MODEL`, `DATABASE_URL`, `EMBEDDING_DIM` (768), `UPLOADS_PATH`, `CORS_ORIGINS`, `ENV`.
 
-`DATABASE_URL` defaults to a local SQLite file (`sqlite:///.../data/app.db`) for local dev and tests. **Production requires a Supabase-managed Postgres URL** — pgvector needs Postgres. Supabase env vars: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL_OVERRIDE`. LLM spend caps (per user, per UTC day): `LLM_SOFT_CAP_USD` (2.00, emits `X-Cost-Warning`), `LLM_HARD_CAP_USD` (3.00, returns 429).
+`DATABASE_URL` defaults to a local SQLite file (`sqlite:///.../data/app.db`) for local dev. Tests never touch it: each runs on its own in-memory engine, and connecting on the default one fails the test. **Production requires a Supabase-managed Postgres URL** — pgvector needs Postgres. Supabase env vars: `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `SUPABASE_JWKS_URL_OVERRIDE`. LLM spend caps (per user, per UTC day): `LLM_SOFT_CAP_USD` (2.00, emits `X-Cost-Warning`), `LLM_HARD_CAP_USD` (3.00, returns 429).
 
 Paths in `config.py` are anchored to the repo root, so the server runs correctly from any working directory. `data/uploads/` is auto-created on first boot; `data/app.db` is created only when running the local SQLite default.
 
