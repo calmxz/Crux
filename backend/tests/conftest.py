@@ -133,6 +133,20 @@ def pytest_deselected(items):
 
 
 def pytest_sessionfinish(session, exitstatus):
+    # Default-engine hits after the last test's teardown (#579): no test is
+    # left to fail, so they fail the run.
+    if _default_engine_hits:
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter is not None:
+            reporter.ensure_newline()
+            reporter.write_sep(
+                "=",
+                "connected on the default engine (db.database.engine) after the last test: "
+                + ", ".join(sorted(set(_default_engine_hits))),
+                red=True,
+            )
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        return
     # Only a clean run is judged: after a failure (or -x) the missing list
     # would be noise over the real error.
     if exitstatus != pytest.ExitCode.OK:
@@ -188,7 +202,8 @@ def _refuse_default_engine(dialect, conn_rec, cargs, cparams):
 @pytest.fixture(autouse=True)
 def _no_default_engine(request):
     # Hits from outside any test (collection, a session fixture) are kept
-    # and reported by the next test's teardown.
+    # and reported by the next test's teardown; pytest_sessionfinish reports
+    # any left after the last one.
     _current_test[0] = request.node.nodeid
     yield
     _current_test[0] = None
