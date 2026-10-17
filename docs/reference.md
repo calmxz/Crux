@@ -201,9 +201,10 @@ their own `TEST_DATABASE_URL` skipif and take two conftest fixtures: `pg_engine`
 call seeds a unique user + session and returns `(Session, uid, sid)`. No module
 writes its own teardown: `teardown_plan` derives children-first deletes from
 `Base.metadata`, by `user_id`/`session_id`, so a new table with either column
-is covered. A table that FKs `users`/`sessions` (even transitively) with
-neither column makes plan-building raise; give it one of the columns. Teardown
-errors are never swallowed. A fixture that holds a connection, row lock or
+is covered. A table that FKs `users`, `sessions` or another keyed table (even
+transitively) with neither column makes plan-building raise; give it one of
+the columns. Teardown errors are never swallowed: every seed is torn down,
+then the failures are raised. A fixture that holds a connection, row lock or
 open transaction on seeded rows must depend on `pg_seed`, so it is torn down
 first; otherwise the teardown's deletes block on it.
 

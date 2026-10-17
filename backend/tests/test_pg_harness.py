@@ -47,6 +47,16 @@ def test_plan_covers_a_keyed_table_with_no_fk():
 
     assert sorted(_names(teardown_plan(md))) == ["audit", "sessions", "users"]
 
+    # A child of that keyed table with neither column is unreachable too.
+    Table(
+        "audit_notes",
+        md,
+        Column("id", Integer, primary_key=True),
+        Column("audit_id", ForeignKey("audit.id")),
+    )
+    with pytest.raises(ValueError, match="'audit_notes'"):
+        teardown_plan(md)
+
 
 def test_plan_raises_on_a_table_it_cannot_reach():
     md = MetaData()

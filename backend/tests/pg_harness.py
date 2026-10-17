@@ -60,7 +60,8 @@ def teardown_plan(metadata: MetaData) -> list[tuple[Table, Predicate]]:
     """Children-first deletes for every table with a `user_id` or `session_id`
     column or an FK path to `users`/`sessions`, ending with `users`. Raises
     if an FK-dependent table has neither column to delete by."""
-    reached = _dependents(metadata, {"users", "sessions"})
+    keyed = {t.name for t in metadata.tables.values() if _KEYS & set(t.c.keys())}
+    reached = _dependents(metadata, {"users", "sessions"} | keyed)
     plan = []
     for table in reversed(metadata.sorted_tables):
         has_key = bool(_KEYS & set(table.c.keys()))
@@ -86,7 +87,7 @@ def run_teardown(db: Session, plan: list[tuple[Table, Predicate]], uid: str, sid
 class PgSeeder:
     """Call with an id prefix and Session fields to seed a unique user +
     session; returns (Session factory, uid, sid). teardown() removes every
-    seed, then re-raises the first failure."""
+    seed, then raises what failed (an ExceptionGroup if more than one)."""
 
     def __init__(self, engine: Engine):
         self.engine = engine
@@ -114,5 +115,7 @@ class PgSeeder:
                     run_teardown(db, self.plan, uid, sid)
             except Exception as e:
                 errors.append(e)
-        if errors:
+        if len(errors) == 1:
             raise errors[0]
+        if errors:
+            raise ExceptionGroup("pg seed teardown failed", errors)
