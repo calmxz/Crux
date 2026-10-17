@@ -221,7 +221,8 @@ async def semantic_fallback_required(
     """Escalate the OPTIONAL lexical gate when the query is semantically
     close to the session's uploaded material -- paraphrase/acronym misses
     the stem overlap cannot catch (D2.2). Best-effort by design: any failure
-    keeps the gate OPTIONAL, mirroring gap_accuracy in routes/chat.py.
+    keeps the gate OPTIONAL. Unlike gap_accuracy in services/prompt_state.py
+    (#565), the reads here run without a savepoint.
 
     The adapter gates and settles the embedding call against `user_id`;
     callers that cannot attribute the call to a user may omit it and skip

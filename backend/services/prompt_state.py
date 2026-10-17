@@ -119,7 +119,9 @@ def gather_session_inputs(
     # Postgres a failed statement aborts the whole transaction, so the read
     # runs in a SAVEPOINT and a failure rolls back only that. Core-level, as in
     # pgvector_store._apply_hnsw_tuning: Session.begin_nested() would flush
-    # pending ORM state and surface an unrelated write error here.
+    # pending ORM state and surface an unrelated write error here. No dialect
+    # guard: on sqlite the savepoint wraps a read and is harmless, and the
+    # chat statement budget then counts what Postgres pays.
     if isinstance(gap_accuracy, _NotLoaded):
         gap_accuracy = {}
         if profile.confirmed_gaps:

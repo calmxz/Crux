@@ -28,7 +28,7 @@ from db.database import _normalized_url, get_db
 from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, UsageCounter, User
 from db.models import Session as SessionModel
 from main import app
-from services import prompt_state, velocity_limit
+from services import prompt_state, summary_service, velocity_limit
 from services.auth import current_user_id
 from tests.conftest import _fake_current_user_id
 
@@ -120,6 +120,11 @@ def test_failed_read_does_not_kill_the_chat_turn(seeded, failing_read, monkeypat
         finally:
             db.close()
 
+    # The response's BackgroundTask opens SessionLocal() on the default URL.
+    async def no_rolling_summary(db, session_id):
+        return None
+
+    monkeypatch.setattr(summary_service, "update_rolling_summary", no_rolling_summary)
     monkeypatch.setattr(settings, "llm_stub", True)
     app.dependency_overrides[get_db] = override_get_db
     app.dependency_overrides[current_user_id] = _fake_current_user_id
