@@ -166,6 +166,29 @@ def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
     assert ef_search == str(int(settings.hnsw_ef_search))
 
 
+def test_prefetch_with_vector_skips_document_gone_non_ready(db, seeded_session, caplog):
+    """#571: with a query_vec there is no ready check, so the document going
+    non-ready after the fallback's check is caught only by the search's
+    status filter (F-27). Its chunks are never served, and no failure is
+    logged: the None comes from no hits, not from the except path."""
+    doc = db.get(Document, seeded_session["doc_id"])
+    doc.status = "pending"
+    db.commit()
+
+    chunks = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db,
+            seeded_session["session_id"],
+            seeded_session["user_id"],
+            "joins",
+            k=3,
+            query_vec=_vec(1),
+        )
+    )
+    assert chunks is None
+    assert "prefetch_for_prompt failed" not in caplog.text
+
+
 def test_query_respects_session_isolation(db, seeded_session):
     """A different session_id returns zero hits even when embeddings match."""
     hits = pgvector_store.query_chunks(

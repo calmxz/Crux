@@ -534,7 +534,13 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
     otherwise every fallback-required turn pays for the same embedding twice
     (double cost + one extra round-trip)."""
     _seed_ready_doc(db_session)
-    _stub_query(monkeypatch, [])
+    searched = []
+
+    def fake_query(db, *, session_id, query_embedding, k):
+        searched.append(query_embedding)
+        return []
+
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query)
     monkeypatch.setattr(
         "services.retrieval_service._session_centroid",
         lambda db, sid: [1.0, 0.0, 0.0],
@@ -567,15 +573,16 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
         )
     )
     assert fake_llm.aembed_calls == [["query"]]
-    # #571: a returned vector already implies a ready document, so the
-    # prefetch does not check again.
+    # #571: the prefetch searches with the fallback's vector and runs no
+    # ready check of its own.
+    assert searched == [vec]
     assert ready_calls == [SESSION_ID]
 
 
 def test_prefetch_with_vector_and_no_hits_returns_none(db_session, monkeypatch, fake_llm):
-    """#571: with a query_vec the ready check is skipped, so a document that
-    went non-ready after the fallback's check reaches the search. The search
-    filters to ready documents (stubbed here as no hits), which is still None."""
+    """#571: with a query_vec the ready check is skipped and the search runs
+    directly; empty hits are None. The real ready filter on the search is
+    pinned on Postgres by test_prefetch_with_vector_skips_document_gone_non_ready."""
     searched = []
 
     def fake_query(db, *, session_id, query_embedding, k):
