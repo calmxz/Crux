@@ -6,6 +6,8 @@ fails a declared expectation that matched no record."""
 import logging
 from pathlib import Path
 
+import pytest
+
 from tests import conftest
 
 BACKEND = Path(__file__).resolve().parent.parent
@@ -94,6 +96,13 @@ def test_one_expectation_covers_every_matching_record(expect_app_log):
 
     logging.getLogger("services.ingestion").warning("upload failed: a.pdf")
     logging.getLogger("worker").error("upload failed: b.pdf")
+
+
+@pytest.mark.parametrize("text", ["", "  "])
+def test_a_blank_expectation_is_refused(expect_app_log, text):
+    # "" is a substring of every message, so it would silence the guard.
+    with pytest.raises(ValueError, match="blank"):
+        expect_app_log(text)
 
 
 def test_an_expectation_that_never_fired_fails_and_names_it(pytester):

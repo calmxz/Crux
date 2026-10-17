@@ -546,6 +546,7 @@ def test_salvage_warning_carries_no_learner_text(caplog, expect_app_log):
             )
         )
     text = caplog.text
+    assert "salvaged" in text  # caplog saw the record, so the absence checks bite
     for secret in ("secret-concept", "secret-gap", "secret summary", "secret-sub"):
         assert secret not in text
 

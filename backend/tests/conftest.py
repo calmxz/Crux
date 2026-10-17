@@ -296,7 +296,13 @@ def expect_app_log(_no_unexpected_app_logs: list[str]) -> Callable[[str], None]:
     """Declare that an app record at WARNING or above containing `text` is
     logged during this test. Tests and fixtures call it the same way; a fixture
     that drives a logged failure declares it, so its tests need not (#594)."""
-    return _no_unexpected_app_logs.append
+
+    def declare(text: str) -> None:
+        if not text.strip():
+            raise ValueError("expect_app_log text is blank; it would match every record")
+        _no_unexpected_app_logs.append(text)
+
+    return declare
 
 
 @contextmanager
