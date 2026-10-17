@@ -161,4 +161,10 @@ def _rollback(ctx: ToolContext, name: str) -> None:
     try:
         ctx.db.rollback()
     except Exception as e:
-        log.warning("tool dispatch rollback failed name=%s error=%s", name, e)
+        log.warning(
+            "tool dispatch rollback failed name=%s session_id=%s user_id=%s error=%s",
+            name,
+            ctx.session_id,
+            ctx.user_id,
+            e,
+        )

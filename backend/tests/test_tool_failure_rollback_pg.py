@@ -24,7 +24,7 @@ from datetime import datetime, timezone
 
 import pytest
 from sqlalchemy import create_engine, delete, select, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy.orm import object_session, sessionmaker
 
 from agent import tutor
 from agent.types import ToolContext
@@ -41,7 +41,7 @@ from db.models import (
 )
 from db.models import Session as SessionModel
 from lib import error_codes
-from services import pgvector_store, profile_service, retrieval_service
+from services import check_service, pgvector_store, profile_service, retrieval_service
 from tests.conftest import tool_call
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
@@ -233,6 +233,56 @@ async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, mon
     assert events[-1].type == "done"
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_prof")["error"] == error_codes.TOOL_FAILED
+
+
+async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_in_error(
+    seeded, fake_llm, monkeypatch
+):
+    """register raises a non-CheckError while it holds the session row lock;
+    _locked leaves that transaction to the caller, and dispatch rolls it back
+    (the check module's docstring relies on this)."""
+    Session, uid, sid = seeded
+    calls: list = []
+
+    def duplicate_pk_write(row, pc):
+        calls.append(pc["gap"])
+        db = object_session(row)
+        db.add(User(id=row.user_id))
+        db.flush()
+
+    monkeypatch.setattr(check_service, "_write_open_set", duplicate_pk_write)
+    ask = {
+        "set_index": 1,
+        "set_total": 1,
+        "gap": GAP,
+        "items": [
+            {
+                "question": "Which join keeps unmatched left rows?",
+                "options": ["LEFT JOIN", "INNER JOIN"],
+                "correct_index": 0,
+                "explanation": "LEFT JOIN keeps every left row.",
+            }
+        ],
+    }
+    fake_llm.streams = [
+        [tool_call("ask_check_questions", ask, id="c_ask")],
+        ["Let us keep going."],
+    ]
+
+    events = await _run_turn(Session, uid, sid)
+
+    assert calls == [GAP]
+    done = _done_by_id(events)
+    assert (done["c_ask"]["status"], done["c_ask"]["error"]) == (
+        "error",
+        error_codes.TOOL_FAILED,
+    )
+    assert not [ev for ev in events if ev.type == "check_question"]
+    assert events[-1].type == "done"
+    assert _assistant_status(Session, sid) == "complete"
+    assert _tool_result_seen_by_model(fake_llm, "c_ask")["error"] == error_codes.TOOL_FAILED
+    with Session() as db:
+        assert db.get(SessionModel, sid).pending_check_json is None
 
 
 async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):

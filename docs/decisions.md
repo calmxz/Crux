@@ -3,6 +3,24 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-17 - A failed tool rolls back the turn's session (#569)
+
+On Postgres a tool that raised left `ctx.db` aborted, so a valid write later
+in the same batch failed with InFailedSqlTransaction, and a failed flush made
+the loop's next commit raise and end the turn `llm_failed`.
+
+- **A rollback in `dispatch`, not a savepoint around the call.** Every write
+  tool commits its own work, and a commit ends the transaction a savepoint
+  lives in. The loop commits each iteration and each write tool commits
+  itself, so the rollback discards no other tool's write.
+- **Only on an exception.** Ok and refused returns are untouched, so the
+  happy path issues no extra statements. Rejected: ending the transaction
+  after every call (closes the gap for any future swallowing tool, but adds a
+  round trip per tool and was outside the brief).
+- **A tool that swallows its own SQL error contains it itself.** `retrieve`
+  runs its vector query in a `core_savepoint`, as the pre-flight reads do
+  (#567).
+
 ## 2026-10-14 - The card-look spec is a required check of its own (#453)
 
 #453's spec is the card refactor's only check that a move keeps the look,
@@ -721,6 +739,11 @@ terms (Check, Set, Item, Close, Recap, Diagnostic) are now in `CONTEXT.md`.
   (commit, then raise). Never by rollback: register and the message-id stamp
   run inside the tutor turn, whose flushed ledger writes must survive. No
   public function takes `commit=`.
+
+  **Amended 2026-10-17 (#569):** the ledger reason went stale with #411
+  (spend settles in the adapter's own transaction). The module still never
+  rolls back, but when register raises, the tool dispatcher now rolls the
+  turn's session back.
 - **Session end is the one named exception.** Abandon joins the caller's
   transaction and takes the lock itself, so F-33's single write window in
   `generate_and_persist` stays. Rejected: callers always commit (moves B-02's
