@@ -206,7 +206,9 @@ transitively) with neither column makes plan-building raise; give it one of
 the columns. Teardown errors are never swallowed: every seed is torn down,
 then the failures are raised. A fixture that holds a connection, row lock or
 open transaction on seeded rows must depend on `pg_seed`, so it is torn down
-first; otherwise the teardown's deletes block on it.
+first; otherwise the teardown's deletes wait on it and fail at their 5s
+`lock_timeout`. A test that makes another session as the seeded user needs no
+cleanup of its own: session-keyed deletes match every session that user owns.
 
 ### Proving a row lock in a test (#418)
 
