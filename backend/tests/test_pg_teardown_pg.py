@@ -1,7 +1,8 @@
 """#574: the shared teardown leaves nothing behind on Postgres.
 
 One row is seeded in every table the plan covers, so an FK the plan orders
-wrong fails here. The seeded tables are enumerated from the plan: a newly
+wrong fails here (except chunk_embeddings -> documents, which cascades; its
+order is pinned in test_pg_harness.py). The seeded tables are enumerated from the plan: a newly
 covered table with no seeder below fails this test instead of passing it.
 
 **Opt-in**: skipped unless `TEST_DATABASE_URL` is set. Run locally with
@@ -28,6 +29,7 @@ from db.models import (
     LlmCallLog,
     UsageCounter,
 )
+from db.models import Session as SessionModel
 from tests.pg_harness import run_teardown
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
@@ -95,3 +97,24 @@ def test_teardown_removes_a_row_from_every_covered_table(pg_seed):
 
     with Session() as db:
         assert set(_counts(db, plan, uid, sid).values()) == {0}
+
+
+def test_teardown_removes_a_second_session_of_the_user_and_its_rows(pg_seed):
+    """A test that makes another session as the seeded user (POST
+    /api/sessions, say) leaves its rows to the same teardown."""
+    Session, uid, sid = pg_seed("teardown-pg", topic="sql")
+    other = f"{sid}-2"
+    with Session() as db:
+        db.add(SessionModel(id=other, user_id=uid, topic="graphs"))
+        db.flush()
+        db.add(ChatMessage(session_id=other, role="user", content="hi"))
+        db.commit()
+
+    with Session() as db:
+        run_teardown(db, pg_seed.plan, uid, sid)
+
+    with Session() as db:
+        assert db.get(SessionModel, other) is None
+        assert (
+            db.execute(select(ChatMessage).where(ChatMessage.session_id == other)).first() is None
+        )

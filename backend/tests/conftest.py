@@ -255,6 +255,8 @@ def pg_engine(request):
     pooler); a module adds connect_args with a PG_CONNECT_ARGS dict."""
     from db.database import _normalized_url
 
+    if not os.environ.get("TEST_DATABASE_URL"):
+        pytest.skip("TEST_DATABASE_URL not set")
     connect_args = {"prepare_threshold": None, **getattr(request.module, "PG_CONNECT_ARGS", {})}
     eng = create_engine(_normalized_url(os.environ["TEST_DATABASE_URL"]), connect_args=connect_args)
     yield eng

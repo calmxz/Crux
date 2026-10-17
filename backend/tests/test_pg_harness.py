@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import pytest
-from sqlalchemy import Column, ForeignKey, Integer, MetaData, String, Table
+from sqlalchemy import Column, ForeignKey, Integer, MetaData, String, Table, create_engine
 
 from db.database import Base
+from tests import pg_harness
 from tests.pg_harness import teardown_plan
 
 
@@ -32,8 +33,16 @@ def test_plan_predicates_match_on_user_and_session():
     def sql(name: str) -> str:
         return str(plan[name]("U", "S").compile(compile_kwargs={"literal_binds": True}))
 
-    assert sql("llm_call_log") == "llm_call_log.user_id = 'U' OR llm_call_log.session_id = 'S'"
-    assert sql("chat_messages") == "chat_messages.session_id = 'S'"
+    # Rows in any other session of uid go too, or deleting that session
+    # would hit an FK.
+    of_uid = "IN (SELECT sessions.id \nFROM sessions \nWHERE sessions.user_id = 'U')"
+    assert sql("llm_call_log") == (
+        f"llm_call_log.user_id = 'U' OR llm_call_log.session_id = 'S'"
+        f" OR llm_call_log.session_id {of_uid}"
+    )
+    assert sql("chat_messages") == (
+        f"chat_messages.session_id = 'S' OR chat_messages.session_id {of_uid}"
+    )
     assert sql("sessions") == "sessions.user_id = 'U' OR sessions.id = 'S'"
     assert sql("users") == "users.id = 'U'"
 
@@ -82,3 +91,40 @@ def test_plan_raises_on_a_table_it_cannot_reach():
 
     with pytest.raises(ValueError, match="'pages'"):
         teardown_plan(md)
+
+
+def _seeder_failing_on(monkeypatch, failing: set[str]):
+    """A PgSeeder over three recorded seeds whose teardown fails for the
+    uids in `failing`. Returns (seeder, uids attempted)."""
+    attempted: list[str] = []
+
+    def fake_run_teardown(db, plan, uid, sid):
+        attempted.append(uid)
+        if uid in failing:
+            raise RuntimeError(f"teardown failed for {uid}")
+
+    monkeypatch.setattr(pg_harness, "run_teardown", fake_run_teardown)
+    # Never connects: run_teardown is faked and sessions open lazily.
+    seeder = pg_harness.PgSeeder(create_engine("sqlite://"))
+    seeder.seeds = [("u1", "s1"), ("u2", "s2"), ("u3", "s3")]
+    return seeder, attempted
+
+
+def test_teardown_attempts_every_seed_and_raises_the_one_failure(monkeypatch):
+    seeder, attempted = _seeder_failing_on(monkeypatch, {"u1"})
+
+    with pytest.raises(RuntimeError, match="u1"):
+        seeder.teardown()
+    assert attempted == ["u1", "u2", "u3"]
+
+
+def test_teardown_raises_every_failure_as_a_group(monkeypatch):
+    seeder, attempted = _seeder_failing_on(monkeypatch, {"u1", "u3"})
+
+    with pytest.raises(ExceptionGroup) as exc:
+        seeder.teardown()
+    assert attempted == ["u1", "u2", "u3"]
+    assert [str(e) for e in exc.value.exceptions] == [
+        "teardown failed for u1",
+        "teardown failed for u3",
+    ]

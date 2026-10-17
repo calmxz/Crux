@@ -12,7 +12,7 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 
-from sqlalchemy import ColumnElement, Engine, MetaData, Table, or_
+from sqlalchemy import ColumnElement, Engine, MetaData, Table, or_, select, text
 from sqlalchemy.orm import Session, sessionmaker
 
 from db.database import Base
@@ -38,7 +38,7 @@ def _dependents(metadata: MetaData, roots: set[str]) -> set[str]:
     return reached
 
 
-def _predicate(table: Table) -> Predicate:
+def _predicate(table: Table, sessions: Table) -> Predicate:
     cols = table.c
     if table.name == "users":
         return lambda uid, sid: cols.id == uid
@@ -48,7 +48,12 @@ def _predicate(table: Table) -> Predicate:
         if "user_id" in cols:
             terms.append(cols.user_id == uid)
         if "session_id" in cols:
+            # Any other session the test made as uid goes too, so its
+            # children must as well.
             terms.append(cols.session_id == sid)
+            terms.append(
+                cols.session_id.in_(select(sessions.c.id).where(sessions.c.user_id == uid))
+            )
         if table.name == "sessions":
             terms.append(cols.id == sid)
         return or_(*terms)
@@ -62,23 +67,25 @@ def teardown_plan(metadata: MetaData) -> list[tuple[Table, Predicate]]:
     if an FK-dependent table has neither column to delete by."""
     keyed = {t.name for t in metadata.tables.values() if _KEYS & set(t.c.keys())}
     reached = _dependents(metadata, {"users", "sessions"} | keyed)
+    sessions = metadata.tables["sessions"]
     plan = []
     for table in reversed(metadata.sorted_tables):
-        has_key = bool(_KEYS & set(table.c.keys()))
-        if table.name not in reached and not has_key:
+        if table.name not in reached:
             continue
-        if table.name not in ("users", "sessions") and not has_key:
+        if table.name not in ("users", "sessions") and table.name not in keyed:
             raise ValueError(
                 f"teardown cannot reach table {table.name!r}: it depends on users/sessions"
                 " but has no user_id or session_id column"
             )
-        plan.append((table, _predicate(table)))
+        plan.append((table, _predicate(table, sessions)))
     return plan
 
 
 def run_teardown(db: Session, plan: list[tuple[Table, Predicate]], uid: str, sid: str) -> None:
     """Delete every row the plan ties to uid/sid, in one transaction. Any
-    error (an FK violation from a row the plan missed) propagates."""
+    error (an FK violation from a row the plan missed, or a lock still held
+    on a seeded row past the timeout) propagates."""
+    db.execute(text("SET LOCAL lock_timeout = '5s'"))
     for table, pred in plan:
         db.execute(table.delete().where(pred(uid, sid)))
     db.commit()
