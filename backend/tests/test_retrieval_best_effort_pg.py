@@ -185,6 +185,19 @@ def test_failed_centroid_read_in_semantic_fallback(lexical_miss, monkeypatch, ca
     assert "semantic fallback check failed; keeping OPTIONAL" in caplog.text
 
 
+def test_failed_ready_check_in_prefetch(lexical_hit, monkeypatch, caplog):
+    Session, uid, sid = lexical_hit
+    calls: list = []
+    monkeypatch.setattr("services.documents_service.has_ready_document", _failing(calls))
+
+    with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
+        status, body = _stream_turn(Session, uid, sid, monkeypatch)
+
+    assert calls, "the failing read never ran"
+    _assert_turn_completed(Session, sid, status, body)
+    assert "prefetch_for_prompt failed; falling back to advisory flag" in caplog.text
+
+
 def test_failed_chunk_search_in_prefetch(lexical_hit, monkeypatch, caplog):
     Session, uid, sid = lexical_hit
     calls: list = []

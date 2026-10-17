@@ -1,6 +1,6 @@
 """Core-level SAVEPOINT for best-effort reads on the request session.
 
-Leaf module: pgvector_store, prompt_state and retrieval_service import it.
+Leaf module, so any service can import it.
 """
 
 from collections.abc import Generator

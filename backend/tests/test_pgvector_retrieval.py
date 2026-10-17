@@ -15,6 +15,7 @@ immediately deletes rows, but you should not be poking prod with tests.
 
 from __future__ import annotations
 
+import asyncio
 import os
 import uuid
 
@@ -26,7 +27,7 @@ from config import settings
 from db.database import _normalized_url
 from db.models import Document, User
 from db.models import Session as SessionModel
-from services import pgvector_store
+from services import pgvector_store, retrieval_service
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 
@@ -143,6 +144,26 @@ def test_cosine_query_returns_nearest_first(db, seeded_session):
     assert hits[0].score is not None and hits[0].score < 0.01
     for h in hits[1:]:
         assert h.score is not None and h.score > 0.5
+
+
+def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
+    """#567: prefetch_for_prompt's reads run in savepoints, with the HNSW
+    tuning's own savepoint nested in the search's. The search still returns
+    the nearest chunk, and the transaction-scoped tuning survives both
+    RELEASEs (query_vec is passed in, so nothing commits in between)."""
+    chunks = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db,
+            seeded_session["session_id"],
+            seeded_session["user_id"],
+            "joins",
+            k=3,
+            query_vec=_vec(1),
+        )
+    )
+    assert chunks is not None and "joins" in chunks[0]["text"]
+    ef_search = db.execute(text("SELECT current_setting('hnsw.ef_search')")).scalar_one()
+    assert ef_search == str(int(settings.hnsw_ef_search))
 
 
 def test_query_respects_session_isolation(db, seeded_session):

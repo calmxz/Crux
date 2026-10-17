@@ -158,7 +158,7 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     return centroid
 
 
-def _fallback_centroid(db: Session, session_id: str) -> list[float] | None:
+def _ready_centroid(db: Session, session_id: str) -> list[float] | None:
     """semantic_fallback_required's reads, in one savepoint: None when the
     session has no ready document or no centroid."""
     with core_savepoint(db):
@@ -256,7 +256,7 @@ async def semantic_fallback_required(
         # F-05: sync DB work on an async handler's event loop; the ready
         # check, the centroid read (and the one-off recompute) go to the
         # threadpool.
-        centroid = await run_in_threadpool(_fallback_centroid, db, session_id)
+        centroid = await run_in_threadpool(_ready_centroid, db, session_id)
         if centroid is None:
             return False, None
         query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
