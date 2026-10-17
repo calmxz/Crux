@@ -304,12 +304,13 @@ async def test_settlement_survives_a_caller_rollback(adapter_on_postgres):
 
 
 def test_settlement_behind_a_held_ledger_row_keeps_the_receipt_and_retries(
-    adapter_on_postgres, caplog, monkeypatch
+    adapter_on_postgres, caplog, monkeypatch, expect_app_log
 ):
     """A caller holding an uncommitted ledger write across a call violates the
     adapter's invariant. Settlement waits on that row lock only until
     lock_timeout, keeps the LlmCallLog row, and returns the result instead of
     hanging; the deferred ledger write lands once the lock is released."""
+    expect_app_log("llm settlement deferred")
     import logging
     import threading
     import time

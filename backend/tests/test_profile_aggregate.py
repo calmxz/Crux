@@ -150,8 +150,9 @@ def test_aggregate_knowledge_level_distribution(client, db_session):
     }
 
 
-def test_aggregate_counts_valid_parts_of_a_partly_bad_row(client, db_session, caplog):
+def test_aggregate_counts_valid_parts_of_a_partly_bad_row(client, db_session, expect_app_log):
     """#436: one retired evidence_type no longer blanks the whole row."""
+    expect_app_log("repaired topic_profile on load")
     db_session.add(User(id=USER_ID))
     db_session.flush()
     s = _mk_session(db_session, "bad", topic="sql")
@@ -171,7 +172,6 @@ def test_aggregate_counts_valid_parts_of_a_partly_bad_row(client, db_session, ca
     assert body["knowledge_level_distribution"]["advanced"] == 1
     assert [c["concept"] for c in body["combined_mastered_concepts"]] == ["joins"]
     assert [g["concept"] for g in body["combined_confirmed_gaps"]] == ["indexes"]
-    assert "repaired topic_profile on load" in caplog.text
 
 
 def test_aggregate_event_count_and_recent_topics(client, db_session):
@@ -776,20 +776,21 @@ AGGREGATE_PIN = {
 }
 
 
-def test_aggregate_response_matches_pre_change_pin(db_session, caplog):
+def test_aggregate_response_matches_pre_change_pin(db_session, expect_app_log):
     """F-08 regression pin: the optimisation must not move a single field."""
+    expect_app_log("unparseable topic_profile_json")
     from services import profile_insights
 
     _seed_pin_fixture(db_session)
     result = profile_insights.aggregate_for_user(db_session, PIN_USER, now=AGG_NOW)
     assert result.model_dump(mode="json") == AGGREGATE_PIN
-    assert "unparseable topic_profile_json" in caplog.text
 
 
-def test_aggregate_does_not_load_full_session_rows(db_session, caplog):
+def test_aggregate_does_not_load_full_session_rows(db_session, expect_app_log):
     """F-08: the sessions scan must project only the columns the aggregate
     reads. Loading whole ORM rows drags kw_index_json and the rolling summary
     for every session the user has ever created."""
+    expect_app_log("unparseable topic_profile_json")
     from services import profile_insights
 
     _seed_pin_fixture(db_session)
@@ -801,11 +802,11 @@ def test_aggregate_does_not_load_full_session_rows(db_session, caplog):
     for s in session_selects:
         assert "sessions.kw_index_json" not in s, s
         assert "sessions.rolling_summary" not in s, s
-    assert "unparseable topic_profile_json" in caplog.text
 
 
-def test_aggregate_statement_count_does_not_grow_with_sessions(db_session, caplog):
+def test_aggregate_statement_count_does_not_grow_with_sessions(db_session, expect_app_log):
     """F-08: statement count is constant in the number of sessions."""
+    expect_app_log("unparseable topic_profile_json")
     from services import profile_insights
 
     _seed_pin_fixture(db_session)
@@ -832,7 +833,6 @@ def test_aggregate_statement_count_does_not_grow_with_sessions(db_session, caplo
 
     assert len(large) == baseline, (baseline, len(large))
     assert baseline <= 6, baseline
-    assert "unparseable topic_profile_json" in caplog.text
 
 
 # --- G-14: the insights half lives in its own module ---

@@ -62,7 +62,8 @@ def failing_read(monkeypatch):
     return calls
 
 
-def test_failed_read_leaves_the_session_usable(seeded, failing_read, caplog):
+def test_failed_read_leaves_the_session_usable(seeded, failing_read, expect_app_log):
+    expect_app_log("gap_accuracy failed")
     Session, _, sid = seeded
     with Session() as db:
         session = db.get(SessionModel, sid)
@@ -74,15 +75,15 @@ def test_failed_read_leaves_the_session_usable(seeded, failing_read, caplog):
         # The next statement on the same transaction must not hit
         # InFailedSqlTransaction.
         assert db.execute(text("SELECT 1")).scalar_one() == 1
-    assert "gap_accuracy failed" in caplog.text
 
 
-def test_failed_read_does_not_kill_the_chat_turn(seeded, failing_read, monkeypatch, caplog):
+def test_failed_read_does_not_kill_the_chat_turn(seeded, failing_read, monkeypatch, expect_app_log):
     """End-to-end acceptance. This one passed before #565 too: the only
     statement after the read in _prepare_turn_context is db.commit(), which
     Postgres answers on an aborted transaction with a silent ROLLBACK of that
     read-only segment. The test above is the one that proves the savepoint;
     this one guards the turn once statements are added after the read."""
+    expect_app_log("gap_accuracy failed")
     Session, uid, sid = seeded
 
     def override_get_db():
@@ -124,4 +125,3 @@ def test_failed_read_does_not_kill_the_chat_turn(seeded, failing_read, monkeypat
             .all()
         )
     assert sorted(roles) == ["assistant", "user"]
-    assert "gap_accuracy failed" in caplog.text

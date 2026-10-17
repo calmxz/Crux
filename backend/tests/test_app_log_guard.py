@@ -1,6 +1,7 @@
-"""#577: the conftest guard fails a test that logs an app record at WARNING or
-above without requesting caplog, so a fake whose failure a best-effort path
-swallows and logs still fails its test."""
+"""#577, #594: the conftest guard fails a test that logs an app record at
+WARNING or above it did not declare with expect_app_log, so a fake whose
+failure a best-effort path swallows and logs still fails its test. It also
+fails a declared expectation that matched no record."""
 
 import logging
 from pathlib import Path
@@ -10,6 +11,16 @@ from tests import conftest
 BACKEND = Path(__file__).resolve().parent.parent
 # Top-level code that is not the app: codegen output, one-off scripts, tests.
 NOT_APP = {"contracts", "scripts", "tests"}
+# The inner runs share the outer test's loggers, so the outer guard sees their
+# records too and the outer test declares them.
+PYTESTER_ARGS = ("-p", "no:cacheprovider", "-p", "no:asyncio")
+INNER_IMPORTS = """
+import logging
+
+import pytest
+
+from tests.conftest import _no_unexpected_app_logs, expect_app_log
+"""
 
 
 def test_app_warnings_and_errors_are_recorded_third_party_and_info_are_not():
@@ -25,13 +36,6 @@ def test_app_warnings_and_errors_are_recorded_third_party_and_info_are_not():
     ]
     # Cleared, so this test's own teardown check passes.
     conftest._app_log_records.clear()
-
-
-def test_requesting_caplog_opts_out_of_the_guard(caplog):
-    logging.getLogger("services.llm").warning("expected")
-
-    assert conftest._app_log_records == []
-    assert "expected" in caplog.text
 
 
 def test_guard_survives_a_root_logger_reset_and_a_raised_level():
@@ -51,25 +55,102 @@ def test_guard_survives_a_root_logger_reset_and_a_raised_level():
     conftest._app_log_records.clear()
 
 
-def test_an_unrequested_app_warning_fails_the_test_and_names_it(pytester, caplog):
-    # caplog opts this outer test out: the inner run's record is its own.
+def test_an_undeclared_app_warning_fails_the_test_and_names_it(pytester, expect_app_log):
+    expect_app_log("prefetch failed: boom")
     pytester.makepyfile(
-        """
-        import logging
-
-        from tests.conftest import _no_unexpected_app_logs
-
-
-        def test_swallowed_fake():
-            logging.getLogger("services.retrieval_service").warning("prefetch failed: boom")
-        """
+        INNER_IMPORTS
+        + """
+def test_swallowed_fake():
+    logging.getLogger("services.retrieval_service").warning("prefetch failed: boom")
+"""
     )
 
-    result = pytester.runpytest_inprocess("-p", "no:cacheprovider", "-p", "no:asyncio")
+    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
 
     result.assert_outcomes(passed=1, errors=1)
     result.stdout.fnmatch_lines(["*WARNING services.retrieval_service: prefetch failed: boom*"])
-    assert "prefetch failed: boom" in caplog.text
+    result.stdout.fnmatch_lines(["*expect_app_log*"])
+
+
+def test_requesting_caplog_does_not_opt_out_of_the_guard(pytester, expect_app_log):
+    expect_app_log("asserted by hand")
+    pytester.makepyfile(
+        INNER_IMPORTS
+        + """
+def test_hand_assert(caplog):
+    logging.getLogger("services.llm").warning("asserted by hand")
+    assert "asserted by hand" in caplog.text
+"""
+    )
+
+    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
+
+    result.assert_outcomes(passed=1, errors=1)
+    result.stdout.fnmatch_lines(["*WARNING services.llm: asserted by hand*"])
+
+
+def test_one_expectation_covers_every_matching_record(expect_app_log):
+    expect_app_log("upload failed")
+
+    logging.getLogger("services.ingestion").warning("upload failed: a.pdf")
+    logging.getLogger("worker").error("upload failed: b.pdf")
+
+
+def test_an_expectation_that_never_fired_fails_and_names_it(pytester):
+    pytester.makepyfile(
+        INNER_IMPORTS
+        + """
+def test_nothing_logged(expect_app_log):
+    expect_app_log("never logged")
+"""
+    )
+
+    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
+
+    result.assert_outcomes(passed=1, errors=1)
+    result.stdout.fnmatch_lines(["*never fired*", "*never logged*"])
+
+
+def test_only_the_undeclared_record_is_listed(pytester, expect_app_log):
+    expect_app_log("declared one")
+    expect_app_log("stray one")
+    pytester.makepyfile(
+        INNER_IMPORTS
+        + """
+def test_two_records(expect_app_log):
+    expect_app_log("declared one")
+    logging.getLogger("services.llm").warning("declared one")
+    logging.getLogger("routes.chat").error("stray one")
+"""
+    )
+
+    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
+
+    result.assert_outcomes(passed=1, errors=1)
+    result.stdout.fnmatch_lines(["*ERROR routes.chat: stray one*"])
+    result.stdout.no_fnmatch_line("*services.llm: declared one*")
+    result.stdout.no_fnmatch_line("*never fired*")
+
+
+def test_an_expectation_declared_by_a_fixture_covers_its_setup_record(pytester, expect_app_log):
+    expect_app_log("seed failed")
+    pytester.makepyfile(
+        INNER_IMPORTS
+        + """
+@pytest.fixture
+def failing_seed(expect_app_log):
+    expect_app_log("seed failed")
+    logging.getLogger("services.ingestion").warning("seed failed: no chunks")
+
+
+def test_uses_the_fixture(failing_seed):
+    pass
+"""
+    )
+
+    result = pytester.runpytest_inprocess(*PYTESTER_ARGS)
+
+    result.assert_outcomes(passed=1)
 
 
 def test_logger_roots_cover_every_top_level_app_module():

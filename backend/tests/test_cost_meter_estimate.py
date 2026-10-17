@@ -73,7 +73,8 @@ def test_unknown_model_falls_back_to_litellm_price_table(monkeypatch):
     assert cost == Decimal("0.003")
 
 
-def test_unknown_model_double_failure_returns_zero(monkeypatch, caplog):
+def test_unknown_model_double_failure_returns_zero(monkeypatch, expect_app_log):
+    expect_app_log("cost fallback failed")
     monkeypatch.setattr(litellm, "token_counter", lambda model, text: 10)
 
     def _boom(**kwargs):
@@ -82,7 +83,6 @@ def test_unknown_model_double_failure_returns_zero(monkeypatch, caplog):
     monkeypatch.setattr(litellm, "cost_per_token", _boom)
     cost = estimate_cancelled_cost("some/unknown-model", "partial reply", 100)
     assert cost == Decimal("0")
-    assert "cost fallback failed" in caplog.text
 
 
 # Tests for embedding_cost (F-19 groundwork)
@@ -98,9 +98,10 @@ class _FakeEmbedResp:
     usage = _FakeUsage()
 
 
-def test_embedding_cost_token_math_fallback(monkeypatch, caplog):
+def test_embedding_cost_token_math_fallback(monkeypatch, expect_app_log):
     # completion_cost blows up on the fake object -> token-math fallback via
     # usage.prompt_tokens against the MODEL_RATES embedding entry.
+    expect_app_log("embedding completion_cost failed")
     from services import cost_meter
 
     monkeypatch.setattr(
@@ -111,10 +112,11 @@ def test_embedding_cost_token_math_fallback(monkeypatch, caplog):
     cost = cost_meter.embedding_cost("gemini/gemini-embedding-2", _FakeEmbedResp(), ["some query"])
     # 1000 tokens * 0.000200 / 1000 = 0.0002
     assert cost == Decimal("0.0002")
-    assert "embedding completion_cost failed" in caplog.text
 
 
-def test_embedding_cost_unknown_model_returns_zero(monkeypatch, caplog):
+def test_embedding_cost_unknown_model_returns_zero(monkeypatch, expect_app_log):
+    expect_app_log("embedding completion_cost failed")
+    expect_app_log("no MODEL_RATES entry")
     from services import cost_meter
 
     monkeypatch.setattr(
@@ -123,5 +125,3 @@ def test_embedding_cost_unknown_model_returns_zero(monkeypatch, caplog):
         lambda **kw: (_ for _ in ()).throw(ValueError("unknown model")),
     )
     assert cost_meter.embedding_cost("nope/nope", _FakeEmbedResp(), ["q"]) == Decimal("0")
-    assert "embedding completion_cost failed" in caplog.text
-    assert "no MODEL_RATES entry" in caplog.text

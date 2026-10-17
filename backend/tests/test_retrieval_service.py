@@ -153,8 +153,9 @@ def test_empty_hits_returns_no_results(session, ctx, mock_embed, db_session, mon
 
 
 def test_pgvector_exception_returns_failed(
-    session, ctx, mock_embed, db_session, monkeypatch, caplog
+    session, ctx, mock_embed, db_session, monkeypatch, expect_app_log
 ):
+    expect_app_log("retrieval failed")
     _seed_ready_doc(db_session)
 
     def boom(*a, **k):
@@ -167,16 +168,16 @@ def test_pgvector_exception_returns_failed(
     assert result.ok is False
     assert result.status == "failed"
     assert result.error == "retrieval_failed"
-    assert "retrieval failed" in caplog.text
 
 
 def test_pgvector_exception_does_not_leak_internal_message(
-    session, ctx, mock_embed, db_session, monkeypatch, caplog
+    session, ctx, mock_embed, db_session, monkeypatch, expect_app_log
 ):
     """H-5 regression: a future change that reintroduces str(e) into the
     error field would leak server internals (file paths, traceback fragments,
     or attacker-controlled input echoes) into chat tool-call traces. Lock
     the generic literal and assert the sentinel exception text is absent."""
+    expect_app_log("retrieval failed")
     _seed_ready_doc(db_session)
 
     sentinel = "SENSITIVE_INTERNAL_PATH_/srv/secret/keys.db"
@@ -191,7 +192,6 @@ def test_pgvector_exception_does_not_leak_internal_message(
     assert result.error == "retrieval_failed"
     serialized = result.model_dump_json()
     assert sentinel not in serialized, "raw exception message leaked into ToolResult"
-    assert "retrieval failed" in caplog.text
 
 
 def test_session_id_mismatch_returns_failed(session, ctx, mock_embed, db_session):
@@ -271,7 +271,10 @@ def test_semantic_fallback_false_on_sqlite_centroid_guard(db_session, monkeypatc
     assert vec is None
 
 
-def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch, fake_llm, caplog):
+def test_semantic_fallback_false_on_embedding_error(
+    db_session, monkeypatch, fake_llm, expect_app_log
+):
+    expect_app_log("semantic fallback check failed")
     monkeypatch.setattr(
         "services.retrieval_service.documents_service.has_ready_document",
         lambda db, sid: True,
@@ -285,7 +288,6 @@ def test_semantic_fallback_false_on_embedding_error(db_session, monkeypatch, fak
     result, vec = asyncio.run(retrieval_service.semantic_fallback_required(db_session, "s1", "q"))
     assert result is False
     assert vec is None
-    assert "semantic fallback check failed" in caplog.text
 
 
 def test_semantic_fallback_false_in_stub_mode(db_session, monkeypatch):
@@ -341,12 +343,13 @@ def test_retrieve_commits_its_metering_before_querying(
 
 
 def test_retrieve_rolls_back_the_error_it_swallows(
-    session, ctx, mock_embed, db_session, monkeypatch, caplog
+    session, ctx, mock_embed, db_session, monkeypatch, expect_app_log
 ):
     """#569: retrieve returns `retrieval_failed` instead of raising, so
     dispatch never rolls back; on Postgres the aborted transaction would fail
     the next tool in the batch. The except arm covers every statement in it,
     the embed's commit included."""
+    expect_app_log("retrieval failed")
     _seed_ready_doc(db_session)
     rollbacks: list[bool] = []
     real_rollback = db_session.rollback
@@ -366,7 +369,6 @@ def test_retrieve_rolls_back_the_error_it_swallows(
     )
     assert (result.ok, result.error) == (False, "retrieval_failed")
     assert rollbacks == [True]
-    assert "retrieval failed" in caplog.text
 
 
 def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch, fake_llm):
@@ -487,9 +489,10 @@ def test_prefetch_for_prompt_no_ready_document_returns_none(db_session, fake_llm
 
 
 def test_prefetch_cost_cap_refusal_is_no_retrieval(
-    session, db_session, monkeypatch, fake_llm, caplog
+    session, db_session, monkeypatch, fake_llm, expect_app_log
 ):
     """A capped user gets no prefetch: the adapter refuses before embedding."""
+    expect_app_log("prefetch_for_prompt failed")
     from config import settings
 
     _seed_ready_doc(db_session)
@@ -502,7 +505,6 @@ def test_prefetch_cost_cap_refusal_is_no_retrieval(
     )
     assert result is None
     assert fake_llm.aembed_calls == []
-    assert "prefetch_for_prompt failed" in caplog.text
 
 
 def test_semantic_fallback_calls_pass_timeout(db_session, monkeypatch):

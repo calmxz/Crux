@@ -83,8 +83,9 @@ async def test_update_rolling_summary_writes_summary_and_count(
 
 
 async def test_update_rolling_summary_llm_failure_skips(
-    db_session, session_with_messages, monkeypatch, fake_llm, caplog
+    db_session, session_with_messages, monkeypatch, fake_llm, expect_app_log
 ):
+    expect_app_log("rolling summary skipped")
     s = session_with_messages(n=30)
     monkeypatch.setattr(summary_service.settings, "llm_stub", False)
     fake_llm.replies = [RuntimeError("llm down")]
@@ -92,7 +93,6 @@ async def test_update_rolling_summary_llm_failure_skips(
     db_session.refresh(s)
     assert s.rolling_summary is None
     assert s.rolling_summary_count is None  # unchanged -> next trigger retries
-    assert "rolling summary skipped" in caplog.text
 
 
 async def test_update_rolling_summary_capped_user_skips_llm(
