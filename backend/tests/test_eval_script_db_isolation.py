@@ -7,6 +7,7 @@ import uuid
 import pytest
 
 from db.database import SessionLocal
+from db.database import engine as default_engine
 from db.models import User
 from services.cost_meter import assert_within_caps
 
@@ -18,7 +19,9 @@ def test_adapter_sessions_reach_the_seeded_database(script, monkeypatch):
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     module = importlib.import_module(f"scripts.{script}")
 
-    original_bind = SessionLocal.kw["bind"]
+    # The script binds SessionLocal itself, so bind_session_local cannot wrap
+    # it; hold the same one-binding rule and restore the default engine.
+    assert SessionLocal.kw["bind"] is default_engine
     try:
         factory = module._make_session_factory()
         user_id = f"u-{uuid.uuid4().hex[:8]}"
@@ -31,4 +34,7 @@ def test_adapter_sessions_reach_the_seeded_database(script, monkeypatch):
             assert db.get_bind() is seeded_engine
             assert_within_caps(db, user_id)
     finally:
-        SessionLocal.configure(bind=original_bind)
+        script_engine = SessionLocal.kw["bind"]
+        SessionLocal.configure(bind=default_engine)
+        if script_engine is not default_engine:
+            script_engine.dispose()
