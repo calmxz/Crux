@@ -73,13 +73,9 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
 
     try:
         query_vec = _embed_query(db, args.query, user_id=ctx.user_id, session_id=ctx.session_id)
-        # #569: the failure is swallowed below, so dispatch never rolls it
-        # back; the savepoint keeps a failed query from aborting the turn's
-        # transaction under the next tool in the batch.
-        with core_savepoint(db):
-            hits = pgvector_store.query_chunks(
-                db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
-            )
+        hits = pgvector_store.query_chunks(
+            db, session_id=ctx.session_id, query_embedding=query_vec, k=args.k or 5
+        )
     except llm.CallRefused as e:
         # A refusal is a tool result, not an exception, so the turn does not
         # fail: the model sees the code. On a cap, if the turn continues the
@@ -94,6 +90,11 @@ def retrieve(db: Session, ctx: ToolContext, args: RetrieveChunksArgs) -> ToolRes
             extra={"err_type": type(e).__name__, "session_id": ctx.session_id},
             exc_info=settings.env != "prod",
         )
+        # #569: a swallowed SQL error still aborts the transaction on
+        # Postgres, and dispatch only rolls back what raises. _embed_query
+        # committed and the vector query only reads, so this discards
+        # nothing. If the rollback itself raises, dispatch handles it.
+        db.rollback()
         return ToolResult(ok=False, status="failed", error="retrieval_failed")
 
     chunks = [

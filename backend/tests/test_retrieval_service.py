@@ -323,29 +323,50 @@ def test_retrieve_meters_embedding_spend(session, ctx, mock_embed, db_session, m
 def test_retrieve_commits_its_metering_before_querying(
     session, ctx, mock_embed, db_session, monkeypatch
 ):
-    # A bundled sibling retrieve_chunks call can spend its whole embedding
-    # retry window next; the user's ledger row must not stay locked across it.
-    # The query itself runs in a fresh transaction (#569's savepoint), so
-    # the order of commit and query is what proves it.
+    # _embed_query commits before the network call so the pooled connection
+    # is not held idle across the embedding and its retries; nothing reopens
+    # a transaction before the query.
     _seed_ready_doc(db_session)
-    order: list[str] = []
-    real_commit = db_session.commit
-
-    def commit():
-        order.append("commit")
-        real_commit()
+    open_at_query: list[bool] = []
 
     def query(db, **_kw):
-        order.append("query")
+        open_at_query.append(db.in_transaction())
         return []
 
-    monkeypatch.setattr(db_session, "commit", commit)
     monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
     monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
-    assert order == ["commit", "query"]
+    assert open_at_query == [False]
+
+
+def test_retrieve_rolls_back_the_error_it_swallows(
+    session, ctx, mock_embed, db_session, monkeypatch
+):
+    """#569: retrieve returns `retrieval_failed` instead of raising, so
+    dispatch never rolls back; on Postgres the aborted transaction would fail
+    the next tool in the batch. The except arm covers every statement in it,
+    the embed's commit included."""
+    _seed_ready_doc(db_session)
+    rollbacks: list[bool] = []
+    real_rollback = db_session.rollback
+
+    def rollback():
+        rollbacks.append(True)
+        real_rollback()
+
+    def query(db, **_kw):
+        raise RuntimeError("vector query failed")
+
+    monkeypatch.setattr(db_session, "rollback", rollback)
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
+    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
+    result = retrieval_service.retrieve(
+        db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
+    )
+    assert (result.ok, result.error) == (False, "retrieval_failed")
+    assert rollbacks == [True]
 
 
 def test_semantic_fallback_meters_when_user_id_given(db_session, monkeypatch, fake_llm):

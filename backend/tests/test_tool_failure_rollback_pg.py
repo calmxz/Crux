@@ -236,7 +236,7 @@ async def test_failed_flush_does_not_end_the_turn_in_error(seeded, fake_llm, mon
 
 
 async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_in_error(
-    seeded, fake_llm, monkeypatch
+    seeded, fake_llm, monkeypatch, caplog
 ):
     """register raises a non-CheckError while it holds the session row lock;
     _locked leaves that transaction to the caller, and dispatch rolls it back
@@ -272,6 +272,8 @@ async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_i
     events = await _run_turn(Session, uid, sid)
 
     assert calls == [GAP]
+    # Postgres rejected the INSERT, so the server-side transaction aborted.
+    assert any("UniqueViolation" in r.getMessage() for r in caplog.records)
     done = _done_by_id(events)
     assert (done["c_ask"]["status"], done["c_ask"]["error"]) == (
         "error",
@@ -282,7 +284,9 @@ async def test_check_register_failing_under_the_row_lock_does_not_end_the_turn_i
     assert _assistant_status(Session, sid) == "complete"
     assert _tool_result_seen_by_model(fake_llm, "c_ask")["error"] == error_codes.TOOL_FAILED
     with Session() as db:
-        assert db.get(SessionModel, sid).pending_check_json is None
+        row = db.get(SessionModel, sid)
+        # register writes the Check pointer before the open Set; neither lands.
+        assert (row.current_check_json, row.pending_check_json) == (None, None)
 
 
 async def test_lone_failed_read_still_ends_done(seeded, fake_llm, monkeypatch):

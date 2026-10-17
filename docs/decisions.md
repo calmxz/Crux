@@ -17,9 +17,13 @@ the loop's next commit raise and end the turn `llm_failed`.
   happy path issues no extra statements. Rejected: ending the transaction
   after every call (closes the gap for any future swallowing tool, but adds a
   round trip per tool and was outside the brief).
-- **A tool that swallows its own SQL error contains it itself.** `retrieve`
-  runs its vector query in a `core_savepoint`, as the pre-flight reads do
-  (#567).
+- **A tool that swallows its own SQL error rolls back itself.** `retrieve`
+  catches its failures and returns `retrieval_failed`, so it rolls back in
+  that except arm. Rejected: a `core_savepoint` around the vector query, as
+  the pre-flight reads use (#567). It leaves the embed's commit and the
+  connection reopened after the embed uncovered, and costs two statements on
+  every successful call; the arm rollback costs nothing on success and
+  discards nothing, since the embed committed and the query only reads.
 
 ## 2026-10-14 - The card-look spec is a required check of its own (#453)
 
