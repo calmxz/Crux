@@ -237,6 +237,12 @@ row it is given, so a detached row costs no refresh SELECT. To override one
 value, use `dataclasses.replace` on either dataclass (the check follow-up
 does this).
 
+The gap-accuracy read is best-effort, and on Postgres a swallowed SQL error
+still aborts the request's transaction. So the read runs in a Core-level
+SAVEPOINT (`db.connection().begin_nested()`), which rolls back only itself;
+`Session.begin_nested()` would flush pending ORM state first (#565). Any
+best-effort read on the request session needs the same.
+
 `tests/test_prompt_golden.py` pins the full system prompt of three chat turns
 and two check follow-ups (`/check/complete`, `/check/stop`), byte for byte,
 against

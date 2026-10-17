@@ -115,12 +115,19 @@ def gather_session_inputs(
 
     # D1.2: per-gap accuracy, best-effort. Only run when there is something
     # to enrich (confirmed_gaps non-empty) to keep the no-gaps path inside
-    # the P3.1 budget; a failure here must never kill the turn.
+    # the P3.1 budget; a failure here must never kill the turn. #565: on
+    # Postgres a failed statement aborts the whole transaction, so the read
+    # runs in a SAVEPOINT and a failure rolls back only that. Core-level, as in
+    # pgvector_store._apply_hnsw_tuning: Session.begin_nested() would flush
+    # pending ORM state and surface an unrelated write error here. No dialect
+    # guard: on sqlite the savepoint wraps a read and is harmless, and the
+    # chat statement budget then counts what Postgres pays.
     if isinstance(gap_accuracy, _NotLoaded):
         gap_accuracy = {}
         if profile.confirmed_gaps:
             try:
-                gap_accuracy = learning_event_service.gap_accuracy(db, session.id)
+                with db.connection().begin_nested():
+                    gap_accuracy = learning_event_service.gap_accuracy(db, session.id)
             except Exception as e:  # noqa: BLE001 - best-effort prompt enrichment
                 log.warning("gap_accuracy failed; continuing without it: %s", e)
 
