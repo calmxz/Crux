@@ -244,6 +244,37 @@ def db_session(monkeypatch):
         engine.dispose()
 
 
+# --- Opt-in Postgres harness (#574) ------------------------------------------
+# Used only by the modules that skip without TEST_DATABASE_URL, so a SQLite
+# run never builds a Postgres engine.
+
+
+@pytest.fixture(scope="module")
+def pg_engine(request):
+    """One engine per module. prepare_threshold=None matches prod (Supabase
+    pooler); a module adds connect_args with a PG_CONNECT_ARGS dict."""
+    from db.database import _normalized_url
+
+    if not os.environ.get("TEST_DATABASE_URL"):
+        pytest.skip("TEST_DATABASE_URL not set")
+    connect_args = {"prepare_threshold": None, **getattr(request.module, "PG_CONNECT_ARGS", {})}
+    eng = create_engine(_normalized_url(os.environ["TEST_DATABASE_URL"]), connect_args=connect_args)
+    yield eng
+    eng.dispose()
+
+
+@pytest.fixture
+def pg_seed(pg_engine):
+    """A tests.pg_harness.PgSeeder. A fixture that holds a connection or open
+    transaction on seeded rows must depend on this one, so it is torn down
+    first and cannot block the teardown's deletes."""
+    from tests.pg_harness import PgSeeder
+
+    seeder = PgSeeder(pg_engine)
+    yield seeder
+    seeder.teardown()
+
+
 class _AuthInjectingClient(TestClient):
     """TestClient shim: any `user_id` field in request body/data/query is
     stripped from the payload and converted to `Authorization: Bearer

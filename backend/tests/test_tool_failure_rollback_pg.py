@@ -19,26 +19,16 @@ from __future__ import annotations
 
 import json
 import os
-import uuid
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy import create_engine, delete, select, text
-from sqlalchemy.orm import object_session, sessionmaker
+from sqlalchemy import select, text
+from sqlalchemy.orm import object_session
 
 from agent import tutor
 from agent.types import ToolContext
 from contracts import TopicProfile
-from db.database import _normalized_url
-from db.models import (
-    ChatMessage,
-    DailyCostLedger,
-    Document,
-    LearningEvent,
-    LlmCallLog,
-    UsageCounter,
-    User,
-)
+from db.models import ChatMessage, Document, User
 from db.models import Session as SessionModel
 from lib import error_codes
 from services import check_service, pgvector_store, profile_service, retrieval_service
@@ -54,50 +44,14 @@ pytestmark = pytest.mark.skipif(
 GAP = "outer joins"
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(_normalized_url(TEST_DB), connect_args={"prepare_threshold": None})
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine, fake_llm, monkeypatch):
+def seeded(pg_seed, fake_llm, monkeypatch):
     """A unique user + session, with the adapter's gate and settlement on the
-    same Postgres. Every row a turn writes is deleted on teardown, children
-    first."""
+    same Postgres. Removed by the shared teardown (conftest pg_seed)."""
     from services import llm
 
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    monkeypatch.setattr(llm, "session_factory", Session)
-    uid = f"tool-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"tool-pg-s-{uuid.uuid4().hex[:12]}"
-    with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(
-                id=sid,
-                user_id=uid,
-                topic="sql",
-                topic_profile_json=TopicProfile().model_dump_json(),
-            )
-        )
-        db.commit()
-    try:
-        yield Session, uid, sid
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(Document).where(Document.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+    monkeypatch.setattr(llm, "session_factory", pg_seed.Session)
+    return pg_seed("tool-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json())
 
 
 def _failing(calls: list):

@@ -172,8 +172,8 @@ rolling-summary task) to the sqlite test engine. On sqlite that engine
 is one shared connection (`StaticPool`), so the adapter's commit also commits
 the caller's pending writes, and so does the rolling-summary task's (which on a
 due summary also makes a `fake_llm` call); isolation is only provable on
-Postgres. A Postgres test must bind `llm.session_factory` to its own
-sessionmaker (see `adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`),
+Postgres. A Postgres test must bind `llm.session_factory` to the seed's
+sessionmaker, `pg_seed.Session` (see `adapter_on_postgres` in `tests/test_llm_characterisation_pg.py`),
 and one that streams a chat turn stubs `summary_service.update_rolling_summary`
 (or the guard below fails it). An autouse
 conftest fixture runs the deferred retry inline (it replaces `llm._schedule`)
@@ -191,6 +191,24 @@ must finish (draining the producer, releasing the B-05 reserve) runs inside
 `anyio.CancelScope(shield=True)`: `chat_stream`'s finally, the check follow-up
 pump in `routes/sessions.py`, and `_prepare_turn`'s release-on-failure. Drain
 before release, in one shield, because both touch the same `Session`.
+
+### Postgres test harness (#574)
+
+Opt-in Postgres modules (`tests/*_pg.py`, `test_pgvector_retrieval.py`) keep
+their own `TEST_DATABASE_URL` skipif and take two conftest fixtures: `pg_engine`
+(module-scoped; a module adds connect args through a module-level
+`PG_CONNECT_ARGS` dict) and `pg_seed`, a `tests/pg_harness.py` `PgSeeder` whose
+call seeds a unique user + session and returns `(Session, uid, sid)`. No module
+writes its own teardown: `teardown_plan` derives children-first deletes from
+`Base.metadata`, by `user_id`/`session_id`, so a new table with either column
+is covered. A table that FKs `users`, `sessions` or another keyed table (even
+transitively) with neither column makes plan-building raise; give it one of
+the columns. Teardown errors are never swallowed: every seed is torn down,
+then the failures are raised. A fixture that holds a connection, row lock or
+open transaction on seeded rows must depend on `pg_seed`, so it is torn down
+first; otherwise the teardown's deletes wait on it and fail at their 5s
+`lock_timeout`. A test that makes another session as the seeded user needs no
+cleanup of its own: session-keyed deletes match every session that user owns.
 
 ### Proving a row lock in a test (#418)
 

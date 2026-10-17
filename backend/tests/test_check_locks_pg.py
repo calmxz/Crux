@@ -25,19 +25,17 @@ from __future__ import annotations
 import json
 import os
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, delete, func, select, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func, select, text
 
 from config import settings
 from contracts import TopicProfile
-from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, UsageCounter, User
+from db.database import get_db
+from db.models import ChatMessage, LearningEvent
 from db.models import Session as SessionModel
 from lib.error_codes import CHECK_CONFLICT, NO_OPEN_CHECK, NO_RESOLVED_BATCH
 from main import app
@@ -54,57 +52,25 @@ pytestmark = pytest.mark.skipif(
 
 # Request connections carry this name so the waiter poll counts only them.
 APP_NAME = "crux-check-locks-pg"
+PG_CONNECT_ARGS = {"application_name": APP_NAME}  # read by conftest pg_engine
 WAIT_TIMEOUT_S = 5.0
 JOIN_TIMEOUT_S = 15.0
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(
-        _normalized_url(TEST_DB),
-        connect_args={"prepare_threshold": None, "application_name": APP_NAME},
-    )
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine):
-    """A unique user + session + asking assistant message per test; every
-    row the requests write is deleted on teardown (Postgres enforces the FKs,
-    so children go first). Yields (Session factory, uid, sid, message id)."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"lock-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"lock-pg-s-{uuid.uuid4().hex[:12]}"
+def seeded(pg_seed):
+    """A unique user + session + asking assistant message per test, removed
+    by the shared teardown (conftest pg_seed). Returns (Session factory, uid,
+    sid, message id)."""
+    Session, uid, sid = pg_seed(
+        "lock-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json()
+    )
     with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(
-                id=sid,
-                user_id=uid,
-                topic="sql",
-                topic_profile_json=TopicProfile().model_dump_json(),
-            )
-        )
-        db.flush()
         msg = ChatMessage(session_id=sid, role="assistant", content="Quick check.")
         db.add(msg)
         db.commit()
         msg_id = msg.id
-    try:
-        yield Session, uid, sid, msg_id
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+    return Session, uid, sid, msg_id
 
 
 @pytest.fixture
@@ -216,19 +182,22 @@ class _HeldRowLock:
 
 
 @pytest.fixture
-def pool():
+def pool(pg_seed):
+    """Depends on `pg_seed` so request threads finish before the seed
+    teardown deletes their rows."""
     with ThreadPoolExecutor(max_workers=2) as ex:
         yield ex
 
 
 @pytest.fixture
-def hold(engine, pool):
+def hold(pg_seed, pool):
     """Depends on `pool` so a failed test releases the lock before the pool
-    waits on the threads blocked behind it."""
+    waits on the threads blocked behind it, and on `pg_seed` so it is
+    released before the seed teardown deletes the locked row."""
     held: list[_HeldRowLock] = []
 
     def _hold(sid: str) -> _HeldRowLock:
-        lock = _HeldRowLock(engine)
+        lock = _HeldRowLock(pg_seed.engine)
         held.append(lock)  # before locking, so teardown closes it either way
         lock.lock(sid)
         return lock

@@ -29,20 +29,17 @@ from __future__ import annotations
 import asyncio
 import json
 import os
-import uuid
 from decimal import Decimal
 from types import SimpleNamespace
 
 import litellm
 import pytest
-from sqlalchemy import create_engine, delete, select
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import select
 
 from config import settings
 from contracts import TopicProfile
-from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, LlmCallLog, UsageCounter, User
-from db.models import Session as SessionModel
+from db.database import get_db
+from db.models import ChatMessage, LlmCallLog
 from main import app
 from routes import chat as chat_route
 from services import cost_meter, summary_service, velocity_limit
@@ -78,44 +75,11 @@ async def _litellm_stream(*chunks, block: asyncio.Event):
     await block.wait()
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(_normalized_url(TEST_DB), connect_args={"prepare_threshold": None})
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine):
-    """A unique user + session per run; every row the turn writes is deleted
-    on teardown (Postgres enforces the FKs, so children go first)."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"char-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"char-pg-s-{uuid.uuid4().hex[:12]}"
-    with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(
-                id=sid,
-                user_id=uid,
-                topic="sql",
-                topic_profile_json=TopicProfile().model_dump_json(),
-            )
-        )
-        db.commit()
-    try:
-        yield Session, uid, sid
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+def seeded(pg_seed):
+    """A unique user + session per run, removed by the shared teardown
+    (conftest pg_seed)."""
+    return pg_seed("char-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json())
 
 
 @pytest.fixture
@@ -432,29 +396,24 @@ async def test_tool_turn_with_retrieve_settles_every_call_without_lock_waits(
         ["Here it is."],
     ]
 
-    try:
-        with Session() as db:
-            ctx = ToolContext(
-                db=db, session_id=sid, user_id=uid, turn_started_at=datetime.now(timezone.utc)
+    with Session() as db:
+        ctx = ToolContext(
+            db=db, session_id=sid, user_id=uid, turn_started_at=datetime.now(timezone.utc)
+        )
+        events = [
+            ev
+            async for ev in tutor.run_streaming(
+                [{"role": "user", "content": "explain joins"}], "sys", ctx
             )
-            events = [
-                ev
-                async for ev in tutor.run_streaming(
-                    [{"role": "user", "content": "explain joins"}], "sys", ctx
-                )
-            ]
+        ]
 
-        assert events[-1].type == "done"
-        assert fake_llm.embed_calls == [["joins"]]
-        with Session() as db:
-            assert cost_meter.current_spend(db, uid) == Decimal("0.0015")
-            assert sorted(_call_log(db, uid)) == [
-                ("chat", Decimal("0.0005")),
-                ("chat", Decimal("0.0005")),
-                ("embedding", Decimal("0.0005")),
-            ]
-        assert not [r for r in caplog.records if "settlement" in r.getMessage()]
-    finally:
-        with Session() as db:
-            db.execute(delete(Document).where(Document.session_id == sid))
-            db.commit()
+    assert events[-1].type == "done"
+    assert fake_llm.embed_calls == [["joins"]]
+    with Session() as db:
+        assert cost_meter.current_spend(db, uid) == Decimal("0.0015")
+        assert sorted(_call_log(db, uid)) == [
+            ("chat", Decimal("0.0005")),
+            ("chat", Decimal("0.0005")),
+            ("embedding", Decimal("0.0005")),
+        ]
+    assert not [r for r in caplog.records if "settlement" in r.getMessage()]
