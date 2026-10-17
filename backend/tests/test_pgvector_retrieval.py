@@ -147,10 +147,10 @@ def test_cosine_query_returns_nearest_first(db, seeded_session):
 
 
 def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
-    """#567: prefetch_for_prompt's reads run in savepoints, with the HNSW
-    tuning's own savepoint nested in the search's. The search still returns
-    the nearest chunk, and the transaction-scoped tuning survives both
-    RELEASEs (query_vec is passed in, so nothing commits in between)."""
+    """#567: prefetch_for_prompt's search runs in a savepoint, with the HNSW
+    tuning's own savepoint nested in it. The search still returns the
+    nearest chunk, and the transaction-scoped tuning survives both RELEASEs
+    (query_vec is passed in, so nothing commits and no ready check runs, #571)."""
     chunks = asyncio.run(
         retrieval_service.prefetch_for_prompt(
             db,

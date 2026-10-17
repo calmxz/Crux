@@ -575,15 +575,26 @@ def test_fallback_vector_prevents_second_embedding(session, db_session, monkeypa
 def test_prefetch_with_vector_and_no_hits_returns_none(db_session, monkeypatch, fake_llm):
     """#571: with a query_vec the ready check is skipped, so a document that
     went non-ready after the fallback's check reaches the search. The search
-    filters to ready documents and finds nothing, which is still None."""
-    _stub_query(monkeypatch, [])
+    filters to ready documents (stubbed here as no hits), which is still None."""
+    searched = []
+
+    def fake_query(db, *, session_id, query_embedding, k):
+        searched.append(session_id)
+        return []
+
+    monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", fake_query)
+    monkeypatch.setattr(
+        "services.retrieval_service.documents_service.has_ready_document",
+        lambda db, sid: pytest.fail("ready check ran despite a query_vec"),
+    )
 
     result = asyncio.run(
         retrieval_service.prefetch_for_prompt(
-            db_session, "no-doc-session", "u1", "query", query_vec=[1.0, 0.0, 0.0]
+            db_session, SESSION_ID, USER_ID, "query", query_vec=[1.0, 0.0, 0.0]
         )
     )
     assert result is None
+    assert searched == [SESSION_ID]
     assert fake_llm.aembed_calls == []
 
 

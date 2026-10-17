@@ -270,6 +270,8 @@ async def semantic_fallback_required(
     Also returns the embedded query vector (None whenever the embedding call
     never ran) so a caller that goes on to call prefetch_for_prompt can hand
     it back in and skip a second, identical embed for the same query (B-09).
+    A vector is only returned after the ready-document check passed, and
+    prefetch_for_prompt relies on that to skip its own check (#571).
     """
     try:
         # F-05: sync DB work on an async handler's event loop; the ready
