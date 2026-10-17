@@ -22,7 +22,7 @@ USER_ID = "u_ing"
 
 
 @pytest.fixture
-def setup_doc(db_session, monkeypatch):
+def setup_doc(db_session):
     """Seed user, session, document."""
     db_session.add(User(id=USER_ID))
     db_session.flush()
@@ -39,7 +39,6 @@ def setup_doc(db_session, monkeypatch):
     db_session.add(doc)
     db_session.commit()
     db_session.refresh(doc)
-
     return doc.id
 
 
@@ -704,7 +703,6 @@ def test_legacy_bare_filename_fallback(
 
 
 def test_run_txt_success(db_session, insert_capture, mock_embed, monkeypatch, tmp_path):
-
     from contracts import TopicProfile
     from db.models import Document, User
     from db.models import Session as SessionModel

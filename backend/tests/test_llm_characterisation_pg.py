@@ -83,7 +83,7 @@ def seeded(pg_seed):
 
 
 @pytest.fixture
-def app_on_postgres(seeded, monkeypatch):
+def app_on_postgres(seeded):
     """The real app on a Postgres session, authenticated as the seeded user.
     The LLM adapter's gate and settlement open their own sessions on the same
     database (#412: the tutor's spend settles there; pg_seed binds

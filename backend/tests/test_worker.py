@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta, timezone
 
+import pytest
+
 import worker
 from db.models import Document, User
 from db.models import Session as SessionModel
@@ -85,7 +87,7 @@ def test_main_loop_processes_then_exits(db_session, monkeypatch):
     assert processed == [d.id]
 
 
-def test_main_loop_exits_when_stop_event_already_set(db_session, monkeypatch):
+def test_main_loop_exits_when_stop_event_already_set(db_session):
     """A stop_event set before entry must exit the loop without claiming
     anything, even with max_iterations=None (the in-process mode)."""
     import threading
@@ -98,7 +100,8 @@ def test_main_loop_exits_when_stop_event_already_set(db_session, monkeypatch):
     assert db_session.get(Document, d.id).status == "pending"
 
 
-def test_main_loop_idle_wait_uses_stop_event_not_sleep(db_session, monkeypatch):
+@pytest.mark.usefixtures("db_session")  # binds SessionLocal to the test engine
+def test_main_loop_idle_wait_uses_stop_event_not_sleep(monkeypatch):
     """With a stop_event provided, idle waiting must go through
     stop_event.wait(POLL_INTERVAL_S) so shutdown interrupts the wait.
     time.sleep must not be touched on this path."""

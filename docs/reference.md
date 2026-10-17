@@ -347,7 +347,9 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   after an exception. `db_session` and `pg_seed` hold it for the test, so no test
   patches a module's `SessionLocal` just to rebind it. New app code that opens its
   own session must use `db.database.SessionLocal` itself: a sessionmaker of its
-  own escapes the binding, and this guard then fails it. Tests that run the app lifespan stub `main.create_tables`
+  own escapes the binding, and this guard then fails it. `get_db` draws from the
+  same `SessionLocal`, so inside the binding a request that the test did not route
+  through a `get_db` override also lands on the test engine instead of being refused. Tests that run the app lifespan stub `main.create_tables`
   (`engine.begin()`).
 - Unexpected app logs (#577): an autouse fixture in `backend/tests/conftest.py`
   fails a test, at teardown, that logs a record at WARNING or above from an app
