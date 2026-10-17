@@ -354,7 +354,8 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   asserted in that fixture. An incidental record is fixed at its cause: an
   embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
   `SimpleNamespace`, so the cost meter can price it. Third-party loggers and Python
-  `warnings` are not covered (`tests/test_app_log_guard.py` pins the fixture).
+  `warnings` are not covered. `tests/test_app_log_guard.py` pins the fixture, and
+  fails when a new top-level backend module or package is missing from the list.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).

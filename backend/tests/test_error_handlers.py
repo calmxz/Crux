@@ -105,6 +105,7 @@ def test_value_error_subclass_is_a_500_not_a_422(caplog):
     assert resp.json()["detail"]["code"] == "internal_error"
     assert SECRET not in resp.text
     assert resp.headers.get("access-control-allow-origin") == ORIGIN
+    assert "unhandled error" in caplog.text
 
 
 def test_value_error_returns_422_with_the_message(value_error_response):
@@ -178,6 +179,7 @@ async def test_exception_after_response_start_is_reraised(caplog):
             collect,
         )
     assert [m["type"] for m in sent] == ["http.response.start", "http.response.body"]
+    assert "unhandled error" in caplog.text
 
 
 async def test_non_http_scope_passes_straight_through():

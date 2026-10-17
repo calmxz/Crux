@@ -51,7 +51,7 @@ where = ["."]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=services --cov=lib --cov=worker --cov=routes --cov=agent --cov=db --cov-report=term-missing --cov-fail-under=75"
+addopts = "-p pytester --cov=services --cov=lib --cov=worker --cov=routes --cov=agent --cov=db --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
 omit = ["tests/*", "scripts/*"]
