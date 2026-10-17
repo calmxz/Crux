@@ -134,12 +134,12 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     The dialect guard stays the first statement so sqlite issues no statement
     at all here (test_chat_prepare_perf counts statements on sqlite).
 
-    The write-back flushes but never commits here; the caller's next commit
-    (semantic_fallback_required releases the connection before embedding)
-    publishes it. A write-back that is rolled back instead just means the
-    next turn recomputes. That includes #567's savepoint rollback, which
-    discards nothing else: chat commits right before the fallback runs, so
-    no other write is pending in it.
+    The write-back is a Core UPDATE, executed at once but never committed
+    here; the caller's next commit (semantic_fallback_required releases the
+    connection before embedding) publishes it. A write-back that is rolled
+    back instead just means the next turn recomputes. No ORM flush: inside
+    #567's savepoint it would sweep in unrelated pending objects, which a
+    rollback would then discard.
     """
     if not _is_postgres(db):
         return None
@@ -154,7 +154,6 @@ def _session_centroid(db: Session, session_id: str) -> list[float] | None:
     db.execute(
         update(SessionModel).where(SessionModel.id == session_id).values(chunk_centroid=centroid)
     )
-    db.flush()
     return centroid
 
 
@@ -165,6 +164,22 @@ def _ready_centroid(db: Session, session_id: str) -> list[float] | None:
         if not documents_service.has_ready_document(db, session_id):
             return None
         return _session_centroid(db, session_id)
+
+
+def _prefetch_ready(db: Session, session_id: str) -> bool:
+    """prefetch_for_prompt's ready check, in its own savepoint."""
+    with core_savepoint(db):
+        return documents_service.has_ready_document(db, session_id)
+
+
+def _prefetch_search(
+    db: Session, session_id: str, query_vec: list, k: int
+) -> list[pgvector_store.RetrievedChunk]:
+    """prefetch_for_prompt's search, in its own savepoint."""
+    with core_savepoint(db):
+        return pgvector_store.query_chunks(
+            db, session_id=session_id, query_embedding=query_vec, k=k
+        )
 
 
 def _cosine_similarity(a: list[float], b: list[float]) -> float:
@@ -199,19 +214,15 @@ async def prefetch_for_prompt(
 
     #567: each read runs in its own SAVEPOINT, so a failed one rolls back
     only itself instead of aborting the turn's transaction. The embed
-    commits, so it sits between them, never inside one.
+    commits, so it sits between them, never inside one. F-05: both reads go
+    to the threadpool, off the event loop.
     """
     try:
-        with core_savepoint(db):
-            ready = documents_service.has_ready_document(db, session_id)
-        if not ready:
+        if not await run_in_threadpool(_prefetch_ready, db, session_id):
             return None
         if query_vec is None:
             query_vec = await _aembed_query(db, query, user_id=user_id, session_id=session_id)
-        with core_savepoint(db):
-            hits = pgvector_store.query_chunks(
-                db, session_id=session_id, query_embedding=query_vec, k=k
-            )
+        hits = await run_in_threadpool(_prefetch_search, db, session_id, query_vec, k)
     except llm.LlmUnavailable:
         return None  # stub mode (#413): no model, so no retrieval; not a failure
     except Exception as e:

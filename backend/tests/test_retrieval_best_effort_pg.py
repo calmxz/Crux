@@ -26,11 +26,19 @@ from sqlalchemy.orm import sessionmaker
 
 from config import settings
 from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, Document, LlmCallLog, UsageCounter, User
+from db.models import (
+    ChatMessage,
+    DailyCostLedger,
+    Document,
+    LearningEvent,
+    LlmCallLog,
+    UsageCounter,
+    User,
+)
 from db.models import Session as SessionModel
 from lib import keyword_index
 from main import app
-from services import summary_service, velocity_limit
+from services import pgvector_store, summary_service, velocity_limit
 from services.auth import current_user_id
 from tests.conftest import _fake_current_user_id
 
@@ -71,6 +79,7 @@ def _seed(engine, kw_stems: list[str]):
     def cleanup():
         with Session() as db:
             db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
+            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
             db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
             db.execute(delete(Document).where(Document.session_id == sid))
             db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
@@ -207,8 +216,16 @@ def test_failed_chunk_search_in_prefetch(lexical_hit, monkeypatch, caplog):
     async def fake_embed(db, query, **kw):
         return [0.1] * settings.embedding_dim
 
+    # The real HNSW tuning runs first, so its nested savepoint is released
+    # before the search fails inside the outer one.
+    fail = _failing(calls)
+
+    def tuned_then_failing(db, *a, **kw):
+        pgvector_store._apply_hnsw_tuning(db)
+        fail(db)
+
     monkeypatch.setattr("services.retrieval_service._aembed_query", fake_embed)
-    monkeypatch.setattr("services.pgvector_store.query_chunks", _failing(calls))
+    monkeypatch.setattr("services.pgvector_store.query_chunks", tuned_then_failing)
 
     with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
         status, body = _stream_turn(Session, uid, sid, monkeypatch)
