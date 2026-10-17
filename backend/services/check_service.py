@@ -32,10 +32,10 @@ this module, as is ChatMessage.check_batch_json (the frozen Recap):
 Transactions. Every action that gets past argument validation takes the
 session row lock and commits itself,
 releasing the lock on every return path, early exits included. A conflict
-commits, then raises CheckError. Nothing releases by rollback: register and
-stamp_message_id run inside the tutor turn, whose flushed cost-ledger writes
-must survive. Only an unexpected exception leaves the transaction to the
-caller. The one exception is abandon_in_caller_transaction, which joins the
+commits, then raises CheckError. Nothing here releases by rollback. Only an
+unexpected exception leaves the transaction to the caller; for register, the
+tool dispatcher rolls it back (#569). The one exception to committing itself
+is abandon_in_caller_transaction, which joins the
 session end's single write window (F-33) and never commits.
 
 Every Close grades. Complete, Stop and abandon all Close through _close,

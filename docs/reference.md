@@ -212,8 +212,9 @@ waiters never appear.
 `pending_check_json`, `current_check_json`, `quiz_cooldown_json` and
 `ChatMessage.check_batch_json`; everything else goes through its row reads.
 Its actions commit themselves, on early exits and `CheckError` too, and
-never release the lock by rollback (the tutor turn's flushed cost-ledger
-writes must survive). `abandon_in_caller_transaction` is the exception: it
+never release the lock by rollback. An unexpected exception leaves the
+transaction to the caller; for `register`, `agent.tools.dispatch` rolls it
+back (#569). `abandon_in_caller_transaction` is the exception: it
 joins the session end's single commit. So a caller never commits after an
 action, and must commit after abandon.
 
