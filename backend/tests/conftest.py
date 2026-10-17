@@ -12,12 +12,13 @@ from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 import pytest
 from fastapi import HTTPException, Request, status
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
 import main as main_module
 from db.database import Base, get_db
+from db.database import engine as default_engine
 from main import app
 from services.auth import current_user_id
 
@@ -168,6 +169,40 @@ def _inline_settle_retry(monkeypatch):
     )
 
 
+# --- Default-engine guard (#579) -------------------------------------------
+# No test may connect on the app's default engine (settings.database_url, a
+# developer's real data/app.db locally). The connect hook records the test
+# and refuses the connection, so the file is never opened; the refusal alone
+# could be swallowed by a best-effort path, so the record fails the test.
+
+_default_engine_hits: list[str] = []
+_current_test: list[str | None] = [None]
+
+
+@event.listens_for(default_engine, "do_connect")
+def _refuse_default_engine(dialect, conn_rec, cargs, cparams):
+    _default_engine_hits.append(_current_test[0] or "<outside a test>")
+    raise RuntimeError("tests must not connect on the default engine (db.database.engine)")
+
+
+@pytest.fixture(autouse=True)
+def _no_default_engine(request):
+    # Hits from outside any test (collection, a session fixture) are kept
+    # and reported by the next test's teardown.
+    _current_test[0] = request.node.nodeid
+    yield
+    _current_test[0] = None
+    if _default_engine_hits:
+        hits = sorted(set(_default_engine_hits))
+        _default_engine_hits.clear()
+        pytest.fail(
+            "connected on the default engine (db.database.engine): "
+            + ", ".join(hits)
+            + "; bind the session factory it used to the test engine",
+            pytrace=False,
+        )
+
+
 @pytest.fixture
 def db_session(monkeypatch):
     engine = create_engine(
@@ -180,9 +215,12 @@ def db_session(monkeypatch):
     # The LLM adapter settles spend in its own session; point it at this
     # engine. StaticPool shares one connection, so its commit also commits
     # the caller's pending writes on sqlite (#411).
+    from routes import chat
     from services import llm
 
     monkeypatch.setattr(llm, "session_factory", Session)
+    # Likewise the post-response rolling-summary task (#579).
+    monkeypatch.setattr(chat, "SessionLocal", Session)
     db = Session()
     try:
         yield db
