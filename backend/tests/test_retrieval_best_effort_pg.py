@@ -15,7 +15,6 @@ point it at a production database.
 from __future__ import annotations
 
 import json
-import logging
 import os
 
 import pytest
@@ -120,46 +119,44 @@ def _assert_turn_completed(Session, sid, status, body):
     assert sorted(roles) == ["assistant", "user"]
 
 
-def test_failed_ready_check_in_semantic_fallback(lexical_miss, monkeypatch, caplog):
+def test_failed_ready_check_in_semantic_fallback(lexical_miss, monkeypatch, expect_app_log):
+    expect_app_log("semantic fallback check failed; keeping OPTIONAL")
     Session, uid, sid = lexical_miss
     calls: list = []
     monkeypatch.setattr("services.documents_service.has_ready_document", _failing(calls))
 
-    with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
-        status, body = _stream_turn(Session, uid, sid, monkeypatch)
+    status, body = _stream_turn(Session, uid, sid, monkeypatch)
 
     assert calls, "the failing read never ran"
     _assert_turn_completed(Session, sid, status, body)
-    assert "semantic fallback check failed; keeping OPTIONAL" in caplog.text
 
 
-def test_failed_centroid_read_in_semantic_fallback(lexical_miss, monkeypatch, caplog):
+def test_failed_centroid_read_in_semantic_fallback(lexical_miss, monkeypatch, expect_app_log):
+    expect_app_log("semantic fallback check failed; keeping OPTIONAL")
     Session, uid, sid = lexical_miss
     calls: list = []
     monkeypatch.setattr("services.retrieval_service._compute_centroid", _failing(calls))
 
-    with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
-        status, body = _stream_turn(Session, uid, sid, monkeypatch)
+    status, body = _stream_turn(Session, uid, sid, monkeypatch)
 
     assert calls, "the failing read never ran"
     _assert_turn_completed(Session, sid, status, body)
-    assert "semantic fallback check failed; keeping OPTIONAL" in caplog.text
 
 
-def test_failed_ready_check_in_prefetch(lexical_hit, monkeypatch, caplog):
+def test_failed_ready_check_in_prefetch(lexical_hit, monkeypatch, expect_app_log):
+    expect_app_log("prefetch_for_prompt failed; falling back to advisory flag")
     Session, uid, sid = lexical_hit
     calls: list = []
     monkeypatch.setattr("services.documents_service.has_ready_document", _failing(calls))
 
-    with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
-        status, body = _stream_turn(Session, uid, sid, monkeypatch)
+    status, body = _stream_turn(Session, uid, sid, monkeypatch)
 
     assert calls, "the failing read never ran"
     _assert_turn_completed(Session, sid, status, body)
-    assert "prefetch_for_prompt failed; falling back to advisory flag" in caplog.text
 
 
-def test_failed_chunk_search_in_prefetch(lexical_hit, monkeypatch, caplog):
+def test_failed_chunk_search_in_prefetch(lexical_hit, monkeypatch, expect_app_log):
+    expect_app_log("prefetch_for_prompt failed; falling back to advisory flag")
     Session, uid, sid = lexical_hit
     calls: list = []
 
@@ -179,9 +176,7 @@ def test_failed_chunk_search_in_prefetch(lexical_hit, monkeypatch, caplog):
     monkeypatch.setattr("services.retrieval_service._aembed_query", fake_embed)
     monkeypatch.setattr("services.pgvector_store.query_chunks", tuned_then_failing)
 
-    with caplog.at_level(logging.WARNING, logger="services.retrieval_service"):
-        status, body = _stream_turn(Session, uid, sid, monkeypatch)
+    status, body = _stream_turn(Session, uid, sid, monkeypatch)
 
     assert calls, "the failing read never ran"
     _assert_turn_completed(Session, sid, status, body)
-    assert "prefetch_for_prompt failed; falling back to advisory flag" in caplog.text

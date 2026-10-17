@@ -160,8 +160,9 @@ def test_no_user_skips_gate_and_ledger(db_session, fake_llm, monkeypatch):
 
 
 async def test_failed_settlement_keeps_the_call_log_and_retries_the_ledger(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, caplog, expect_app_log
 ):
+    expect_app_log("llm settlement deferred")
     real_record_cost = cost_meter.record_cost
     calls = []
 
@@ -206,8 +207,11 @@ async def test_failed_settlement_keeps_the_call_log_and_retries_the_ledger(
 
 
 async def test_failed_retry_logs_at_error_with_the_receipt_kept(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, caplog, expect_app_log
 ):
+    expect_app_log("llm settlement deferred")
+    expect_app_log("llm settlement failed")
+
     def ledger_down(*args, **kwargs):
         raise RuntimeError("ledger down")
 
@@ -215,7 +219,7 @@ async def test_failed_retry_logs_at_error_with_the_receipt_kept(
     fake_llm.replies = ["kept"]
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         result = await _complete()
 
     assert result.text == "kept"
@@ -245,8 +249,9 @@ def _ledger_down_once(monkeypatch, exc):
 
 
 async def test_full_retry_capacity_logs_the_spend_unsettled(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, caplog, expect_app_log
 ):
+    expect_app_log("llm settlement failed")
     _ledger_down_once(monkeypatch, RuntimeError("lock timeout"))
     scheduled = []
     monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append(fn))
@@ -254,7 +259,7 @@ async def test_full_retry_capacity_logs_the_spend_unsettled(
     llm._retry_slots.acquire()  # another retry already waiting
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         await _complete()
 
     assert scheduled == []
@@ -265,8 +270,9 @@ async def test_full_retry_capacity_logs_the_spend_unsettled(
 
 
 async def test_pool_timeout_leaves_the_receipt_to_the_retry(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, expect_app_log
 ):
+    expect_app_log("llm settlement deferred")
     _ledger_down_once(monkeypatch, sqlalchemy.exc.TimeoutError("pool full"))
     scheduled = []
     monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
@@ -279,12 +285,12 @@ async def test_pool_timeout_leaves_the_receipt_to_the_retry(
     fn(*args)
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
-    assert "llm settlement deferred" in caplog.text
 
 
 async def test_retry_books_to_the_day_the_call_was_settled(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, expect_app_log
 ):
+    expect_app_log("llm settlement deferred")
     calls = _ledger_down_once(monkeypatch, RuntimeError("lock timeout"))
     scheduled = []
     monkeypatch.setattr(llm, "_schedule", lambda delay, fn, *a: scheduled.append((fn, a)))
@@ -299,16 +305,16 @@ async def test_retry_books_to_the_day_the_call_was_settled(
     assert calls == [None, "2026-10-14"]
     row = db_session.execute(select(DailyCostLedger)).scalar_one()
     assert (row.date_utc, Decimal(str(row.cost_usd))) == ("2026-10-14", Decimal("0.0020"))
-    assert "llm settlement deferred" in caplog.text
 
 
 async def test_lost_call_log_row_logs_at_error_and_keeps_the_ledger(
-    db_session, user, fake_llm, monkeypatch, caplog
+    db_session, user, fake_llm, monkeypatch, caplog, expect_app_log
 ):
+    expect_app_log("llm call log row lost")
     monkeypatch.setattr(cost_meter, "log_call", lambda *a, **k: False)
     fake_llm.cost = Decimal("0.002")
 
-    with caplog.at_level(logging.ERROR, logger="services.llm"):
+    with caplog.at_level(logging.WARNING, logger="services.llm"):
         await _complete()
 
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
@@ -746,9 +752,10 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
 
 
 async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
-    litellm_stream, monkeypatch, caplog
+    litellm_stream, monkeypatch, caplog, expect_app_log
 ):
     """F-19: a pricing-table gap must not register the call as $0."""
+    expect_app_log("completion_cost failed: unknown model")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
         litellm, "stream_chunk_builder", lambda chunks, messages=None: SimpleNamespace(usage=None)

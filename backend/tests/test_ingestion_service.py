@@ -184,8 +184,9 @@ def test_success_path(
 
 
 def test_pypdf_failure_marks_failed(
-    setup_doc, insert_capture, mock_embed, db_session, monkeypatch, tmp_path, caplog
+    setup_doc, insert_capture, mock_embed, db_session, monkeypatch, tmp_path, expect_app_log
 ):
+    expect_app_log("ingestion failed")
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
 
     def boom(_path):
@@ -202,12 +203,12 @@ def test_pypdf_failure_marks_failed(
     # fixed, enumerated, user-facing message.
     assert doc.error == ingestion_service.ERR_EXTRACTION_FAILED
     assert insert_capture == []
-    assert "ingestion failed" in caplog.text
 
 
 def test_embedding_failure_marks_failed(
-    setup_doc, insert_capture, mock_pdf, db_session, monkeypatch, tmp_path, fake_llm, caplog
+    setup_doc, insert_capture, mock_pdf, db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
+    expect_app_log("ingestion failed")
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
     fake_llm.embed_errors = [RuntimeError("embedding api down")]
     from services import ingestion_service
@@ -218,12 +219,12 @@ def test_embedding_failure_marks_failed(
     assert doc.status == "failed"
     assert doc.error == ingestion_service.ERR_EMBEDDING_FAILED
     assert insert_capture == []
-    assert "ingestion failed" in caplog.text
 
 
 def test_pgvector_insert_failure_marks_failed(
-    setup_doc, mock_pdf, mock_embed, db_session, monkeypatch, tmp_path, caplog
+    setup_doc, mock_pdf, mock_embed, db_session, monkeypatch, tmp_path, expect_app_log
 ):
+    expect_app_log("ingestion failed")
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
 
     def boom(*a, **k):
@@ -238,14 +239,14 @@ def test_pgvector_insert_failure_marks_failed(
     assert doc.status == "failed"
     # The insert happens inside _embed_and_store, so it is the embed stage.
     assert doc.error == ingestion_service.ERR_EMBEDDING_FAILED
-    assert "ingestion failed" in caplog.text
 
 
 def test_run_fails_over_chunk_cap_before_embedding(
-    db_session, monkeypatch, tmp_path, fake_llm, caplog
+    db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
     """F-03 enforcement: documents whose chunk count exceeds settings.max_chunks
     must fail before any embedding call -- no vendor spend for an oversized doc."""
+    expect_app_log("ingestion stopped")
     from services import ingestion_service
 
     db_session.add(User(id="u_cap"))
@@ -285,11 +286,10 @@ def test_run_fails_over_chunk_cap_before_embedding(
     assert "chunk limit" in refreshed.error
     assert fake_llm.embed_calls == []
     assert inserted == []
-    assert "ingestion stopped" in caplog.text
 
 
 def test_merge_failure_keeps_already_committed_chunks(
-    db_session, monkeypatch, tmp_path, fake_llm, caplog
+    db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
     """F-02/F-03/B-02: _embed_and_store commits each batch (embed+insert+meter)
     as it goes, so chunks are durable before run() ever reaches the
@@ -298,6 +298,7 @@ def test_merge_failure_keeps_already_committed_chunks(
     failed, but it must NOT undo the already-committed, already-paid-for
     chunk rows -- that's the whole point of per-batch commits (a retry can
     resume instead of re-embedding from scratch)."""
+    expect_app_log("ingestion failed")
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -333,11 +334,10 @@ def test_merge_failure_keeps_already_committed_chunks(
     assert doc.status == "failed"
     assert doc.error == ingestion_service.ERR_INGESTION_FAILED
     assert db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() > 0
-    assert "ingestion failed" in caplog.text
 
 
 def test_rerun_after_partial_failure_skips_already_paid_chunks(
-    db_session, monkeypatch, tmp_path, fake_llm, caplog
+    db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
     """F-02 resume contract, exercised through run() (not just the
     _embed_and_store unit tests) with the real _existing_chunk_indexes query:
@@ -345,6 +345,7 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
     keyword-merge step leaves those chunks committed. Re-running the same
     document must not re-embed any of them -- the provider must not be
     called again -- and must reach status=ready this time."""
+    expect_app_log("ingestion failed")
     from db.models import ChunkEmbedding
     from services import ingestion_service
 
@@ -396,17 +397,17 @@ def test_rerun_after_partial_failure_skips_already_paid_chunks(
     assert (
         db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() == committed_before
     )
-    assert "ingestion failed" in caplog.text
 
 
 def test_merge_failure_still_records_embedding_spend_after_rollback(
-    db_session, monkeypatch, tmp_path, fake_llm, caplog
+    db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
     """F-02/F-03/B-02: the adapter settles each batch's embedding spend in
     its own transaction, before run() ever reaches the keyword-merge step.
     So the vendor's real spend is durable on the daily cost ledger -- not
     via a post-rollback re-record -- even though the doc ends up 'failed'
     from a later merge_into_session error."""
+    expect_app_log("ingestion failed")
     from db.models import ChunkEmbedding
     from services import cost_meter, ingestion_service
 
@@ -443,7 +444,6 @@ def test_merge_failure_still_records_embedding_spend_after_rollback(
     assert refreshed.status == "failed"
     assert db_session.query(ChunkEmbedding).filter_by(document_id=doc.id).count() > 0
     assert cost_meter.current_spend(db_session, "u_merge_boom2") == Decimal("0.0040")
-    assert "ingestion failed" in caplog.text
 
 
 def test_extract_plaintext_txt_and_md():
@@ -605,11 +605,12 @@ def test_embed_and_store_stops_at_cap_between_batches(db_session, monkeypatch, f
 
 
 def test_run_fails_over_cost_cap_and_keeps_prior_spend(
-    db_session, monkeypatch, tmp_path, fake_llm, caplog
+    db_session, monkeypatch, tmp_path, fake_llm, expect_app_log
 ):
     """B-01: a cap breach discovered mid-ingestion must fail the document
     with a friendly error, distinct from the generic embedding-failure
     message, and must not lose spend already paid for by earlier batches."""
+    expect_app_log("ingestion stopped")
     from services import cost_meter as cm
     from services import ingestion_service
 
@@ -648,12 +649,12 @@ def test_run_fails_over_cost_cap_and_keeps_prior_spend(
     # Spend already on the ledger before ingestion ran must survive intact
     # (nothing new was spent since the very first batch was blocked).
     assert cm.current_spend(db_session, "u_cap_run") == Decimal("0.2000")
-    assert "ingestion stopped" in caplog.text
 
 
-def test_missing_blob_marks_failed(setup_doc, db_session, monkeypatch, tmp_path, caplog):
+def test_missing_blob_marks_failed(setup_doc, db_session, monkeypatch, tmp_path, expect_app_log):
     """F-15: if the blob isn't in the object store (and no legacy bare-filename
     fallback exists either), ingestion must fail the document, not crash."""
+    expect_app_log("ingestion failed")
     monkeypatch.setattr("services.ingestion_service.settings.uploads_path", str(tmp_path))
     from services import ingestion_service
 
@@ -662,7 +663,6 @@ def test_missing_blob_marks_failed(setup_doc, db_session, monkeypatch, tmp_path,
     doc = db_session.get(Document, setup_doc)
     assert doc.status == "failed"
     assert doc.error
-    assert "ingestion failed" in caplog.text
 
 
 def test_extract_plaintext_from_bytes():
@@ -926,11 +926,12 @@ def test_run_holds_no_db_transaction_during_blob_load_and_extract(
 
 
 def test_run_marks_failed_when_extract_raises_outside_session(
-    db_session, insert_capture, mock_embed, monkeypatch, tmp_path, caplog
+    db_session, insert_capture, mock_embed, monkeypatch, tmp_path, expect_app_log
 ):
     """F-02 regression: the failure arms run after the session was closed, so
     they must re-fetch the Document by id rather than touch a detached
     instance."""
+    expect_app_log("ingestion failed")
     from services import ingestion_service
 
     db_session.add(User(id="u_notx2"))
@@ -962,7 +963,6 @@ def test_run_marks_failed_when_extract_raises_outside_session(
     refreshed = db_session.get(Document, doc.id)
     assert refreshed.status == "failed"
     assert refreshed.error == ingestion_service.ERR_EXTRACTION_FAILED
-    assert "ingestion failed" in caplog.text
 
 
 def test_run_invalidates_session_chunk_centroid(
@@ -1000,10 +1000,11 @@ def test_run_invalidates_session_chunk_centroid(
 
 
 def test_run_passes_max_chunks_and_fails_on_early_abort(
-    db_session, insert_capture, mock_embed, monkeypatch, tmp_path, caplog
+    db_session, insert_capture, mock_embed, monkeypatch, tmp_path, expect_app_log
 ):
     """F-03: the cap is enforced inside the chunker (early abort), not by
     counting a fully materialised chunk list afterwards."""
+    expect_app_log("ingestion stopped")
     from config import settings
     from services import ingestion_service
 
@@ -1041,15 +1042,15 @@ def test_run_passes_max_chunks_and_fails_on_early_abort(
     assert refreshed.status == "failed"
     assert refreshed.error == "document too large to ingest (chunk limit)"
     assert insert_capture == []
-    assert "ingestion stopped" in caplog.text
 
 
 def test_partial_ingest_failure_still_invalidates_centroid(
-    db_session, mock_embed, monkeypatch, tmp_path, caplog
+    db_session, mock_embed, monkeypatch, tmp_path, expect_app_log
 ):
     """F-05: _embed_and_store commits per batch, so a failure mid-document
     leaves durable new chunks. The centroid must already be NULL by then --
     otherwise a stale mean survives with nothing left to refresh it."""
+    expect_app_log("ingestion failed")
     from config import settings
     from services import ingestion_service
 
@@ -1091,21 +1092,19 @@ def test_partial_ingest_failure_still_invalidates_centroid(
     assert calls["n"] > 1
     assert db_session.get(Document, doc.id).status == "failed"
     assert db_session.get(SessionModel, "s_cinv2").chunk_centroid is None
-    assert "ingestion failed" in caplog.text
 
 
 # --- C-11: documents.error is an enumerated, leak-free string -------------
 
 
 def test_extraction_failure_hides_exception_text_but_logs_it(
-    setup_doc, insert_capture, mock_embed, db_session, monkeypatch, tmp_path, caplog
+    setup_doc, insert_capture, mock_embed, db_session, monkeypatch, tmp_path, expect_app_log
 ):
     """C-11: documents.error is rendered verbatim by the frontend, so a raw
     exception message would leak server paths to the browser. The persisted
     string must be one of the enumerated constants; the original text must
     still reach the log for operators."""
-    import logging
-
+    expect_app_log("/srv/secret/path: boom")
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
 
     def boom(_blob, _filename):
@@ -1114,22 +1113,28 @@ def test_extraction_failure_hides_exception_text_but_logs_it(
     monkeypatch.setattr("services.ingestion_service._extract", boom)
     from services import ingestion_service
 
-    with caplog.at_level(logging.ERROR, logger="services.ingestion_service"):
-        ingestion_service.run(setup_doc)
+    ingestion_service.run(setup_doc)
 
     db_session.expire_all()
     doc = db_session.get(Document, setup_doc)
     assert doc.status == "failed"
     assert doc.error == ingestion_service.ERR_EXTRACTION_FAILED
     assert "secret" not in doc.error
-    assert "/srv/secret/path: boom" in " ".join(r.getMessage() for r in caplog.records)
 
 
 def test_generic_stage_failure_uses_the_catch_all_message(
-    setup_doc, insert_capture, mock_pdf, mock_embed, db_session, monkeypatch, tmp_path, caplog
+    setup_doc,
+    insert_capture,
+    mock_pdf,
+    mock_embed,
+    db_session,
+    monkeypatch,
+    tmp_path,
+    expect_app_log,
 ):
     """A failure outside extract/embed (here: the keyword merge) maps to the
     generic constant, never to str(e)."""
+    expect_app_log("ingestion failed")
     _write_blob_stub(monkeypatch, tmp_path, setup_doc, "x.pdf")
 
     def boom(db, session_id, stems):
@@ -1143,7 +1148,6 @@ def test_generic_stage_failure_uses_the_catch_all_message(
     doc = db_session.get(Document, setup_doc)
     assert doc.status == "failed"
     assert doc.error == ingestion_service.ERR_INGESTION_FAILED
-    assert "ingestion failed" in caplog.text
 
 
 def test_every_assigned_document_error_is_enumerated():

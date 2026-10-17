@@ -353,14 +353,22 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   same `SessionLocal`, so inside the binding a request that the test did not route
   through a `get_db` override also lands on the test engine instead of being refused. Tests that run the app lifespan stub `main.create_tables`
   (`engine.begin()`).
-- Unexpected app logs (#577): an autouse fixture in `backend/tests/conftest.py`
+- Unexpected app logs (#577, #594): an autouse fixture in `backend/tests/conftest.py`
   fails a test, at teardown, that logs a record at WARNING or above from an app
-  logger (`agent`, `config`, `db`, `lib`, `main`, `routes`, `services`, `worker`),
-  listing each record's logger and message. It catches a fake whose failure a
-  best-effort path swallowed and logged. A test that drives a failure on purpose
-  opts out by requesting `caplog` and must then assert the message it expects (a
-  review rule, not checked by the fixture); a record logged in a fixture's setup is
-  asserted in that fixture. An incidental record is fixed at its cause: an
+  logger (`agent`, `config`, `db`, `lib`, `main`, `routes`, `services`, `worker`)
+  that no declared expectation covers, listing each record's logger and message.
+  It catches a fake whose failure a best-effort path swallowed and logged. A test
+  that drives a failure on purpose declares it with the `expect_app_log` fixture:
+  `expect_app_log("unhandled error")` covers every record whose message contains
+  that text, and an expectation that matched no record fails the test too, so the
+  declaration replaces a hand-written `assert ... in caplog.text`. The unfired
+  check applies only to a test whose body passed: one that failed or skipped
+  first already reports that. A fixture that logs during its setup declares the
+  expectation itself. Requesting `caplog` does not opt out; keep it only for
+  checks the declaration cannot make (level, record fields, absence of learner
+  text, INFO records). `caplog.at_level` / `set_level` above WARNING on an app
+  logger stops its warnings being logged at all, hiding them from the guard;
+  `test_no_test_raises_an_app_logger_above_warning` fails on any such call. An incidental record is fixed at its cause: an
   embedding fake returns `tests.conftest.embedding_response(...)`, not a bare
   `SimpleNamespace`, so the cost meter can price it against litellm's bundled
   pricing table (conftest sets `LITELLM_LOCAL_MODEL_COST_MAP`). The recorder sits on

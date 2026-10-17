@@ -26,7 +26,9 @@ def test_ready_ok_when_db_reachable(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_ready_unavailable_when_db_raises(client, monkeypatch, caplog):
+def test_ready_unavailable_when_db_raises(client, monkeypatch, expect_app_log):
+    expect_app_log("readiness probe failed")
+
     def boom(_db):
         raise RuntimeError("connection refused")
 
@@ -35,7 +37,6 @@ def test_ready_unavailable_when_db_raises(client, monkeypatch, caplog):
     response = client.get("/ready")
     assert response.status_code == 503
     assert response.json() == {"status": "unavailable"}
-    assert "readiness probe failed" in caplog.text
 
 
 class _FakeSession:

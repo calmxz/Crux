@@ -378,11 +378,12 @@ async def test_cancel_while_a_finished_stream_closes_reports_no_inflight_cost(
 
 @pytest.mark.asyncio
 async def test_malformed_tool_args_yield_error_not_dispatch(
-    db_session, fake_llm, monkeypatch, caplog
+    db_session, fake_llm, monkeypatch, expect_app_log
 ):
     """F-20a: a truncated/garbled streamed tool-args blob must fail loudly
     instead of dispatching {} (which would validate -- session_id is
     injected -- and silently report a no-op patch as ok)."""
+    expect_app_log("invalid tool args json (stream)")
     fake_llm.streams = [
         # Turn 1: a tool call whose accumulated arguments are truncated JSON.
         [tool_call("update_topic_profile", '{"session_id": "s1", "add_confirm', id="tc_1")],
@@ -405,7 +406,6 @@ async def test_malformed_tool_args_yield_error_not_dispatch(
     assert "malformed" in done_events[0].data["error"]
     assert dispatched == []
     assert events[-1].type == "done"
-    assert "invalid tool args json (stream)" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -422,9 +422,10 @@ async def test_no_estimate_on_happy_path(db_session, fake_llm):
 
 
 @pytest.mark.asyncio
-async def test_run_streaming_emits_error_on_cost_cap(db_session, user, fake_llm, caplog):
+async def test_run_streaming_emits_error_on_cost_cap(db_session, user, fake_llm, expect_app_log):
     """At the cap, the adapter gate refuses the first call: an error event
     with the cap fields, and the provider is never called."""
+    expect_app_log("llm call refused mid-turn (stream)")
     cost_meter.record_cost(db_session, "u1", Decimal("3.10"))
     db_session.commit()
 
@@ -441,7 +442,6 @@ async def test_run_streaming_emits_error_on_cost_cap(db_session, user, fake_llm,
     assert fake_llm.stream_calls == []
     # Nothing streamed, so nothing is persisted.
     assert db_session.query(ChatMessage).filter(ChatMessage.session_id == "s3").count() == 0
-    assert "llm call refused mid-turn (stream)" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -657,11 +657,14 @@ async def test_run_streaming_writes_llm_call_log_row(db_session, user, fake_llm)
 
 
 @pytest.mark.asyncio
-async def test_llm_exception_yields_error_event_and_persists_partial(db_session, fake_llm, caplog):
+async def test_llm_exception_yields_error_event_and_persists_partial(
+    db_session, fake_llm, expect_app_log
+):
     """F-01: a non-cancel exception (provider 429/timeout, malformed chunk, tool
     crash) must surface as exactly one error SSE event -- not escape the
     generator and leave the client stuck in 'streaming' forever -- and the
     partial assistant text must be persisted with status='error'."""
+    expect_app_log("agent loop failed (stream)")
     fake_llm.streams = [RuntimeError("provider blew up")]
 
     ctx = _ctx(db_session, session_id="s_llm_exception")
@@ -673,7 +676,6 @@ async def test_llm_exception_yields_error_event_and_persists_partial(db_session,
 
     msg = db_session.query(ChatMessage).filter(ChatMessage.session_id == "s_llm_exception").one()
     assert msg.status == "error"
-    assert "agent loop failed (stream)" in caplog.text
 
 
 @pytest.mark.asyncio
@@ -730,10 +732,13 @@ async def test_cancel_estimates_only_the_cut_short_call_as_sent(
 
 
 @pytest.mark.asyncio
-async def test_error_mid_stream_bills_the_failed_call_once(db_session, user, fake_llm, caplog):
+async def test_error_mid_stream_bills_the_failed_call_once(
+    db_session, user, fake_llm, expect_app_log
+):
     """F-03/F-06, changed by #412: a mid-stream provider crash bills the
     started call once, an estimate of its prompt plus the text it streamed.
     The error arm no longer re-estimates the whole turn on top."""
+    expect_app_log("agent loop failed (stream)")
     fake_llm.streams = [["partial ", RuntimeError("provider blew up mid-stream")]]
     fake_llm.partial_cost = Decimal("0.0009")
 
@@ -745,7 +750,6 @@ async def test_error_mid_stream_bills_the_failed_call_once(db_session, user, fak
     assert cost_meter.current_spend(db_session, "u1") == Decimal("0.0009")
     rows = db_session.query(LlmCallLog).filter(LlmCallLog.session_id == "s_error_bill").all()
     assert len(rows) == 1
-    assert "agent loop failed (stream)" in caplog.text
 
 
 @pytest.mark.asyncio

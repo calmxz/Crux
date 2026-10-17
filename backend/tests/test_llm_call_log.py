@@ -40,7 +40,8 @@ def test_log_call_zero_cost_skipped(db_session):
     assert db_session.query(LlmCallLog).count() == 0
 
 
-def test_log_call_failure_is_isolated(db_session, caplog):
+def test_log_call_failure_is_isolated(db_session, expect_app_log):
+    expect_app_log("llm_call_log write failed")
     with patch.object(db_session, "add", side_effect=RuntimeError("boom")):
         written = cost_meter.log_call(
             db_session,
@@ -51,14 +52,14 @@ def test_log_call_failure_is_isolated(db_session, caplog):
             cost_usd=Decimal("0.01"),
         )  # must not raise
     assert written is False  # the adapter error-logs a lost row on False
-    assert "llm_call_log write failed" in caplog.text
 
 
-def test_log_call_flush_failure_does_not_break_session(db_session, caplog):
+def test_log_call_flush_failure_does_not_break_session(db_session, expect_app_log):
     """Stronger isolation check: a failure during flush (not just db.add)
     must not leave the session in SQLAlchemy's rollback-required state --
     otherwise the caller's next unguarded db.commit() (e.g. persisting the
     assistant message) would raise and fail the user's turn."""
+    expect_app_log("llm_call_log write failed")
     with patch.object(db_session, "flush", side_effect=RuntimeError("boom")):
         written = cost_meter.log_call(
             db_session,
@@ -84,7 +85,6 @@ def test_log_call_flush_failure_does_not_break_session(db_session, caplog):
     )
     db_session.commit()
     assert db_session.query(LlmCallLog).count() == 1
-    assert "llm_call_log write failed" in caplog.text
 
 
 def test_log_call_persists_token_counts(db_session):

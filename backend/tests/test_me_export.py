@@ -232,7 +232,8 @@ def test_export_legacy_null_feedback_pref_reports_hints(client, db_session):
     assert body["account"]["feedback_pref"] == "hints"
 
 
-def test_export_tolerates_malformed_stored_json(client, db_session, caplog):
+def test_export_tolerates_malformed_stored_json(client, db_session, expect_app_log):
+    expect_app_log("unparseable topic_profile_json")
     _seed(db_session, ME)
     for m in db_session.query(ChatMessage).all():
         m.citations_json = "not json"
@@ -248,7 +249,6 @@ def test_export_tolerates_malformed_stored_json(client, db_session, caplog):
     assert all(m["citations"] == [] for m in s1["messages"])
     assert s1["check_answers"][0]["options"] == []
     assert s1["topic_profile"]["confirmed_gaps"] == []
-    assert "unparseable topic_profile_json" in caplog.text
 
 
 def test_export_is_not_served_from_another_token(client, db_session):
