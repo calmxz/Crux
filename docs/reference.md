@@ -212,8 +212,9 @@ waiters never appear.
 `pending_check_json`, `current_check_json`, `quiz_cooldown_json` and
 `ChatMessage.check_batch_json`; everything else goes through its row reads.
 Its actions commit themselves, on early exits and `CheckError` too, and
-never release the lock by rollback (the tutor turn's flushed cost-ledger
-writes must survive). `abandon_in_caller_transaction` is the exception: it
+never release the lock by rollback. An unexpected exception leaves the
+transaction to the caller; for `register`, `agent.tools.dispatch` rolls it
+back (#569). `abandon_in_caller_transaction` is the exception: it
 joins the session end's single commit. So a caller never commits after an
 action, and must commit after abandon.
 
@@ -268,6 +269,14 @@ not part of the openapi contract.
 exceptions; the real exception text is only in the server WARNING log.
 `pydantic.ValidationError` is the deliberate exception and passes through: the
 model needs the field detail to repair its own call.
+
+Both arms also roll back `ctx.db` (#569): on Postgres a failed statement aborts
+the transaction, which would fail the next tool in the batch and the loop's
+next commit. Two rules follow for any tool. A write tool commits its own work
+before returning, since a later tool's failure rolls back anything left
+uncommitted. A tool that swallows its own SQL error (as `retrieve` does,
+returning `retrieval_failed`) rolls back itself in that except arm, since
+`dispatch` rolls back only on an exception.
 
 ### Ingestion error strings (C-11)
 
