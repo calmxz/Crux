@@ -132,20 +132,26 @@ def pytest_deselected(items):
         items[0].config.stash[_sse_deselected_key] = True
 
 
+def _fail_run(session, message: str) -> None:
+    """Fail a run that would otherwise pass, with a red banner. A run already
+    failing, interrupted or broken keeps its own exit code."""
+    reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+    if reporter is not None:
+        reporter.ensure_newline()
+        reporter.write_sep("=", message, red=True)
+    if session.exitstatus == pytest.ExitCode.OK:
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
 def pytest_sessionfinish(session, exitstatus):
     # Default-engine hits after the last test's teardown (#579): no test is
     # left to fail, so they fail the run.
     if _default_engine_hits:
-        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if reporter is not None:
-            reporter.ensure_newline()
-            reporter.write_sep(
-                "=",
-                "connected on the default engine (db.database.engine) after the last test: "
-                + ", ".join(sorted(set(_default_engine_hits))),
-                red=True,
-            )
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        _fail_run(
+            session,
+            "connected on the default engine (db.database.engine) after the last test: "
+            + ", ".join(sorted(set(_default_engine_hits))),
+        )
         return
     # Only a clean run is judged: after a failure (or -x) the missing list
     # would be noise over the real error.
@@ -157,15 +163,7 @@ def pytest_sessionfinish(session, exitstatus):
 
     missing = sorted(set(sse_event_schemas()) - session.config.stash[_sse_seen_key])
     if missing:
-        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
-        if reporter is not None:
-            reporter.ensure_newline()
-            reporter.write_sep(
-                "=",
-                "SSE event types never emitted by non-test code: " + ", ".join(missing),
-                red=True,
-            )
-        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+        _fail_run(session, "SSE event types never emitted by non-test code: " + ", ".join(missing))
 
 
 @pytest.fixture(autouse=True)
@@ -213,7 +211,8 @@ def _no_default_engine(request):
         pytest.fail(
             "connected on the default engine (db.database.engine): "
             + ", ".join(hits)
-            + "; bind the session factory it used to the test engine",
+            + "; bind the session factory it used to the test engine. A hit"
+            " can also come from a thread or fixture an earlier test left behind.",
             pytrace=False,
         )
 
