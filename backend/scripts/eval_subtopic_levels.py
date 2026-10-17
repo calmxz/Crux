@@ -15,9 +15,12 @@ tutor.run_streaming with the profile reloaded after each turn.
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
 
-Each run hits the live LLM and is metered against your daily cap; the
-default 10 runs across 2 patterns x up to 3 turns each = a few dozen calls.
-Use --runs 3 for a quick smoke check.
+Each run hits the live LLM and is billed by the provider. Metering lands in
+the script's in-memory DB with a fresh user per run: the per-user cap never
+trips, only GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) can
+stop a long run, and none of it reaches your real ledger. The default 10 runs
+across 2 patterns x up to 3 turns each = a few dozen calls. Use --runs 3 for a
+quick smoke check.
 """
 
 from __future__ import annotations
