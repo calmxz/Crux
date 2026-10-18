@@ -304,9 +304,9 @@ def _patch_level(subtopic, level="advanced"):
 
 
 async def _run_by(script, turns, by_turn):
-    factory = script._make_session_factory()
-    pattern = {**_pattern(turns), "expected": {**_pattern(turns)["expected"], "by_turn": by_turn}}
-    return await script._run_pattern_once(factory, pattern)
+    pattern = _pattern(turns)
+    pattern["expected"]["by_turn"] = by_turn
+    return await script._run_pattern_once(script._make_session_factory(), pattern)
 
 
 @pytest.mark.asyncio
@@ -400,8 +400,39 @@ async def test_a_run_that_raises_shows_its_trace(script, fake_llm, monkeypatch, 
         await _run(script, ["Quiz me.", ANSWER])
 
     err = capsys.readouterr().err
-    assert "[probe] miss (no match)" in err
+    assert "[probe] miss (raised at turn 2)" in err
     assert "turn 1 ask_check_questions {'gap': 'u-substitution'} ok" in err
+
+
+@pytest.mark.asyncio
+async def test_a_turn_that_raises_midway_keeps_its_labels(script, fake_llm, monkeypatch, capsys):
+    # Set 1's follow-up patches, then closing Set 2 raises inside turn 2.
+    real_complete = check_service.complete
+    calls = []
+
+    def complete_then_fail(db, session_id):
+        calls.append(session_id)
+        if len(calls) == 2:
+            raise RuntimeError("second complete failed")
+        return real_complete(db, session_id)
+
+    monkeypatch.setattr(check_service, "complete", complete_then_fail)
+    fake_llm.streams = [
+        _quiz_turn(1, 2),
+        [_patch_level("u substitution")],
+        _quiz_turn(2, 2, [1, 2], prefix="R"),
+    ]
+
+    with pytest.raises(RuntimeError, match="second complete failed"):
+        await _run(script, ["Quiz me.", ANSWER, "Next?"])
+
+    err = capsys.readouterr().err
+    assert "[probe] miss (raised at turn 2): subtopic_levels={'u substitution': 'advanced'}" in err
+    assert (
+        "    turn 2 update_topic_profile {'subtopic': 'u substitution', "
+        "'evidence_type': 'declared', 'subtopic_level': 'advanced'} ok"
+    ) in err
+    assert "    turn 2 ask_check_questions {'gap': 'u-substitution'} ok" in err
 
 
 @pytest.mark.asyncio

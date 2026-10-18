@@ -174,6 +174,19 @@ def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:
         db.close()
 
 
+@dataclasses.dataclass
+class _Trace:
+    """#612: one run's tool calls and turn errors, each labelled with the
+    pattern turn it happened in as it is written, so a turn that raises
+    midway keeps its labels."""
+
+    turn: int = 0
+    lines: list[str] = dataclasses.field(default_factory=list)
+
+    def add(self, line: str) -> None:
+        self.lines.append(f"turn {self.turn} {line}")
+
+
 def _shown_args(name: str, args: dict) -> dict:
     if name == "ask_check_questions":
         return {"gap": args.get("gap")}
@@ -181,7 +194,7 @@ def _shown_args(name: str, args: dict) -> dict:
 
 
 async def _stream_reply(
-    messages: list[dict], system_prompt: str, ctx: ToolContext, trace: list[str]
+    messages: list[dict], system_prompt: str, ctx: ToolContext, trace: _Trace
 ) -> str:
     """The tutor's reply text. #612: appends every tool call with its outcome,
     and any error that ended the turn, to `trace` as the events stream, so
@@ -198,14 +211,14 @@ async def _stream_reply(
             line = f"{name} {_shown_args(name, args)!r} {ev.data['status']}"
             if ev.data.get("error"):
                 line += f": {ev.data['error']}"
-            trace.append(line)
+            trace.add(line)
         elif ev.type == "error":
-            trace.append(f"turn ended with error {ev.data!r}")
+            trace.add(f"turn ended with error {ev.data!r}")
     return "".join(reply_parts)
 
 
 async def _chat_turn(
-    db, session_id: str, user_id: str, messages: list[dict], trace: list[str]
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
 ) -> None:
     # The seed has no level; keep the diagnostic off so the eval
     # measures subtopic patching, as it was calibrated.
@@ -227,7 +240,7 @@ async def _chat_turn(
 
 
 async def _answer_step(
-    db, session_id: str, user_id: str, messages: list[dict], trace: list[str]
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
 ) -> bool:
     """Answer the open Set correctly, as the learner's clicks and Done button
     do, then every later Set a follow-up poses. A follow-up that replies
@@ -244,7 +257,7 @@ async def _answer_step(
 
 
 async def _answer_set(
-    db, session_id: str, user_id: str, messages: list[dict], pc: dict, trace: list[str]
+    db, session_id: str, user_id: str, messages: list[dict], pc: dict, trace: _Trace
 ) -> None:
     """Answer every pending Item of Set `pc` correctly, Close it and run the
     follow-up turn."""
@@ -290,12 +303,12 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
     user_id, session_id = _seed_session(SessionLocal, pattern)
     db = SessionLocal()
     expected = pattern["expected"]
-    trace: list[str] = []
+    trace = _Trace()
     matched_at: int | None = None
     try:
         messages: list[dict] = []
         for turn_idx, turn in enumerate(pattern["turns"], start=1):
-            start = len(trace)
+            trace.turn = turn_idx
             if isinstance(turn, str):
                 messages.append({"role": "user", "content": turn})
                 await _chat_turn(db, session_id, user_id, messages, trace)
@@ -307,7 +320,6 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
                     "answer step skipped",
                     file=sys.stderr,
                 )
-            trace[start:] = [f"turn {turn_idx} {line}" for line in trace[start:]]
 
             updated = profile_service.load_profile(db, session_id)
             if matched_at is None and _matches(updated, expected):
@@ -315,35 +327,42 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
 
         ok = matched_at is not None and matched_at <= expected["by_turn"]
         if not ok:
-            _report_miss(db, session_id, pattern["name"], expected, matched_at, trace)
+            when = (
+                "no match"
+                if matched_at is None
+                else f"matched at turn {matched_at}, expected by turn {expected['by_turn']}"
+            )
+            _report_miss(db, session_id, pattern["name"], when, trace)
         return ok
-    except Exception:
-        # A run that raises is a failure too; show what it did first.
-        _report_miss(db, session_id, pattern["name"], expected, matched_at, trace)
+    except BaseException:
+        # A run that raises (Ctrl-C included) is a failure too, and its calls
+        # were billed: show what it did first.
+        _report_miss(db, session_id, pattern["name"], f"raised at turn {trace.turn}", trace)
         raise
     finally:
         db.close()
 
 
-def _report_miss(
-    db, session_id: str, name: str, expected: dict, matched_at: int | None, trace: list[str]
-) -> None:
+def _report_miss(db, session_id: str, name: str, when: str, trace: _Trace) -> None:
     """#612: what the tutor did in a failed run, so a miss can be told apart:
     no patch, a patch under another subtopic name, a refused patch, a late
-    one, or a turn that errored."""
-    profile = profile_service.load_profile(db, session_id)
-    events = db.scalars(select(LearningEvent).where(LearningEvent.session_id == session_id)).all()
-    correct = sum(1 for e in events if e.correct)
-    when = (
-        "no match"
-        if matched_at is None
-        else f"matched at turn {matched_at}, expected by turn {expected['by_turn']}"
-    )
-    lines = [
-        f"  [{name}] miss ({when}): subtopic_levels={(profile.subtopic_levels or {})!r}; "
-        f"graded {correct}/{len(events)} correct",
-        *(f"    {line}" for line in trace),
-    ]
+    one, or a turn that errored or raised."""
+    try:
+        # After a raise the session may hold a failed transaction.
+        db.rollback()
+        profile = profile_service.load_profile(db, session_id)
+        events = db.scalars(
+            select(LearningEvent).where(LearningEvent.session_id == session_id)
+        ).all()
+        correct = sum(1 for e in events if e.correct)
+        state = (
+            f"subtopic_levels={(profile.subtopic_levels or {})!r}; "
+            f"graded {correct}/{len(events)} correct"
+        )
+    except Exception as e:  # noqa: BLE001
+        # The trace still prints when the database cannot be read.
+        state = f"profile unreadable ({type(e).__name__})"
+    lines = [f"  [{name}] miss ({when}): {state}", *(f"    {line}" for line in trace.lines)]
     # Model-written names can hold characters a cp1252 console cannot print.
     text = "\n".join(lines).encode("ascii", "backslashreplace").decode("ascii")
     print(text, file=sys.stderr)
@@ -409,6 +428,9 @@ def main() -> int:
         help="Run only this pattern; repeat for more (default: every pattern).",
     )
     args = parser.parse_args()
+    # Model-written text reaches stderr (errors, traces); a cp1252 console
+    # cannot encode all of it, and a print that raises would end the eval.
+    sys.stderr.reconfigure(errors="backslashreplace")
 
     if os.environ.get("LLM_STUB") == "1":
         print(
