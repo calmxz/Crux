@@ -423,6 +423,17 @@ deploy target: blueprint values, not confirmed deployed. Local dev
 (native uvicorn, docker compose) and tests use `backend/config.py` defaults
 unless `.env` overrides them.
 
+### Subtopic eval pattern turns (#601)
+
+A turn in `backend/scripts/subtopic_patterns/*.json` is a chat message (a
+string) or `{"action": "answer_checks_correctly"}`. The answer step runs what
+the learner's clicks run: `check_service.answer` with each pending Item's
+`correct_index`, `check_service.complete` (the Done button), then the
+follow-up turn on the `[check results]` summary, mirroring
+`routes/sessions.py::_followup_context`. Change one, check the other. With
+no open Set the step is skipped and logged. Any other turn object fails at
+load. A follow-up that opens a later Set leaves it unanswered.
+
 ## Frontend
 
 ### `--control-edge` token (D-20)

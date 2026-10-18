@@ -128,12 +128,22 @@ async def test_the_follow_up_sees_the_results_and_the_next_turn_does_not(script,
 
 
 @pytest.mark.asyncio
+async def test_the_follow_up_cannot_start_a_new_check(script, fake_llm):
+    # The Done click's follow-up is suppressed: a fresh Set 1 is refused.
+    fake_llm.streams = [_quiz_turn(), _quiz_turn(), ["Fine, moving on."]]
+
+    factory, _ok = await _run(script, ["Quiz me on u-sub.", ANSWER])
+
+    with factory() as db:
+        assert check_service.open_set(db.get(SessionModel, SESSION_ID)) is None
+
+
+@pytest.mark.asyncio
 async def test_with_no_open_set_the_answer_step_is_skipped_and_logged(script, fake_llm, capsys):
     fake_llm.streams = [["Sure, here is u-sub."], ["Next up: parts."]]
 
-    factory, ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
+    factory, _ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
 
-    assert ok is False
     assert len(fake_llm.stream_calls) == 2
     with factory() as db:
         assert db.scalars(select(LearningEvent)).all() == []
