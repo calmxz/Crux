@@ -5,7 +5,7 @@ $root = $PSScriptRoot
 
 $uvicorn = Join-Path $root "backend\.venv\Scripts\uvicorn.exe"
 if (-not (Test-Path $uvicorn)) {
-    Write-Error "uvicorn not found at $uvicorn - is the venv set up? (cd backend; python -m venv .venv; .venv\Scripts\pip install -e .)"
+    Write-Error "uvicorn not found at $uvicorn - is the venv set up? (cd backend; uv sync --locked --extra dev)"
     exit 1
 }
 
