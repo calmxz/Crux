@@ -316,7 +316,7 @@ Runner for the Phase 3/5 focus-clearing checkpoint:
 GEMINI_API_KEY=... python backend/scripts/reliability_focus_clear.py --runs 10
 ```
 
-Loads fixtures from `backend/scripts/focus_patterns/{linear,topic_shift,tangent,vague_signal}.json`, drives `agent.tutor.run` against an in-memory SQLite, reports per-pattern pass rate, and exits 1 if any pattern <85%.
+Loads fixtures from `backend/scripts/focus_patterns/{linear,topic_shift,tangent,vague_signal}.json`, drives `agent.tutor.run` against an in-memory SQLite, reports per-pattern pass rate, and exits 1 if any pattern <85%. `--max-cost` (default $5) stops starting new fixture runs once recorded spend reaches it; a cost stop prints spend and runs completed, no verdict, and exits 3. Every run ends with a `Total spend` line.
 
 ### 6.4 Phase 0 spike
 
