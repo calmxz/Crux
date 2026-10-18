@@ -1,0 +1,26 @@
+{
+  "name": "basedpyright-lsp",
+  "version": "1.0.0",
+  "author": {
+    "name": "calmxz"
+  },
+  "description": "basedpyright language server for the backend, reading backend/pyrightconfig.json and its committed baseline",
+  "lspServers": {
+    "basedpyright": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${CLAUDE_PROJECT_DIR}/backend",
+        "--no-sync",
+        "basedpyright-langserver",
+        "--stdio"
+      ],
+      "workspaceFolder": "${CLAUDE_PROJECT_DIR}/backend",
+      "extensionToLanguage": {
+        ".py": "python",
+        ".pyi": "python"
+      }
+    }
+  }
+}

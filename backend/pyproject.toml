@@ -43,6 +43,7 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.16.10,<1.0",
     "jsonschema>=4.26.0",
+    "basedpyright>=1.40.2,<1.41",
 ]
 
 [tool.setuptools.packages.find]

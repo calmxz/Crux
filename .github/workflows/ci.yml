@@ -57,6 +57,12 @@ jobs:
       - name: Format check (ruff)
         run: ruff format --check .
 
+      # #616: fails on any error outside .basedpyright/baseline.json (exit 1)
+      # and on a fixed error the baseline still lists (exit 3). The flag is
+      # explicit so the gate does not depend on basedpyright's CI detection.
+      - name: Typecheck (basedpyright)
+        run: basedpyright --baselinemode=lock
+
       - name: Validate OpenAPI spec
         working-directory: .
         run: python -m openapi_spec_validator docs/api/openapi.yaml

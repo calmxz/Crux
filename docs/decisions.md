@@ -3,6 +3,27 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-18 - basedpyright with a baseline types the backend, in CI and the editor (#607, #616)
+
+The backend had a pyright config but nothing ran it, and fixing its 95
+errors to zero would touch about 20 files during the #493 refactor.
+
+- **basedpyright, not pyright.** Its built-in baseline makes CI fail only on
+  new errors, with no custom baseline script. `--baselinemode=lock` also
+  fails (exit 3) when a fixed error stays in the baseline, so the baseline
+  only shrinks unless a PR rewrites it with `--writebaseline`, which shows up
+  in review. #607 asked that fixing a baselined error never fail CI; #616's
+  shrink-only rule wins, and the fix is one local run.
+- **The editor uses it too.** The official `pyright-lsp` plugin can't read a
+  baseline, so it reported all 95 errors after every edit, on lines the edit
+  never touched. A repo-local plugin runs basedpyright's language server on
+  the same config and baseline, which reports baselined errors as hints.
+  `pyright-lsp` is turned off for this repo only.
+- **The plugin is enabled locally.** `.claude/` stays gitignored, so each
+  checkout adds the marketplace and `enabledPlugins` lines itself
+  (`docs/reference.md` "Backend typecheck") rather than the repo tracking the
+  hook setup.
+
 ## 2026-10-18 - Graded Set scores reach subtopic_levels through the tutor (#612, #614)
 
 R4.1 AC3's `tested_progression` eval scored 0: every Item was graded
