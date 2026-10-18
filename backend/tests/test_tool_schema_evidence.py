@@ -1,6 +1,6 @@
 """The update_topic_profile parameter schema must not contradict the service.
 
-profile_service.apply_patch rejects a knowledge_level change without
+profile_service.apply_patch rejects a knowledge_level or subtopic_level change without
 evidence_type declared/tested (F-39). The schema description the LLM sees is
 generated from docs/api/openapi.yaml; if it claims evidence_type is only
 needed for add_mastered_concept, the model omits it on level-only patches,
@@ -17,4 +17,9 @@ def _update_profile_fn():
 def test_schema_description_states_level_needs_evidence():
     params = _update_profile_fn()["parameters"]
     desc = params.get("description") or ""
-    assert "required whenever `knowledge_level` or `add_mastered_concept` is present" in desc, desc
+    # Whitespace-normalized: the YAML block wraps the sentence across lines.
+    flat = " ".join(desc.split())
+    assert (
+        "required whenever `knowledge_level`, `add_mastered_concept` or "
+        "`subtopic_level` is present" in flat
+    ), desc

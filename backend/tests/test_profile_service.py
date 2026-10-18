@@ -866,12 +866,95 @@ def test_apply_patch_sets_subtopic_level(session_row, db_session):
     from services import profile_service
 
     ctx, args = _ctx_args(
-        db_session, session_row, subtopic="  Integration BY Parts ", subtopic_level="beginner"
+        db_session,
+        session_row,
+        subtopic="  Integration BY Parts ",
+        subtopic_level="beginner",
+        evidence_type="declared",
     )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert res.ok
     p = profile_service.load_profile(db_session, session_row.id)
     assert p.subtopic_levels == {"integration by parts": "beginner"}
+
+
+@pytest.mark.parametrize("evidence", [None, "inferred"])
+def test_apply_patch_subtopic_level_without_evidence_fails(session_row, db_session, evidence):
+    # #614: a subtopic level needs the same declared/tested evidence as
+    # knowledge_level (F-39); omitted or inferred fails and writes nothing.
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="chain rule",
+        subtopic_level="beginner",
+        evidence_type=evidence,
+    )
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert not res.ok and res.status == "failed"
+    assert res.error == "subtopic_level change requires evidence_type 'declared' or 'tested'"
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "advanced"}
+
+
+@pytest.mark.parametrize("evidence", ["declared", "tested"])
+def test_apply_patch_subtopic_level_with_evidence_writes(session_row, db_session, evidence):
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="Chain Rule",
+        subtopic_level="beginner",
+        evidence_type=evidence,
+    )
+    assert profile_service.apply_patch(db_session, ctx, args).ok
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "beginner"}
+
+
+def test_apply_patch_rejected_subtopic_level_saves_no_other_field(session_row, db_session):
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.focus_target_gap = "limits"
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="chain rule",
+        subtopic_level="beginner",
+        add_confirmed_gap="u-substitution",
+        focus_target_gap="u-substitution",
+    )
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert res.error == "subtopic_level change requires evidence_type 'declared' or 'tested'"
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "advanced"}
+    assert p.confirmed_gaps == []
+    assert p.focus_target_gap == "limits"
+
+
+@pytest.mark.parametrize("evidence", [None, "declared"])
+def test_apply_patch_subtopic_pair_rule_checked_before_evidence(session_row, db_session, evidence):
+    # With evidence omitted, the evidence gate would also reject this patch:
+    # the pair error proves the pair rule runs first.
+    from services import profile_service
+
+    ctx, args = _ctx_args(db_session, session_row, subtopic="chain rule", evidence_type=evidence)
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert res.error == "subtopic and subtopic_level must be provided together"
 
 
 def test_apply_patch_subtopic_requires_pair(session_row, db_session):
@@ -890,19 +973,33 @@ def test_apply_patch_subtopic_cap(session_row, db_session):
     p.subtopic_levels = {f"topic {i}": "beginner" for i in range(20)}
     profile_service.save_profile(db_session, session_row.id, p)
 
-    ctx, args = _ctx_args(db_session, session_row, subtopic="one more", subtopic_level="advanced")
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="one more",
+        subtopic_level="advanced",
+        evidence_type="declared",
+    )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert not res.ok and "full" in res.error
 
     # updating an existing key is always allowed
-    ctx, args = _ctx_args(db_session, session_row, subtopic="topic 3", subtopic_level="advanced")
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="topic 3",
+        subtopic_level="advanced",
+        evidence_type="declared",
+    )
     assert profile_service.apply_patch(db_session, ctx, args).ok
 
 
 def test_apply_patch_subtopic_empty_after_strip(session_row, db_session):
     from services import profile_service
 
-    ctx, args = _ctx_args(db_session, session_row, subtopic="   ", subtopic_level="beginner")
+    ctx, args = _ctx_args(
+        db_session, session_row, subtopic="   ", subtopic_level="beginner", evidence_type="declared"
+    )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert not res.ok
     assert "empty" in res.error

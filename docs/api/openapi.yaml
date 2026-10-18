@@ -1152,14 +1152,16 @@ components:
       type: object
       additionalProperties: false
       required: [session_id]
+      # The evidence sentence below is pinned by
+      # backend/tests/test_tool_schema_evidence.py.
       description: |
         Patch operation for a session's TopicProfile. Sending
         `focus_target_gap: null` together with `focus_clear_reason` clears
         focus; omitting the field leaves focus unchanged.
         `focus_clear_reason=tested_correct` is verified server-side against
         the session's learning events. `evidence_type` (`declared` or
-        `tested`) is required whenever `knowledge_level` or `add_mastered_concept` is present;
-        omitting it makes the patch fail. `subtopic` and `subtopic_level`
+        `tested`) is required whenever `knowledge_level`, `add_mastered_concept`
+        or `subtopic_level` is present; omitting it makes the patch fail. `subtopic` and `subtopic_level`
         must be provided together (service-enforced cross-field rule).
       properties:
         session_id:
@@ -1229,7 +1231,9 @@ components:
             - $ref: "#/components/schemas/KnowledgeLevel"
             - type: "null"
           default: null
-          description: Learner's level on subtopic. Must be sent with subtopic.
+          description: >-
+            Learner's level on subtopic. Must be sent with subtopic. Requires
+            evidence_type declared or tested; the patch fails without it.
 
     RetrieveChunksArgs:
       type: object

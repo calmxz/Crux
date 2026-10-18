@@ -3,6 +3,33 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-18 - Graded Set scores reach subtopic_levels through the tutor (#612, #614)
+
+R4.1 AC3's `tested_progression` eval scored 0: every Item was graded
+correct, yet `subtopic_levels` stayed `{}`. Nothing tied a graded Check to a
+subtopic level. The rules only said to set one when the learner "declares or
+demonstrates" it, and server grading writes mastery, gaps and (for a
+Diagnostic) `knowledge_level`, never `subtopic_levels`.
+
+- **The tutor writes the level, from a prompt rule.** On a `[check results]`
+  turn of an ordinary Check whose Set has an answered Item and whose gap is a
+  subtopic of the TOPIC, the tutor patches `subtopic` + `subtopic_level` with
+  `evidence_type="tested"`. The level uses the Diagnostic thresholds
+  (`_level_for_score`) over answered Items, the score the summary shows; a
+  Diagnostic also counts skips.
+  AC3 measures how reliably the LLM patches subtopic levels. Also, the server
+  can't tell a subtopic ("u-substitution") from a one-off misconception gap
+  ("sign error in the chain rule"), so a server write would fill the
+  `MAX_SUBTOPICS` cap with junk keys. Diagnostic Sets still write only
+  `knowledge_level`.
+- **Fallback, if the rule can't reach 85%: a hybrid.** The tutor creates
+  entries; server grading updates levels on existing keys only. That needs a
+  new triage decision.
+- **A tutor subtopic patch needs evidence (#614).** `apply_patch` fails the
+  whole patch unless `evidence_type` is "declared" or "tested", the F-39
+  standard for `knowledge_level`. The learner's own edits on the profile
+  route stay ungated: editing your own level is declaring it.
+
 ## 2026-10-18 - Every backend install uses the committed uv.lock (#609)
 
 Locally the backend was installed with uv against `backend/uv.lock`, but the
