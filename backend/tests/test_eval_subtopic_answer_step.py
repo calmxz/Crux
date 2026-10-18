@@ -115,7 +115,7 @@ async def test_the_answer_step_answers_every_set_of_the_check(script, fake_llm):
     fake_llm.streams = [
         _quiz_turn(1, 2),
         ["Good. Set 2:", *_quiz_turn(2, 2, set2, prefix="R")],
-        ["All six right."],
+        ["All five right."],
         ["Next up: parts."],
     ]
 
@@ -136,6 +136,20 @@ async def test_the_answer_step_answers_every_set_of_the_check(script, fake_llm):
         "Quiz me on u-sub.",
         "What's next?",
     ]
+
+
+@pytest.mark.asyncio
+async def test_a_follow_up_without_the_next_set_ends_the_step(script, fake_llm):
+    fake_llm.streams = [_quiz_turn(1, 2), ["Good. More later."], ["Next up: parts."]]
+
+    factory, _ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
+
+    assert len(fake_llm.stream_calls) == 3
+    with factory() as db:
+        row = db.get(SessionModel, SESSION_ID)
+        assert check_service.open_set(row) is None
+        assert check_service.current_check(row)["last_set_index"] == 1
+        assert len(db.scalars(select(LearningEvent)).all()) == len(CORRECT)
 
 
 @pytest.mark.asyncio

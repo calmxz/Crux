@@ -17,8 +17,8 @@ A pattern turn is a chat message (a string) or the structured answer step
 open check Set correctly through check_service.answer, Closes the Set through
 check_service.complete and runs the follow-up turn on the results summary,
 as the learner's clicks and Done button do in the app. When a follow-up poses
-the Check's next Set, the step answers that too, so the whole Check is done
-before the next turn: one more paid call per extra Set. Every pattern is
+the Check's next Set, the step answers that too (at most 3 Sets): one more
+paid call per extra Set. Every pattern is
 validated before the first run; a malformed one exits 4 having spent nothing.
 
 Usage:
@@ -31,8 +31,9 @@ trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new runs once this process's recorded spend reaches it, so a run
 can overshoot it by one run; a cost stop prints no verdict and exits 3.
 GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies. The
-default 10 runs across 2 patterns x up to 3 turns each = a few dozen calls.
-Use --runs 3 for a quick smoke check.
+default 10 runs per pattern: declared_level makes 3 calls a run,
+tested_progression 3 to 5 (one follow-up per Set), so 60 to 80 calls for
+both. Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
@@ -70,6 +71,8 @@ from services import check_service, profile_service, prompt_state  # noqa: E402
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"
 PATTERNS = ("declared_level", "tested_progression")
 ANSWER_STEP = {"action": "answer_checks_correctly"}
+# Sets per Check: openapi.yaml caps AskCheckQuestionsArgs.set_total at 3.
+MAX_SETS = 3
 RUNS_PER_PATTERN = 10
 THRESHOLD = 0.85
 DEFAULT_MAX_COST = Decimal("5")
@@ -200,17 +203,18 @@ async def _chat_turn(db, session_id: str, user_id: str, messages: list[dict]) ->
 
 
 async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) -> bool:
-    """Answer the open Check correctly, as the learner's clicks and Done
-    button do: every Set, since a follow-up may pose the Check's next one.
+    """Answer the open Set correctly, as the learner's clicks and Done button
+    do, then every later Set a follow-up poses. A follow-up that replies
+    without posing the next Set leaves the Check between Sets, as in the app.
     Returns False, doing nothing, when no Set is open."""
-    pc = check_service.open_set(db.get(SessionModel, session_id))
-    if pc is None:
-        return False
-    # Ends: a follow-up may only pose the next Set, and a Check has at most 3.
-    while pc is not None:
-        await _answer_set(db, session_id, user_id, messages, pc)
+    answered = False
+    for _ in range(MAX_SETS):
         pc = check_service.open_set(db.get(SessionModel, session_id))
-    return True
+        if pc is None:
+            break
+        await _answer_set(db, session_id, user_id, messages, pc)
+        answered = True
+    return answered
 
 
 async def _answer_set(db, session_id: str, user_id: str, messages: list[dict], pc: dict) -> None:

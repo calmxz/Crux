@@ -434,7 +434,8 @@ follow-up turn on the `[check results]` summary, mirroring
 no open Set the step is skipped and logged. Every pattern is validated (turns
 and `expected` keys) before the first run, and one bad fixture exits 4
 before any spend. A follow-up that poses the Check's next Set gets that Set
-answered and Closed too, so the next turn always follows a finished Check.
+answered and Closed too (at most 3 Sets). A follow-up that replies without
+posing it leaves the Check between Sets for the next turn, as in the app.
 
 ## Frontend
 
