@@ -64,7 +64,7 @@ from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
-from db.models import DailyCostLedger, User  # noqa: E402
+from db.models import ChatMessage, DailyCostLedger, LearningEvent, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
 from services import check_service, profile_service, prompt_state  # noqa: E402
 
@@ -283,11 +283,41 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
             if matched_at is None and _matches(updated, expected):
                 matched_at = turn_idx
 
-        if matched_at is None:
-            return False
-        return matched_at <= expected["by_turn"]
+        ok = matched_at is not None and matched_at <= expected["by_turn"]
+        if not ok:
+            _report_miss(db, session_id, pattern["name"])
+        return ok
     finally:
         db.close()
+
+
+def _report_miss(db, session_id: str, name: str) -> None:
+    """#612: what the tutor did in a failed run, so a miss can be told apart:
+    no patch, a patch under another subtopic name, or a refused patch. Reads
+    the tool calls the tutor persisted on its replies."""
+    profile = profile_service.load_profile(db, session_id)
+    events = db.scalars(select(LearningEvent).where(LearningEvent.session_id == session_id)).all()
+    correct = sum(1 for e in events if e.correct)
+    lines = [
+        f"  [{name}] miss: subtopic_levels={(profile.subtopic_levels or {})!r}; "
+        f"graded {correct}/{len(events)} correct"
+    ]
+    replies = db.scalars(
+        select(ChatMessage)
+        .where(ChatMessage.session_id == session_id, ChatMessage.role == "assistant")
+        .order_by(ChatMessage.id)
+    ).all()
+    for n, reply in enumerate(replies, start=1):
+        for call in json.loads(reply.tool_calls_json or "[]"):
+            if call["name"] == "ask_check_questions":
+                args = {"gap": call["args"].get("gap")}
+            else:
+                args = {k: v for k, v in call["args"].items() if k != "session_id"}
+            line = f"    reply {n} {call['name']} {args!r} {call['status']}"
+            if call.get("error"):
+                line += f": {call['error']}"
+            lines.append(line)
+    print("\n".join(lines), file=sys.stderr)
 
 
 async def _main_async(

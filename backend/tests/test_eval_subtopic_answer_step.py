@@ -294,3 +294,52 @@ def test_tested_progression_answers_with_a_structured_turn(script):
     pattern = script._load_pattern(script.PATTERN_DIR / "tested_progression.json")
     assert pattern["turns"][1] == ANSWER
     assert "[simulate" not in json.dumps(pattern)
+
+
+def _patch_level(subtopic, level="advanced"):
+    args = {"session_id": SESSION_ID, "subtopic": subtopic, "evidence_type": "declared"}
+    if level is not None:
+        args["subtopic_level"] = level
+    return tool_call("update_topic_profile", args=args)
+
+
+@pytest.mark.asyncio
+async def test_a_miss_prints_the_profile_grading_and_tool_calls(script, fake_llm, capsys):
+    # #612: a failed run says what the tutor did, so a 0% can be diagnosed.
+    fake_llm.streams = [
+        _quiz_turn(),
+        [_patch_level("u substitution")],
+        ["Nice work."],
+        [_patch_level("u-substitution", level=None)],
+        ["Next up: parts."],
+    ]
+
+    _factory, ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
+
+    assert ok is False
+    err = capsys.readouterr().err
+    assert "[probe] miss: subtopic_levels={'u substitution': 'advanced'}; graded 3/3 correct" in err
+    assert "reply 1 ask_check_questions {'gap': 'u-substitution'} ok" in err
+    assert (
+        "reply 2 update_topic_profile {'subtopic': 'u substitution', "
+        "'evidence_type': 'declared', 'subtopic_level': 'advanced'} ok"
+    ) in err
+    assert (
+        "reply 3 update_topic_profile {'subtopic': 'u-substitution', "
+        "'evidence_type': 'declared'} failed: subtopic and subtopic_level must be provided together"
+    ) in err
+
+
+@pytest.mark.asyncio
+async def test_a_pass_prints_no_miss(script, fake_llm, capsys):
+    fake_llm.streams = [
+        _quiz_turn(),
+        [_patch_level("u-substitution")],
+        ["Nice work."],
+        ["Next up: parts."],
+    ]
+
+    _factory, ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
+
+    assert ok is True
+    assert "miss" not in capsys.readouterr().err
