@@ -14,7 +14,6 @@ docs/dev/debug-accounts.txt
 *.pem
 *.crt
 service-account*.json
-firebase-*.json
 .claude/
 # MCP server config (env-var refs only, no secrets) — local-only like .claude/.
 .mcp.json
@@ -74,8 +73,6 @@ Thumbs.db
 
 
 CLAUDE.md
-DESIGN.md
-PRODUCT.md
 .superpowers/
 
 .playwright-mcp/
