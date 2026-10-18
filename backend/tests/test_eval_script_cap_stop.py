@@ -111,7 +111,7 @@ def test_a_daily_cap_refusal_also_stops(script, monkeypatch, capsys):
 
 
 def test_a_non_cap_error_is_still_scored(script, monkeypatch, capsys):
-    calls = _stub_stream(script, monkeypatch, ["llm_unavailable"])
+    calls = _stub_stream(script, monkeypatch, [error_codes.LLM_UNAVAILABLE])
     code = _main(script, monkeypatch, "--runs", "1")
 
     assert len(calls) > 1
