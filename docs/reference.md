@@ -432,7 +432,8 @@ columns, without line numbers, so moving code doesn't break matching.
 - **Editor**: the repo-local plugin `plugins/basedpyright-lsp` (marketplace
   `.claude-plugin/marketplace.json`) runs `basedpyright-langserver` from the
   backend venv with `backend/` as its workspace folder, so it reads the same
-  config and baseline as CI. Baselined errors come back as hints, new ones as
+  config and baseline as CI. The config pins `pythonPlatform` to Linux (CI
+  and Render), so a Windows run reports what CI reports. Baselined errors come back as hints, new ones as
   errors. Saving a file can shrink the baseline the same way a plain run
   does: commit that change. `.claude/` is gitignored, so the plugin is turned
   on in each checkout's own `.claude/settings.json`:
@@ -447,12 +448,13 @@ columns, without line numbers, so moving code doesn't break matching.
   }
   ```
 
-  then trust the folder in a new session. The server starts with
-  `uv run --no-sync`, so the venv must have the dev extra
-  (`uv sync --locked --extra dev`).
+  then trust the folder in a new session. The server starts through
+  `uv run --locked --extra dev --inexact`, which syncs `backend/.venv` to the
+  lock first (a fresh worktree gets a full venv, never an empty one).
 - **ASCII console output**: `tests/test_scripts_ascii_console.py` fails when
-  a `backend/scripts/` file can print a non-ASCII string (the Windows console
-  is cp1252): any string literal inside `print`, `input`,
+  a `backend/scripts/` file can print a non-ASCII string. On Windows, stdout
+  is cp1252 with strict errors, so one crashes the script; stderr uses
+  `backslashreplace` and only garbles it, but is held to the same rule. Any string literal inside `print`, `input`,
   `sys.stdout/stderr.write`, the argparse constructors and `add_*` builders,
   `parser.error`, `ArgumentTypeError`, `SystemExit` / `sys.exit`, and the
   module docstring when passed as `description=__doc__`. Comments, other

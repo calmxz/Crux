@@ -1,7 +1,8 @@
 """#607: backend scripts print ASCII only.
 
-The Windows console is cp1252, so a non-ASCII character reaching it raises
-UnicodeEncodeError and kills the script, worst when it runs unattended.
+On Windows stdout is cp1252 with strict errors, so a non-ASCII character
+printed there raises UnicodeEncodeError and kills the script, worst when it
+runs unattended. stderr only garbles it, but is held to the same rule.
 Checked with `ast`, not a line regex: a print often spans several lines.
 """
 

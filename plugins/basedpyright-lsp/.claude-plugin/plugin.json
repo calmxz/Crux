@@ -12,7 +12,10 @@
         "run",
         "--project",
         "${CLAUDE_PROJECT_DIR}/backend",
-        "--no-sync",
+        "--locked",
+        "--extra",
+        "dev",
+        "--inexact",
         "basedpyright-langserver",
         "--stdio"
       ],
