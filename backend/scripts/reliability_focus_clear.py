@@ -20,8 +20,9 @@ trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new fixture runs once this process's recorded spend reaches it, so a
 run can overshoot it by one fixture run; a cost stop prints no verdict and
 exits 3. GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still
-applies. The default 10 runs across 9 fixtures = 90 sessions, ~3-6 turns each
-= a few hundred calls. Use --runs 3 for a quick smoke check.
+applies: a call any cost cap refuses ends the eval the same way (exit 3),
+discarding the fixture run it hit. The default 10 runs across 9 fixtures =
+90 sessions, ~3-6 turns each = a few hundred calls. Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
@@ -54,6 +55,7 @@ from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
 from db.models import DailyCostLedger, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
+from lib import error_codes  # noqa: E402
 from services import profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "focus_patterns"
@@ -71,6 +73,17 @@ class EvalOutcome:
     planned: int
     spend: Decimal
     cost_stopped: bool
+    # The refusal code when a cost cap refused a tutor call (#605).
+    cap_refused: str | None = None
+
+
+class _CapRefused(Exception):
+    """#605: a cost cap refused a tutor call; the refused call never reached
+    the model. `_main_async` catches it before its per-run `except Exception`."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
 
 
 def _positive_usd(value: str) -> Decimal:
@@ -131,7 +144,8 @@ def _seed_session(SessionLocal, fixture: dict) -> tuple[str, str]:
 
 async def _run_fixture(SessionLocal, fixture: dict) -> bool:
     """One fixture run. Returns True if the model's clearing behavior matched
-    `expected_clear_at_turn` (None means must-not-clear)."""
+    `expected_clear_at_turn` (None means must-not-clear). Raises _CapRefused
+    if a cost cap refused a turn's call."""
     user_id, session_id = _seed_session(SessionLocal, fixture)
     db = SessionLocal()
     try:
@@ -159,9 +173,14 @@ async def _run_fixture(SessionLocal, fixture: dict) -> bool:
                 turn_started_at=datetime.now(timezone.utc),
             )
             reply_parts: list[str] = []
+            cap_code: str | None = None
             async for ev in tutor.run_streaming(messages, system_prompt, ctx):
                 if ev.type == "assistant_delta":
                     reply_parts.append(ev.data.get("text", ""))
+                elif ev.type == "error" and ev.data.get("code") in error_codes.COST_CAP_CODES:
+                    cap_code = ev.data["code"]
+            if cap_code is not None:
+                raise _CapRefused(cap_code)
             reply = "".join(reply_parts)
             messages.append({"role": "assistant", "content": reply})
 
@@ -180,7 +199,8 @@ async def _run_fixture(SessionLocal, fixture: dict) -> bool:
 async def _main_async(runs: int, max_cost: Decimal) -> EvalOutcome:
     """Runs every fixture `runs` times, checking recorded spend against
     `max_cost` before each fixture run (never mid-run). On reaching it, starts
-    no further runs and returns with `cost_stopped` set."""
+    no further runs and returns with `cost_stopped` set. A cost cap refusing
+    a call mid-run discards that run and returns with `cap_refused` set."""
     SessionLocal = _make_session_factory()
     results: dict[str, tuple[float, int]] = {}
     fixtures_by_pattern = {
@@ -199,6 +219,15 @@ async def _main_async(runs: int, max_cost: Decimal) -> EvalOutcome:
                     return EvalOutcome(results, completed, planned, spend, cost_stopped=True)
                 try:
                     ok = await _run_fixture(SessionLocal, fixture)
+                except _CapRefused as refused:
+                    return EvalOutcome(
+                        results,
+                        completed,
+                        planned,
+                        _total_spend(SessionLocal),
+                        cost_stopped=False,
+                        cap_refused=refused.code,
+                    )
                 except Exception as e:  # noqa: BLE001
                     print(
                         f"  [{pattern} run={run_idx} fix={fix_idx}] error: {e}",
@@ -249,6 +278,13 @@ def main() -> int:
 
 
 def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
+    if outcome.cap_refused is not None:
+        print(
+            f"\nCost cap refused a call ({outcome.cap_refused}): spent ${outcome.spend:.4f}. "
+            f"Completed {outcome.completed} of {outcome.planned} planned runs. "
+            "No verdict over partial results."
+        )
+        return COST_STOP_EXIT
     if outcome.cost_stopped:
         print(
             f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.4f}. "
