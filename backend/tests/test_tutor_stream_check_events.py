@@ -232,7 +232,7 @@ async def test_cancel_mid_text_stream_does_not_raise_name_error(monkeypatch, db_
     try:
         event = await agen.athrow(asyncio.CancelledError())
         collected.append(event)
-    except (asyncio.CancelledError, StopAsyncIteration):
+    except asyncio.CancelledError, StopAsyncIteration:
         # Generator re-raised instead of yielding a final event. That is an
         # acceptable outcome: the cancel branch still persisted the cancelled
         # message before re-raising, which the DB assertion below verifies.

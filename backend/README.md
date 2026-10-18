@@ -1,6 +1,6 @@
 # Crux Backend
 
-FastAPI + Supabase Postgres (pgvector). Python 3.12+.
+FastAPI + Supabase Postgres (pgvector). Python 3.14+.
 
 ## Setup
 

@@ -300,11 +300,11 @@ def _load_messages(
     for m in rows:
         try:
             citations = [Citation(**c) for c in json.loads(m.citations_json or "[]")]
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             citations = []
         try:
             tool_calls = [ToolCallRecord(**t) for t in json.loads(m.tool_calls_json or "[]")]
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             tool_calls = []
         # Suppress recap for the message whose batch is still OPEN: the live
         # CheckQuestion card (driven by pending_check) owns that batch until

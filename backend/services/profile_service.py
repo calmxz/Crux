@@ -188,7 +188,7 @@ def _parse_profile(raw: str | None) -> TopicProfile:
     raw = raw or "{}"
     try:
         data = json.loads(raw)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         log.warning("unparseable topic_profile_json; using empty profile")
         return TopicProfile()
     if not isinstance(data, dict):

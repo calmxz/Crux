@@ -32,7 +32,7 @@ def delete_auth_user(user_id: str) -> None:
     # value rejects anything else and never forwards the raw string.
     try:
         safe_user_id = str(uuid.UUID(user_id))
-    except (ValueError, AttributeError, TypeError):
+    except ValueError, AttributeError, TypeError:
         raise AuthAdminError("auth admin delete refused: user id is not a UUID") from None
     url = f"{settings.supabase_url.rstrip('/')}/auth/v1/admin/users/{safe_user_id}"
     headers = {"apikey": key, "Authorization": f"Bearer {key}"}

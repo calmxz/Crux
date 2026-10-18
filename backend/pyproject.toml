@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crux-backend"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.141.1,<0.141.2",  # MAL-2026-4750: 0.136.3 flagged malicious by pip-audit (amazon-inspector)
     "uvicorn[standard]>=0.54.0,<1.0",
@@ -58,7 +58,7 @@ omit = ["tests/*", "scripts/*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 extend-exclude = ["contracts/models.py"]
 
 [tool.ruff.format]

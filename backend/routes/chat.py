@@ -491,7 +491,7 @@ async def chat_stream(
                     task.cancel()
                     try:
                         await task
-                    except (asyncio.CancelledError, Exception):
+                    except asyncio.CancelledError, Exception:
                         # Producer cancelled or errored during disconnect
                         # cleanup; suppress.
                         pass

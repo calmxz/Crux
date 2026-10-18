@@ -105,7 +105,7 @@ def compute_enrichment(db: Session, rows: list[SessionModel]) -> dict[str, Sessi
     for r in rows:
         try:
             prof = json.loads(r.topic_profile_json or "{}")
-        except (ValueError, TypeError):
+        except ValueError, TypeError:
             prof = {}
         out[r.id] = SessionEnrichment(
             message_count=counts.get(r.id, 0),
