@@ -30,7 +30,8 @@ the script's in-memory DB with a fresh user per run: the per-user cap never
 trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new runs once this process's recorded spend reaches it, so a run
 can overshoot it by one run; a cost stop prints no verdict and exits 3.
-GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies. The
+GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies: a
+call it refuses ends the eval the same way, discarding the run it hit. The
 default 10 runs per pattern: declared_level makes 3 calls a run,
 tested_progression 3 to 5 (one follow-up per Set), so 60 to 80 calls for
 both. Use --runs 3 for a quick smoke check.
@@ -67,6 +68,7 @@ from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
 from db.models import DailyCostLedger, LearningEvent, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
+from lib import error_codes  # noqa: E402
 from services import check_service, profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"
@@ -80,6 +82,7 @@ DEFAULT_MAX_COST = Decimal("5")
 # Distinct from a threshold failure (1) and an argparse usage error (2).
 COST_STOP_EXIT = 3
 BAD_PATTERN_EXIT = 4
+CAP_CODES = frozenset({error_codes.GLOBAL_COST_CAP_REACHED, error_codes.DAILY_COST_CAP_REACHED})
 
 
 @dataclasses.dataclass
@@ -89,6 +92,17 @@ class EvalOutcome:
     planned: int
     spend: Decimal
     cost_stopped: bool
+    # The refusal code when a cost cap refused a tutor call (#605).
+    cap_refused: str | None = None
+
+
+class _CapRefused(BaseException):
+    """#605: a cost cap refused a tutor call, so the run never reached the
+    model. A BaseException so the per-run `except Exception` cannot score it."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
 
 
 def _positive_usd(value: str) -> Decimal:
@@ -199,9 +213,11 @@ async def _stream_reply(
 ) -> str:
     """The tutor's reply text. #612: appends every tool call with its outcome,
     and any error that ended the turn, to `trace` as the events stream, so
-    a turn that persists nothing still shows what it did."""
+    a turn that persists nothing still shows what it did. Raises _CapRefused
+    once the stream ends if a cost cap refused the call."""
     reply_parts: list[str] = []
     started: dict[str, tuple[str, dict]] = {}
+    cap_code: str | None = None
     async for ev in tutor.run_streaming(messages, system_prompt, ctx):
         if ev.type == "assistant_delta":
             reply_parts.append(ev.data.get("text", ""))
@@ -213,8 +229,12 @@ async def _stream_reply(
             if ev.data.get("error"):
                 line += f": {ev.data['error']}"
             trace.add(line)
+        elif ev.type == "error" and ev.data.get("code") in CAP_CODES:
+            cap_code = ev.data["code"]
         elif ev.type == "error":
             trace.add(f"turn ended with error {ev.data!r}")
+    if cap_code is not None:
+        raise _CapRefused(cap_code)
     return "".join(reply_parts)
 
 
@@ -335,6 +355,9 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
             )
             _report_miss(db, session_id, pattern["name"], when, trace)
         return ok
+    except _CapRefused:
+        # Not a miss: the refused call never reached the model.
+        raise
     except BaseException:
         # A run that raises (Ctrl-C included) is a failure too, and its calls
         # were billed: show what it did first.
@@ -374,7 +397,8 @@ async def _main_async(
 ) -> EvalOutcome:
     """Runs every pattern `runs_per_pattern` times, checking recorded spend
     against `max_cost` before each run (never mid-run). On reaching it, starts
-    no further runs and returns with `cost_stopped` set."""
+    no further runs and returns with `cost_stopped` set. A cost cap refusing
+    a call mid-run discards that run and returns with `cap_refused` set."""
     SessionLocal = _make_session_factory()
     results: dict[str, tuple[float, int]] = {}
     planned = runs_per_pattern * len(patterns)
@@ -391,6 +415,15 @@ async def _main_async(
                 if not ok:
                     # Closes the miss trace printed just above it.
                     print(f"  [{pattern_name} run={run_idx}] fail", file=sys.stderr)
+            except _CapRefused as refused:
+                return EvalOutcome(
+                    results,
+                    completed,
+                    planned,
+                    _total_spend(SessionLocal),
+                    cost_stopped=True,
+                    cap_refused=refused.code,
+                )
             except Exception as e:  # noqa: BLE001
                 print(
                     f"  [{pattern_name} run={run_idx}] error: {e}",
@@ -458,6 +491,13 @@ def main() -> int:
 
 
 def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
+    if outcome.cap_refused is not None:
+        print(
+            f"\nCost cap refused a call ({outcome.cap_refused}): spent ${outcome.spend:.4f}. "
+            f"Completed {outcome.completed} of {outcome.planned} planned runs. "
+            "No verdict over partial results."
+        )
+        return COST_STOP_EXIT
     if outcome.cost_stopped:
         print(
             f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.4f}. "
