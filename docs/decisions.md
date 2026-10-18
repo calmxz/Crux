@@ -17,8 +17,10 @@ errors to zero would touch about 20 files during the #493 refactor.
 - **The editor uses it too.** The official `pyright-lsp` plugin can't read a
   baseline, so it reported all 95 errors after every edit, on lines the edit
   never touched. A repo-local plugin runs basedpyright's language server on
-  the same config and baseline, which reports baselined errors as hints.
-  `pyright-lsp` is turned off for this repo only.
+  the same config and baseline. Its server still sends baselined errors as
+  hints, which reached Claude after every edit in testing, so the plugin
+  sets `disableTaggedHints` and only new errors come back. `pyright-lsp` is
+  turned off for this repo only.
 - **The plugin is enabled locally.** `.claude/` stays gitignored, so each
   checkout adds the marketplace and `enabledPlugins` lines itself
   (`docs/reference.md` "Backend typecheck") rather than the repo tracking the

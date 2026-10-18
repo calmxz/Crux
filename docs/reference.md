@@ -433,8 +433,11 @@ columns, without line numbers, so moving code doesn't break matching.
   `.claude-plugin/marketplace.json`) runs `basedpyright-langserver` from the
   backend venv with `backend/` as its workspace folder, so it reads the same
   config and baseline as CI. The config pins `pythonPlatform` to Linux (CI
-  and Render), so a Windows run reports what CI reports. Baselined errors come back as hints, new ones as
-  errors. Saving a file can shrink the baseline the same way a plain run
+  and Render), so a Windows run reports what CI reports. The server sends
+  baselined errors as hints, and the plugin's
+  `basedpyright.disableTaggedHints` setting drops every hint before it is
+  published, so after an edit Claude gets only errors CI would fail on (this
+  also hides unreachable / unused / deprecated hints). Saving a file can shrink the baseline the same way a plain run
   does: commit that change. `.claude/` is gitignored, so the plugin is turned
   on in each checkout's own `.claude/settings.json`:
 

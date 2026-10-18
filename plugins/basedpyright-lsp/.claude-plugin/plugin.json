@@ -20,6 +20,11 @@
         "--stdio"
       ],
       "workspaceFolder": "${CLAUDE_PROJECT_DIR}/backend",
+      "settings": {
+        "basedpyright": {
+          "disableTaggedHints": true
+        }
+      },
       "extensionToLanguage": {
         ".py": "python",
         ".pyi": "python"
