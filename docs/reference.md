@@ -319,10 +319,13 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   exact version in five places, the Dockerfile's uv image and every
   setup-uv `version:` (each marked `lockstep`); Dependabot skips the image,
   so bump all five by hand in one commit.
-- Backend Python (3.14, #620) has no single source: the Dockerfile base tag,
-  every `setup-python` `python-version`, `backup.yml`'s `--python`,
-  `requires-python`, ruff `target-version`, `pyrightconfig.json` and
-  `backend/.python-version`. Dependabot only bumps the base image's patch.
+- Backend Python (3.14, #620): `backend/.python-version` feeds every
+  `setup-python` step (`python-version-file`) and uv. A minor bump also edits
+  the Dockerfile base tag, `requires-python`, ruff `target-version` and
+  `pyrightconfig.json`, then re-runs `uv sync` locally (`dev.ps1` and
+  `pg_tests.sh` use `backend/.venv` as is, so a stale venv fails at import).
+  `gen_contracts.py --target-python-version` stays at 3.12 on purpose; output
+  is valid on newer versions. Dependabot only bumps the base image's patch.
   Ruff's py314 target formats `except (A, B):` as `except A, B:` (PEP 758);
   that is a tuple of exception types, not Python 2's `except E, name`.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and
