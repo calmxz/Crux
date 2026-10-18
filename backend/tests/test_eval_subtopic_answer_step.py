@@ -4,6 +4,7 @@ the way the learner's Done click does."""
 
 import importlib
 import json
+import sys
 import uuid
 from types import SimpleNamespace
 
@@ -182,10 +183,16 @@ async def test_an_unknown_turn_action_fails_the_run_unvalidated(script, fake_llm
     assert len(fake_llm.stream_calls) == 1
 
 
-@pytest.mark.asyncio
-async def test_a_bad_later_pattern_fails_before_the_first_run(script, monkeypatch, tmp_path):
-    for name, turns in [("good", ["Hi."]), ("bad", [{"action": "nope"}])]:
-        (tmp_path / f"{name}.json").write_text(json.dumps(_pattern(turns)))
+@pytest.mark.parametrize(
+    "bad",
+    [
+        _pattern([{"action": "nope"}]),
+        {**_pattern(["Hi."]), "expected": {"subtopic": "u-sub", "levels": ["advanced"]}},
+    ],
+)
+def test_a_bad_later_pattern_exits_before_the_first_run(script, monkeypatch, tmp_path, capsys, bad):
+    (tmp_path / "good.json").write_text(json.dumps(_pattern(["Hi."])))
+    (tmp_path / "bad.json").write_text(json.dumps(bad))
     monkeypatch.setattr(script, "PATTERN_DIR", tmp_path)
     monkeypatch.setattr(script, "PATTERNS", ("good", "bad"))
     runs = []
@@ -195,11 +202,15 @@ async def test_a_bad_later_pattern_fails_before_the_first_run(script, monkeypatc
         return True
 
     monkeypatch.setattr(script, "_run_pattern_once", run)
+    monkeypatch.setattr(sys, "argv", ["eval_subtopic_levels"])
 
-    with pytest.raises(ValueError, match="bad.json"):
-        await script._main_async(1, script.DEFAULT_MAX_COST)
+    code = script.main()
 
+    assert code == script.BAD_PATTERN_EXIT
+    assert code not in (0, 1, 2, script.COST_STOP_EXIT)
     assert runs == []
+    assert "bad.json" in capsys.readouterr().err
+    assert SessionLocal.kw["bind"] is default_engine
 
 
 def test_tested_progression_answers_with_a_structured_turn(script):

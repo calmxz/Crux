@@ -16,7 +16,8 @@ A pattern turn is a chat message (a string) or the structured answer step
 {"action": "answer_checks_correctly"}: it answers every pending Item of the
 open check Set correctly through check_service.answer, Closes the Set through
 check_service.complete and runs the follow-up turn on the results summary,
-as the learner's clicks and Done button do in the app.
+as the learner's clicks and Done button do in the app. Every pattern is
+validated before the first run; a malformed one exits 4 having spent nothing.
 
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
@@ -71,6 +72,7 @@ THRESHOLD = 0.85
 DEFAULT_MAX_COST = Decimal("5")
 # Distinct from a threshold failure (1) and an argparse usage error (2).
 COST_STOP_EXIT = 3
+BAD_PATTERN_EXIT = 4
 
 
 @dataclasses.dataclass
@@ -101,14 +103,25 @@ def _total_spend(SessionLocal) -> Decimal:
     return Decimal(str(total))
 
 
+def _valid_turn(turn) -> bool:
+    return isinstance(turn, str) or turn == ANSWER_STEP
+
+
 def _load_pattern(path: Path) -> dict:
-    """A pattern fixture, refusing an unknown turn here rather than failing
-    every run of it."""
+    """A pattern fixture, refusing a malformed one here rather than failing
+    every paid run of it."""
     pattern = json.loads(path.read_text(encoding="utf-8"))
     for n, turn in enumerate(pattern["turns"], start=1):
-        if not isinstance(turn, str) and turn != ANSWER_STEP:
+        if not _valid_turn(turn):
             raise ValueError(f"{path.name} turn {n}: unknown turn {turn!r}")
+    missing = {"subtopic", "levels", "by_turn"} - set(pattern.get("expected", {}))
+    if missing:
+        raise ValueError(f"{path.name}: expected lacks {sorted(missing)}")
     return pattern
+
+
+def _load_patterns() -> dict[str, dict]:
+    return {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in PATTERNS}
 
 
 def _matches(profile, expected) -> bool:
@@ -243,7 +256,7 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
             if isinstance(turn, str):
                 messages.append({"role": "user", "content": turn})
                 await _chat_turn(db, session_id, user_id, messages)
-            elif turn != ANSWER_STEP:
+            elif not _valid_turn(turn):
                 raise ValueError(f"turn {turn_idx}: unknown turn {turn!r}")
             elif not await _answer_step(db, session_id, user_id, messages):
                 print(
@@ -263,16 +276,16 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
         db.close()
 
 
-async def _main_async(runs_per_pattern: int, max_cost: Decimal) -> EvalOutcome:
+async def _main_async(
+    patterns: dict[str, dict], runs_per_pattern: int, max_cost: Decimal
+) -> EvalOutcome:
     """Runs every pattern `runs_per_pattern` times, checking recorded spend
     against `max_cost` before each run (never mid-run). On reaching it, starts
     no further runs and returns with `cost_stopped` set."""
     SessionLocal = _make_session_factory()
     results: dict[str, tuple[float, int]] = {}
-    planned = runs_per_pattern * len(PATTERNS)
+    planned = runs_per_pattern * len(patterns)
     completed = 0
-    # Every pattern before the first paid run, so a bad one costs nothing.
-    patterns = {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in PATTERNS}
 
     for pattern_name, pattern in patterns.items():
         passes = []
@@ -322,8 +335,15 @@ def main() -> int:
             file=sys.stderr,
         )
 
+    # Every pattern before the first paid run, so a bad one costs nothing.
     try:
-        outcome = asyncio.run(_main_async(args.runs, args.max_cost))
+        patterns = _load_patterns()
+    except (OSError, ValueError, KeyError) as e:
+        print(f"Bad pattern fixture: {e}", file=sys.stderr)
+        return BAD_PATTERN_EXIT
+
+    try:
+        outcome = asyncio.run(_main_async(patterns, args.runs, args.max_cost))
         return _report(outcome, args.max_cost)
     finally:
         # Also on Ctrl-C or a crash: the calls made so far are billed.

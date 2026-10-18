@@ -431,8 +431,9 @@ the learner's clicks run: `check_service.answer` with each pending Item's
 `correct_index`, `check_service.complete` (the Done button), then the
 follow-up turn on the `[check results]` summary, mirroring
 `routes/sessions.py::_followup_context`. Change one, check the other. With
-no open Set the step is skipped and logged. Any other turn object fails at
-load. A follow-up that opens a later Set leaves it unanswered.
+no open Set the step is skipped and logged. Every pattern is validated (turns
+and `expected` keys) before the first run, and one bad fixture exits 4
+before any spend. A follow-up that opens a later Set leaves it unanswered.
 
 ## Frontend
 
