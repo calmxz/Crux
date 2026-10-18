@@ -303,9 +303,26 @@ def _patch_level(subtopic, level="advanced"):
     return tool_call("update_topic_profile", args=args)
 
 
+async def _run_by(script, turns, by_turn):
+    factory = script._make_session_factory()
+    pattern = {**_pattern(turns), "expected": {**_pattern(turns)["expected"], "by_turn": by_turn}}
+    return await script._run_pattern_once(factory, pattern)
+
+
 @pytest.mark.asyncio
-async def test_a_miss_prints_the_profile_grading_and_tool_calls(script, fake_llm, capsys):
+async def test_a_miss_prints_the_profile_grading_and_tool_calls(
+    script, fake_llm, monkeypatch, capsys
+):
     # #612: a failed run says what the tutor did, so a 0% can be diagnosed.
+    # One wrong answer, so the graded count is not the Item count.
+    real_answer = check_service.answer
+
+    def answer_first_wrong(db, session_id, index, selected_index):
+        if index == 0:
+            selected_index = (selected_index + 1) % 3
+        return real_answer(db, session_id, index, selected_index)
+
+    monkeypatch.setattr(check_service, "answer", answer_first_wrong)
     fake_llm.streams = [
         _quiz_turn(),
         [_patch_level("u substitution")],
@@ -318,15 +335,18 @@ async def test_a_miss_prints_the_profile_grading_and_tool_calls(script, fake_llm
 
     assert ok is False
     err = capsys.readouterr().err
-    assert "[probe] miss: subtopic_levels={'u substitution': 'advanced'}; graded 3/3 correct" in err
-    assert "reply 1 ask_check_questions {'gap': 'u-substitution'} ok" in err
     assert (
-        "reply 2 update_topic_profile {'subtopic': 'u substitution', "
+        "[probe] miss (no match): subtopic_levels={'u substitution': 'advanced'}; "
+        "graded 2/3 correct"
+    ) in err
+    assert "turn 1 ask_check_questions {'gap': 'u-substitution'} ok" in err
+    assert (
+        "turn 2 update_topic_profile {'subtopic': 'u substitution', "
         "'evidence_type': 'declared', 'subtopic_level': 'advanced'} ok"
     ) in err
     assert (
-        "reply 3 update_topic_profile {'subtopic': 'u-substitution', "
-        "'evidence_type': 'declared'} failed: subtopic and subtopic_level must be provided together"
+        "turn 3 update_topic_profile {'subtopic': 'u-substitution', "
+        "'evidence_type': 'declared'} error: subtopic and subtopic_level must be provided together"
     ) in err
 
 
@@ -343,3 +363,53 @@ async def test_a_pass_prints_no_miss(script, fake_llm, capsys):
 
     assert ok is True
     assert "miss" not in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_a_late_match_says_when_it_matched(script, fake_llm, capsys):
+    fake_llm.streams = [["Sure."], ["Noted."], [_patch_level("u-substitution")], ["Done."]]
+
+    ok = await _run_by(script, ["Hi.", "More.", "Set it."], by_turn=2)
+
+    assert ok is False
+    assert "[probe] miss (matched at turn 3, expected by turn 2)" in capsys.readouterr().err
+
+
+@pytest.mark.asyncio
+async def test_a_turn_that_aborts_still_shows_its_calls(script, fake_llm, capsys):
+    # Refused calls with no text until max_iters: the tutor persists nothing.
+    fake_llm.streams = [[_patch_level("u-substitution", level=None)] for _ in range(8)]
+
+    _factory, ok = await _run(script, ["Set it."])
+
+    assert ok is False
+    err = capsys.readouterr().err
+    assert err.count("turn 1 update_topic_profile") == 8
+    assert "turn 1 turn ended with error {'code': 'max_iters_reached'}" in err
+
+
+@pytest.mark.asyncio
+async def test_a_run_that_raises_shows_its_trace(script, fake_llm, monkeypatch, capsys):
+    def boom(db, session_id):
+        raise RuntimeError("complete failed")
+
+    monkeypatch.setattr(check_service, "complete", boom)
+    fake_llm.streams = [_quiz_turn()]
+
+    with pytest.raises(RuntimeError, match="complete failed"):
+        await _run(script, ["Quiz me.", ANSWER])
+
+    err = capsys.readouterr().err
+    assert "[probe] miss (no match)" in err
+    assert "turn 1 ask_check_questions {'gap': 'u-substitution'} ok" in err
+
+
+@pytest.mark.asyncio
+async def test_the_trace_escapes_non_ascii(script, fake_llm, capsys):
+    fake_llm.streams = [[_patch_level("u\u2192sub")], ["Done."]]
+
+    await _run(script, ["Set it."])
+
+    err = capsys.readouterr().err
+    assert "u\\u2192sub" in err
+    assert err.isascii()
