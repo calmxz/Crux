@@ -28,6 +28,8 @@ A test that injects a failure patches the call that fails in production (the SQL
 
 For each test the diff adds or edits, name the product-code line whose breakage would turn it red. A test with no such line is vacuous: it sets state the component never reads, or asserts something true whatever the code does. Fix it or delete it. A rename that touches a test re-asks this, since renaming can leave a test pointing at nothing. (#532: a HomeView test set the sidebar list flag, which HomeView never reads; it passed the two-axis review and the bug-hunt review caught it.)
 
+A test that asserts a printed or returned value seeds its inputs so every value the assertion could match is distinct. When two inputs are equal, the assertion passes whichever one the code reads. (#600: spend was seeded equal to the limit, so `"$0.5000" in out` passed whether the cost-stop message printed the spend or the limit; the two-axis review passed it and the bug-hunt review caught it.)
+
 ## A removed guard names its backstop's test
 
 When a diff drops a check because another layer already enforces it, name the test that goes red if that layer's check is removed, and confirm it asserts behaviour: rows in, rows out. A test that inspects generated SQL text or a call's arguments is not a backstop. If no such test exists, the diff adds one. (#571: prefetch dropped its ready check on the strength of `test_query_chunks_filters_to_ready_documents`, which only checks the SQL string contains `documents.status`; the Spec review accepted it and the bug-hunt review caught it.)
