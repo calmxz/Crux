@@ -75,7 +75,7 @@ Most "AI tutors" today are a chat box bolted onto a generic LLM. They ask the sa
 | Vector store | pgvector 0.8.x in Supabase Postgres | Co-located with app schema; `ivfflat` cosine index on `chunk_embeddings` |
 | Auth | Supabase Auth (email/password) | JWT verified server-side against Supabase JWKS |
 | LLM gateway | LiteLLM direct | One client, swap providers via env var (Gemini default, Anthropic fallback) |
-| LLM | `gemini/gemini-3.5-flash-lite` (chat), `gemini/gemini-embedding-2` (embeddings) | Cheap, fast, large context |
+| LLM | `gemini/gemini-3.8-flash` (chat), `gemini/gemini-embedding-2` (embeddings) | Cheap, fast, large context |
 | Tests | pytest, vitest, Playwright | Backend unit/integration, frontend unit, e2e |
 | Deploy | Docker Compose; ngrok for public demo | Reproducible local stack; tunneled public preview |
 
@@ -225,7 +225,7 @@ The backend reads `.env` at the repo root. For the production stack, the same `.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `MODEL` | LiteLLM-prefixed chat model id. Swap to `anthropic/claude-sonnet-5` if reliability checkpoints fail. | `gemini/gemini-3.5-flash-lite` |
+| `MODEL` | LiteLLM-prefixed chat model id. Swap to `anthropic/claude-sonnet-5` if reliability checkpoints fail. | `gemini/gemini-3.8-flash` |
 | `EMBEDDING_MODEL` | Embedding model used by pgvector ingestion + retrieval. | `gemini/gemini-embedding-2` |
 | `DAILY_CAP` | Per-user daily request cap. | `50` |
 | `DATABASE_URL` | SQLAlchemy connection string (Supabase pooler URI; bare `postgresql://` auto-converted to `postgresql+psycopg://`). | `sqlite:///./data/app.db` (legacy default; Phase 7+ requires Supabase Postgres URL) |

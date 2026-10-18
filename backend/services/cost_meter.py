@@ -306,7 +306,13 @@ def spend_subquery(user_id: str):
 # Per-1000-token USD rates. Verified against ai.google.dev/gemini-api/docs/pricing
 # (standard paid tier) on 2026-08-24; update on model/pricing change.
 MODEL_RATES: dict[str, dict[str, Decimal]] = {
-    # Google Gemini 3.5 Flash-Lite — default chat model
+    # Google Gemini 3.8 Flash — default chat model (verified 2026-10-18).
+    # Google doubles both rates on 2027-01-01 ($1.50 / $7.50 per 1M).
+    "gemini/gemini-3.8-flash": {
+        "input_per_1k": Decimal("0.000750"),  # $0.75 / 1M tokens
+        "output_per_1k": Decimal("0.003750"),  # $3.75 / 1M tokens
+    },
+    # Google Gemini 3.5 Flash-Lite — previous default; kept for env-selected fallback
     "gemini/gemini-3.5-flash-lite": {
         "input_per_1k": Decimal("0.000300"),  # $0.30 / 1M tokens
         "output_per_1k": Decimal("0.002500"),  # $2.50 / 1M tokens
@@ -343,7 +349,7 @@ def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> 
     preserves arithmetic accuracy across multiple cancelled turns.
 
     litellm.token_counter confirmed to return sane (non-zero) counts for
-    'gemini/gemini-3.5-flash-lite' — returns 6 for a 6-word phrase — so no
+    'gemini/gemini-3.8-flash' — returns 6 for a 6-word phrase — so no
     fallback guard is needed for this model id.
 
     Unknown models fall back to litellm.cost_per_token, then to 0.

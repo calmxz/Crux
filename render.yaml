@@ -16,7 +16,7 @@ services:
       # G-12: pinned explicitly so a default change in backend/config.py
       # cannot silently alter the deploy.
       - key: MODEL
-        value: gemini/gemini-3.5-flash-lite
+        value: gemini/gemini-3.8-flash
       - key: EMBEDDING_MODEL
         value: gemini/gemini-embedding-2
       - key: DB_POOL_SIZE
