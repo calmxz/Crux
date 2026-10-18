@@ -1,6 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  # #609: bumps arrive as reviewed uv.lock changes, the only versions that
+  # CI, e2e and the image install.
+  - package-ecosystem: "uv"
     directory: "/backend"
     target-branch: "dev"
     schedule:

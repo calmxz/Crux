@@ -3,6 +3,29 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-18 - Every backend install uses the committed uv.lock (#609)
+
+Locally the backend was installed with uv against `backend/uv.lock`, but the
+lock was gitignored. CI, e2e and the Render image ran `pip install`, which
+re-resolves the `pyproject.toml` ranges on every run and deploy. litellm
+1.106.0 showed the cost: it needs `mcp` on the tool-calling path, CI went red
+on an unrelated PR, and the next deploy would have failed every tutor turn,
+while local stayed on 1.105.0 and passed.
+
+- **Commit the lock and install it everywhere with `uv sync --locked`.**
+  Upstream releases reach CI and production only as reviewed Dependabot lock
+  PRs (ecosystem `uv`). Rejected: capping litellm only (fixes this release,
+  not the next one), and committing the lock while keeping pip (pip ignores
+  `uv.lock`, so nothing would change).
+- **The image keeps pip's shape.** The venv is at `/opt/venv`, root-owned
+  outside the chowned `/app`: inside `/app`, the chown copied the whole venv
+  into a new layer (+700MB). Bytecode is compiled at install
+  (`UV_COMPILE_BYTECODE`), as pip did; without it, cold starts recompiled
+  every package under `PYTHONDONTWRITEBYTECODE`. Verified locally: the old
+  and new images both migrate a fresh Postgres and serve `/ready` in about 10s.
+- **The litellm/mcp question is deferred to #610**, decided when Dependabot
+  proposes 1.106 or later.
+
 ## 2026-10-17 - A failed tool rolls back the turn's session (#569)
 
 On Postgres a tool that raised left `ctx.db` aborted, so a valid write later
