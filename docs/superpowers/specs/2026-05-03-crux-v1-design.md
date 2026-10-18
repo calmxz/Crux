@@ -9,7 +9,7 @@ This document supersedes `Crux_Spec.md` and `Crux_DevPlan.md` for v1 scope. The 
 > **Infrastructure reconciled 2026-05-30 (factual, not design-intent):** the
 > shipped code diverges from this doc's original stack. Current truth: vector
 > store is **pgvector on Supabase-managed Postgres** (not ChromaDB/SQLite);
-> default LLM is **`gemini/gemini-3.5-flash-lite`** (reconciled 2026-09-10); embeddings are
+> default LLM is **`gemini/gemini-3.8-flash`** (reconciled 2026-10-18); embeddings are
 > **`gemini/gemini-embedding-2`** (not text-embedding-004); **SSE token streaming
 > is shipped** (not "None"). The §1 table and §2 architecture below are corrected;
 > deeper sections (e.g. §swap-path, §test plan) may retain as-authored
@@ -27,7 +27,7 @@ This document supersedes `Crux_Spec.md` and `Crux_DevPlan.md` for v1 scope. The 
 | Duration | 7 weeks, public deadline | Stall prevention; bumped from 6 to absorb full-pyramid test cost |
 | Profile depth | Mid (not full spec) | LLM tool-call reliability risk; user has no agent experience |
 | Agent framework | LiteLLM direct | Avoid ADK + agent-pattern double unknown |
-| LLM | `gemini/gemini-3.5-flash-lite` via LiteLLM (reconciled 2026-09-10; was 3.1-flash-lite, bumped 2026-08-24) | Cost; paid `claude-sonnet-5` as fallback if reliability issues |
+| LLM | `gemini/gemini-3.8-flash` via LiteLLM (reconciled 2026-10-18; was 3.5-flash-lite, before that 3.1-flash-lite) | Cost; paid `claude-sonnet-5` as fallback if reliability issues |
 | Embeddings | `gemini/gemini-embedding-2` (768-dim) — was `text-embedding-004` (reconciled 2026-05-30) | Same |
 | Backend | FastAPI + Postgres (Supabase) + pgvector, dockerized — was `SQLite + ChromaDB` (reconciled 2026-05-30, Phase 7) | User said no Firebase; pgvector folds vectors into the relational store |
 | Frontend | Vue 3 + Vite + PrimeVue + Pinia | Portfolio recognizability |
@@ -57,7 +57,7 @@ Volumes:
 
 **Latency budget:**
 - Backend non-LLM response: <100ms
-- LLM call dominates wall time (`gemini-3.5-flash-lite`: a few seconds typical; mitigated by SSE streaming)
+- LLM call dominates wall time (`gemini-3.8-flash`: a few seconds typical; mitigated by SSE streaming)
 - No cold start (local docker)
 
 ---
@@ -458,7 +458,7 @@ Inherited from original spec §13. Defined in advance so swap decisions are mech
 
 ### LLM (tutor model)
 
-**Default:** `gemini/gemini-3.5-flash-lite` via LiteLLM (reconciled 2026-09-10; `config.py` is authoritative).
+**Default:** `gemini/gemini-3.8-flash` via LiteLLM (reconciled 2026-10-18; `config.py` is authoritative).
 
 **Swap triggers:**
 - Tool-call reliability <85% on `update_topic_profile` after 2 prompt iterations (Phase 2 checkpoint).
@@ -466,7 +466,7 @@ Inherited from original spec §13. Defined in advance so swap decisions are mech
 - Free-tier rate limits block dogfooding cadence (>10 retry-after rejections per session).
 
 **Swap path:** change `TUTOR_MODEL` env var. LiteLLM handles. Candidates in order:
-2. `gemini/gemini-3.5-flash-lite` paid tier (higher rate limits, same model; reconciled 2026-09-10, was `gemini-2.5-pro`).
+2. `gemini/gemini-3.8-flash` paid tier (higher rate limits, same model; reconciled 2026-10-18).
 2. `gemini/gemini-2.5-pro` paid tier (higher rate limits, same model).
 3. `openai/gpt-4.1-mini` (paid, fallback if Anthropic unavailable).
 
