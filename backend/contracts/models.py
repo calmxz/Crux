@@ -105,8 +105,8 @@ class UpdateTopicProfileArgs(BaseModel):
     focus; omitting the field leaves focus unchanged.
     `focus_clear_reason=tested_correct` is verified server-side against
     the session's learning events. `evidence_type` (`declared` or
-    `tested`) is required whenever `knowledge_level` or `add_mastered_concept` is present;
-    omitting it makes the patch fail. `subtopic` and `subtopic_level`
+    `tested`) is required whenever `knowledge_level`, `add_mastered_concept`
+    or `subtopic_level` is present; omitting it makes the patch fail. `subtopic` and `subtopic_level`
     must be provided together (service-enforced cross-field rule).
 
     """
@@ -150,7 +150,7 @@ class UpdateTopicProfileArgs(BaseModel):
     """
     subtopic_level: Literal["beginner", "intermediate", "advanced"] | None = None
     """
-    Learner's level on subtopic. Must be sent with subtopic.
+    Learner's level on subtopic. Must be sent with subtopic. Requires evidence_type declared or tested; the patch fails without it.
     """
 
 
