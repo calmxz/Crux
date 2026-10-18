@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import io
 import json
 import os
 import sys
@@ -64,7 +65,7 @@ from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
-from db.models import DailyCostLedger, User  # noqa: E402
+from db.models import DailyCostLedger, LearningEvent, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
 from services import check_service, profile_service, prompt_state  # noqa: E402
 
@@ -174,15 +175,52 @@ def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:
         db.close()
 
 
-async def _stream_reply(messages: list[dict], system_prompt: str, ctx: ToolContext) -> str:
+@dataclasses.dataclass
+class _Trace:
+    """#612: one run's tool calls and turn errors, each labelled with the
+    pattern turn it happened in as it is written, so a turn that raises
+    midway keeps its labels."""
+
+    turn: int = 0
+    lines: list[str] = dataclasses.field(default_factory=list)
+
+    def add(self, line: str) -> None:
+        self.lines.append(f"turn {self.turn} {line}")
+
+
+def _shown_args(name: str, args: dict) -> dict:
+    if name == "ask_check_questions":
+        return {"gap": args.get("gap")}
+    return {k: v for k, v in args.items() if k != "session_id"}
+
+
+async def _stream_reply(
+    messages: list[dict], system_prompt: str, ctx: ToolContext, trace: _Trace
+) -> str:
+    """The tutor's reply text. #612: appends every tool call with its outcome,
+    and any error that ended the turn, to `trace` as the events stream, so
+    a turn that persists nothing still shows what it did."""
     reply_parts: list[str] = []
+    started: dict[str, tuple[str, dict]] = {}
     async for ev in tutor.run_streaming(messages, system_prompt, ctx):
         if ev.type == "assistant_delta":
             reply_parts.append(ev.data.get("text", ""))
+        elif ev.type == "tool_call_start":
+            started[ev.data["id"]] = (ev.data["name"], ev.data.get("args") or {})
+        elif ev.type == "tool_call_done":
+            name, args = started.pop(ev.data["id"], ("?", {}))
+            line = f"{name} {_shown_args(name, args)!r} {ev.data['status']}"
+            if ev.data.get("error"):
+                line += f": {ev.data['error']}"
+            trace.add(line)
+        elif ev.type == "error":
+            trace.add(f"turn ended with error {ev.data!r}")
     return "".join(reply_parts)
 
 
-async def _chat_turn(db, session_id: str, user_id: str, messages: list[dict]) -> None:
+async def _chat_turn(
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
+) -> None:
     # The seed has no level; keep the diagnostic off so the eval
     # measures subtopic patching, as it was calibrated.
     state = dataclasses.replace(
@@ -198,11 +236,13 @@ async def _chat_turn(db, session_id: str, user_id: str, messages: list[dict]) ->
         user_id=user_id,
         turn_started_at=datetime.now(timezone.utc),
     )
-    reply = await _stream_reply(messages, prompts.build_system_prompt(state), ctx)
+    reply = await _stream_reply(messages, prompts.build_system_prompt(state), ctx, trace)
     messages.append({"role": "assistant", "content": reply})
 
 
-async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) -> bool:
+async def _answer_step(
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
+) -> bool:
     """Answer the open Set correctly, as the learner's clicks and Done button
     do, then every later Set a follow-up poses. A follow-up that replies
     without posing the next Set leaves the Check between Sets, as in the app.
@@ -212,12 +252,14 @@ async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) 
         pc = check_service.open_set(db.get(SessionModel, session_id))
         if pc is None:
             break
-        await _answer_set(db, session_id, user_id, messages, pc)
+        await _answer_set(db, session_id, user_id, messages, pc, trace)
         answered = True
     return answered
 
 
-async def _answer_set(db, session_id: str, user_id: str, messages: list[dict], pc: dict) -> None:
+async def _answer_set(
+    db, session_id: str, user_id: str, messages: list[dict], pc: dict, trace: _Trace
+) -> None:
     """Answer every pending Item of Set `pc` correctly, Close it and run the
     follow-up turn."""
     for index, item in enumerate(pc["items"]):
@@ -250,7 +292,7 @@ async def _answer_set(db, session_id: str, user_id: str, messages: list[dict], p
     )
     # The summary turn is not persisted in the app, so later turns never see it.
     followup = [*messages, {"role": "user", "content": summary}]
-    reply = await _stream_reply(followup, prompts.build_system_prompt(state), ctx)
+    reply = await _stream_reply(followup, prompts.build_system_prompt(state), ctx, trace)
     messages.append({"role": "assistant", "content": reply})
 
 
@@ -261,18 +303,19 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
     `pattern["expected"]["by_turn"]`."""
     user_id, session_id = _seed_session(SessionLocal, pattern)
     db = SessionLocal()
+    expected = pattern["expected"]
+    trace = _Trace()
+    matched_at: int | None = None
     try:
         messages: list[dict] = []
-        expected = pattern["expected"]
-        matched_at: int | None = None
-
         for turn_idx, turn in enumerate(pattern["turns"], start=1):
+            trace.turn = turn_idx
             if isinstance(turn, str):
                 messages.append({"role": "user", "content": turn})
-                await _chat_turn(db, session_id, user_id, messages)
+                await _chat_turn(db, session_id, user_id, messages, trace)
             elif not _valid_turn(turn):
                 raise ValueError(f"turn {turn_idx}: unknown turn {turn!r}")
-            elif not await _answer_step(db, session_id, user_id, messages):
+            elif not await _answer_step(db, session_id, user_id, messages, trace):
                 print(
                     f"  [{pattern['name']}] turn {turn_idx}: no open check Set; "
                     "answer step skipped",
@@ -283,11 +326,47 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
             if matched_at is None and _matches(updated, expected):
                 matched_at = turn_idx
 
-        if matched_at is None:
-            return False
-        return matched_at <= expected["by_turn"]
+        ok = matched_at is not None and matched_at <= expected["by_turn"]
+        if not ok:
+            when = (
+                "no match"
+                if matched_at is None
+                else f"matched at turn {matched_at}, expected by turn {expected['by_turn']}"
+            )
+            _report_miss(db, session_id, pattern["name"], when, trace)
+        return ok
+    except BaseException:
+        # A run that raises (Ctrl-C included) is a failure too, and its calls
+        # were billed: show what it did first.
+        _report_miss(db, session_id, pattern["name"], f"raised at turn {trace.turn}", trace)
+        raise
     finally:
         db.close()
+
+
+def _report_miss(db, session_id: str, name: str, when: str, trace: _Trace) -> None:
+    """#612: what the tutor did in a failed run, so a miss can be told apart:
+    no patch, a patch under another subtopic name, a refused patch, a late
+    one, or a turn that errored or raised."""
+    try:
+        # After a raise the session may hold a failed transaction.
+        db.rollback()
+        profile = profile_service.load_profile(db, session_id)
+        events = db.scalars(
+            select(LearningEvent).where(LearningEvent.session_id == session_id)
+        ).all()
+        correct = sum(1 for e in events if e.correct)
+        state = (
+            f"subtopic_levels={(profile.subtopic_levels or {})!r}; "
+            f"graded {correct}/{len(events)} correct"
+        )
+    except Exception as e:  # noqa: BLE001
+        # The trace still prints when the database cannot be read.
+        state = f"profile unreadable ({type(e).__name__})"
+    lines = [f"  [{name}] miss ({when}): {state}", *(f"    {line}" for line in trace.lines)]
+    # Model-written names can hold characters a cp1252 console cannot print.
+    text = "\n".join(lines).encode("ascii", "backslashreplace").decode("ascii")
+    print(text, file=sys.stderr)
 
 
 async def _main_async(
@@ -309,6 +388,9 @@ async def _main_async(
                 return EvalOutcome(results, completed, planned, spend, cost_stopped=True)
             try:
                 ok = await _run_pattern_once(SessionLocal, pattern)
+                if not ok:
+                    # Closes the miss trace printed just above it.
+                    print(f"  [{pattern_name} run={run_idx}] fail", file=sys.stderr)
             except Exception as e:  # noqa: BLE001
                 print(
                     f"  [{pattern_name} run={run_idx}] error: {e}",
@@ -347,6 +429,10 @@ def main() -> int:
         help="Run only this pattern; repeat for more (default: every pattern).",
     )
     args = parser.parse_args()
+    # Model-written text reaches stderr (errors, traces); a cp1252 console
+    # cannot encode all of it, and a print that raises would end the eval.
+    if isinstance(sys.stderr, io.TextIOWrapper):
+        sys.stderr.reconfigure(errors="backslashreplace")
 
     if os.environ.get("LLM_STUB") == "1":
         print(
