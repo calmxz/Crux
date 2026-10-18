@@ -41,6 +41,7 @@ from __future__ import annotations
 import argparse
 import asyncio
 import dataclasses
+import io
 import json
 import os
 import sys
@@ -430,7 +431,8 @@ def main() -> int:
     args = parser.parse_args()
     # Model-written text reaches stderr (errors, traces); a cp1252 console
     # cannot encode all of it, and a print that raises would end the eval.
-    sys.stderr.reconfigure(errors="backslashreplace")
+    if isinstance(sys.stderr, io.TextIOWrapper):
+        sys.stderr.reconfigure(errors="backslashreplace")
 
     if os.environ.get("LLM_STUB") == "1":
         print(
