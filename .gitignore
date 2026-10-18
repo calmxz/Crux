@@ -42,7 +42,6 @@ backend/.pytest_cache/
 backend/htmlcov/
 backend/.coverage
 .coverage
-backend/uv.lock
 
 # Data volumes (never commit SQLite, uploads, or ChromaDB).
 # Both `data/` at repo root and `backend/data/` matter: when uvicorn is

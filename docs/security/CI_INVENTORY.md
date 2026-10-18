@@ -22,9 +22,9 @@ file.
 
 | Tool | Catches | Where | Fail threshold | Upstream |
 |---|---|---|---|---|
-| **pip-audit** | Known CVEs in Python deps (resolves transitive tree from `pyproject.toml`) | `security` job in `ci.yml` | Any advisory | https://github.com/pypa/pip-audit |
+| **pip-audit** | Known CVEs in Python deps (the locked set: `uv export` of `backend/uv.lock`, hash-pinned) | `security` job in `ci.yml` | Any advisory | https://github.com/pypa/pip-audit |
 | **npm audit** | Known CVEs in npm prod deps (skips devDeps) | `security` job in `ci.yml` | `--audit-level=high` | https://docs.npmjs.com/cli/v10/commands/npm-audit |
-| **Dependabot** | Weekly automated PRs to bump outdated deps (pip + npm + github-actions + docker) | `.github/dependabot.yml` | Opens PRs, doesn't fail CI directly | https://docs.github.com/en/code-security/dependabot |
+| **Dependabot** | Weekly automated PRs to bump outdated deps (uv + npm + github-actions + docker) | `.github/dependabot.yml` | Opens PRs, doesn't fail CI directly | https://docs.github.com/en/code-security/dependabot |
 
 ## Container and Dockerfile
 

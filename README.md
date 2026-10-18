@@ -176,16 +176,17 @@ See the [Configuration](#configuration) section for the full variable reference.
 **Backend** — from `backend/`:
 
 ```bash
-python -m venv .venv
+uv sync --locked --extra dev
 
 # Windows PowerShell:
 .venv\Scripts\Activate.ps1
 # macOS / Linux:
 source .venv/bin/activate
 
-pip install -e .[dev]
 uvicorn main:app --reload
 ```
+
+Dependencies come from the committed `uv.lock`, the same set CI and the Docker image install. Change them with `uv add` / `uv remove`, never by editing `pyproject.toml` alone.
 
 Or from the repo root: `uvicorn main:app --reload --app-dir backend`. `config.py` anchors `.env` and `data/` to the repo root, so cwd doesn't matter. `data/uploads/` auto-creates on first boot (plus `data/app.db` if you're on the SQLite fallback). Postgres + pgvector live in Supabase — there's no local DB to start.
 

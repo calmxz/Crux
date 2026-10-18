@@ -3,6 +3,47 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-18 - Every backend install uses the committed uv.lock (#609)
+
+Locally the backend was installed with uv against `backend/uv.lock`, but the
+lock was gitignored. CI, e2e and the Render image ran `pip install`, which
+re-resolves the `pyproject.toml` ranges on every run and deploy. litellm
+1.106.0 showed the cost: it needs `mcp` on the tool-calling path, CI went red
+on an unrelated PR, and the next deploy would have failed every tutor turn,
+while local stayed on 1.105.0 and passed.
+
+- **Commit the lock and install it everywhere with `uv sync --locked`.**
+  Upstream releases reach CI and production only as reviewed Dependabot lock
+  PRs (ecosystem `uv`). Rejected: capping litellm only (fixes this release,
+  not the next one), and committing the lock while keeping pip (pip ignores
+  `uv.lock`, so nothing would change).
+- **The image keeps pip's shape.** The venv is at `/opt/venv`, root-owned
+  outside the chowned `/app`: inside `/app`, the chown copied the whole venv
+  into a new layer (+700MB). Bytecode is compiled at install
+  (`UV_COMPILE_BYTECODE`), as pip did; without it, cold starts recompiled
+  every package under `PYTHONDONTWRITEBYTECODE`. The app is not installed as
+  a package: the old `pip install .` ran before the code was copied, so it
+  installed none either, and a project install would build with an unlocked
+  setuptools. Verified locally: the old and new images both migrate a fresh
+  Postgres and serve `/ready` in about 10s.
+- **uv is an exact pin in five places, bumped by hand in lockstep.** The
+  Dockerfile's uv image and every setup-uv `version:`; Dependabot skips the
+  image. Rejected: one range in `[tool.uv] required-version` read by
+  setup-uv. A range lets CI float to a newer patch than the image, and uv
+  enforces it on every uv that reads the project, including Dependabot's own:
+  once that moves past the range, every lock PR fails and updates stop.
+- **The backup job installs the full locked set**, not boto3 alone. A
+  boto3-only install through constraints lost uv's hash checks, on the job
+  that holds the database and R2 credentials. `--locked` cannot fail there by
+  itself: CI fails the same commit first.
+- **The lock was refreshed before it shipped.** Gitignored, it had aged
+  behind what pip resolved: its export carried 19 known CVEs in six packages
+  (starlette, anyio, urllib3, cryptography, multidict, fsspec), which this
+  change would have downgraded production to. Those six were moved to fixed
+  versions with `uv lock --upgrade-package`; everything else stays as locked.
+- **The litellm/mcp question is deferred to #610**, decided when Dependabot
+  proposes 1.106 or later.
+
 ## 2026-10-17 - A failed tool rolls back the turn's session (#569)
 
 On Postgres a tool that raised left `ctx.db` aborted, so a valid write later

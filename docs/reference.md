@@ -308,6 +308,17 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
 
 ### CI drift guards
 
+- Backend lock (#609): CI, e2e, the backup job and the Docker image install
+  with `uv sync --locked` from the committed `backend/uv.lock`, so they get
+  the versions you run locally, never a fresh resolve of the `pyproject.toml`
+  ranges. `--locked` fails the install when the lock has drifted from
+  `pyproject.toml`: change dependencies with `uv add` / `uv remove` and commit
+  both files. pip-audit audits the exported lock. The image keeps its venv at
+  `/opt/venv` (root-owned, outside the chowned `/app`), compiles bytecode at
+  install, and does not install the app as a package. uv is pinned to one
+  exact version in five places, the Dockerfile's uv image and every
+  setup-uv `version:` (each marked `lockstep`); Dependabot skips the image,
+  so bump all five by hand in one commit.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and
   fails if a handler can raise a non-2xx status code that `docs/api/openapi.yaml`
   does not document under that path+method. It follows same-module helpers one

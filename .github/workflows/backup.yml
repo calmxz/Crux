@@ -33,8 +33,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Install boto3
-        run: pip install "boto3>=1.35,<2.0"
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: '0.11.7'  # lockstep: backend/Dockerfile uv image
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      # #609: the locked, hash-checked set like every other backend install
+      # (boto3 is all scripts/backup.py needs). --locked cannot fail here on
+      # its own: CI fails the same commit first.
+      - name: Install backend deps (locked)
+        run: |
+          uv sync --locked --no-install-project --python 3.12
+          echo "$GITHUB_WORKSPACE/backend/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Dump database
         env:

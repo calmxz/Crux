@@ -7,11 +7,12 @@ FastAPI + Supabase Postgres (pgvector). Python 3.12+.
 From `backend/`:
 
 ```bash
-python -m venv .venv
+uv sync --locked --extra dev
 .venv\Scripts\activate          # Windows
 # source .venv/bin/activate     # macOS/Linux
-pip install -e .[dev]
 ```
+
+Installs the committed `uv.lock`, the same versions CI and the Docker image use.
 
 ## Environment
 
