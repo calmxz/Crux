@@ -17,10 +17,12 @@ Usage:
 
 Each run hits the live LLM and is billed by the provider. Metering lands in
 the script's in-memory DB with a fresh user per run: the per-user cap never
-trips, only GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) can
-stop a long run, and none of it reaches your real ledger. The default 10 runs
-across 2 patterns x up to 3 turns each = a few dozen calls. Use --runs 3 for a
-quick smoke check.
+trips, and none of it reaches your real ledger. --max-cost (default $5) stops
+starting new runs once this process's recorded spend reaches it, so a run
+can overshoot it by one run; a cost stop prints no verdict and exits 3.
+GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies. The
+default 10 runs across 2 patterns x up to 3 turns each = a few dozen calls.
+Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
@@ -33,13 +35,14 @@ import os
 import sys
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Force an in-memory DB before importing anything that touches db.database.
 # Assigned, not defaulted: an exported DATABASE_URL must not reach it (#596).
 os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.pool import StaticPool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -50,14 +53,45 @@ from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
+from db.models import DailyCostLedger, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
-from db.models import User  # noqa: E402
 from services import profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"
 PATTERNS = ("declared_level", "tested_progression")
 RUNS_PER_PATTERN = 10
 THRESHOLD = 0.85
+DEFAULT_MAX_COST = Decimal("5")
+# Distinct from a threshold failure (1) and an argparse usage error (2).
+COST_STOP_EXIT = 3
+
+
+@dataclasses.dataclass
+class EvalOutcome:
+    results: dict[str, tuple[float, int]]
+    completed: int
+    planned: int
+    spend: Decimal
+    cost_stopped: bool
+
+
+def _positive_usd(value: str) -> Decimal:
+    try:
+        usd = Decimal(value)
+    except InvalidOperation:
+        raise argparse.ArgumentTypeError(f"not a number: {value!r}") from None
+    if not usd.is_finite() or usd <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive amount, got {value!r}")
+    return usd
+
+
+def _total_spend(SessionLocal) -> Decimal:
+    # Every date, not cost_meter.global_spend: that filters to today (UTC), so
+    # a run crossing UTC midnight would read $0. This DB only ever holds this
+    # invocation's spend.
+    with SessionLocal() as db:
+        total = db.scalar(select(func.coalesce(func.sum(DailyCostLedger.cost_usd), 0)))
+    return Decimal(str(total))
 
 
 def _matches(profile, expected) -> bool:
@@ -154,15 +188,23 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
         db.close()
 
 
-async def _main_async(runs_per_pattern: int) -> dict[str, tuple[float, int]]:
+async def _main_async(runs_per_pattern: int, max_cost: Decimal) -> EvalOutcome:
+    """Runs every pattern `runs_per_pattern` times, checking recorded spend
+    against `max_cost` before each run (never mid-run). On reaching it, starts
+    no further runs and returns with `cost_stopped` set."""
     SessionLocal = _make_session_factory()
     results: dict[str, tuple[float, int]] = {}
+    planned = runs_per_pattern * len(PATTERNS)
+    completed = 0
 
     for pattern_name in PATTERNS:
         path = PATTERN_DIR / f"{pattern_name}.json"
         pattern = json.loads(path.read_text(encoding="utf-8"))
         passes = []
         for run_idx in range(runs_per_pattern):
+            spend = _total_spend(SessionLocal)
+            if spend >= max_cost:
+                return EvalOutcome(results, completed, planned, spend, cost_stopped=True)
             try:
                 ok = await _run_pattern_once(SessionLocal, pattern)
             except Exception as e:  # noqa: BLE001
@@ -172,9 +214,10 @@ async def _main_async(runs_per_pattern: int) -> dict[str, tuple[float, int]]:
                 )
                 ok = False
             passes.append(ok)
+            completed += 1
         rate = sum(passes) / len(passes) if passes else 0.0
         results[pattern_name] = (rate, len(passes))
-    return results
+    return EvalOutcome(results, completed, planned, _total_spend(SessionLocal), cost_stopped=False)
 
 
 def main() -> int:
@@ -185,6 +228,16 @@ def main() -> int:
         default=RUNS_PER_PATTERN,
         help=f"Runs per pattern (default {RUNS_PER_PATTERN}).",
     )
+    parser.add_argument(
+        "--max-cost",
+        type=_positive_usd,
+        default=DEFAULT_MAX_COST,
+        help=(
+            "Start no new run once recorded spend reaches this many USD "
+            f"(default {DEFAULT_MAX_COST}). Checked between runs, so spend can "
+            "overshoot it by one run."
+        ),
+    )
     args = parser.parse_args()
 
     if os.environ.get("LLM_STUB") == "1":
@@ -194,11 +247,27 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    results = asyncio.run(_main_async(args.runs))
+    try:
+        outcome = asyncio.run(_main_async(args.runs, args.max_cost))
+        return _report(outcome, args.max_cost)
+    finally:
+        # Also on Ctrl-C or a crash: the calls made so far are billed.
+        # _main_async binds SessionLocal before its first await.
+        print(f"\nTotal spend: ${_total_spend(SessionLocal):.4f}")
+
+
+def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
+    if outcome.cost_stopped:
+        print(
+            f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.4f}. "
+            f"Completed {outcome.completed} of {outcome.planned} planned runs. "
+            "No verdict over partial results."
+        )
+        return COST_STOP_EXIT
 
     print("\n=== Subtopic-level reliability (R4.1 AC3) ===")
     failed = []
-    for pattern_name, (rate, n) in results.items():
+    for pattern_name, (rate, n) in outcome.results.items():
         flag = "PASS" if rate >= THRESHOLD else "FAIL"
         print(f"  {pattern_name:20s} {rate * 100:5.1f}%  ({n} runs)  [{flag}]")
         if rate < THRESHOLD:
