@@ -1,4 +1,4 @@
-"""Focus-clearing reliability checkpoint (spec §6.3).
+"""Focus-clearing reliability checkpoint (spec section 6.3).
 
 Manual, hand-scripted, NOT in CI. Runs the tutor agent against the real LLM
 across 4 prompt patterns (linear, topic_shift, tangent, vague_signal). Each
@@ -263,7 +263,7 @@ def main() -> int:
 
     if os.environ.get("LLM_STUB") == "1":
         print(
-            "WARNING: LLM_STUB=1 — results are not meaningful; the stub does "
+            "WARNING: LLM_STUB=1 - results are not meaningful; the stub does "
             "not exercise focus-clearing logic.",
             file=sys.stderr,
         )
@@ -293,7 +293,7 @@ def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
         )
         return COST_STOP_EXIT
 
-    print("\n=== Focus-clearing reliability (spec §6.3) ===")
+    print("\n=== Focus-clearing reliability (spec section 6.3) ===")
     failed = []
     for pattern, (rate, n) in outcome.results.items():
         flag = "PASS" if rate >= PASS_THRESHOLD else "FAIL"
@@ -304,7 +304,7 @@ def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
     if failed:
         print(
             f"\nFAILED patterns: {failed}. Threshold {PASS_THRESHOLD * 100:.0f}%. "
-            "Per spec §6.3: iterate prompts up to 3 times, then swap model.",
+            "Per spec section 6.3: iterate prompts up to 3 times, then swap model.",
         )
         return 1
     print(f"\nAll {len(PATTERNS)} patterns >= {PASS_THRESHOLD * 100:.0f}%.")

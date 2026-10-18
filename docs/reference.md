@@ -406,6 +406,68 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   (pure ASGI, registered outermost) before any parsing. Multipart uploads have
   their own gate in `routes/upload.py`.
 
+### Backend typecheck (#607, #616)
+
+basedpyright (a pyright fork with a built-in baseline) checks what
+`backend/pyrightconfig.json` covers: basic mode, `tests/`, alembic versions
+and `contracts/models.py` left out. `backend/.basedpyright/baseline.json`
+lists the errors accepted when the check landed (95), per file by rule and
+columns, without line numbers, so moving code doesn't break matching.
+
+- **Run it from `backend/`**: `.venv/Scripts/basedpyright` (Windows) or
+  `.venv/bin/basedpyright`. It finds `backend/.venv` itself, so imports
+  resolve against the locked packages even when another Python is first on
+  PATH. From the repo root it reads the editor-only root config, finds no
+  baseline and reports every error.
+- **CI** runs `basedpyright --baselinemode=lock`: exit 1 on any error not in
+  the baseline (a new error in a file that already has baselined ones
+  included), exit 3 when a baselined error is fixed but the baseline still
+  lists it. On exit 3, run the plain command locally: it drops fixed errors
+  from the baseline (`went down by N`) and never adds new ones. Commit the
+  smaller file.
+- **`--writebaseline`** adds the current errors to the baseline. Use it only
+  to accept errors on purpose, e.g. a basedpyright upgrade that changes
+  diagnostics (the dev extra pins `<1.41` so such a bump is its own PR), and
+  say why in the PR.
+- **Editor**: the repo-local plugin `plugins/basedpyright-lsp` (marketplace
+  `.claude-plugin/marketplace.json`) runs `basedpyright-langserver` from the
+  backend venv with `backend/` as its workspace folder, so it reads the same
+  config and baseline as CI. The config pins `pythonPlatform` to Linux (CI
+  and Render), so a Windows run reports what CI reports. The server sends
+  baselined errors as hints, and the plugin's
+  `basedpyright.disableTaggedHints` setting drops every hint before it is
+  published, so after an edit Claude gets only errors CI would fail on (this
+  also hides unreachable / unused / deprecated hints). Saving a file can shrink the baseline the same way a plain run
+  does: commit that change. `.claude/` is gitignored, so the plugin is turned
+  on in each checkout's own `.claude/settings.json`:
+
+  ```json
+  "extraKnownMarketplaces": {
+    "crux-local": { "source": { "source": "directory", "path": "./" } }
+  },
+  "enabledPlugins": {
+    "basedpyright-lsp@crux-local": true,
+    "pyright-lsp@claude-plugins-official": false
+  }
+  ```
+
+  then trust the folder in a new session. The server starts through
+  `uv run --locked --extra dev --inexact`, which syncs `backend/.venv` to the
+  lock first (a fresh worktree gets a full venv, never an empty one).
+- **ASCII console output**: `tests/test_scripts_ascii_console.py` fails when
+  a `backend/scripts/` file can print a non-ASCII string. On Windows, stdout
+  is cp1252 with strict errors, so one crashes the script; stderr uses
+  `backslashreplace` and only garbles it, but is held to the same rule. Any string literal inside `print`, `input`,
+  `sys.stdout/stderr.write`, the argparse constructors and `add_*` builders,
+  `parser.error`, `ArgumentTypeError`, `SystemExit` / `sys.exit`, and the
+  module docstring when passed as `description=__doc__`. Comments, other
+  strings and any `.write` not on `sys.stdout` / `sys.stderr` (a file
+  handle's) are allowed. Literals only: a string bound to a name before it is
+  printed is not followed, so keep console text inline in the call.
+- **Typecheck known gap**: baseline entries hold rule and columns, not the message.
+  Fixing a baselined error and adding a different one with the same rule at
+  the same columns in the same file passes lock mode.
+
 ### Unhandled-error contract (C-14)
 
 `backend/lib/error_handlers.py`. Any exception that escapes a route answers
