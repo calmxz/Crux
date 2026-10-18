@@ -319,6 +319,12 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   exact version in five places, the Dockerfile's uv image and every
   setup-uv `version:` (each marked `lockstep`); Dependabot skips the image,
   so bump all five by hand in one commit.
+- Backend Python (3.14, #620) has no single source: the Dockerfile base tag,
+  every `setup-python` `python-version`, `backup.yml`'s `--python`,
+  `requires-python`, ruff `target-version`, `pyrightconfig.json` and
+  `backend/.python-version`. Dependabot only bumps the base image's patch.
+  Ruff's py314 target formats `except (A, B):` as `except A, B:` (PEP 758);
+  that is a tuple of exception types, not Python 2's `except E, name`.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and
   fails if a handler can raise a non-2xx status code that `docs/api/openapi.yaml`
   does not document under that path+method. It follows same-module helpers one

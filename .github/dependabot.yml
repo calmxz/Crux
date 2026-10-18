@@ -84,6 +84,12 @@ updates:
     ignore:
       - dependency-name: "astral-sh/uv"
       - dependency-name: "ghcr.io/astral-sh/uv"
+      # #620: Python minors move by hand with setup-python, pyproject and
+      # .python-version; patch bumps of the base image stay automatic.
+      - dependency-name: "python"
+        update-types:
+          - "version-update:semver-major"
+          - "version-update:semver-minor"
     labels:
       - "dependencies"
       - "docker"
