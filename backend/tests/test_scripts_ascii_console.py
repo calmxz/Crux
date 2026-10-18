@@ -16,8 +16,11 @@ SCRIPTS = Path(__file__).resolve().parent.parent / "scripts"
 # against the callee's last name, so `parser.error` and `sys.exit` count.
 # The argparse constructors are here because their strings (help, choices,
 # metavar, description) all print through `--help` or a usage error.
+# Only literals written inside the call are seen: a string bound to a name
+# first (`msg = "..."; print(msg)`) is not followed.
 _CONSOLE_CALLS = {
     "print",
+    "input",
     "error",
     "exit",
     "SystemExit",
@@ -65,7 +68,7 @@ def console_non_ascii(source: str) -> list[tuple[int, str]]:
             elif isinstance(node, ast.Name) and node.id == "__doc__":
                 doc = ast.get_docstring(tree, clean=False) or ""
                 if _non_ascii(doc):
-                    found.append((1, doc))
+                    found.append((tree.body[0].lineno, doc))
     return sorted(set(found))
 
 
@@ -78,10 +81,10 @@ def console_non_ascii(source: str) -> list[tuple[int, str]]:
             id="multi-line-print-continuation",
         ),
         pytest.param('n = 1\nprint(f"{n} \u2014 done")\n', id="f-string-part"),
-        pytest.param(
-            'import sys\nprint("x", file=sys.stderr, sep="\u2014")\n', id="print-to-stderr"
-        ),
+        pytest.param('import sys\nprint("a \u2014 b", file=sys.stderr)\n', id="print-file-stderr"),
         pytest.param('import sys\nsys.stderr.write("\u2014\\n")\n', id="stderr-write"),
+        pytest.param('import sys\nsys.stdout.write("\u2014\\n")\n', id="stdout-write"),
+        pytest.param('answer = input("go \u2014 ")\n', id="input-prompt"),
         pytest.param(
             '"""Tool (spec \u00a76.3)."""\nimport argparse\n'
             "parser = argparse.ArgumentParser(description=__doc__)\n",
@@ -100,6 +103,28 @@ def console_non_ascii(source: str) -> list[tuple[int, str]]:
             id="argument-type-error",
         ),
         pytest.param('raise SystemExit("\u2014")\n', id="system-exit"),
+        pytest.param('import sys\nsys.exit("\u2014")\n', id="sys-exit"),
+        pytest.param(
+            'import argparse\nargparse.ArgumentParser(epilog="\u2014")\n', id="argparse-epilog"
+        ),
+        pytest.param(
+            'import argparse\np = argparse.ArgumentParser()\np.add_subparsers(title="\u2014")\n',
+            id="add-subparsers",
+        ),
+        pytest.param(
+            "import argparse\nsub = argparse.ArgumentParser().add_subparsers()\n"
+            'sub.add_parser("up", help="\u2014")\n',
+            id="add-parser",
+        ),
+        pytest.param(
+            'import argparse\np = argparse.ArgumentParser()\np.add_argument_group("\u2014")\n',
+            id="add-argument-group",
+        ),
+        pytest.param(
+            "import argparse\np = argparse.ArgumentParser()\n"
+            'p.add_mutually_exclusive_group(title="\u2014")\n',
+            id="add-mutually-exclusive-group",
+        ),
     ],
 )
 def test_console_non_ascii_is_flagged(source):

@@ -452,11 +452,16 @@ columns, without line numbers, so moving code doesn't break matching.
   (`uv sync --locked --extra dev`).
 - **ASCII console output**: `tests/test_scripts_ascii_console.py` fails when
   a `backend/scripts/` file can print a non-ASCII string (the Windows console
-  is cp1252): anything inside `print`, `sys.stdout/stderr.write`, the argparse
-  constructors and `add_argument`, `parser.error`, `ArgumentTypeError`,
-  `SystemExit` / `sys.exit`, and the module docstring when passed as
-  `description=__doc__`. Comments, other strings and writes to files opened
-  with an `encoding=` are allowed.
+  is cp1252): any string literal inside `print`, `input`,
+  `sys.stdout/stderr.write`, the argparse constructors and `add_*` builders,
+  `parser.error`, `ArgumentTypeError`, `SystemExit` / `sys.exit`, and the
+  module docstring when passed as `description=__doc__`. Comments, other
+  strings and any `.write` not on `sys.stdout` / `sys.stderr` (a file
+  handle's) are allowed. Literals only: a string bound to a name before it is
+  printed is not followed, so keep console text inline in the call.
+- **Typecheck known gap**: baseline entries hold rule and columns, not the message.
+  Fixing a baselined error and adding a different one with the same rule at
+  the same columns in the same file passes lock mode.
 
 ### Unhandled-error contract (C-14)
 
