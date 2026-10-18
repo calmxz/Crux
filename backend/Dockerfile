@@ -28,6 +28,10 @@ RUN apt-get update \
 
 COPY --from=uv /uv /bin/uv
 
+# uv installs everything, so the base image's pip is dead weight, and the
+# copies of urllib3, msgpack and setuptools it bundles carry HIGH CVEs (#620).
+RUN python -m pip uninstall -y pip
+
 # Dependencies only: extras (dev) stay out, and the app is not installed as
 # a package; uvicorn and alembic import it from /app. The pip image's
 # `pip install .` ran before the code was copied, so it installed none either.
