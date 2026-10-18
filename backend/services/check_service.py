@@ -105,7 +105,7 @@ def _json_dict(raw: str | None) -> dict | None:
         return None
     try:
         data = json.loads(raw)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
     return data if isinstance(data, dict) else None
 
@@ -210,7 +210,7 @@ def _rebuild_recap(db: Session, msg: ChatMessage, events: list | None = None) ->
     mis-marked "answered". Accepted as best-effort only."""
     try:
         tcs = json.loads(msg.tool_calls_json or "[]")
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
     ask = next((t for t in tcs if t.get("name") == "ask_check_questions"), None)
     if ask is None:

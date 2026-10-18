@@ -1,5 +1,5 @@
 {
-  "pythonVersion": "3.12",
+  "pythonVersion": "3.14",
   "typeCheckingMode": "basic",
   "exclude": [".venv", "db/alembic/versions", "contracts/models.py"],
   "ignore": ["tests"]

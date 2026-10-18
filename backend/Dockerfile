@@ -1,8 +1,8 @@
 # Lockstep with every setup-uv `version:` in .github/workflows (Dependabot
 # skips this image so the pins move together, by hand).
-FROM ghcr.io/astral-sh/uv:0.11.7@sha256:240fb85ab0f263ef12f492d8476aa3a2e4e1e333f7d67fbdd923d00a506a516a AS uv
+FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
 
-FROM python:3.12.15-slim
+FROM python:3.14.8-slim
 
 # #609: install the committed uv.lock, never a fresh resolve. The image's
 # Python, not a uv download; bytecode compiled at install as pip did (no

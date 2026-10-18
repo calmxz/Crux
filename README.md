@@ -8,7 +8,7 @@ Pick a topic, drop in your course PDFs, and chat with a tutor that builds a live
 
 [![CI](https://github.com/calmxz/Crux/actions/workflows/ci.yml/badge.svg)](https://github.com/calmxz/Crux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3-42b883.svg)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![pgvector](https://img.shields.io/badge/pgvector-0.8.x-336791.svg)](https://github.com/pgvector/pgvector)
@@ -70,7 +70,7 @@ Most "AI tutors" today are a chat box bolted onto a generic LLM. They ask the sa
 | Layer | Tech | Why |
 |---|---|---|
 | Frontend | Vue 3, Vite, Pinia, PrimeVue | Reactive SPA, fast dev loop, accessible components out of the box |
-| Backend | FastAPI, Uvicorn, Python 3.12 | Typed routes, automatic OpenAPI, async-friendly |
+| Backend | FastAPI, Uvicorn, Python 3.14 | Typed routes, automatic OpenAPI, async-friendly |
 | ORM / DB | SQLAlchemy + Supabase Postgres 17 | Managed Postgres + Alembic migrations; pooled connection via Supabase pgbouncer |
 | Vector store | pgvector 0.8.x in Supabase Postgres | Co-located with app schema; `ivfflat` cosine index on `chunk_embeddings` |
 | Auth | Supabase Auth (email/password) | JWT verified server-side against Supabase JWKS |
@@ -131,7 +131,7 @@ The system prompt is split: an immutable rules block (`backend/agent/prompts.py`
 
 Local development runs the app natively (Postgres + pgvector and Auth are Supabase-managed, so there is no local DB container):
 
-- Python 3.12 (`python --version`)
+- Python 3.14 (`python --version`)
 - Node.js 20.x or newer + npm 10.x (`node --version`, `npm --version`)
 - For RAG (PDF upload + retrieval): a Supabase Postgres connection string in `DATABASE_URL`. Without it the backend falls back to a local SQLite file (`sqlite:///./data/app.db`) — fine for a quick spin, but pgvector retrieval requires Postgres.
 
