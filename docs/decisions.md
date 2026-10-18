@@ -14,7 +14,9 @@ Diagnostic) `knowledge_level`, never `subtopic_levels`.
 - **The tutor writes the level, from a prompt rule.** On a `[check results]`
   turn of an ordinary Check whose Set has an answered Item and whose gap is a
   subtopic of the TOPIC, the tutor patches `subtopic` + `subtopic_level` with
-  `evidence_type="tested"`, using the Diagnostic cut-offs (`_level_for_score`).
+  `evidence_type="tested"`. The level uses the Diagnostic thresholds
+  (`_level_for_score`) over answered Items, the score the summary shows; a
+  Diagnostic also counts skips.
   AC3 measures how reliably the LLM patches subtopic levels. Also, the server
   can't tell a subtopic ("u-substitution") from a one-off misconception gap
   ("sign error in the chain rule"), so a server write would fill the

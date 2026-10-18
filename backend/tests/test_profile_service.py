@@ -939,26 +939,22 @@ def test_apply_patch_rejected_subtopic_level_saves_no_other_field(session_row, d
         focus_target_gap="u-substitution",
     )
     res = profile_service.apply_patch(db_session, ctx, args)
-    assert not res.ok
+    assert res.error == "subtopic_level change requires evidence_type 'declared' or 'tested'"
     p = profile_service.load_profile(db_session, session_row.id)
     assert p.subtopic_levels == {"chain rule": "advanced"}
     assert p.confirmed_gaps == []
     assert p.focus_target_gap == "limits"
 
 
-def test_apply_patch_subtopic_pair_rule_checked_before_evidence(session_row, db_session):
+@pytest.mark.parametrize("evidence", [None, "declared"])
+def test_apply_patch_subtopic_pair_rule_checked_before_evidence(session_row, db_session, evidence):
+    # With evidence omitted, the evidence gate would also reject this patch:
+    # the pair error proves the pair rule runs first.
     from services import profile_service
 
-    # The level-only case carries focus so it is not rejected as an empty patch.
-    for kw in (
-        {"subtopic": "chain rule"},
-        {"subtopic_level": "beginner", "focus_target_gap": "limits"},
-    ):
-        for evidence in (None, "declared"):
-            ctx, args = _ctx_args(db_session, session_row, evidence_type=evidence, **kw)
-            res = profile_service.apply_patch(db_session, ctx, args)
-            assert not res.ok
-            assert "together" in res.error
+    ctx, args = _ctx_args(db_session, session_row, subtopic="chain rule", evidence_type=evidence)
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert res.error == "subtopic and subtopic_level must be provided together"
 
 
 def test_apply_patch_subtopic_requires_pair(session_row, db_session):
