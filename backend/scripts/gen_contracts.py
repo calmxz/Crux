@@ -39,8 +39,8 @@ def main() -> int:
     if importlib.util.find_spec("datamodel_code_generator") is None:
         print(
             "error: datamodel_code_generator not installed in this Python. "
-            "Install dev deps:\n"
-            f"  {sys.executable} -m pip install -e backend[dev]",
+            "Install dev deps (from backend/):\n"
+            "  uv sync --locked --extra dev",
             file=sys.stderr,
         )
         return 1

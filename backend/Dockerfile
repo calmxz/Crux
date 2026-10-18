@@ -1,3 +1,5 @@
+# Must satisfy [tool.uv] required-version in pyproject.toml; uv sync fails
+# the build otherwise.
 FROM ghcr.io/astral-sh/uv:0.11.7@sha256:240fb85ab0f263ef12f492d8476aa3a2e4e1e333f7d67fbdd923d00a506a516a AS uv
 
 FROM python:3.12.14-slim
@@ -26,13 +28,12 @@ RUN apt-get update \
 
 COPY --from=uv /uv /bin/uv
 
-# Dependencies first, so a code-only change reuses this layer. Extras (dev)
-# stay out.
+# Dependencies only: extras (dev) stay out, and the app is not installed as
+# a package (uvicorn and alembic import it from /app, as with pip before).
 COPY pyproject.toml uv.lock ./
 RUN uv sync --locked --no-install-project
 
 COPY . ./
-RUN uv sync --locked --no-editable
 
 RUN adduser --system --no-create-home --group --uid 1000 app \
     && mkdir -p /app/data/uploads \

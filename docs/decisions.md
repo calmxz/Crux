@@ -23,6 +23,11 @@ while local stayed on 1.105.0 and passed.
   (`UV_COMPILE_BYTECODE`), as pip did; without it, cold starts recompiled
   every package under `PYTHONDONTWRITEBYTECODE`. Verified locally: the old
   and new images both migrate a fresh Postgres and serve `/ready` in about 10s.
+- **The lock was refreshed before it shipped.** Gitignored, it had aged
+  behind what pip resolved: its export carried 19 known CVEs in six packages
+  (starlette, anyio, urllib3, cryptography, multidict, fsspec), which this
+  change would have downgraded production to. Those six were moved to fixed
+  versions with `uv lock --upgrade-package`; everything else stays as locked.
 - **The litellm/mcp question is deferred to #610**, decided when Dependabot
   proposes 1.106 or later.
 

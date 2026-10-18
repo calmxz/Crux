@@ -40,7 +40,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: '0.11.7'
+          version-file: backend/pyproject.toml
           enable-cache: true
           cache-dependency-glob: backend/uv.lock
 
@@ -203,7 +203,7 @@ jobs:
 
       - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
         with:
-          version: '0.11.7'
+          version-file: backend/pyproject.toml
 
       # #609: audit what ships, the locked set, not a fresh resolve of the
       # pyproject ranges. Hashes make pip-audit take the pins as-is.
