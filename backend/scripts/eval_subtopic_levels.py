@@ -256,7 +256,7 @@ def main() -> int:
 def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
     if outcome.cost_stopped:
         print(
-            f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.2f}. "
+            f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.4f}. "
             f"Completed {outcome.completed} of {outcome.planned} planned runs. "
             "No verdict over partial results."
         )

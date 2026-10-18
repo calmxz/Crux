@@ -73,6 +73,9 @@ def _main(module, monkeypatch, *args: str) -> int:
 
 
 def test_help_shows_the_default_limit(script, monkeypatch, capsys):
+    # argparse wraps help to the terminal width; a wide one keeps the
+    # default on one line.
+    monkeypatch.setenv("COLUMNS", "200")
     with pytest.raises(SystemExit) as exc:
         _main(script, monkeypatch, "--help")
     assert exc.value.code == 0
@@ -81,7 +84,7 @@ def test_help_shows_the_default_limit(script, monkeypatch, capsys):
     assert "default 5" in out
 
 
-@pytest.mark.parametrize("value", ["0", "-1", "abc"])
+@pytest.mark.parametrize("value", ["0", "-1", "abc", "inf", "nan"])
 def test_a_non_positive_limit_fails_parsing(script, monkeypatch, capsys, value):
     calls = _stub_runs(script, monkeypatch, cost="0.01", ok=True)
     with pytest.raises(SystemExit) as exc:
@@ -100,7 +103,7 @@ def test_reaching_the_limit_stops_before_the_next_run(script, monkeypatch, capsy
     assert code not in (0, 1)
     out = capsys.readouterr().out
     assert "$0.5000" in out
-    assert "limit $0.50" in out
+    assert "limit $0.5000" in out
     assert f"Completed 1 of {_planned_runs(script, 1)} planned runs" in out
     assert "PASS" not in out and "FAIL" not in out
     assert out.rstrip().endswith("Total spend: $0.5000")
