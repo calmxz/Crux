@@ -48,12 +48,6 @@ dev = [
 [tool.setuptools.packages.find]
 where = ["."]
 
-# #609: the one source for uv's version. CI's setup-uv reads it
-# (version-file), and uv refuses to run outside it, so a Dockerfile uv image
-# bumped past it fails the build instead of drifting from CI.
-[tool.uv]
-required-version = ">=0.11.7,<0.12"
-
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]

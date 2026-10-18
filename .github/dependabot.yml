@@ -79,6 +79,11 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    # #609: the uv image moves by hand, in lockstep with the setup-uv
+    # `version:` pins in .github/workflows.
+    ignore:
+      - dependency-name: "astral-sh/uv"
+      - dependency-name: "ghcr.io/astral-sh/uv"
     labels:
       - "dependencies"
       - "docker"

@@ -21,8 +21,21 @@ while local stayed on 1.105.0 and passed.
   outside the chowned `/app`: inside `/app`, the chown copied the whole venv
   into a new layer (+700MB). Bytecode is compiled at install
   (`UV_COMPILE_BYTECODE`), as pip did; without it, cold starts recompiled
-  every package under `PYTHONDONTWRITEBYTECODE`. Verified locally: the old
-  and new images both migrate a fresh Postgres and serve `/ready` in about 10s.
+  every package under `PYTHONDONTWRITEBYTECODE`. The app is not installed as
+  a package: the old `pip install .` ran before the code was copied, so it
+  installed none either, and a project install would build with an unlocked
+  setuptools. Verified locally: the old and new images both migrate a fresh
+  Postgres and serve `/ready` in about 10s.
+- **uv is an exact pin in five places, bumped by hand in lockstep.** The
+  Dockerfile's uv image and every setup-uv `version:`; Dependabot skips the
+  image. Rejected: one range in `[tool.uv] required-version` read by
+  setup-uv. A range lets CI float to a newer patch than the image, and uv
+  enforces it on every uv that reads the project, including Dependabot's own:
+  once that moves past the range, every lock PR fails and updates stop.
+- **The backup job installs the full locked set**, not boto3 alone. A
+  boto3-only install through constraints lost uv's hash checks, on the job
+  that holds the database and R2 credentials. `--locked` cannot fail there by
+  itself: CI fails the same commit first.
 - **The lock was refreshed before it shipped.** Gitignored, it had aged
   behind what pip resolved: its export carried 19 known CVEs in six packages
   (starlette, anyio, urllib3, cryptography, multidict, fsspec), which this
