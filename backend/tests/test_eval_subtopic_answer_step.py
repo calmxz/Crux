@@ -53,24 +53,24 @@ def _pattern(turns):
     }
 
 
-def _quiz_turn():
+def _quiz_turn(set_index=1, set_total=1, correct=CORRECT, prefix="Q"):
     return [
-        "Three questions on u-substitution.",
+        "Questions on u-substitution.",
         tool_call(
             "ask_check_questions",
             args={
                 "session_id": SESSION_ID,
-                "set_index": 1,
-                "set_total": 1,
+                "set_index": set_index,
+                "set_total": set_total,
                 "gap": "u-substitution",
                 "items": [
                     {
-                        "question": f"Q{n}?",
+                        "question": f"{prefix}{n}?",
                         "options": ["a", "b", "c"],
                         "correct_index": c,
                         "explanation": f"E{n}.",
                     }
-                    for n, c in enumerate(CORRECT)
+                    for n, c in enumerate(correct)
                 ],
             },
         ),
@@ -106,6 +106,35 @@ async def test_the_answer_step_grades_every_item_through_check_service(
         assert check_service.open_set(row) is None
     assert [(e.question, e.correct, e.selected_index, e.correct_index) for e in events] == [
         (f"Q{n}?", True, c, c) for n, c in enumerate(CORRECT)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_the_answer_step_answers_every_set_of_the_check(script, fake_llm):
+    set2 = [1, 2]
+    fake_llm.streams = [
+        _quiz_turn(1, 2),
+        ["Good. Set 2:", *_quiz_turn(2, 2, set2, prefix="R")],
+        ["All six right."],
+        ["Next up: parts."],
+    ]
+
+    factory, _ok = await _run(script, ["Quiz me on u-sub.", ANSWER, "What's next?"])
+
+    with factory() as db:
+        events = db.scalars(select(LearningEvent).order_by(LearningEvent.id)).all()
+        assert check_service.open_set(db.get(SessionModel, SESSION_ID)) is None
+    assert [(e.question, e.correct, e.selected_index) for e in events] == [
+        *[(f"Q{n}?", True, c) for n, c in enumerate(CORRECT)],
+        *[(f"R{n}?", True, c) for n, c in enumerate(set2)],
+    ]
+    summaries = [c["messages"][-1]["content"] for c in fake_llm.stream_calls[1:3]]
+    assert summaries[0].endswith("3/3 correct. Set 1 of 2.")
+    assert summaries[1].endswith("2/2 correct. Set 2 of 2.")
+    turn3 = fake_llm.stream_calls[3]["messages"]
+    assert [m["content"] for m in turn3 if m["role"] == "user"] == [
+        "Quiz me on u-sub.",
+        "What's next?",
     ]
 
 
@@ -166,6 +195,47 @@ async def test_string_turns_go_to_the_tutor_as_chat_messages(script, fake_llm):
     ]
 
 
+def _stub_runs(script, monkeypatch):
+    """Replace the per-run coroutine with one that makes no LLM call and
+    records which pattern ran."""
+    runs = []
+
+    async def run(session_factory, pattern):
+        runs.append(pattern["name"])
+        return True
+
+    monkeypatch.setattr(script, "_run_pattern_once", run)
+    return runs
+
+
+def _main(script, monkeypatch, *args):
+    monkeypatch.setattr(sys, "argv", ["eval_subtopic_levels", *args])
+    return script.main()
+
+
+def test_pattern_runs_only_the_named_pattern(script, monkeypatch, capsys):
+    runs = _stub_runs(script, monkeypatch)
+
+    code = _main(script, monkeypatch, "--pattern", "tested_progression", "--runs", "2")
+
+    assert code == 0
+    assert runs == ["tested_progression", "tested_progression"]
+    out = capsys.readouterr().out
+    assert "declared_level" not in out
+    assert "All 1 patterns" in out
+
+
+def test_an_unknown_pattern_fails_parsing(script, monkeypatch, capsys):
+    runs = _stub_runs(script, monkeypatch)
+
+    with pytest.raises(SystemExit) as exc:
+        _main(script, monkeypatch, "--pattern", "tested_progresion")
+
+    assert exc.value.code == 2
+    assert "--pattern" in capsys.readouterr().err
+    assert runs == []
+
+
 def test_an_unknown_turn_action_fails_at_load(script, tmp_path):
     path = tmp_path / "bad.json"
     path.write_text(json.dumps(_pattern(["Hi.", {"action": "answer_checks_wrongly"}])))
@@ -195,16 +265,9 @@ def test_a_bad_later_pattern_exits_before_the_first_run(script, monkeypatch, tmp
     (tmp_path / "bad.json").write_text(json.dumps(bad))
     monkeypatch.setattr(script, "PATTERN_DIR", tmp_path)
     monkeypatch.setattr(script, "PATTERNS", ("good", "bad"))
-    runs = []
+    runs = _stub_runs(script, monkeypatch)
 
-    async def run(session_factory, pattern):
-        runs.append(pattern)
-        return True
-
-    monkeypatch.setattr(script, "_run_pattern_once", run)
-    monkeypatch.setattr(sys, "argv", ["eval_subtopic_levels"])
-
-    code = script.main()
+    code = _main(script, monkeypatch)
 
     assert code == script.BAD_PATTERN_EXIT
     assert code not in (0, 1, 2, script.COST_STOP_EXIT)

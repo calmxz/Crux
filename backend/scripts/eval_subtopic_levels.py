@@ -16,11 +16,14 @@ A pattern turn is a chat message (a string) or the structured answer step
 {"action": "answer_checks_correctly"}: it answers every pending Item of the
 open check Set correctly through check_service.answer, Closes the Set through
 check_service.complete and runs the follow-up turn on the results summary,
-as the learner's clicks and Done button do in the app. Every pattern is
+as the learner's clicks and Done button do in the app. When a follow-up poses
+the Check's next Set, the step answers that too, so the whole Check is done
+before the next turn: one more paid call per extra Set. Every pattern is
 validated before the first run; a malformed one exits 4 having spent nothing.
 
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
+    ... --pattern tested_progression --runs 10 --max-cost 1   # one pattern
 
 Each run hits the live LLM and is billed by the provider. Metering lands in
 the script's in-memory DB with a fresh user per run: the per-user cap never
@@ -120,8 +123,8 @@ def _load_pattern(path: Path) -> dict:
     return pattern
 
 
-def _load_patterns() -> dict[str, dict]:
-    return {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in PATTERNS}
+def _load_patterns(names) -> dict[str, dict]:
+    return {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in names}
 
 
 def _matches(profile, expected) -> bool:
@@ -197,21 +200,29 @@ async def _chat_turn(db, session_id: str, user_id: str, messages: list[dict]) ->
 
 
 async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) -> bool:
-    """Answer every pending Item of the open Set correctly, Close it and run
-    the follow-up turn, as the learner's clicks and Done button do. Returns
-    False, doing nothing, when no Set is open."""
+    """Answer the open Check correctly, as the learner's clicks and Done
+    button do: every Set, since a follow-up may pose the Check's next one.
+    Returns False, doing nothing, when no Set is open."""
     pc = check_service.open_set(db.get(SessionModel, session_id))
     if pc is None:
         return False
+    # Ends: a follow-up may only pose the next Set, and a Check has at most 3.
+    while pc is not None:
+        await _answer_set(db, session_id, user_id, messages, pc)
+        pc = check_service.open_set(db.get(SessionModel, session_id))
+    return True
+
+
+async def _answer_set(db, session_id: str, user_id: str, messages: list[dict], pc: dict) -> None:
+    """Answer every pending Item of Set `pc` correctly, Close it and run the
+    follow-up turn."""
     for index, item in enumerate(pc["items"]):
         if item.get("status", "pending") == "pending":
             check_service.answer(db, session_id, index, item["correct_index"])
     summary, cooldown = check_service.complete(db, session_id)
 
     # Mirrors routes/sessions.py::_followup_context, less its daily message
-    # cap (a fresh user per run never reaches it). If the follow-up opens a
-    # later Set of the Check, it stays open into the next turn, as it does
-    # for a learner who types instead of answering.
+    # cap (a fresh user per run never reaches it).
     inputs = dataclasses.replace(
         prompt_state.gather_session_inputs(
             db, db.get(SessionModel, session_id), learner_prefs={}, gap_accuracy={}
@@ -237,7 +248,6 @@ async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) 
     followup = [*messages, {"role": "user", "content": summary}]
     reply = await _stream_reply(followup, prompts.build_system_prompt(state), ctx)
     messages.append({"role": "assistant", "content": reply})
-    return True
 
 
 async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
@@ -326,6 +336,12 @@ def main() -> int:
             "overshoot it by one run."
         ),
     )
+    parser.add_argument(
+        "--pattern",
+        action="append",
+        choices=PATTERNS,
+        help="Run only this pattern; repeat for more (default: every pattern).",
+    )
     args = parser.parse_args()
 
     if os.environ.get("LLM_STUB") == "1":
@@ -337,7 +353,7 @@ def main() -> int:
 
     # Every pattern before the first paid run, so a bad one costs nothing.
     try:
-        patterns = _load_patterns()
+        patterns = _load_patterns(args.pattern or PATTERNS)
     except (OSError, ValueError, KeyError) as e:
         print(f"Bad pattern fixture: {e}", file=sys.stderr)
         return BAD_PATTERN_EXIT
@@ -373,7 +389,7 @@ def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
             f"\nFAILED patterns: {failed}. Threshold {THRESHOLD * 100:.0f}%.",
         )
         return 1
-    print(f"\nAll {len(PATTERNS)} patterns >= {THRESHOLD * 100:.0f}%.")
+    print(f"\nAll {len(outcome.results)} patterns >= {THRESHOLD * 100:.0f}%.")
     return 0
 
 

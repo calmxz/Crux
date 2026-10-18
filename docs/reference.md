@@ -433,7 +433,8 @@ follow-up turn on the `[check results]` summary, mirroring
 `routes/sessions.py::_followup_context`. Change one, check the other. With
 no open Set the step is skipped and logged. Every pattern is validated (turns
 and `expected` keys) before the first run, and one bad fixture exits 4
-before any spend. A follow-up that opens a later Set leaves it unanswered.
+before any spend. A follow-up that poses the Check's next Set gets that Set
+answered and Closed too, so the next turn always follows a finished Check.
 
 ## Frontend
 
