@@ -31,8 +31,8 @@ trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new runs once this process's recorded spend reaches it, so a run
 can overshoot it by one run; a cost stop prints no verdict and exits 3.
 GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies: a
-call it refuses ends the eval the same way, discarding the run it hit. The
-default 10 runs per pattern: declared_level makes 3 calls a run,
+call it refuses ends the eval the same way (exit 3), discarding the run it
+hit. The default 10 runs per pattern: declared_level makes 3 calls a run,
 tested_progression 3 to 5 (one follow-up per Set), so 60 to 80 calls for
 both. Use --runs 3 for a quick smoke check.
 """
@@ -97,8 +97,8 @@ class EvalOutcome:
 
 
 class _CapRefused(BaseException):
-    """#605: a cost cap refused a tutor call, so the run never reached the
-    model. A BaseException so the per-run `except Exception` cannot score it."""
+    """#605: a cost cap refused a tutor call; the refused call never reached
+    the model. A BaseException so the per-run `except Exception` cannot score it."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -421,7 +421,7 @@ async def _main_async(
                     completed,
                     planned,
                     _total_spend(SessionLocal),
-                    cost_stopped=True,
+                    cost_stopped=False,
                     cap_refused=refused.code,
                 )
             except Exception as e:  # noqa: BLE001

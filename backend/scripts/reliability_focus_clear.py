@@ -20,9 +20,9 @@ trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new fixture runs once this process's recorded spend reaches it, so a
 run can overshoot it by one fixture run; a cost stop prints no verdict and
 exits 3. GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still
-applies: a call it refuses ends the eval the same way, discarding the fixture
-run it hit. The default 10 runs across 9 fixtures = 90 sessions, ~3-6 turns each
-= a few hundred calls. Use --runs 3 for a quick smoke check.
+applies: a call it refuses ends the eval the same way (exit 3), discarding
+the fixture run it hit. The default 10 runs across 9 fixtures = 90 sessions,
+~3-6 turns each = a few hundred calls. Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
@@ -79,8 +79,8 @@ class EvalOutcome:
 
 
 class _CapRefused(BaseException):
-    """#605: a cost cap refused a tutor call, so the run never reached the
-    model. A BaseException so the per-run `except Exception` cannot score it."""
+    """#605: a cost cap refused a tutor call; the refused call never reached
+    the model. A BaseException so the per-run `except Exception` cannot score it."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -226,7 +226,7 @@ async def _main_async(runs: int, max_cost: Decimal) -> EvalOutcome:
                         completed,
                         planned,
                         _total_spend(SessionLocal),
-                        cost_stopped=True,
+                        cost_stopped=False,
                         cap_refused=refused.code,
                     )
                 except Exception as e:  # noqa: BLE001
