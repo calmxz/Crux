@@ -95,18 +95,33 @@ def test_a_non_positive_limit_fails_parsing(script, monkeypatch, capsys, value):
 
 
 def test_reaching_the_limit_stops_before_the_next_run(script, monkeypatch, capsys):
-    calls = _stub_runs(script, monkeypatch, cost="0.50", ok=True)
+    calls = _stub_runs(script, monkeypatch, cost="0.60", ok=True)
     code = _main(script, monkeypatch, "--runs", "1", "--max-cost", "0.50")
 
     assert len(calls) == 1
     assert code == script.COST_STOP_EXIT
     assert code not in (0, 1)
     out = capsys.readouterr().out
-    assert "$0.5000" in out
-    assert "limit $0.5000" in out
+    assert "spent $0.6000, limit $0.5000" in out
     assert f"Completed 1 of {_planned_runs(script, 1)} planned runs" in out
     assert "PASS" not in out and "FAIL" not in out
-    assert out.rstrip().endswith("Total spend: $0.5000")
+    assert out.rstrip().endswith("Total spend: $0.6000")
+
+
+def test_an_interrupted_run_still_reports_spend(script, monkeypatch, capsys):
+    calls = _stub_runs(script, monkeypatch, cost="0.25", ok=True)
+    booked = getattr(script, RUNNERS[script.__name__.rsplit(".", 1)[-1]])
+
+    async def interrupted(session_factory, item):
+        await booked(session_factory, item)
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(script, RUNNERS[script.__name__.rsplit(".", 1)[-1]], interrupted)
+    with pytest.raises(KeyboardInterrupt):
+        _main(script, monkeypatch, "--runs", "1")
+
+    assert len(calls) == 1
+    assert capsys.readouterr().out.rstrip().endswith("Total spend: $0.2500")
 
 
 def test_spend_dated_before_today_counts_toward_the_limit(script, monkeypatch, capsys):

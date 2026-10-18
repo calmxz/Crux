@@ -247,10 +247,13 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    outcome = asyncio.run(_main_async(args.runs, args.max_cost))
-    code = _report(outcome, args.max_cost)
-    print(f"\nTotal spend: ${outcome.spend:.4f}")
-    return code
+    try:
+        outcome = asyncio.run(_main_async(args.runs, args.max_cost))
+        return _report(outcome, args.max_cost)
+    finally:
+        # Also on Ctrl-C or a crash: the calls made so far are billed.
+        # _main_async binds SessionLocal before its first await.
+        print(f"\nTotal spend: ${_total_spend(SessionLocal):.4f}")
 
 
 def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
