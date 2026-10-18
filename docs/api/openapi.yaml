@@ -1152,6 +1152,8 @@ components:
       type: object
       additionalProperties: false
       required: [session_id]
+      # The evidence sentence below is pinned by
+      # backend/tests/test_tool_schema_evidence.py.
       description: |
         Patch operation for a session's TopicProfile. Sending
         `focus_target_gap: null` together with `focus_clear_reason` clears
