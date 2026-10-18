@@ -172,6 +172,36 @@ def test_an_unknown_turn_action_fails_at_load(script, tmp_path):
         script._load_pattern(path)
 
 
+@pytest.mark.asyncio
+async def test_an_unknown_turn_action_fails_the_run_unvalidated(script, fake_llm):
+    fake_llm.streams = [_quiz_turn()]
+
+    with pytest.raises(ValueError, match="answer_checks_wrongly"):
+        await _run(script, ["Quiz me.", {"action": "answer_checks_wrongly"}])
+
+    assert len(fake_llm.stream_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_a_bad_later_pattern_fails_before_the_first_run(script, monkeypatch, tmp_path):
+    for name, turns in [("good", ["Hi."]), ("bad", [{"action": "nope"}])]:
+        (tmp_path / f"{name}.json").write_text(json.dumps(_pattern(turns)))
+    monkeypatch.setattr(script, "PATTERN_DIR", tmp_path)
+    monkeypatch.setattr(script, "PATTERNS", ("good", "bad"))
+    runs = []
+
+    async def run(session_factory, pattern):
+        runs.append(pattern)
+        return True
+
+    monkeypatch.setattr(script, "_run_pattern_once", run)
+
+    with pytest.raises(ValueError, match="bad.json"):
+        await script._main_async(1, script.DEFAULT_MAX_COST)
+
+    assert runs == []
+
+
 def test_tested_progression_answers_with_a_structured_turn(script):
     pattern = script._load_pattern(script.PATTERN_DIR / "tested_progression.json")
     assert pattern["turns"][1] == ANSWER

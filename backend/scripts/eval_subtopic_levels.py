@@ -191,7 +191,7 @@ async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) 
     if pc is None:
         return False
     for index, item in enumerate(pc["items"]):
-        if item["status"] == "pending":
+        if item.get("status", "pending") == "pending":
             check_service.answer(db, session_id, index, item["correct_index"])
     summary, cooldown = check_service.complete(db, session_id)
 
@@ -243,6 +243,8 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
             if isinstance(turn, str):
                 messages.append({"role": "user", "content": turn})
                 await _chat_turn(db, session_id, user_id, messages)
+            elif turn != ANSWER_STEP:
+                raise ValueError(f"turn {turn_idx}: unknown turn {turn!r}")
             elif not await _answer_step(db, session_id, user_id, messages):
                 print(
                     f"  [{pattern['name']}] turn {turn_idx}: no open check Set; "
@@ -269,9 +271,10 @@ async def _main_async(runs_per_pattern: int, max_cost: Decimal) -> EvalOutcome:
     results: dict[str, tuple[float, int]] = {}
     planned = runs_per_pattern * len(PATTERNS)
     completed = 0
+    # Every pattern before the first paid run, so a bad one costs nothing.
+    patterns = {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in PATTERNS}
 
-    for pattern_name in PATTERNS:
-        pattern = _load_pattern(PATTERN_DIR / f"{pattern_name}.json")
+    for pattern_name, pattern in patterns.items():
         passes = []
         for run_idx in range(runs_per_pattern):
             spend = _total_spend(SessionLocal)
