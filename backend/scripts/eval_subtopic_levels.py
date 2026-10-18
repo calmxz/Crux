@@ -12,6 +12,12 @@ turn-feeding, and profile-reload wiring: an in-memory StaticPool sqlite DB,
 one seeded Session per run, turns fed one at a time through
 tutor.run_streaming with the profile reloaded after each turn.
 
+A pattern turn is a chat message (a string) or the structured answer step
+{"action": "answer_checks_correctly"}: it answers every pending Item of the
+open check Set correctly through check_service.answer, Closes the Set through
+check_service.complete and runs the follow-up turn on the results summary,
+as the learner's clicks and Done button do in the app.
+
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
 
@@ -55,10 +61,11 @@ from contracts import TopicProfile  # noqa: E402
 from db.database import Base, SessionLocal  # noqa: E402
 from db.models import DailyCostLedger, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
-from services import profile_service, prompt_state  # noqa: E402
+from services import check_service, profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"
 PATTERNS = ("declared_level", "tested_progression")
+ANSWER_STEP = {"action": "answer_checks_correctly"}
 RUNS_PER_PATTERN = 10
 THRESHOLD = 0.85
 DEFAULT_MAX_COST = Decimal("5")
@@ -92,6 +99,16 @@ def _total_spend(SessionLocal) -> Decimal:
     with SessionLocal() as db:
         total = db.scalar(select(func.coalesce(func.sum(DailyCostLedger.cost_usd), 0)))
     return Decimal(str(total))
+
+
+def _load_pattern(path: Path) -> dict:
+    """A pattern fixture, refusing an unknown turn here rather than failing
+    every run of it."""
+    pattern = json.loads(path.read_text(encoding="utf-8"))
+    for n, turn in enumerate(pattern["turns"], start=1):
+        if not isinstance(turn, str) and turn != ANSWER_STEP:
+            raise ValueError(f"{path.name} turn {n}: unknown turn {turn!r}")
+    return pattern
 
 
 def _matches(profile, expected) -> bool:
@@ -138,6 +155,78 @@ def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:
         db.close()
 
 
+async def _stream_reply(messages: list[dict], system_prompt: str, ctx: ToolContext) -> str:
+    reply_parts: list[str] = []
+    async for ev in tutor.run_streaming(messages, system_prompt, ctx):
+        if ev.type == "assistant_delta":
+            reply_parts.append(ev.data.get("text", ""))
+    return "".join(reply_parts)
+
+
+async def _chat_turn(db, session_id: str, user_id: str, messages: list[dict]) -> None:
+    # The seed has no level; keep the diagnostic off so the eval
+    # measures subtopic patching, as it was calibrated.
+    state = dataclasses.replace(
+        prompt_state.assemble(
+            prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+            prompt_state.TurnInputs(retrieval_required=False),
+        ),
+        diagnostic_required=False,
+    )
+    ctx = ToolContext(
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
+        turn_started_at=datetime.now(timezone.utc),
+    )
+    reply = await _stream_reply(messages, prompts.build_system_prompt(state), ctx)
+    messages.append({"role": "assistant", "content": reply})
+
+
+async def _answer_step(db, session_id: str, user_id: str, messages: list[dict]) -> bool:
+    """Answer every pending Item of the open Set correctly, Close it and run
+    the follow-up turn, as the learner's clicks and Done button do. Returns
+    False, doing nothing, when no Set is open."""
+    pc = check_service.open_set(db.get(SessionModel, session_id))
+    if pc is None:
+        return False
+    for index, item in enumerate(pc["items"]):
+        if item["status"] == "pending":
+            check_service.answer(db, session_id, index, item["correct_index"])
+    summary, cooldown = check_service.complete(db, session_id)
+
+    # Mirrors routes/sessions.py::_followup_context, less its daily message
+    # cap (a fresh user per run never reaches it). If the follow-up opens a
+    # later Set of the Check, it stays open into the next turn, as it does
+    # for a learner who types instead of answering.
+    inputs = dataclasses.replace(
+        prompt_state.gather_session_inputs(
+            db, db.get(SessionModel, session_id), learner_prefs={}, gap_accuracy={}
+        ),
+        rolling_summary=None,
+        pending_check=None,
+        current_check=None,
+        quiz_cooldown=cooldown,
+    )
+    state = dataclasses.replace(
+        prompt_state.assemble(inputs, prompt_state.TurnInputs(retrieval_required=False)),
+        diagnostic_required=False,
+    )
+    ctx = ToolContext(
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
+        turn_started_at=datetime.now(timezone.utc),
+        suppress_check=True,
+        diagnostic_required=(inputs.profile.knowledge_level is None),
+    )
+    # The summary turn is not persisted in the app, so later turns never see it.
+    followup = [*messages, {"role": "user", "content": summary}]
+    reply = await _stream_reply(followup, prompts.build_system_prompt(state), ctx)
+    messages.append({"role": "assistant", "content": reply})
+    return True
+
+
 async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
     """One run of a pattern. Feeds `pattern["turns"]` one at a time, reloading
     the profile after each turn, and records the earliest turn at which
@@ -150,32 +239,16 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
         expected = pattern["expected"]
         matched_at: int | None = None
 
-        for turn_idx, user_turn in enumerate(pattern["turns"], start=1):
-            messages.append({"role": "user", "content": user_turn})
-
-            # The seed has no level; keep the diagnostic off so the eval
-            # measures subtopic patching, as it was calibrated.
-            state = dataclasses.replace(
-                prompt_state.assemble(
-                    prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
-                    prompt_state.TurnInputs(retrieval_required=False),
-                ),
-                diagnostic_required=False,
-            )
-            system_prompt = prompts.build_system_prompt(state)
-
-            ctx = ToolContext(
-                db=db,
-                session_id=session_id,
-                user_id=user_id,
-                turn_started_at=datetime.now(timezone.utc),
-            )
-            reply_parts: list[str] = []
-            async for ev in tutor.run_streaming(messages, system_prompt, ctx):
-                if ev.type == "assistant_delta":
-                    reply_parts.append(ev.data.get("text", ""))
-            reply = "".join(reply_parts)
-            messages.append({"role": "assistant", "content": reply})
+        for turn_idx, turn in enumerate(pattern["turns"], start=1):
+            if isinstance(turn, str):
+                messages.append({"role": "user", "content": turn})
+                await _chat_turn(db, session_id, user_id, messages)
+            elif not await _answer_step(db, session_id, user_id, messages):
+                print(
+                    f"  [{pattern['name']}] turn {turn_idx}: no open check Set; "
+                    "answer step skipped",
+                    file=sys.stderr,
+                )
 
             updated = profile_service.load_profile(db, session_id)
             if matched_at is None and _matches(updated, expected):
@@ -198,8 +271,7 @@ async def _main_async(runs_per_pattern: int, max_cost: Decimal) -> EvalOutcome:
     completed = 0
 
     for pattern_name in PATTERNS:
-        path = PATTERN_DIR / f"{pattern_name}.json"
-        pattern = json.loads(path.read_text(encoding="utf-8"))
+        pattern = _load_pattern(PATTERN_DIR / f"{pattern_name}.json")
         passes = []
         for run_idx in range(runs_per_pattern):
             spend = _total_spend(SessionLocal)
