@@ -8,6 +8,7 @@ from decimal import Decimal
 import pytest
 
 from agent.stream_events import StreamEvent
+from config import settings
 from db.database import SessionLocal
 from db.database import engine as default_engine
 from lib import error_codes
@@ -158,3 +159,18 @@ def test_a_refusal_in_a_check_follow_up_stops_the_eval(script, monkeypatch, caps
     _assert_cap_stop(captured.out, code, script, completed=0, accepted=1)
     assert "answer step skipped" not in captured.err
     assert "miss (" not in captured.err
+
+
+def test_the_real_cap_gate_refusal_stops_the_eval(
+    script, monkeypatch, capsys, fake_llm, expect_app_log
+):
+    # The adapter's own gate refuses, and the tutor turns that into the
+    # `error` event: no stubbed stream. Each finished call books CALL_COST,
+    # so the second call finds the global ceiling reached.
+    expect_app_log("llm call refused mid-turn (stream)")
+    fake_llm.cost = CALL_COST
+    monkeypatch.setattr(settings, "global_daily_cost_cap_usd", float(CALL_COST))
+    code = _main(script, monkeypatch, "--runs", "2")
+
+    assert len(fake_llm.stream_calls) == 1
+    _assert_cap_stop(capsys.readouterr().out, code, script, completed=0, accepted=1)

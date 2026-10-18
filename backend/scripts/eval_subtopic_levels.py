@@ -31,10 +31,10 @@ trips, and none of it reaches your real ledger. --max-cost (default $5) stops
 starting new runs once this process's recorded spend reaches it, so a run
 can overshoot it by one run; a cost stop prints no verdict and exits 3.
 GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies: a
-call it refuses ends the eval the same way (exit 3), discarding the run it
-hit. The default 10 runs per pattern: declared_level makes 3 calls a run,
-tested_progression 3 to 5 (one follow-up per Set), so 60 to 80 calls for
-both. Use --runs 3 for a quick smoke check.
+call any cost cap refuses ends the eval the same way (exit 3), discarding
+the run it hit. The default 10 runs per pattern: declared_level makes 3
+calls a run, tested_progression 3 to 5 (one follow-up per Set), so 60 to 80
+calls for both. Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
@@ -82,7 +82,6 @@ DEFAULT_MAX_COST = Decimal("5")
 # Distinct from a threshold failure (1) and an argparse usage error (2).
 COST_STOP_EXIT = 3
 BAD_PATTERN_EXIT = 4
-CAP_CODES = frozenset({error_codes.GLOBAL_COST_CAP_REACHED, error_codes.DAILY_COST_CAP_REACHED})
 
 
 @dataclasses.dataclass
@@ -96,9 +95,9 @@ class EvalOutcome:
     cap_refused: str | None = None
 
 
-class _CapRefused(BaseException):
+class _CapRefused(Exception):
     """#605: a cost cap refused a tutor call; the refused call never reached
-    the model. A BaseException so the per-run `except Exception` cannot score it."""
+    the model. `_main_async` catches it before its per-run `except Exception`."""
 
     def __init__(self, code: str):
         super().__init__(code)
@@ -229,7 +228,7 @@ async def _stream_reply(
             if ev.data.get("error"):
                 line += f": {ev.data['error']}"
             trace.add(line)
-        elif ev.type == "error" and ev.data.get("code") in CAP_CODES:
+        elif ev.type == "error" and ev.data.get("code") in error_codes.COST_CAP_CODES:
             cap_code = ev.data["code"]
         elif ev.type == "error":
             trace.add(f"turn ended with error {ev.data!r}")

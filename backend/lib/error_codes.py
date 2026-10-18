@@ -10,6 +10,8 @@ inline instead of using a constant here. Spellings are API: do not rename.
 DAILY_CAP_REACHED = "daily_cap_reached"
 DAILY_COST_CAP_REACHED = "daily_cost_cap_reached"
 GLOBAL_COST_CAP_REACHED = "global_cost_cap_reached"
+# Every code cost_meter.assert_within_caps refuses a call with (#605).
+COST_CAP_CODES = frozenset({DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED})
 CHUNK_LIMIT_EXCEEDED = "chunk_limit_exceeded"
 TOO_MANY_REQUESTS = "too_many_requests"
 # Upload-time page-count gate (PDF/PPTX), see routes/upload.py.
