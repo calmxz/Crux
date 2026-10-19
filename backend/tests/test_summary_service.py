@@ -370,9 +370,9 @@ def test_rolling_system_prompt_declares_transcript_untrusted():
 def test_summary_prompts_carry_determinism_rule_before_untrusted_rule(prompt):
     # #637: the rule replaces temperature 0.0 on summaries.
     low = getattr(summary_service, prompt).lower()
-    rule = low.find("use only facts stated in")
+    rule = low.find("base every statement on what the topic")
     assert rule != -1
-    assert "do not infer, embellish or invent" in low
+    assert "do not embellish or invent" in low
     assert "no preamble" in low
     assert rule < low.find("untrusted")
 

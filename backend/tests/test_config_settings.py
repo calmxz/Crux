@@ -7,6 +7,7 @@ def test_settings_load_with_retired_temperature_env_vars(monkeypatch):
     # #637 removed both settings; a deploy that still sets them must boot.
     monkeypatch.setenv("LLM_TEMPERATURE", "0.3")
     monkeypatch.setenv("SUMMARY_TEMPERATURE", "0.0")
+    monkeypatch.delenv("MODEL", raising=False)
 
     s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
 

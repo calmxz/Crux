@@ -43,7 +43,7 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Protocol, TypeVar
+from typing import Literal, Protocol, TypeVar
 
 import litellm
 
@@ -170,6 +170,10 @@ class ProviderStream(Protocol):
         """Release the underlying response."""
 
 
+# The reasoning_effort values LiteLLM maps for every reasoning provider.
+ReasoningEffort = Literal["minimal", "low", "medium", "high"]
+
+
 class Provider(Protocol):
     """The vendor call and its pricing. Never touches the database."""
 
@@ -182,7 +186,11 @@ class Provider(Protocol):
         """Model name recorded on embedding call log rows."""
 
     async def complete(
-        self, messages: list[dict], *, reasoning_effort: str | None = None, timeout: float
+        self,
+        messages: list[dict],
+        *,
+        reasoning_effort: ReasoningEffort | None = None,
+        timeout: float,
     ) -> Completion:
         """One non-streamed chat completion, priced."""
 
@@ -832,7 +840,7 @@ class Llm:
         messages: list[dict],
         *,
         meter: Meter,
-        reasoning_effort: str | None = None,
+        reasoning_effort: ReasoningEffort | None = None,
         timeout: float,
     ) -> Completion:
         await run_in_threadpool(_gate, meter, self.provider)

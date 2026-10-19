@@ -27,9 +27,17 @@ cause unexpected behavior, such as looping or degraded performance". We sent
   parameter would otherwise raise on a swap, and every summary would quietly
   fall back to the mechanical one. Rejected: `get_supported_openai_params`,
   which lists `reasoning_effort` for `openai/gpt-4.1-mini` (LiteLLM 1.106).
-- **A determinism rule replaces temperature 0.0.** Both summary system prompts
-  say to use only facts stated in the input, not to infer, embellish or invent,
-  and to write no preamble. The untrusted-transcript rule follows it.
+  LiteLLM also sets `includeThoughts: True` with it, so summaries get thought
+  summaries back that we discard (only `content` is read). Accepted: thinking
+  tokens are billed either way, and opting out means passing a raw Gemini
+  `thinkingConfig` the swap gate would not cover.
+- **A grounding rule replaces temperature 0.0.** Both summary system prompts
+  say to base every statement on what the topic, profile (session summary
+  only) and transcript show, not to embellish or invent, and to write no
+  preamble. The untrusted-transcript rule follows it. Rejected: "do not
+  infer", which the brief suggested. The same prompts ask what the learner
+  understood and what gaps remain, which are judgements drawn from the
+  transcript, and forbidding inference would push the model to drop them.
 
 ## 2026-10-19 - litellm is declared as litellm[mcp] (#610)
 

@@ -587,6 +587,10 @@ def _use_model(monkeypatch, model: str) -> None:
         model,
         {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
     )
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, model, [])
+    # completion_cost is faked; skip loading these rates into litellm's
+    # process-wide price map, which no fixture restores.
+    monkeypatch.setattr(cost_meter, "register_rates", lambda model: True)
 
 
 async def test_production_model_calls_carry_no_sampling_params(
