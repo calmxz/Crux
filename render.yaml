@@ -39,6 +39,10 @@ services:
         value: "0.50"
       - key: LLM_HARD_CAP_USD
         value: "1.00"
+      # Account-wide daily spend cap (#603), set in the Render dashboard; see
+      # "Render settings" in docs/reference.md.
+      - key: GLOBAL_DAILY_COST_CAP_USD
+        sync: false
       - key: GEMINI_API_KEY
         sync: false
       - key: DATABASE_URL
