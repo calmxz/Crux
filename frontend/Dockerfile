@@ -1,5 +1,7 @@
 # Build stage: compile Vite bundle.
-FROM node:26-alpine AS build
+# #634: base images are digest-pinned so a Docker Hub re-push of the tag
+# cannot change them unreviewed; Dependabot bumps the tag and digest together.
+FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
@@ -18,7 +20,7 @@ ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL \
 RUN npm run build
 
 # Serve stage: lean nginx with SPA fallback + /api proxy.
-FROM nginx:1.31.6-alpine
+FROM nginx:1.31.6-alpine@sha256:df221db836e1754089190208cee7eeda94f233197056426eda74a43ab1abeac2
 # Pull latest alpine patches over the pinned baseline so any CVEs fixed after the
 # image was published are applied. Trivy scan gates merges on CRITICAL CVEs.
 RUN apk --no-cache upgrade
