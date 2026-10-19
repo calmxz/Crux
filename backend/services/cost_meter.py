@@ -400,6 +400,11 @@ def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> 
     cancellation) plus the output cost for however many tokens were streamed
     in `delta_text`.
 
+    Despite the name, every estimate path uses it (cancels, replies without
+    usage, timed-out prompts, embeddings). It prices cached prompt tokens at
+    the input rate on purpose: no cached count exists there, and erring high
+    is safe for a spend cap (#647).
+
     The returned value is intentionally NOT quantized: record_cost quantizes
     on write, so accumulating raw sub-cent cancellation costs before truncation
     preserves arithmetic accuracy across multiple cancelled turns.
