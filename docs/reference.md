@@ -368,7 +368,10 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   `pyrightconfig.json`, then re-runs `uv sync` locally (`dev.ps1` and
   `pg_tests.sh` use `backend/.venv` as is, so a stale venv fails at import).
   `gen_contracts.py --target-python-version` stays at 3.12 on purpose; output
-  is valid on newer versions. Dependabot only bumps the base image's patch.
+  is valid on newer versions. Dependabot only bumps the base image's patch,
+  tag and digest together (the `FROM` is digest-pinned, #623). CI's
+  `setup-python` takes the newest 3.14.x, so it can run a newer patch than
+  the image until that PR merges; `docs/decisions.md` (2026-10-19) has why.
   Ruff's py314 target formats `except (A, B):` as `except A, B:` (PEP 758);
   that is a tuple of exception types, not Python 2's `except E, name`.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and

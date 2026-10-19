@@ -2,7 +2,9 @@
 # skips this image so the pins move together, by hand).
 FROM ghcr.io/astral-sh/uv:0.13.1@sha256:4a1f3666816dafadd20ceb71eac9a7d56d7ef30279f7d64048519ab901ada336 AS uv
 
-FROM python:3.14.8-slim
+# #623: digest-pinned so Render builds the exact bits trivy scanned;
+# Dependabot bumps the tag and digest together.
+FROM python:3.14.8-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
 
 # #609: install the committed uv.lock, never a fresh resolve. The image's
 # Python, not a uv download; bytecode compiled at install as pip did (no
@@ -21,9 +23,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# curl is for the HEALTHCHECK. No compiler (#623): every package in uv.lock
+# ships a wheel for this platform.
 # hadolint ignore=DL3008
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential curl \
+    && apt-get install -y --no-install-recommends curl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=uv /uv /bin/uv

@@ -3,6 +3,32 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - The backend image is digest-pinned, and CI's Python patch may lead it (#623)
+
+The #620 review found three gaps in `backend/Dockerfile` that predate it.
+
+- **The base image is pinned by digest**, `python:3.14.8-slim@sha256:...`,
+  like the uv image. Before this a Docker Hub re-push of the tag reached
+  Render on bits trivy never scanned. Dependabot bumps the tag and digest
+  together.
+- **No compiler in the image.** Every package in `uv.lock` ships a wheel for
+  cp314, abi3 or py3 on manylinux x86_64, so `build-essential` (~200MB)
+  compiled nothing. A future package without a wheel fails
+  `uv sync --locked` in the image build, which CI runs on every PR, so the
+  failure shows up in review, not on Render.
+- **CI floats to the newest 3.14.x; the image moves on Dependabot patch PRs.**
+  `backend/.python-version` stays at `3.14`. Rejected: pinning the patch
+  there, the choice the uv entry (#609) made. Dependabot already bumps the
+  image's patch automatically (#620) but cannot edit `.python-version`, so a
+  pin only flips the drift: each patch PR would leave CI on the older patch
+  until someone bumps the file by hand. Removing the drift for real takes a
+  CI check that the Dockerfile tag equals `.python-version`, and that turns
+  every automatic patch PR into a manual one. The drift also points the safe
+  way: CI tests a patch at least as new as production's, and the gap closes
+  when the weekly patch PR merges. uv can be pinned exactly because
+  Dependabot skips the uv image, so every one of its pins moves by hand in
+  the same commit.
+
 ## 2026-10-19 - MODEL_RATES prices chat turns, with Google's dated price changes (#622)
 
 Google doubles every `gemini-3.8-flash` rate on 2027-01-01. Chat turns were
