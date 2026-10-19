@@ -16,18 +16,15 @@ The #620 review found three gaps in `backend/Dockerfile` that predate it.
   compiled nothing. A future package without a wheel fails
   `uv sync --locked` in the image build, which CI runs on every PR, so the
   failure shows up in review, not on Render.
-- **CI floats to the newest 3.14.x; the image moves on Dependabot patch PRs.**
-  `backend/.python-version` stays at `3.14`. Rejected: pinning the patch
-  there, the choice the uv entry (#609) made. Dependabot already bumps the
-  image's patch automatically (#620) but cannot edit `.python-version`, so a
-  pin only flips the drift: each patch PR would leave CI on the older patch
-  until someone bumps the file by hand. Removing the drift for real takes a
-  CI check that the Dockerfile tag equals `.python-version`, and that turns
-  every automatic patch PR into a manual one. The drift also points the safe
-  way: CI tests a patch at least as new as production's, and the gap closes
-  when the weekly patch PR merges. uv can be pinned exactly because
-  Dependabot skips the uv image, so every one of its pins moves by hand in
-  the same commit.
+- **CI and the image may run different 3.14 patches; accepted.**
+  `backend/.python-version` stays at `3.14`, so setup-python takes whatever
+  3.14.x the runner has, while the image moves on Dependabot patch PRs.
+  Rejected: pinning the patch there, as #609 did for uv. Dependabot bumps the
+  image's patch automatically (#620) but cannot edit `.python-version`, so
+  every patch PR would need a hand edit, or a CI check tying the two, which
+  makes every automatic PR manual. uv can be pinned exactly because
+  Dependabot skips the uv image. A patch gap within one minor is small, and
+  it closes once the patch PR merges and the runners catch up.
 
 ## 2026-10-19 - MODEL_RATES prices chat turns, with Google's dated price changes (#622)
 

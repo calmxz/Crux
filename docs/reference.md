@@ -370,8 +370,9 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   `gen_contracts.py --target-python-version` stays at 3.12 on purpose; output
   is valid on newer versions. Dependabot only bumps the base image's patch,
   tag and digest together (the `FROM` is digest-pinned, #623). CI's
-  `setup-python` takes the newest 3.14.x, so it can run a newer patch than
-  the image until that PR merges; `docs/decisions.md` (2026-10-19) has why.
+  `setup-python` takes the runner's 3.14.x, which can differ from the
+  image's patch until the Dependabot patch PR merges; the #623 entry in
+  `docs/decisions.md` has why.
   Ruff's py314 target formats `except (A, B):` as `except A, B:` (PEP 758);
   that is a tuple of exception types, not Python 2's `except E, name`.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and
