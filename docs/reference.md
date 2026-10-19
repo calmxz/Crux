@@ -578,7 +578,10 @@ unless `.env` overrides them.
 writes into that map (#643). `LiteLlmProvider._completion_cost` prices a
 model with `rates_for(model)` by `usage_cost`: the response's usage at those
 rates, cached prompt tokens at `cache_read_per_1k` (the input rate when none
-is listed), thinking tokens inside completion tokens. A response without usage
+is listed), thinking tokens inside completion tokens. Every chat entry lists a
+`cache_read_per_1k`, even one whose provider caches only on request: implicit
+caching makes cached tokens common, and the input rate over-bills them (#644,
+pinned by `test_every_chat_model_lists_a_cache_rate`). A response without usage
 is priced by token math over the prompt, its tools, the text and tool-call
 arguments, with a warning; it misses thinking tokens (bills low) and prices
 cached tokens at the input rate (bills high). A model with no rates is priced by litellm's

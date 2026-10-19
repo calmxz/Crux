@@ -760,8 +760,8 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
 
     cost, usage = ps.priced()
 
-    # #643: usage x MODEL_RATES; no cache rate listed, so cached tokens price
-    # at the input rate. (1500 x 0.0003 + 200 x 0.0025) / 1000
+    # #643: usage x MODEL_RATES; the pinned rates list no cache rate, so cached
+    # tokens price at the input rate. (1500 x 0.0003 + 200 x 0.0025) / 1000
     assert cost == Decimal("0.00095")
     assert usage == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
     assert seen == {"chunks": 1, "messages": MESSAGES}

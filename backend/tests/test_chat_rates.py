@@ -199,6 +199,14 @@ def test_configured_model_has_a_cache_rate():
     assert rates is not None and "cache_read_per_1k" in rates
 
 
+def test_every_chat_model_lists_a_cache_rate():
+    """#644: a chat entry without one bills cached tokens at the input rate."""
+    entries = [(m, r) for m, r in cost_meter.MODEL_RATES.items() if m != settings.embedding_model]
+    entries += [(m, r) for m, sched in cost_meter.SCHEDULED_RATES.items() for _, r in sched]
+    assert len(entries) > 1
+    assert [m for m, r in entries if "cache_read_per_1k" not in r] == []
+
+
 def test_flash_rates_before_2027(on_date):
     on_date("2026-12-31")
     assert cost_meter.rates_for(FLASH) == {
