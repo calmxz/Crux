@@ -102,10 +102,18 @@ async def _litellm_stream(*chunks, block: asyncio.Event | None = None, error=Non
         raise error
 
 
-def _completion(content: str) -> SimpleNamespace:
-    """A non-streamed acompletion response (the summaries)."""
+def _usage(prompt: int, completion: int) -> SimpleNamespace:
     return SimpleNamespace(
-        choices=[SimpleNamespace(message=SimpleNamespace(content=content))], usage=None
+        prompt_tokens=prompt, completion_tokens=completion, prompt_tokens_details=None
+    )
+
+
+def _completion(content: str, usage: tuple[int, int] | None = None) -> SimpleNamespace:
+    """A non-streamed acompletion response (the summaries), with `usage`
+    (prompt, completion) tokens, which price it at MODEL_RATES (#643)."""
+    return SimpleNamespace(
+        choices=[SimpleNamespace(message=SimpleNamespace(content=content))],
+        usage=_usage(*usage) if usage is not None else None,
     )
 
 
@@ -113,8 +121,8 @@ class FakeLitellm:
     """Scriptable stand-in for the litellm calls the app makes.
 
     `responses` feeds acompletion in order; `usages` feeds the token usage of
-    each finished chat call in order (a stream's built response, a summary's
-    completion), which prices it at MODEL_RATES (#643). An embedding reports
+    each finished stream's built response in order, which prices it at
+    MODEL_RATES (#643); a summary carries its own (`_completion`). An embedding reports
     EMBED_TOKENS_PER_TEXT prompt tokens per input, priced at EMBED_RATES
     (#630: embeddings price from MODEL_RATES, not completion_cost). An
     unscripted call is recorded in `unexpected` as well as raised: production
@@ -145,8 +153,6 @@ class FakeLitellm:
         response = self.responses.pop(0)
         if isinstance(response, BaseException):
             raise response
-        if isinstance(response, SimpleNamespace):  # a summary's completion
-            response.usage = self._usage()
         return response
 
     def completion_cost(self, completion_response=None, **kwargs):
@@ -154,17 +160,11 @@ class FakeLitellm:
         self.unexpected.append("completion_cost")
         raise AssertionError("unexpected litellm.completion_cost call")
 
-    def _usage(self) -> SimpleNamespace:
+    def stream_chunk_builder(self, chunks, messages=None, **kwargs):
         if not self.usages:
             self.unexpected.append("usage")
-            raise AssertionError("unscripted usage for a finished chat call")
-        prompt, completion = self.usages.pop(0)
-        return SimpleNamespace(
-            prompt_tokens=prompt, completion_tokens=completion, prompt_tokens_details=None
-        )
-
-    def stream_chunk_builder(self, chunks, messages=None, **kwargs):
-        return SimpleNamespace(usage=self._usage())
+            raise AssertionError("unscripted usage for a finished stream")
+        return SimpleNamespace(usage=_usage(*self.usages.pop(0)))
 
     def token_counter(self, model=None, messages=None, text=None, **kwargs):
         if messages is not None:
@@ -615,10 +615,10 @@ async def test_production_model_calls_carry_no_sampling_params(
     _seed_messages(db_session, 31)
     fake_litellm.responses = [
         _litellm_stream(_text_chunk("Hello")),
-        _completion("Earlier the learner practised joins."),
-        _completion("Covered joins."),
+        _completion("Earlier the learner practised joins.", USAGE_0020),
+        _completion("Covered joins.", USAGE_0020),
     ]
-    fake_litellm.usages = [USAGE_0010, USAGE_0020, USAGE_0020]
+    fake_litellm.usages = [USAGE_0010]
 
     await _run(_ctx(db_session))
     await summary_service.update_rolling_summary(db_session, SESSION_ID)
@@ -650,10 +650,9 @@ async def test_summary_omits_reasoning_effort_when_model_lacks_reasoning(
         monkeypatch.setattr(litellm, "supports_reasoning", boom)
     _seed_messages(db_session, 31)
     fake_litellm.responses = [
-        _completion("Earlier the learner practised joins."),
-        _completion("Covered joins."),
+        _completion("Earlier the learner practised joins.", USAGE_0020),
+        _completion("Covered joins.", USAGE_0020),
     ]
-    fake_litellm.usages = [USAGE_0020, USAGE_0020]
 
     rolling = await summary_service.update_rolling_summary(db_session, SESSION_ID)
     session = db_session.get(SessionModel, SESSION_ID)
@@ -676,8 +675,7 @@ def ledger_down(monkeypatch):
 
 async def test_generate_and_persist_meters_summary(db_session, seeded, fake_litellm):
     _seed_messages(db_session, 2)
-    fake_litellm.responses = [_completion("Covered joins; foreign keys remain a gap.")]
-    fake_litellm.usages = [USAGE_0020]
+    fake_litellm.responses = [_completion("Covered joins; foreign keys remain a gap.", USAGE_0020)]
 
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
@@ -697,8 +695,7 @@ async def test_generate_and_persist_record_cost_failure_keeps_summary(
     expect_app_log("llm settlement deferred")
     expect_app_log("llm settlement failed")
     _seed_messages(db_session, 2)
-    fake_litellm.responses = [_completion("Covered joins.")]
-    fake_litellm.usages = [USAGE_0020]
+    fake_litellm.responses = [_completion("Covered joins.", USAGE_0020)]
 
     session = db_session.get(SessionModel, SESSION_ID)
     summary = await summary_service.generate_and_persist(db_session, session)
@@ -706,7 +703,6 @@ async def test_generate_and_persist_record_cost_failure_keeps_summary(
     # Changed by #411: settlement never raises, so a failed ledger write no
     # longer throws the paid summary away for the mechanical one.
     assert len(fake_litellm.acompletion_calls) == 1
-    assert fake_litellm.usages == []
     assert summary == "Covered joins."
     profile = profile_service.load_profile(db_session, SESSION_ID)
     assert profile.last_session_summary == summary
@@ -716,8 +712,7 @@ async def test_generate_and_persist_record_cost_failure_keeps_summary(
 
 async def test_update_rolling_summary_meters_rolling_summary(db_session, seeded, fake_litellm):
     _seed_messages(db_session, 31)  # 11 dropped past the 20-message window
-    fake_litellm.responses = [_completion("Earlier the learner practised joins.")]
-    fake_litellm.usages = [USAGE_0020]
+    fake_litellm.responses = [_completion("Earlier the learner practised joins.", USAGE_0020)]
 
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
@@ -737,15 +732,13 @@ async def test_update_rolling_summary_record_cost_failure_keeps_summary(
     expect_app_log("llm settlement deferred")
     expect_app_log("llm settlement failed")
     _seed_messages(db_session, 31)
-    fake_litellm.responses = [_completion("Earlier the learner practised joins.")]
-    fake_litellm.usages = [USAGE_0020]
+    fake_litellm.responses = [_completion("Earlier the learner practised joins.", USAGE_0020)]
 
     result = await summary_service.update_rolling_summary(db_session, SESSION_ID)
 
     # Changed by #411: settlement never raises, so a failed ledger write no
     # longer discards the paid rolling summary.
     assert len(fake_litellm.acompletion_calls) == 1
-    assert fake_litellm.usages == []
     assert result == "Earlier the learner practised joins."
     session = db_session.get(SessionModel, SESSION_ID)
     assert session.rolling_summary == result

@@ -685,6 +685,18 @@ def litellm_stream(monkeypatch):
     return state
 
 
+def _pin_rates(monkeypatch, model: str = "gemini/gemini-3.5-flash-lite") -> None:
+    """Price the chat `model` at fixed rates with no schedule, so a pricing
+    update to MODEL_RATES does not read as a behaviour change."""
+    monkeypatch.setattr(settings, "model", model)
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        model,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, model, [])
+
+
 async def _provider_stream(chunks_state, chunks):
     chunks_state["chunks"] = chunks
     ps = await llm.LiteLlmProvider().stream(
@@ -743,7 +755,7 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
         return built
 
     monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
-    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     cost, usage = ps.priced()
@@ -836,6 +848,7 @@ async def test_litellm_stream_builder_prompt_count_includes_the_tools(litellm_st
         )
 
     monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
+    _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     ps.priced()
