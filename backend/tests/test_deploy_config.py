@@ -2,6 +2,7 @@ import json
 import re
 from pathlib import Path
 
+import pytest
 import yaml
 
 from config import Settings
@@ -13,6 +14,7 @@ COMPOSE_FILES = (REPO_ROOT / "docker-compose.yml", REPO_ROOT / "docker-compose.p
 BACKUP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "backup.yml"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 BACKEND_DOCKERFILE = REPO_ROOT / "backend" / "Dockerfile"
+FRONTEND_DOCKERFILE = REPO_ROOT / "frontend" / "Dockerfile"
 
 # G-12: names that may appear in .env.example without being a Settings field.
 # Empty on purpose -- a template var the app never reads is dead config.
@@ -192,13 +194,16 @@ def _dockerfile_text(path) -> str:
     return re.sub(r"\\\n", " ", "\n".join(lines))
 
 
-def test_backend_base_images_are_digest_pinned():
-    """#623: a tag alone lets Docker Hub re-push it, and Render then builds on
-    bits trivy never scanned. Earlier-stage aliases and `scratch` pull
-    nothing."""
+@pytest.mark.parametrize(
+    "dockerfile", [BACKEND_DOCKERFILE, FRONTEND_DOCKERFILE], ids=["backend", "frontend"]
+)
+def test_base_images_are_digest_pinned(dockerfile):
+    """#623, #634: a tag alone lets Docker Hub re-push it, and the image then
+    builds on bits trivy never scanned. Earlier-stage aliases and `scratch`
+    pull nothing."""
     stages = set()
     unpinned = []
-    froms = _FROM_RE.findall(_dockerfile_text(BACKEND_DOCKERFILE))
+    froms = _FROM_RE.findall(_dockerfile_text(dockerfile))
     for args in froms:
         tokens = [tok for tok in args.split() if not tok.startswith("--")]
         ref = tokens[0]

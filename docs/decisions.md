@@ -47,6 +47,10 @@ The #620 review found three gaps in `backend/Dockerfile` that predate it.
   The cost: Debian security fixes in those rebuilds, which the next Render
   build used to pick up silently, now wait for that PR (7-day cooldown).
   Accepted, since a reviewed, scanned image is the point of the pin.
+  `frontend/Dockerfile` is pinned the same way (#634), and that cost mostly
+  skips it: its nginx stage runs `apk --no-cache upgrade` at build time, so
+  Alpine fixes land without a Dependabot PR, and its node stage only emits
+  static files.
 - **No compiler in the image.** Every package in `uv.lock` ships a wheel for
   cp314, abi3 or py3 on manylinux x86_64, so `build-essential` (~200MB)
   compiled nothing. A future package without a wheel fails
