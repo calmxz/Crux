@@ -249,16 +249,16 @@ def test_unscheduled_model_keeps_its_model_rates():
 @pytest.mark.parametrize(
     ("model", "expected"),
     [
-        # (200 x 0.0003 + 800 x 0.00003 + 200 x 0.0025) / 1000
-        ("gemini/gemini-3.5-flash-lite", Decimal("0.000584")),
-        # (200 x 0.00025 + 800 x 0.000025 + 200 x 0.0015) / 1000
-        ("gemini/gemini-3.1-flash-lite", Decimal("0.00037")),
+        # (200 x 0.0003 + 800 x 0.00003 + 300 x 0.0025) / 1000
+        ("gemini/gemini-3.5-flash-lite", Decimal("0.000834")),
+        # (200 x 0.00025 + 800 x 0.000025 + 300 x 0.0015) / 1000
+        ("gemini/gemini-3.1-flash-lite", Decimal("0.00052")),
     ],
 )
 def test_fallback_flash_lite_bills_cached_tokens_at_the_cache_rate(model, expected):
     """#644: implicit caching makes cached_tokens non-zero on most turns, so a
     missing cache rate over-bills them at the input rate."""
-    usage = {"prompt_tokens": 1000, "cached_tokens": 800, "completion_tokens": 200}
+    usage = {"prompt_tokens": 1000, "cached_tokens": 800, "completion_tokens": 300}
     assert cost_meter.usage_cost(model, usage) == expected
 
 
