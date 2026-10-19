@@ -371,15 +371,16 @@ def rates_for(model: str) -> dict[str, Decimal] | None:
 _registered: dict[str, dict[str, Decimal]] = {}
 
 
-def register_rates(model: str) -> None:
+def register_rates(model: str) -> bool:
     """Load today's rates for chat `model` into litellm's price map, so
     completion_cost meters from MODEL_RATES rather than whatever map litellm
     fetched at import. Re-registers only when the rates change, so a process
     alive across a SCHEDULED_RATES date picks the new price up on its next
-    call. Unknown models are left to litellm. Never raises."""
+    call. Unknown models are left to litellm. Returns False only when the
+    registration failed, so litellm's map may be stale. Never raises."""
     rates = rates_for(model)
     if rates is None or _registered.get(model) == rates:
-        return
+        return True
     output = float(rates["output_per_1k"] / 1000)
     entry: dict[str, object] = {
         "input_cost_per_token": float(rates["input_per_1k"] / 1000),
@@ -394,8 +395,9 @@ def register_rates(model: str) -> None:
         litellm.register_model({model: entry})
     except Exception as e:  # noqa: BLE001 - metering must not raise
         log.warning("could not register rates for %s: %s", model, e)
-        return
+        return False
     _registered[model] = rates
+    return True
 
 
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:

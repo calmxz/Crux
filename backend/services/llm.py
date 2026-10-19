@@ -238,7 +238,9 @@ class LiteLlmProvider:
         """litellm's price over the response usage, at the MODEL_RATES we
         registered; on failure, token math over the prompt and the reply.
         Never raises."""
-        cost_meter.register_rates(settings.model)
+        if not cost_meter.register_rates(settings.model):
+            # litellm's map may hold an old price; token math uses ours.
+            return self._token_math(messages, content)
         try:
             # model= supplies the provider prefix: Gemini responses carry the
             # bare name, which resolves to a different (unregistered) entry.

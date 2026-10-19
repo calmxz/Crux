@@ -557,7 +557,9 @@ into the map via `litellm.register_model`; it re-registers only when the rates
 change. To change a price, edit `MODEL_RATES`, or add a dated entry to
 `SCHEDULED_RATES` for an announced change: the first turn on or after that
 UTC day meters at the new rate, with no deploy or restart. Without
-`cache_read_per_1k`, cached prompt tokens keep litellm's cache rate.
+`cache_read_per_1k`, cached prompt tokens keep litellm's cache rate. If
+`register_model` raises, that turn is priced by token math at `rates_for`
+(cache discount ignored, so it over-meters) instead of the possibly stale map.
 `completion_cost` gets `model=settings.model` because Gemini responses carry
 the bare name (`gemini-3.8-flash`), a separate map entry that is never
 registered. Embeddings still price through litellm first (`embedding_cost`).

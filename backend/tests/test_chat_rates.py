@@ -35,13 +35,13 @@ def _resp(prompt: int, completion: int, cached: int | None = None) -> ModelRespo
 
 
 def _usage_x_rates(rates, prompt: int, completion: int, cached: int = 0) -> Decimal:
-    cache_rate = rates.get("cache_read_per_1k", rates["input_per_1k"])
     usd = (
         Decimal(prompt - cached) * rates["input_per_1k"]
-        + Decimal(cached) * cache_rate
         + Decimal(completion) * rates["output_per_1k"]
-    ) / Decimal(1000)
-    return usd.quantize(Decimal("0.000001"))
+    )
+    if cached:
+        usd += Decimal(cached) * rates["cache_read_per_1k"]
+    return (usd / Decimal(1000)).quantize(Decimal("0.000001"))
 
 
 def _priced(resp) -> Decimal:
@@ -49,27 +49,48 @@ def _priced(resp) -> Decimal:
     return cost.quantize(Decimal("0.000001"))
 
 
+# Rates no price map ships, so a match proves they came from MODEL_RATES.
+SENTINEL = {
+    "input_per_1k": Decimal("0.004000"),
+    "output_per_1k": Decimal("0.020000"),
+    "cache_read_per_1k": Decimal("0.000400"),
+}
+
+
+@pytest.fixture(autouse=True)
+def fresh_registration(monkeypatch):
+    """Each test starts with nothing registered, and leaves litellm's map at
+    today's real rates for the rest of the suite."""
+    cost_meter._registered.clear()
+    yield
+    monkeypatch.undo()
+    cost_meter._registered.clear()
+    cost_meter.register_rates(settings.model)
+
+
 @pytest.fixture
 def on_date(monkeypatch):
     def set_today(day: str) -> None:
         monkeypatch.setattr(cost_meter, "_today_utc", lambda: day)
 
-    yield set_today
-    # Leave litellm's map at today's rates for later tests.
-    monkeypatch.undo()
-    cost_meter.register_rates(settings.model)
+    return set_today
 
 
-def test_completion_cost_equals_usage_x_model_rates():
-    rates = cost_meter.rates_for(settings.model)
-    assert rates is not None
-    assert _priced(_resp(1000, 200)) == _usage_x_rates(rates, 1000, 200)
+def test_completion_cost_equals_usage_x_model_rates(monkeypatch):
+    monkeypatch.setitem(cost_meter.MODEL_RATES, settings.model, SENTINEL)
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.model, [])
+    assert _priced(_resp(1000, 200)) == _usage_x_rates(SENTINEL, 1000, 200)
 
 
-def test_cached_prompt_tokens_price_at_the_cache_rate():
+def test_cached_prompt_tokens_price_at_the_cache_rate(monkeypatch):
+    monkeypatch.setitem(cost_meter.MODEL_RATES, settings.model, SENTINEL)
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.model, [])
+    assert _priced(_resp(1000, 200, cached=400)) == _usage_x_rates(SENTINEL, 1000, 200, cached=400)
+
+
+def test_configured_model_has_a_cache_rate():
     rates = cost_meter.rates_for(settings.model)
     assert rates is not None and "cache_read_per_1k" in rates
-    assert _priced(_resp(1000, 200, cached=400)) == _usage_x_rates(rates, 1000, 200, cached=400)
 
 
 def test_flash_rates_before_2027(on_date):
@@ -99,27 +120,49 @@ def test_a_running_process_picks_up_the_new_rates(monkeypatch, on_date):
     assert _priced(_resp(1000, 200)) == Decimal("0.003000")
 
 
-def test_cancelled_flash_stream_prices_at_the_rates_in_effect(on_date):
+def test_cancelled_flash_stream_prices_at_the_rates_in_effect(monkeypatch, on_date):
     """#602: the cancelled-stream estimate for 3.8 Flash is pinned, not derived."""
+    monkeypatch.setattr(litellm, "token_counter", lambda model, text: 10)
     on_date("2026-12-31")
-    assert cost_meter.estimate_cancelled_cost(FLASH, "", 1000) == Decimal("0.00075")
+    # (1000 x 0.00075 + 10 x 0.00375) / 1000
+    assert cost_meter.estimate_cancelled_cost(FLASH, "partial", 1000) == Decimal("0.0007875")
     on_date("2027-01-01")
-    assert cost_meter.estimate_cancelled_cost(FLASH, "", 1000) == Decimal("0.0015")
+    assert cost_meter.estimate_cancelled_cost(FLASH, "partial", 1000) == Decimal("0.001575")
 
 
 def test_unscheduled_model_keeps_its_model_rates():
-    assert cost_meter.rates_for("gemini/gemini-3.5-flash-lite") == (
-        cost_meter.MODEL_RATES["gemini/gemini-3.5-flash-lite"]
+    assert (
+        cost_meter.rates_for("gemini/gemini-3.5-flash-lite")
+        == (cost_meter.MODEL_RATES["gemini/gemini-3.5-flash-lite"])
     )
     assert cost_meter.rates_for("some/unknown-model") is None
 
 
-def test_registration_failure_never_raises(monkeypatch, on_date, expect_app_log):
+def test_registration_failure_never_raises(monkeypatch, expect_app_log):
     expect_app_log("could not register rates")
+    calls = []
 
     def boom(*args, **kwargs):
+        calls.append(args)
         raise ValueError("bad map")
 
     monkeypatch.setattr(litellm, "register_model", boom)
-    on_date("2030-01-01")  # a period not registered yet, so registration runs
-    cost_meter.register_rates(FLASH)
+
+    assert cost_meter.register_rates(FLASH) is False
+    assert len(calls) == 1
+    assert FLASH not in cost_meter._registered  # retried on the next call
+
+
+def test_failed_registration_prices_by_token_math_not_the_map(monkeypatch, on_date, expect_app_log):
+    """A map litellm never updated must not meter 2027 turns at the old price."""
+    expect_app_log("could not register rates")
+    monkeypatch.setattr(settings, "model", FLASH)
+    monkeypatch.setattr(
+        litellm, "register_model", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad map"))
+    )
+    monkeypatch.setattr(
+        litellm, "token_counter", lambda model, **kw: 1000 if "messages" in kw else 200
+    )
+    on_date("2027-01-01")
+
+    assert _priced(_resp(1000, 200)) == Decimal("0.003000")
