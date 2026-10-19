@@ -9,10 +9,12 @@ litellm declares only under its [mcp] extra. Pin every half here.
 """
 
 import importlib
+import re
 import tomllib
 from pathlib import Path
 
 PYPROJECT = Path(__file__).resolve().parent.parent / "pyproject.toml"
+_REQ = re.compile(r"\s*([A-Za-z0-9._-]+)\s*(?:\[([^\]]*)\])?")
 
 
 def test_litellm_tools_path_importable():
@@ -20,23 +22,26 @@ def test_litellm_tools_path_importable():
     importlib.import_module("litellm.responses.mcp.chat_completions_handler")
 
 
-def test_orjson_declared_as_dependency():
+def _declared() -> dict[str, set[str]]:
+    # name -> extras, for every [project] dependency, whatever its version operator
     data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
-    deps = data["project"]["dependencies"]
-    assert any(d.split(">=")[0].split("[")[0].strip() == "orjson" for d in deps), (
+    out: dict[str, set[str]] = {}
+    for d in data["project"]["dependencies"]:
+        m = _REQ.match(d)
+        assert m, f"unparseable dependency: {d!r}"
+        out[m.group(1).lower()] = {e.strip() for e in (m.group(2) or "").split(",") if e.strip()}
+    return out
+
+
+def test_orjson_declared_as_dependency():
+    assert "orjson" in _declared(), (
         "orjson must stay an explicit dependency: litellm's tool-calling path "
         "imports it transitively but does not declare it outside the [proxy] extra"
     )
 
 
 def test_litellm_declared_with_mcp_extra():
-    data = tomllib.loads(PYPROJECT.read_text(encoding="utf-8"))
-    deps = data["project"]["dependencies"]
-    litellm = [d for d in deps if d.split(">=")[0].split("[")[0].strip() == "litellm"]
-    assert len(litellm) == 1
-    name = litellm[0].split(">=")[0]
-    extras = name.split("[")[1].split("]")[0] if "[" in name else ""
-    assert "mcp" in [e.strip() for e in extras.split(",")], (
+    assert "mcp" in _declared().get("litellm", set()), (
         "litellm must be declared as litellm[mcp]: litellm >= 1.106 imports mcp on "
         "the tool-calling path but declares it only under the [mcp] extra"
     )
