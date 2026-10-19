@@ -2,6 +2,10 @@
 
 Judgement calls for the reviewer. Mechanical rules (formatting, lint, banned patterns) live in oxlint, ruff, prettier, and CI, not here. Each rule below was flagged by a reviewer on a real PR.
 
+## The backend is Python 3.14
+
+Judge backend syntax against Python 3.14 (`backend/.python-version`). An unparenthesized `except TypeError, ValueError:` is valid there (PEP 758) and is what `ruff format` writes for the py314 target; it is not a SyntaxError. (#620: a security review flagged 11 reformatted files as unparsable.)
+
 ## Comments track the code
 
 When a diff renames, moves, or changes the behaviour of a symbol, every comment that names or describes it is updated in the same diff. Check comments near the change and comments elsewhere that mention the old name. (Stale comments reached review on #400, #443, #459.)

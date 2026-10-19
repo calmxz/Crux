@@ -3,6 +3,48 @@
 Technical lookup: how things work, gotchas, conventions. Durable "why" (decisions,
 tradeoffs) belongs in `docs/decisions.md` instead.
 
+## Contents
+
+Every `###` section, in file order; `backend/tests/test_reference_contents.py`
+fails when one is missing here.
+
+- **Backend**
+  - Alembic migrations: live-Postgres safety checklist (C-12)
+  - Retrieval transaction tuning (F-10)
+  - Chat cost gate is a reservation, not a read (B-05)
+  - LLM adapter (#411, #412, #413)
+  - Stream cleanup must be shielded (#421)
+  - Postgres test harness (#574)
+  - Proving a row lock in a test (#418)
+  - Check module owns its transaction (#420)
+  - Prompt state (#395)
+  - Liveness vs readiness (G-07)
+  - Tool dispatch error surface (G-04)
+  - Ingestion error strings (C-11)
+  - CI drift guards
+  - Backend typecheck (#607, #616)
+  - Unhandled-error contract (C-14)
+  - Cross-session insights module (G-14)
+  - Access-token revocation window (A-01)
+  - Cost cap tiers (B-08)
+  - Render settings: Blueprint vs dashboard
+  - Subtopic eval pattern turns (#601)
+- **Frontend**
+  - `--control-edge` token (D-20)
+  - Reference polling (F-12 / E-07)
+  - apiClient GET retry and cache (F-18, client side -- server half below)
+  - HTTP ETag on hot GETs (F-18, backend half, #331)
+  - Auth error copy (E-13)
+  - Streaming markdown render cache (F-15)
+  - Message window (F-16)
+  - Optimistic chat row identity (F-21)
+  - Reset epoch (#414)
+  - Sidebar session window (#522, #524, #528, #533, #534, #544)
+  - E2E sign-in against the real backend (#518)
+  - Card look spec (#453)
+  - Favicon generation
+  - Anti-slop Oxlint plugin
+
 ## Backend
 
 ### Alembic migrations: live-Postgres safety checklist (C-12)
@@ -504,6 +546,18 @@ The Render blueprint values are what `render.yaml` pins for the Render
 deploy target: blueprint values, not confirmed deployed. Local dev
 (native uvicorn, docker compose) and tests use `backend/config.py` defaults
 unless `.env` overrides them.
+
+### Render settings: Blueprint vs dashboard
+
+`render.yaml` is the Blueprint: a `value:` entry is the default a Blueprint sync
+applies, and a `sync: false` entry is a key whose value exists only in the
+Render dashboard. A dashboard edit overrides the Blueprint until the next sync,
+so the repo is not proof of what production runs. Before stating a production
+value, ask the user. Production has diverged here before: `MODEL` ran
+`gemini-3.8-flash` while every committed file said `gemini-3.5-flash-lite`
+(fixed in #621). Every setting changed in the dashboard gets an entry in
+`render.yaml` (`sync: false` when the value isn't pinned), so the key is at
+least discoverable; `GLOBAL_DAILY_COST_CAP_USD` (#603) is one.
 
 ### Subtopic eval pattern turns (#601)
 
