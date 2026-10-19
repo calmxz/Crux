@@ -1,4 +1,6 @@
 # Build stage: compile Vite bundle.
+# #634: base images are digest-pinned so the build uses the exact bits trivy
+# scanned; Dependabot bumps the tag and digest together.
 FROM node:26-alpine@sha256:6f08a523443ddedf52941874c203475b0ad503e859ad70cb26ab8be9a517dbd5 AS build
 WORKDIR /app
 COPY package*.json ./

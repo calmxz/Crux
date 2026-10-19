@@ -14,7 +14,7 @@ COMPOSE_FILES = (REPO_ROOT / "docker-compose.yml", REPO_ROOT / "docker-compose.p
 BACKUP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "backup.yml"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 BACKEND_DOCKERFILE = REPO_ROOT / "backend" / "Dockerfile"
-FRONTEND_DOCKERFILE = REPO_ROOT / "frontend" / "Dockerfile"
+DOCKERFILES = (BACKEND_DOCKERFILE, REPO_ROOT / "frontend" / "Dockerfile")
 
 # G-12: names that may appear in .env.example without being a Settings field.
 # Empty on purpose -- a template var the app never reads is dead config.
@@ -194,9 +194,7 @@ def _dockerfile_text(path) -> str:
     return re.sub(r"\\\n", " ", "\n".join(lines))
 
 
-@pytest.mark.parametrize(
-    "dockerfile", [BACKEND_DOCKERFILE, FRONTEND_DOCKERFILE], ids=["backend", "frontend"]
-)
+@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda p: p.parent.name)
 def test_base_images_are_digest_pinned(dockerfile):
     """#623, #634: a tag alone lets Docker Hub re-push it, and the image then
     builds on bits trivy never scanned. Earlier-stage aliases and `scratch`
