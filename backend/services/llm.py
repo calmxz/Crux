@@ -197,8 +197,11 @@ class Provider(Protocol):
     async def aembed(self, texts: list[str]) -> Embedding:
         """Async form of embed."""
 
-    def completion_prompt_cost(self, messages: list[dict]) -> Decimal:
-        """Estimated prompt cost of a completion. Never raises."""
+    def completion_prompt_cost(
+        self, messages: list[dict], tools: list[dict] | None = None
+    ) -> Decimal:
+        """Estimated prompt cost of a completion sent with `tools`. Never raises."""
+        ...
 
     def embedding_prompt_cost(self, texts: list[str]) -> Decimal:
         """Estimated prompt cost of an embedding batch. Never raises."""
@@ -230,11 +233,11 @@ class LiteLlmProvider:
         content = resp.choices[0].message.content or ""
         return Completion(
             text=content,
-            cost=self._completion_cost(resp, messages, content),
+            cost=self._completion_cost(resp, messages, content, None),
             usage=cost_meter.extract_usage(resp),
         )
 
-    def _completion_cost(self, resp, messages, content: str) -> Decimal:
+    def _completion_cost(self, resp, messages, content: str, tools) -> Decimal:
         """litellm's price over the response usage, at the MODEL_RATES we
         registered; on failure, the response's usage at those rates, else
         token math over the prompt and the reply. Never raises."""
@@ -255,13 +258,13 @@ class LiteLlmProvider:
         except Exception as e:  # noqa: BLE001
             log.warning("usage cost failed: %s", e)
             cost = None
-        return cost if cost is not None else self._token_math(messages, content)
+        return cost if cost is not None else self._token_math(messages, content, tools)
 
-    def _token_math(self, messages, content: str) -> Decimal:
-        """Prompt tokens plus `content` priced at the chat model's rates.
-        Never raises."""
+    def _token_math(self, messages, content: str, tools) -> Decimal:
+        """Prompt tokens, the tool schemas included (#628), plus `content`
+        priced at the chat model's rates. Never raises."""
         try:
-            pt = litellm.token_counter(model=settings.model, messages=messages)
+            pt = litellm.token_counter(model=settings.model, messages=messages, tools=tools)
             return cost_meter.estimate_cancelled_cost(settings.model, content, pt)
         except Exception as e:  # noqa: BLE001 - an estimate must not raise
             # Local tokenization only; no credential in the exception.
@@ -281,7 +284,7 @@ class LiteLlmProvider:
             timeout=timeout,
             **kwargs,
         )
-        return _LiteLlmStream(self, resp, messages)
+        return _LiteLlmStream(self, resp, messages, tools)
 
     def _embedding(self, resp, texts: list[str]) -> Embedding:
         vectors = [d["embedding"] if isinstance(d, dict) else d.embedding for d in resp.data]
@@ -309,8 +312,8 @@ class LiteLlmProvider:
         )
         return self._embedding(resp, texts)
 
-    def completion_prompt_cost(self, messages) -> Decimal:
-        return self._token_math(messages, "")
+    def completion_prompt_cost(self, messages, tools=None) -> Decimal:
+        return self._token_math(messages, "", tools)
 
     def embedding_prompt_cost(self, texts) -> Decimal:
         model = settings.embedding_model
@@ -326,10 +329,13 @@ class _LiteLlmStream:
     """litellm's streamed chunks, reduced to text tokens plus assembled tool
     calls. Pricing reads the kept chunks back through stream_chunk_builder."""
 
-    def __init__(self, provider: LiteLlmProvider, resp, messages: list[dict]):
+    def __init__(
+        self, provider: LiteLlmProvider, resp, messages: list[dict], tools: list[dict] | None
+    ):
         self._provider = provider
         self._resp = resp
         self._messages = messages
+        self._tools = tools
         self._chunks: list = []
         self._frags: dict[int, dict] = {}
         self.received = False
@@ -372,14 +378,14 @@ class _LiteLlmStream:
             return self.estimate(), {}
         # F-19: a pricing-table gap falls back to token math, never $0.
         return (
-            self._provider._completion_cost(built, self._messages, self.text),
+            self._provider._completion_cost(built, self._messages, self.text, self._tools),
             cost_meter.extract_usage(built),
         )
 
     def estimate(self) -> Decimal:
         # Tool-call arguments received so far are billed output too.
         args = "".join(slot["args"] for slot in self._frags.values())
-        return self._provider._token_math(self._messages, self.text + args)
+        return self._provider._token_math(self._messages, self.text + args, self._tools)
 
     async def aclose(self) -> None:
         close = getattr(self._resp, "aclose", None)
@@ -411,7 +417,7 @@ class StubProvider:
     async def aembed(self, texts) -> Embedding:
         raise LlmUnavailable()
 
-    def completion_prompt_cost(self, messages) -> Decimal:
+    def completion_prompt_cost(self, messages, tools=None) -> Decimal:
         return Decimal("0")
 
     def embedding_prompt_cost(self, texts) -> Decimal:
@@ -693,7 +699,10 @@ class LlmStream:
             return Decimal("0"), {}
         if ps is None:
             # The request went out but no stream object came back yet.
-            return self._provider.completion_prompt_cost(self._messages), {}
+            return (
+                self._provider.completion_prompt_cost(self._messages, self._open_kwargs["tools"]),
+                {},
+            )
         return ps.estimate(), {}
 
     async def __aexit__(self, exc_type, exc, tb) -> bool:

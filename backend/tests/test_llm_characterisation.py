@@ -43,6 +43,9 @@ SESSION_ID = "char-s1"
 MODEL = "gemini/gemini-3.5-flash-lite"
 
 EMBEDDING_MODEL = "gemini/gemini-embedding-2"
+# Pinned by _real_llm_settings: an embedding of one text costs $0.0005.
+EMBED_RATES = {"input_per_1k": Decimal("0.000200"), "output_per_1k": Decimal("0")}
+EMBED_TOKENS_PER_TEXT = 2500
 
 # token_counter fake: every prompt snapshot counts PROMPT_TOKENS, streamed
 # text TOKENS_PER_WORD per word, so the estimate shows WHICH text was billed.
@@ -106,9 +109,12 @@ class FakeLitellm:
     """Scriptable stand-in for the litellm calls the app makes.
 
     `responses` feeds acompletion in order; `costs` feeds completion_cost in
-    order (one entry per priced call, chat or embedding). An unscripted call
-    is recorded in `unexpected` as well as raised: production code catches
-    the AssertionError and falls back, so the fixture checks the record.
+    order (one entry per priced chat call). An embedding reports
+    EMBED_TOKENS_PER_TEXT prompt tokens per input, priced at EMBED_RATES
+    (#630: embeddings price from MODEL_RATES, not completion_cost). An
+    unscripted call is recorded in `unexpected` as well as raised: production
+    code catches the AssertionError and falls back, so the fixture checks the
+    record.
     """
 
     def __init__(self, monkeypatch):
@@ -152,7 +158,8 @@ class FakeLitellm:
 
     def _embed_response(self, inputs):
         vec = [0.1] * settings.embedding_dim
-        return SimpleNamespace(data=[{"embedding": vec} for _ in inputs], usage=None)
+        usage = SimpleNamespace(prompt_tokens=EMBED_TOKENS_PER_TEXT * len(inputs))
+        return SimpleNamespace(data=[{"embedding": vec} for _ in inputs], usage=usage)
 
     def embedding(self, model=None, input=(), **kwargs):
         self.embedding_calls.append(list(input))
@@ -187,6 +194,8 @@ def _real_llm_settings(monkeypatch):
         MODEL,
         {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
     )
+    monkeypatch.setitem(cost_meter.MODEL_RATES, EMBEDDING_MODEL, EMBED_RATES)
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, EMBEDDING_MODEL, [])
 
 
 @pytest.fixture
@@ -670,7 +679,6 @@ def test_prepare_failure_after_prefetch_keeps_embedding_spend(
     db_session.add(Document(session_id=SESSION_ID, filename="ref.txt", status="ready"))
     db_session.commit()
 
-    fake_litellm.costs = [0.0005]
     monkeypatch.setattr(pgvector_store, "query_chunks", lambda *a, **k: [])
 
     def boom(prompt_state):
@@ -724,8 +732,6 @@ def _chunks(n: int) -> list[chunking.Chunk]:
 
 
 def test_ingestion_meters_each_batch(db_session, ingest_doc, fake_litellm):
-    fake_litellm.costs = [0.0005, 0.0005, 0.0005]
-
     stored = ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(3), user_id=USER_ID)
 
     assert stored == 3
@@ -742,7 +748,6 @@ def test_ingestion_capped_user_stops_at_next_batch(
 ):
     monkeypatch.setattr(settings, "llm_soft_cap_usd", 0.0005)
     monkeypatch.setattr(settings, "llm_hard_cap_usd", 0.001)
-    fake_litellm.costs = [0.0005, 0.0005]
 
     with pytest.raises(cost_meter.CostCapExceeded):
         ingestion_service._embed_and_store(db_session, ingest_doc, _chunks(3), user_id=USER_ID)

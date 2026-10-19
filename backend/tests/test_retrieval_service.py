@@ -309,10 +309,21 @@ def test_cosine_similarity_basics():
 
 
 def test_retrieve_meters_embedding_spend(session, ctx, mock_embed, db_session, monkeypatch):
+    from config import settings
+
     # F-19: every retrieval turn embeds the query; that spend must hit the ledger.
     _seed_ready_doc(db_session)
     _stub_query(monkeypatch, [])
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
+    # #630: priced from the usage at MODEL_RATES, pinned here: 2500 x $0.20/1M.
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        settings.embedding_model,
+        {"input_per_1k": Decimal("0.000200"), "output_per_1k": Decimal("0")},
+    )
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.embedding_model, [])
+    monkeypatch.setattr(
+        litellm, "embedding", lambda model, input, **_: embedding_response([[0.1] * 8], 2500)
+    )
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
@@ -335,7 +346,6 @@ def test_retrieve_commits_its_metering_before_querying(
         return []
 
     monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
@@ -363,7 +373,6 @@ def test_retrieve_rolls_back_the_error_it_swallows(
 
     monkeypatch.setattr(db_session, "rollback", rollback)
     monkeypatch.setattr("services.retrieval_service.pgvector_store.query_chunks", query)
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0005)
     result = retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
@@ -423,7 +432,6 @@ def test_embedding_calls_pass_timeout(session, ctx, db_session, monkeypatch):
         return embedding_response([[0.1] * 8])
 
     monkeypatch.setattr(litellm, "embedding", _fake_embedding)
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kw: 0.0)
     retrieval_service.retrieve(
         db_session, ctx, RetrieveChunksArgs(session_id=SESSION_ID, query="query", k=5)
     )
