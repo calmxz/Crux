@@ -458,7 +458,7 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
 
     A model with rates prices its prompt tokens at rates_for(model), not at
     litellm's import-time map (#630); the tokens come from the response usage,
-    else from counting `texts`. An unknown model falls back to litellm's own
+    else (none or 0 reported) from counting `texts`. An unknown model falls back to litellm's own
     accounting, so real spend never silently registers as 0 (F-19), and
     returns 0 with a warning when that fails too.
     """
@@ -474,7 +474,7 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
         return Decimal("0")
     try:
         tokens = extract_usage(resp)["prompt_tokens"]
-        if tokens is None:
+        if not tokens:
             tokens = sum(litellm.token_counter(model=model, text=t or "") for t in texts)
         return Decimal(tokens) * rates["input_per_1k"] / Decimal(1000)
     except Exception as e:  # noqa: BLE001

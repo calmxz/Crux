@@ -562,12 +562,12 @@ field `register_rates` doesn't set (batch, flex, priority) keeps litellm's
 value. If `register_model` or `completion_cost` raises, the turn is priced by
 `usage_cost` (the response's usage at `rates_for`, thinking tokens included),
 and only without usage by token math over the text. Token math counts the
-call's tool schemas as prompt tokens (#628; the tutor's four add ~2k).
+call's tool schemas as prompt tokens (#628).
 `completion_cost` gets `model=settings.model` because Gemini responses carry
 the bare name (`gemini-3.8-flash`), a separate map entry that is never
 registered. Embeddings price the response's prompt tokens at `rates_for`
 directly, with no `register_model` (`embedding_cost`, #630); litellm prices an
-embedding model only when `MODEL_RATES` has no entry for it.
+embedding model only when `rates_for` returns None for it.
 
 ### Render settings: Blueprint vs dashboard
 

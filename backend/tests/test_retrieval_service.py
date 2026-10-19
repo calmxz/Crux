@@ -308,7 +308,7 @@ def test_cosine_similarity_basics():
 # --- F-19 / F-06: embedding metering + timeout ---------------------------
 
 
-def test_retrieve_meters_embedding_spend(session, ctx, mock_embed, db_session, monkeypatch):
+def test_retrieve_meters_embedding_spend(session, ctx, db_session, monkeypatch):
     from config import settings
 
     # F-19: every retrieval turn embeds the query; that spend must hit the ledger.

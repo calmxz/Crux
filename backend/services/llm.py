@@ -233,14 +233,14 @@ class LiteLlmProvider:
         content = resp.choices[0].message.content or ""
         return Completion(
             text=content,
-            cost=self._completion_cost(resp, messages, content, None),
+            cost=self._completion_cost(resp, messages, content, tools=None),
             usage=cost_meter.extract_usage(resp),
         )
 
     def _completion_cost(self, resp, messages, content: str, tools) -> Decimal:
         """litellm's price over the response usage, at the MODEL_RATES we
         registered; on failure, the response's usage at those rates, else
-        token math over the prompt and the reply. Never raises."""
+        token math over the prompt, its `tools` and the reply. Never raises."""
         if cost_meter.register_rates(settings.model):
             try:
                 # model= supplies the provider prefix: Gemini responses carry
