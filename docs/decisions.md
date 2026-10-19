@@ -18,8 +18,18 @@ The 1.107 pre-releases keep that shape.
   its imports entirely (our tools are plain functions). It is a private
   kwarg: a rename upstream would bring the import back unannounced, failing
   every tutor turn while the stubbed suite stays green. The cost of the
-  extra (mcp, a second HTTP stack, about 0.9s of import on a process's first
-  tool turn) is small next to that.
+  extra (mcp, a second HTTP stack, about 0.9s of import) is small next to
+  that.
+- **The tool path is imported at startup.** litellm imports it lazily on a
+  process's first call with tools, so the first tutor turn after each deploy
+  or restart waited the extra ~0.9s. `services/llm.py` imports it at module
+  level, so every process that loads the adapter pays it at startup. A
+  broken import now fails the boot, which Render treats as a failed deploy
+  and keeps the old instance serving, instead of failing every tutor turn.
+  With no old instance (a restart) the whole API is down, not just tutor
+  turns; accepted, since CI's collection fails on the same import first.
+  Rejected: a lifespan pre-import that logs and carries on when the import
+  fails. It hid a missing `mcp`: the app booted green and every turn failed.
 - **Shipped without waiting for Dependabot.** Its PR would only have bumped
   the litellm range, without the extra, and arrived red.
 - **`orjson` stays an explicit dependency.** It is still only under
