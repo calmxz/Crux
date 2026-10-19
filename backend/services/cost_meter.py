@@ -396,8 +396,8 @@ def usage_cost(model: str, usage: dict) -> Decimal | None:
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:
     """Return an estimated USD cost for an LLM call without usage.
 
-    Despite the name, every estimate path uses it: cancels, replies without
-    usage, timed-out prompts, embeddings. Charges the full prompt cost (all
+    Despite the name, every estimate path uses it (listed in
+    docs/reference.md "Chat pricing source"), embeddings included. Charges the full prompt cost (all
     tokens were sent to the model) plus the output cost for however many
     tokens arrived in `delta_text`. Cached prompt tokens are priced at the
     input rate on purpose; see docs/reference.md "Chat pricing source" (#647).

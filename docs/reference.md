@@ -587,13 +587,18 @@ arguments, with a warning; it misses thinking tokens (bills low) and prices
 cached tokens at the input rate (bills high). Every estimated chat cost prices
 cached tokens at the input rate too, since all of them go through
 `_token_math` to `cost_meter.estimate_cancelled_cost`, which never reads
-`cache_read_per_1k`. That covers a cancelled or failed stream and one whose
-`stream_chunk_builder` raises (`_LiteLlmStream.estimate`), and the prompt-only
+`cache_read_per_1k` (a model with no rates falls to `litellm.cost_per_token`,
+also with no cached count, then $0). The estimate paths
+(`_LiteLlmStream.estimate`) are a cancelled stream, a stream that timed out or
+failed after a chunk arrived (other failures with nothing received settle $0),
+and a stream whose `stream_chunk_builder` raises; plus the prompt-only
 `completion_prompt_cost` settled for a timed-out completion or a stream whose
-request went out with no stream back. This is deliberate (#647): no cached
-count exists on those paths (Gemini reports it in the final chunk, which a
-cancel never receives), and guessing a cached share could bill low, the unsafe
-direction for a daily budget. A model with no rates is priced by litellm's
+request went out with no stream back. For cancels and timeouts this is
+deliberate (#647): Gemini reports the cached count in the final chunk, which
+they almost never receive, and guessing a cached share could bill low, the
+unsafe direction for a daily budget. The `stream_chunk_builder` path is not:
+its kept chunks can hold that usage, and it discards it (#648).
+A model with no rates is priced by litellm's
 `completion_cost`, then by token math if that raises. To change a price, edit
 `MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
 change: `rates_for` is read per call, so the first turn on or after that UTC
