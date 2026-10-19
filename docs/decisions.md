@@ -3,6 +3,23 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - litellm is declared as litellm[mcp] (#610)
+
+litellm 1.106 imports `mcp` on the tool-calling path, which every tutor turn
+takes, but declares it only under its `[proxy]` extra and a new `[mcp]` extra.
+The 1.107 pre-releases keep that shape.
+
+- **Depend on `litellm[mcp]>=1.106.0,<2.0`.** The extra is upstream's own
+  declaration, so litellm owns the `mcp` range and it moves with litellm
+  upgrades. Rejected: a bare `mcp` dependency (we would own a range we don't
+  use directly, and it can drift from what litellm needs), and a `<1.106` cap
+  (it would freeze litellm with no upstream fix in sight).
+- **Shipped without waiting for Dependabot.** Its PR would only have bumped
+  the litellm range, without the extra, and arrived red.
+- **`orjson` stays an explicit dependency.** It is still only under
+  `[proxy]`, and `[proxy]` would pull the whole proxy server.
+- `tests/test_llm_deps.py` fails if the `[mcp]` extra is dropped.
+
 ## 2026-10-19 - The backend image is digest-pinned, and CI's Python patch may lead it (#623)
 
 The #620 review found three gaps in `backend/Dockerfile` that predate it.
@@ -151,7 +168,7 @@ while local stayed on 1.105.0 and passed.
   change would have downgraded production to. Those six were moved to fixed
   versions with `uv lock --upgrade-package`; everything else stays as locked.
 - **The litellm/mcp question is deferred to #610**, decided when Dependabot
-  proposes 1.106 or later.
+  proposes 1.106 or later. Decided early: see the 2026-10-19 #610 entry.
 
 ## 2026-10-17 - A failed tool rolls back the turn's session (#569)
 
