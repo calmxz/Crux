@@ -3,6 +3,39 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - MODEL_RATES prices chat turns, with Google's dated price changes (#622)
+
+Google doubles every `gemini-3.8-flash` rate on 2027-01-01. Chat turns were
+priced from litellm's map, which production fetches at import, so turns would
+meter at half price until litellm updated its JSON and the backend restarted.
+The per-user and global caps would let through about twice the intended spend.
+
+- **litellm still does the arithmetic.** `register_rates` loads `MODEL_RATES`
+  into litellm's map, so `completion_cost` keeps handling cached and thinking
+  tokens. Metering `usage x MODEL_RATES` directly would have meant
+  re-implementing the cache discount. A test pins `completion_cost` to usage
+  times our rates, so the two sources cannot drift.
+- **The 2027 price is scheduled, not a reminder.** `SCHEDULED_RATES` holds the
+  announced rates with their start date, and a running process switches on
+  its first turn of 2027-01-01 UTC. That replaces a human edit timed for
+  New Year.
+
+## 2026-10-19 - gemini-3.8-flash is the model for every LLM purpose (#602)
+
+Production moved from `gemini-3.5-flash-lite` to `gemini-3.8-flash`, and #621
+made it the configured default.
+
+- **Decision:** 3.8 Flash for chat, follow-up and summary calls. The maintainer
+  judges Flash capable for all of them and Lite not worth the quality loss.
+- **Accepted cost:** about 5x per turn, roughly $0.014 against $0.003 (estimated
+  2026-10-18 from eval measurements and production `llm_call_log`), and twice
+  that from 2027-01-01 when Google doubles the rates (see the #622 entry).
+- **Safeguards:** the per-user message cap and soft/hard USD caps, plus a global
+  daily cap (`GLOBAL_DAILY_COST_CAP_USD`, set by the maintainer in #603).
+- **Deferred:** routing the cheaper purposes (follow-up, summary) to Lite, a
+  hybrid setup, waits on a maintainer decision. 3.5 Flash-Lite stays in
+  `MODEL_RATES` as the env-selectable cheap fallback.
+
 ## 2026-10-18 - basedpyright with a baseline types the backend, in CI and the editor (#607, #616)
 
 The backend had a pyright config but nothing ran it, and fixing its 95

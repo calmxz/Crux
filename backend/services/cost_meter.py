@@ -305,12 +305,16 @@ def spend_subquery(user_id: str):
 
 # Per-1000-token USD rates. Verified against ai.google.dev/gemini-api/docs/pricing
 # (standard paid tier) on 2026-08-24; update on model/pricing change.
+# The source of truth for chat pricing: register_rates loads the chat model's
+# entry into litellm's price map, so completion_cost prices from here (#622).
+# cache_read_per_1k is optional; without it litellm keeps its own cache rate.
 MODEL_RATES: dict[str, dict[str, Decimal]] = {
     # Google Gemini 3.8 Flash — default chat model (verified 2026-10-18).
-    # Google doubles both rates on 2027-01-01 ($1.50 / $7.50 per 1M).
+    # Google doubles every rate on 2027-01-01; see SCHEDULED_RATES.
     "gemini/gemini-3.8-flash": {
         "input_per_1k": Decimal("0.000750"),  # $0.75 / 1M tokens
-        "output_per_1k": Decimal("0.003750"),  # $3.75 / 1M tokens
+        "output_per_1k": Decimal("0.003750"),  # $3.75 / 1M tokens (incl. thinking)
+        "cache_read_per_1k": Decimal("0.000075"),  # $0.075 / 1M tokens
     },
     # Google Gemini 3.5 Flash-Lite — previous default; kept for env-selected fallback
     "gemini/gemini-3.5-flash-lite": {
@@ -336,6 +340,63 @@ MODEL_RATES: dict[str, dict[str, Decimal]] = {
     },
 }
 
+# Announced price changes: model -> [(first UTC day, rates)], oldest first.
+# rates_for applies the latest one in effect, else the MODEL_RATES entry.
+SCHEDULED_RATES: dict[str, list[tuple[str, dict[str, Decimal]]]] = {
+    # Verified against ai.google.dev/gemini-api/docs/pricing 2026-10-18.
+    "gemini/gemini-3.8-flash": [
+        (
+            "2027-01-01",
+            {
+                "input_per_1k": Decimal("0.001500"),  # $1.50 / 1M tokens
+                "output_per_1k": Decimal("0.007500"),  # $7.50 / 1M tokens (incl. thinking)
+                "cache_read_per_1k": Decimal("0.000150"),  # $0.15 / 1M tokens
+            },
+        ),
+    ],
+}
+
+
+def rates_for(model: str) -> dict[str, Decimal] | None:
+    """Per-1k rates for `model` in effect today (UTC), or None if unknown."""
+    rates = MODEL_RATES.get(model)
+    today = _today_utc()
+    for first_day, scheduled in SCHEDULED_RATES.get(model, []):
+        if today >= first_day:
+            rates = scheduled
+    return rates
+
+
+# model -> the rates last loaded into litellm's price map.
+_registered: dict[str, dict[str, Decimal]] = {}
+
+
+def register_rates(model: str) -> None:
+    """Load today's rates for chat `model` into litellm's price map, so
+    completion_cost meters from MODEL_RATES rather than whatever map litellm
+    fetched at import. Re-registers only when the rates change, so a process
+    alive across a SCHEDULED_RATES date picks the new price up on its next
+    call. Unknown models are left to litellm. Never raises."""
+    rates = rates_for(model)
+    if rates is None or _registered.get(model) == rates:
+        return
+    output = float(rates["output_per_1k"] / 1000)
+    entry: dict[str, object] = {
+        "input_cost_per_token": float(rates["input_per_1k"] / 1000),
+        "output_cost_per_token": output,
+        "output_cost_per_reasoning_token": output,
+        "litellm_provider": model.split("/", 1)[0],
+        "mode": "chat",
+    }
+    if "cache_read_per_1k" in rates:
+        entry["cache_read_input_token_cost"] = float(rates["cache_read_per_1k"] / 1000)
+    try:
+        litellm.register_model({model: entry})
+    except Exception as e:  # noqa: BLE001 - metering must not raise
+        log.warning("could not register rates for %s: %s", model, e)
+        return
+    _registered[model] = rates
+
 
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:
     """Return an estimated USD cost for a cancelled streaming LLM reply.
@@ -352,9 +413,10 @@ def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> 
     'gemini/gemini-3.8-flash' — returns 6 for a 6-word phrase — so no
     fallback guard is needed for this model id.
 
-    Unknown models fall back to litellm.cost_per_token, then to 0.
+    Prices at rates_for(model); unknown models fall back to
+    litellm.cost_per_token, then to 0.
     """
-    rates = MODEL_RATES.get(model)
+    rates = rates_for(model)
     output_tokens = litellm.token_counter(model=model, text=delta_text or "")
     if rates is not None:
         prompt_cost = Decimal(prompt_tokens) * rates["input_per_1k"]

@@ -235,10 +235,16 @@ class LiteLlmProvider:
         )
 
     def _completion_cost(self, resp, messages, content: str) -> Decimal:
-        """litellm's own price; on failure, token math over the prompt and
-        the reply. Never raises."""
+        """litellm's price over the response usage, at the MODEL_RATES we
+        registered; on failure, token math over the prompt and the reply.
+        Never raises."""
+        cost_meter.register_rates(settings.model)
         try:
-            return _to_decimal(litellm.completion_cost(completion_response=resp))
+            # model= supplies the provider prefix: Gemini responses carry the
+            # bare name, which resolves to a different (unregistered) entry.
+            return _to_decimal(
+                litellm.completion_cost(completion_response=resp, model=settings.model)
+            )
         except Exception as e:  # noqa: BLE001 - pricing must not fail the call
             log.warning("completion_cost failed: %s", e)
         return self._token_math(messages, content)
