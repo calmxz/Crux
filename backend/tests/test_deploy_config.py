@@ -18,11 +18,21 @@ BACKEND_DOCKERFILE = REPO_ROOT / "backend" / "Dockerfile"
 
 
 def _find_dockerfiles() -> tuple:
-    """Every Dockerfile in the tree, so a new one is checked without a list edit."""
+    """Every Dockerfile in the tree, so a new one is checked without a list edit.
+    A subdirectory with its own `.git` (a nested worktree) is another checkout."""
     found = []
     for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
-        dirnames[:] = [d for d in dirnames if d not in {".git", ".venv", "node_modules"}]
-        found += [Path(dirpath) / f for f in filenames if f.startswith("Dockerfile")]
+        dirnames[:] = [
+            d
+            for d in dirnames
+            if d not in {".git", ".venv", "node_modules"}
+            and not (Path(dirpath) / d / ".git").exists()
+        ]
+        found += [
+            Path(dirpath) / f
+            for f in filenames
+            if f.lower().startswith("dockerfile") or f.lower().endswith(".dockerfile")
+        ]
     return tuple(sorted(found))
 
 
