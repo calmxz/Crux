@@ -6,6 +6,8 @@ conftest fixture put everything back before it started. Each pair registers
 its own rates, so a pair cannot pass on what an earlier pair leaked.
 """
 
+import inspect
+import re
 from decimal import Decimal
 
 import litellm
@@ -15,6 +17,7 @@ from litellm import ModelResponse, Usage
 
 from config import settings
 from services import cost_meter, llm
+from tests.conftest import _LITELLM_MODEL_SETS
 
 FLASH = "gemini/gemini-3.8-flash"
 MADE_UP = "openai/crux-made-up-641"
@@ -70,6 +73,12 @@ def _assert_restored(pair: str) -> None:
     assert cost == pytest.approx(expected)
 
 
+def test_restored_model_sets_are_the_ones_register_model_adds_to():
+    """A litellm upgrade that adds a provider branch fails here, not as a leak."""
+    source = inspect.getsource(litellm.utils.register_model)
+    assert set(re.findall(r"litellm\.(\w+)\.add\(", source)) == set(_LITELLM_MODEL_SETS)
+
+
 def test_registers_sentinel_rates(monkeypatch):
     _register_sentinel(monkeypatch, "passing", PASSING_SENTINEL)
 
@@ -78,7 +87,11 @@ def test_sentinel_rates_are_gone_after_a_passing_test():
     _assert_restored("passing")
 
 
-@pytest.mark.xfail(strict=True, reason="#641: teardown must restore after a failure")
+@pytest.mark.xfail(
+    strict=True,
+    raises=pytest.fail.Exception,
+    reason="#641: teardown must restore after a failure",
+)
 def test_registers_sentinel_rates_then_fails(monkeypatch):
     _register_sentinel(monkeypatch, "failing", FAILING_SENTINEL)
     pytest.fail("fails after registering")

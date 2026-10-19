@@ -136,6 +136,9 @@ def test_registration_failure_never_raises(monkeypatch, expect_app_log):
         raise ValueError("bad map")
 
     monkeypatch.setattr(litellm, "register_model", boom)
+    # Rates already registered short-circuit before boom; the conftest restores
+    # _registered after the test.
+    cost_meter._registered.pop(FLASH, None)
 
     assert cost_meter.register_rates(FLASH) is False
     assert len(calls) == 1

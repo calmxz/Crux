@@ -242,30 +242,32 @@ def _restore_litellm_prices(monkeypatch):
 
     from services import cost_meter
 
+    # The small pieces are copied at setup, so a stale set name fails here
+    # rather than inside register_rates, whose except would log it away.
     registered = dict(cost_meter._registered)
-    saved: dict[str, Any] = {}
+    runtime = _snapshot_dict(litellm.utils._runtime_registered_model_cost)
+    model_sets = {name: set(getattr(litellm, name)) for name in _LITELLM_MODEL_SETS}
+    model_cost: list[dict] = []  # the map's snapshot, taken on first registration
+    lock = threading.Lock()
     original = litellm.register_model
 
     @functools.wraps(original)
     def snapshotting_register_model(*args, **kwargs):
         # Before delegating, so a registration that raises midway is covered.
-        if not saved:
-            saved["model_cost"] = _snapshot_dict(litellm.model_cost)
-            saved["runtime"] = _snapshot_dict(litellm.utils._runtime_registered_model_cost)
-            saved["model_sets"] = {
-                name: set(getattr(litellm, name)) for name in _LITELLM_MODEL_SETS
-            }
+        with lock:
+            if not model_cost:
+                model_cost.append(_snapshot_dict(litellm.model_cost))
         return original(*args, **kwargs)
 
     monkeypatch.setattr(litellm, "register_model", snapshotting_register_model)
     yield
     cost_meter._registered.clear()
     cost_meter._registered.update(registered)
-    if not saved:
+    if not model_cost:
         return
-    _restore_dict(litellm.model_cost, saved["model_cost"])
-    _restore_dict(litellm.utils._runtime_registered_model_cost, saved["runtime"])
-    for name, contents in saved["model_sets"].items():
+    _restore_dict(litellm.model_cost, model_cost[0])
+    _restore_dict(litellm.utils._runtime_registered_model_cost, runtime)
+    for name, contents in model_sets.items():
         getattr(litellm, name).intersection_update(contents)
     litellm.utils._invalidate_model_cost_lowercase_map()
 

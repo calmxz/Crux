@@ -470,8 +470,8 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   function-scoped test is seen: a module- or session-scoped fixture that
   registers, a `from litellm import register_model` reference, a later fixture
   teardown that registers, or a direct write to `litellm.model_cost` all leak.
-  The provider-set list is pinned to litellm 1.106's `register_model`; recheck
-  it on a litellm upgrade. `tests/test_litellm_price_restore.py` pins the fixture.
+  `tests/test_litellm_price_restore.py` pins the fixture, and fails when a
+  litellm upgrade changes the provider sets `register_model` adds to.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
