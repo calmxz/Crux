@@ -10,7 +10,10 @@ The #620 review found three gaps in `backend/Dockerfile` that predate it.
 - **The base image is pinned by digest**, `python:3.14.8-slim@sha256:...`,
   like the uv image. Before this a Docker Hub re-push of the tag reached
   Render on bits trivy never scanned. Dependabot bumps the tag and digest
-  together.
+  together, and opens digest-only PRs when Docker Hub rebuilds the same tag.
+  The cost: Debian security fixes in those rebuilds, which the next Render
+  build used to pick up silently, now wait for that PR (7-day cooldown).
+  Accepted, since a reviewed, scanned image is the point of the pin.
 - **No compiler in the image.** Every package in `uv.lock` ships a wheel for
   cp314, abi3 or py3 on manylinux x86_64, so `build-essential` (~200MB)
   compiled nothing. A future package without a wheel fails

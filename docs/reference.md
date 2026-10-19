@@ -368,8 +368,10 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   `pyrightconfig.json`, then re-runs `uv sync` locally (`dev.ps1` and
   `pg_tests.sh` use `backend/.venv` as is, so a stale venv fails at import).
   `gen_contracts.py --target-python-version` stays at 3.12 on purpose; output
-  is valid on newer versions. Dependabot only bumps the base image's patch,
-  tag and digest together (the `FROM` is digest-pinned, #623). CI's
+  is valid on newer versions. The base `FROM` is digest-pinned (#623):
+  Dependabot bumps its patch (tag and digest together) and opens digest-only
+  PRs when Docker Hub rebuilds the same tag with OS fixes; merge those
+  promptly, since the image gets no Debian updates otherwise. CI's
   `setup-python` takes the runner's 3.14.x, which can differ from the
   image's patch until the Dependabot patch PR merges; the #623 entry in
   `docs/decisions.md` has why.

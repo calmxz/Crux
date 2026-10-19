@@ -174,29 +174,39 @@ def test_render_does_not_define_worker_service():
     assert {s["type"] for s in cfg["services"]} == {"web"}
 
 
-def _dockerfile_instructions(path) -> list:
-    """(KEYWORD, args) per instruction, comments dropped and `\\` continuations
-    joined."""
-    joined = re.sub(r"\\\n", " ", path.read_text(encoding="utf-8"))
-    out = []
-    for raw in joined.splitlines():
-        line = raw.strip()
-        if line and not line.startswith("#"):
-            keyword, _, args = line.partition(" ")
-            out.append((keyword.upper(), args.strip()))
-    return out
+_FROM_RE = re.compile(r"^\s*FROM\s+(.+)$", re.IGNORECASE | re.MULTILINE)
+_TOOLCHAIN_RE = re.compile(
+    r"(?<![\w.-])(build-essential|gcc|g\+\+|cpp|cc|clang|make|libc6-dev"
+    r"|(?:lib)?python3[\d.]*-dev)(?:-[\d.]+)?(?![\w.+-])"
+)
+
+
+def _dockerfile_text(path) -> str:
+    """Comment lines dropped, then `\\` continuations joined, in Docker's order:
+    a comment inside a continued RUN does not end it."""
+    lines = [
+        line
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+    ]
+    return re.sub(r"\\\n", " ", "\n".join(lines))
 
 
 def test_backend_base_images_are_digest_pinned():
     """#623: a tag alone lets Docker Hub re-push it, and Render then builds on
-    bits trivy never scanned."""
-    refs = [
-        next(tok for tok in args.split() if not tok.startswith("--"))
-        for keyword, args in _dockerfile_instructions(BACKEND_DOCKERFILE)
-        if keyword == "FROM"
-    ]
-    assert refs
-    unpinned = [ref for ref in refs if not re.search(r"@sha256:[0-9a-f]{64}$", ref)]
+    bits trivy never scanned. Earlier-stage aliases and `scratch` pull
+    nothing."""
+    stages = set()
+    unpinned = []
+    froms = _FROM_RE.findall(_dockerfile_text(BACKEND_DOCKERFILE))
+    for args in froms:
+        tokens = [tok for tok in args.split() if not tok.startswith("--")]
+        ref = tokens[0]
+        if ref not in stages and ref != "scratch" and not re.search(r"@sha256:[0-9a-f]{64}$", ref):
+            unpinned.append(ref)
+        if len(tokens) >= 3 and tokens[1].lower() == "as":
+            stages.add(tokens[2])
+    assert froms
     assert not unpinned, f"FROM without a digest: {unpinned}"
 
 
@@ -205,11 +215,7 @@ def test_backend_image_has_no_build_toolchain():
     image is ~200MB of unused attack surface. A package that needs one fails
     `uv sync --locked` in the image build; add the toolchain back then, in a
     build stage, which this test does not check."""
-    instructions = _dockerfile_instructions(BACKEND_DOCKERFILE)
-    last_from = max(i for i, (keyword, _) in enumerate(instructions) if keyword == "FROM")
-    final_stage = " ".join(args for _, args in instructions[last_from:])
-    found = re.findall(
-        r"(?<![\w-])(build-essential|gcc|g\+\+|clang|make|libc6-dev|python3-dev)(?![\w-])",
-        final_stage,
-    )
+    text = _dockerfile_text(BACKEND_DOCKERFILE)
+    final_stage = text[list(_FROM_RE.finditer(text))[-1].start() :]
+    found = _TOOLCHAIN_RE.findall(final_stage)
     assert not found, f"compiler toolchain in the runtime stage: {found}"
