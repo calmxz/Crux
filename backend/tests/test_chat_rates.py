@@ -1,11 +1,13 @@
-"""#622: MODEL_RATES is the chat price source; litellm's price map is not.
+"""MODEL_RATES is the chat price source; litellm's price map is not.
 
-completion_cost for the configured model must equal usage x the rates in
-effect today, so a stale litellm map (or a backend that outlives a price
-change) cannot under-meter the spend caps.
+A rated model's turn costs its usage x the rates in effect today, so a stale
+litellm map (or a backend that outlives a price change) cannot under-meter the
+spend caps (#622). litellm prices only models without rates, and nothing
+writes into its price map (#643).
 """
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import litellm
 import pytest
@@ -16,6 +18,9 @@ from config import settings
 from services import cost_meter, llm
 
 FLASH = "gemini/gemini-3.8-flash"
+# In litellm's bundled price map, not in MODEL_RATES.
+UNRATED = "gemini/gemini-2.5-flash"
+MESSAGES = [{"role": "user", "content": "hi"}]
 
 
 def _resp(prompt: int, completion: int, cached: int | None = None) -> ModelResponse:
@@ -65,16 +70,128 @@ def on_date(monkeypatch):
     return set_today
 
 
-def test_completion_cost_equals_usage_x_model_rates(monkeypatch):
+@pytest.fixture
+def litellm_prices(monkeypatch):
+    """Fail the test on any litellm.completion_cost or litellm.register_model
+    call. Recorded and checked at teardown, not just raised: pricing catches
+    every exception, so a raise alone would fall through to another price."""
+    calls: dict[str, list] = {"completion_cost": [], "register_model": []}
+
+    def completion_cost(**kwargs):
+        calls["completion_cost"].append(kwargs)
+        raise AssertionError("litellm.completion_cost must not price this call")
+
+    def register_model(*args, **kwargs):
+        calls["register_model"].append(args)
+        raise AssertionError("nothing writes into litellm's price map")
+
+    monkeypatch.setattr(litellm, "completion_cost", completion_cost)
+    monkeypatch.setattr(litellm, "register_model", register_model)
+    yield calls
+    assert calls == {"completion_cost": [], "register_model": []}
+
+
+@pytest.fixture
+def sentinel_rates(monkeypatch):
     monkeypatch.setitem(cost_meter.MODEL_RATES, settings.model, SENTINEL)
     monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.model, [])
+
+
+def test_rated_model_costs_usage_x_model_rates(sentinel_rates, litellm_prices):
     assert _priced(_resp(1000, 200)) == _usage_x_rates(SENTINEL, 1000, 200)
 
 
-def test_cached_prompt_tokens_price_at_the_cache_rate(monkeypatch):
-    monkeypatch.setitem(cost_meter.MODEL_RATES, settings.model, SENTINEL)
-    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.model, [])
+def test_cached_prompt_tokens_price_at_the_cache_rate(sentinel_rates, litellm_prices):
     assert _priced(_resp(1000, 200, cached=400)) == _usage_x_rates(SENTINEL, 1000, 200, cached=400)
+
+
+async def test_complete_prices_a_rated_turn_from_model_rates(
+    sentinel_rates, litellm_prices, monkeypatch
+):
+    async def acompletion(**kwargs):
+        return _resp(1000, 200, cached=400)
+
+    monkeypatch.setattr(litellm, "acompletion", acompletion)
+
+    completion = await llm.LiteLlmProvider().complete(MESSAGES, timeout=5)
+
+    assert completion.cost.quantize(Decimal("0.000001")) == _usage_x_rates(
+        SENTINEL, 1000, 200, cached=400
+    )
+
+
+async def test_stream_prices_a_rated_turn_from_model_rates(
+    sentinel_rates, litellm_prices, monkeypatch
+):
+    async def acompletion(**kwargs):
+        async def gen():
+            delta = SimpleNamespace(content="hi", tool_calls=None)
+            yield SimpleNamespace(choices=[SimpleNamespace(delta=delta)])
+
+        return gen()
+
+    monkeypatch.setattr(litellm, "acompletion", acompletion)
+    monkeypatch.setattr(
+        litellm, "stream_chunk_builder", lambda chunks, **kw: _resp(1000, 200, cached=400)
+    )
+    ps = await llm.LiteLlmProvider().stream(MESSAGES, tools=None, tool_choice=None, timeout=5)
+    _ = [t async for t in ps]
+
+    cost, _usage = ps.priced()
+
+    assert cost.quantize(Decimal("0.000001")) == _usage_x_rates(SENTINEL, 1000, 200, cached=400)
+
+
+def test_rated_response_without_usage_bills_token_math(
+    sentinel_rates, litellm_prices, expect_app_log
+):
+    """A pricing gap bills the prompt, its tools and the reply at our rates,
+    not 0 and not litellm's price."""
+    expect_app_log("pricing by token math")
+    provider = llm.LiteLlmProvider()
+    tools = [{"type": "function", "function": {"name": "ask", "parameters": {}}}]
+
+    cost = provider._completion_cost(SimpleNamespace(usage=None), MESSAGES, "reply", tools)
+
+    assert cost > Decimal("0")
+    assert cost == provider._token_math(MESSAGES, "reply", tools)
+
+
+def test_unrated_model_takes_litellms_price(monkeypatch):
+    monkeypatch.setattr(settings, "model", UNRATED)
+    priced, registered = [], []
+
+    def completion_cost(**kwargs):
+        priced.append(kwargs)
+        return 0.0042
+
+    monkeypatch.setattr(litellm, "completion_cost", completion_cost)
+    monkeypatch.setattr(litellm, "register_model", lambda *a, **k: registered.append(a))
+    resp = _resp(1000, 200)
+
+    assert llm.LiteLlmProvider()._completion_cost(resp, MESSAGES, "hi") == Decimal("0.0042")
+    # model= supplies the provider prefix the bare response name lacks.
+    assert priced == [{"completion_response": resp, "model": UNRATED}]
+    assert registered == []
+
+
+def test_unrated_model_falls_back_to_token_math(monkeypatch, expect_app_log):
+    expect_app_log("completion_cost failed: unknown model")
+    monkeypatch.setattr(settings, "model", UNRATED)
+    registered = []
+
+    def no_price(**kwargs):
+        raise ValueError("unknown model")
+
+    monkeypatch.setattr(litellm, "completion_cost", no_price)
+    monkeypatch.setattr(litellm, "register_model", lambda *a, **k: registered.append(a))
+    provider = llm.LiteLlmProvider()
+
+    cost = provider._completion_cost(_resp(1000, 200), MESSAGES, "hi")
+
+    assert cost > Decimal("0")
+    assert cost == provider._token_math(MESSAGES, "hi")
+    assert registered == []
 
 
 def test_configured_model_has_a_cache_rate():
@@ -100,13 +217,15 @@ def test_flash_rates_double_on_2027_01_01(on_date):
     }
 
 
-def test_a_running_process_picks_up_the_new_rates(monkeypatch, on_date):
+def test_a_running_process_picks_up_the_new_rates(monkeypatch, on_date, litellm_prices):
     """A backend alive across 2027-01-01 meters the next turn at the new price."""
     monkeypatch.setattr(settings, "model", FLASH)
     on_date("2026-12-31")
     assert _priced(_resp(1000, 200)) == Decimal("0.001500")
     on_date("2027-01-01")
     assert _priced(_resp(1000, 200)) == Decimal("0.003000")
+    # (600 x 0.0015 + 400 x 0.00015 + 200 x 0.0075) / 1000
+    assert _priced(_resp(1000, 200, cached=400)) == Decimal("0.002460")
 
 
 def test_cancelled_flash_stream_prices_at_the_rates_in_effect(monkeypatch, on_date):
@@ -127,48 +246,11 @@ def test_unscheduled_model_keeps_its_model_rates():
     assert cost_meter.rates_for("some/unknown-model") is None
 
 
-def test_registration_failure_never_raises(monkeypatch, expect_app_log):
-    expect_app_log("could not register rates")
-    calls = []
-
-    def boom(*args, **kwargs):
-        calls.append(args)
-        raise ValueError("bad map")
-
-    monkeypatch.setattr(litellm, "register_model", boom)
-    # Rates already registered short-circuit before boom; the conftest restores
-    # _registered after the test.
-    cost_meter._registered.pop(FLASH, None)
-
-    assert cost_meter.register_rates(FLASH) is False
-    assert len(calls) == 1
-    assert FLASH not in cost_meter._registered  # retried on the next call
-
-
-def test_failed_registration_prices_usage_at_our_rates(monkeypatch, on_date, expect_app_log):
-    """A map litellm never updated must not meter 2027 turns at the old price."""
-    expect_app_log("could not register rates")
-    monkeypatch.setattr(settings, "model", FLASH)
-    monkeypatch.setattr(
-        litellm, "register_model", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad map"))
-    )
-    on_date("2027-01-01")
-
-    # (600 x 0.0015 + 400 x 0.00015 + 200 x 0.0075) / 1000
-    assert _priced(_resp(1000, 200, cached=400)) == Decimal("0.002460")
-
-
-def test_pricing_gap_bills_usage_not_the_visible_text(monkeypatch, expect_app_log):
+def test_usage_bills_thinking_and_tool_call_tokens(monkeypatch, litellm_prices):
     """completion_tokens carries thinking and tool-call tokens; token math over
     the reply text would drop them."""
-    expect_app_log("completion_cost failed")
     monkeypatch.setattr(settings, "model", FLASH)
     monkeypatch.setitem(cost_meter.SCHEDULED_RATES, FLASH, [])
-
-    def no_price(**kwargs):
-        raise ValueError("unknown model")
-
-    monkeypatch.setattr(litellm, "completion_cost", no_price)
 
     # (1000 x 0.00075 + 2300 x 0.00375) / 1000
     assert _priced(_resp(1000, 2300)) == Decimal("0.009375")

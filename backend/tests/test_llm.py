@@ -685,6 +685,18 @@ def litellm_stream(monkeypatch):
     return state
 
 
+def _pin_rates(monkeypatch, model: str = "gemini/gemini-3.5-flash-lite") -> None:
+    """Price the chat `model` at fixed rates with no schedule, so a pricing
+    update to MODEL_RATES does not read as a behaviour change."""
+    monkeypatch.setattr(settings, "model", model)
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        model,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, model, [])
+
+
 async def _provider_stream(chunks_state, chunks):
     chunks_state["chunks"] = chunks
     ps = await llm.LiteLlmProvider().stream(
@@ -743,12 +755,14 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
         return built
 
     monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
-    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response, model=None: 0.0032)
+    _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     cost, usage = ps.priced()
 
-    assert cost == Decimal("0.0032")
+    # #643: usage x MODEL_RATES; no cache rate listed, so cached tokens price
+    # at the input rate. (1500 x 0.0003 + 200 x 0.0025) / 1000
+    assert cost == Decimal("0.00095")
     assert usage == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
     assert seen == {"chunks": 1, "messages": MESSAGES}
     assert litellm_stream["counted"] == []  # P3.2: no tokenization on the happy path
@@ -758,7 +772,7 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
     litellm_stream, monkeypatch, caplog, expect_app_log
 ):
     """F-19: a pricing-table gap must not register the call as $0."""
-    expect_app_log("completion_cost failed: unknown model")
+    expect_app_log("pricing by token math")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
         litellm,
@@ -766,10 +780,6 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
         lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
     )
 
-    def no_price(completion_response, model=None):
-        raise ValueError("unknown model")
-
-    monkeypatch.setattr(litellm, "completion_cost", no_price)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     cost, _usage = ps.priced()
@@ -780,7 +790,7 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
         r.getMessage()
         for r in caplog.records
         if r.name == "services.llm" and r.levelno >= logging.WARNING
-    ] == ["completion_cost failed: unknown model"]
+    ] == ["no usage on the gemini/gemini-3.5-flash-lite response; pricing by token math"]
 
 
 async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stream, monkeypatch):
@@ -809,7 +819,7 @@ async def test_litellm_stream_prompt_counts_include_the_tools(
     litellm_stream, monkeypatch, expect_app_log
 ):
     """#628: the tool schemas are prompt tokens too, on every fallback count."""
-    expect_app_log("completion_cost failed: unknown model")
+    expect_app_log("pricing by token math")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
         litellm,
@@ -817,10 +827,6 @@ async def test_litellm_stream_prompt_counts_include_the_tools(
         lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
     )
 
-    def no_price(completion_response, model=None):
-        raise ValueError("unknown model")
-
-    monkeypatch.setattr(litellm, "completion_cost", no_price)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     ps.estimate()
@@ -836,10 +842,13 @@ async def test_litellm_stream_builder_prompt_count_includes_the_tools(litellm_st
 
     def builder(chunks, messages=None, count_prompt_tokens=None):
         seen["prompt_tokens"] = count_prompt_tokens()
-        return SimpleNamespace(usage=None)
+        # litellm puts its count into the built usage, which prices the turn.
+        return SimpleNamespace(
+            usage=SimpleNamespace(prompt_tokens=seen["prompt_tokens"], completion_tokens=1)
+        )
 
     monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
-    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response, model=None: 0.001)
+    _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     ps.priced()
@@ -853,7 +862,7 @@ async def test_litellm_stream_pricing_gap_bills_tool_call_arguments(
 ):
     """A finished tool-call turn priced by token math bills its arguments, as
     the cancelled-stream estimate does."""
-    expect_app_log("completion_cost failed: unknown model")
+    expect_app_log("pricing by token math")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
         litellm,
@@ -861,10 +870,6 @@ async def test_litellm_stream_pricing_gap_bills_tool_call_arguments(
         lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
     )
 
-    def no_price(completion_response, model=None):
-        raise ValueError("unknown model")
-
-    monkeypatch.setattr(litellm, "completion_cost", no_price)
     ps, _ = await _provider_stream(
         litellm_stream,
         [_chunk(content="Q: "), _chunk(tool_calls=[_frag(0, id="a", name="ask", arguments="{}")])],

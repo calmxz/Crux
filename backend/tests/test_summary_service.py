@@ -79,21 +79,29 @@ def test_successful_summary_logs_llm_call(session_with_messages, db_session, mon
         return SimpleNamespace(
             choices=[SimpleNamespace(message=SimpleNamespace(content="a good summary"))],
             usage=SimpleNamespace(
-                prompt_tokens=50, completion_tokens=10, prompt_tokens_details=None
+                prompt_tokens=5000, completion_tokens=1000, prompt_tokens_details=None
             ),
         )
 
     monkeypatch.setattr(litellm, "acompletion", fake_acompletion)
-    monkeypatch.setattr(litellm, "completion_cost", lambda **kwargs: 0.0021)
+    # #643: the usage prices the call at the chat model's MODEL_RATES.
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        settings.model,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, settings.model, [])
 
     asyncio.run(summary_service.generate_and_persist(db_session, session_with_messages))
 
     row = db_session.query(LlmCallLog).filter(LlmCallLog.purpose == "summary").one()
     assert row.session_id == SESSION_ID
     assert row.user_id == USER_ID
-    assert row.prompt_tokens == 50
-    assert row.completion_tokens == 10
+    assert row.prompt_tokens == 5000
+    assert row.completion_tokens == 1000
     assert row.cached_tokens is None
+    # (5000 * 0.0003 + 1000 * 0.0025) / 1000
+    assert Decimal(str(row.cost_usd)) == Decimal("0.004")
 
 
 def test_llm_exception_uses_mechanical_fallback(

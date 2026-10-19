@@ -27,7 +27,7 @@ fails when one is missing here.
   - Cross-session insights module (G-14)
   - Access-token revocation window (A-01)
   - Cost cap tiers (B-08)
-  - Chat pricing source (#622)
+  - Chat pricing source (#622, #643)
   - Render settings: Blueprint vs dashboard
   - Subtopic eval pattern turns (#601)
 - **Frontend**
@@ -461,17 +461,6 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   logger or raises its level does not blind it. Third-party loggers and Python
   `warnings` are not covered. `tests/test_app_log_guard.py` pins the fixture, and
   fails when a new top-level backend module or package is missing from the list.
-- litellm price state (#641): an autouse fixture in `backend/tests/conftest.py`
-  wraps `litellm.register_model`, so a test's first registration (normally via
-  `cost_meter.register_rates`) snapshots `litellm.model_cost`, litellm's runtime
-  registrations and the provider model-name sets `register_model` adds to, and
-  teardown restores them in place, with `cost_meter._registered`, whatever the
-  outcome. Only a call through the `litellm.register_model` attribute during a
-  function-scoped test is seen: a module- or session-scoped fixture that
-  registers, a `from litellm import register_model` reference, a later fixture
-  teardown that registers, or a direct write to `litellm.model_cost` all leak.
-  `tests/test_litellm_price_restore.py` pins the fixture, and fails when a
-  litellm upgrade changes the provider sets `register_model` adds to.
 - xfail marks (#641): `backend/tests/test_xfail_guard.py` fails on any
   `pytest.mark.xfail` without `raises=`. Without it, any failure (a broken setup
   step, a precondition assert) counts as the expected one and the run stays green.
@@ -582,29 +571,34 @@ deploy target: blueprint values, not confirmed deployed. Local dev
 (native uvicorn, docker compose) and tests use `backend/config.py` defaults
 unless `.env` overrides them.
 
-### Chat pricing source (#622)
+### Chat pricing source (#622, #643)
 
 `cost_meter.MODEL_RATES` is the price source for chat turns, not litellm's map
-(fetched from GitHub at import in production, so it lags Google). Before each
-`completion_cost`, `register_rates(settings.model)` loads `rates_for(model)`
-into the map via `litellm.register_model`; it re-registers only when the rates
-change. To change a price, edit `MODEL_RATES`, or add a dated entry to
-`SCHEDULED_RATES` for an announced change: the first turn on or after that
-UTC day meters at the new rate, with no deploy or restart. Without
-`cache_read_per_1k`, cached prompt tokens keep litellm's cache rate, and every
-field `register_rates` doesn't set (batch, flex, priority) keeps litellm's
-value. If `register_model` or `completion_cost` raises, the turn is priced by
-`usage_cost` (the response's usage at `rates_for`, thinking tokens included),
-and only without usage by token math over the text and tool-call arguments.
+(fetched from GitHub at import in production, so it lags Google), and nothing
+writes into that map (#643). `LiteLlmProvider._completion_cost` prices a
+model with `rates_for(model)` by `usage_cost`: the response's usage at those
+rates, cached prompt tokens at `cache_read_per_1k` (the input rate when none
+is listed), thinking tokens inside completion tokens. A response without usage
+is priced by token math over the prompt, its tools, the text and tool-call
+arguments, with a warning; it misses thinking tokens (bills low) and prices
+cached tokens at the input rate (bills high). A model with no rates is priced by litellm's
+`completion_cost`, then by token math if that raises. To change a price, edit
+`MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
+change: `rates_for` is read per call, so the first turn on or after that UTC
+day meters at the new rate, with no deploy or restart. A configured model that
+needs tiered, long-context or cache-write pricing must add those rate fields
+to `MODEL_RATES` and `usage_cost`; litellm no longer covers them for a rated
+model. Both callers price this way: `complete()` (summaries) and a stream's
+built response (tutor turns, tools included).
 Every prompt count litellm or token math makes (a stream's chunks without
 usage included) counts the call's tool schemas (#628, `_prompt_tokens`). It
 errs low: litellm's tool formatter skips `$defs` and `$ref`, so it puts the
 tutor's tools at about 1.1k tokens, their JSON at 2.7k. A schema it cannot
 format drops the tools from the count, with a warning.
-`completion_cost` gets `model=settings.model` because Gemini responses carry
-the bare name (`gemini-3.8-flash`), a separate map entry that is never
-registered. Embeddings price the response's prompt tokens at `rates_for`
-directly, with no `register_model` (`embedding_cost`, #630); litellm prices an
+For an unrated model, `completion_cost` gets `model=settings.model` because
+Gemini responses carry the bare name, which resolves to a different map
+entry. Embeddings price the response's prompt tokens at `rates_for`
+directly (`embedding_cost`, #630); litellm prices an
 embedding model only when `rates_for` returns None for it. Every embedded
 input is text, priced at `input_per_1k`; without usage tokens, the texts are
 counted with litellm's default tokenizer, an approximation of Gemini's.

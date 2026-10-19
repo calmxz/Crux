@@ -3,6 +3,31 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - Chat turns price from usage x MODEL_RATES, not litellm's map (#643)
+
+Supersedes the "litellm still does the arithmetic" bullet of the #622 entry.
+A chat model listed in `MODEL_RATES` now prices a turn with
+`cost_meter.usage_cost`, and nothing writes into litellm's price map.
+
+- **The reason for keeping litellm's arithmetic no longer holds.** #622 kept
+  `completion_cost` to avoid re-implementing the cache discount, but
+  `usage_cost` already prices cached prompt tokens at `cache_read_per_1k` and
+  counts thinking tokens inside completion tokens. On litellm 1.106 the two
+  agreed to 8 decimal places for the configured model.
+- **Registration cost more than it saved.** `register_model` wrote into
+  litellm's process-wide map and merged into its builtin entry, so fields we
+  never set (batch, flex, priority, grounding) kept litellm's import-time
+  values. In tests it leaked prices between tests and needed the #641
+  snapshot-and-restore fixture, which is now gone.
+- **Unrated models still use litellm.** A model with no `MODEL_RATES` entry is
+  priced by `completion_cost`, then by token math, with no registration first.
+- **Accepted gap:** a rated model that needs tiered, long-context or
+  cache-write pricing must add those fields to `MODEL_RATES` and `usage_cost`;
+  litellm no longer covers them for rated models. None applies today: the
+  backend sends no `cache_control`, `service_tier` or grounding.
+- **The #622 scheduled-rates bullet stands.** `rates_for` is read per call, so
+  a running process still switches at a `SCHEDULED_RATES` date.
+
 ## 2026-10-19 - No sampling params on LLM calls; summaries ask for low thinking (#637)
 
 Google's Gemini 3 guide strongly recommends keeping `temperature` at its
@@ -114,7 +139,8 @@ The per-user and global caps would let through about twice the intended spend.
   into litellm's map, so `completion_cost` keeps handling cached and thinking
   tokens. Metering `usage x MODEL_RATES` directly would have meant
   re-implementing the cache discount. A test pins `completion_cost` to usage
-  times our rates, so the two sources cannot drift.
+  times our rates, so the two sources cannot drift. (Superseded by #643: chat
+  turns now price from usage x `MODEL_RATES` directly.)
 - **The 2027 price is scheduled, not a reminder.** `SCHEDULED_RATES` holds the
   announced rates with their start date, and a running process switches on
   its first turn of 2027-01-01 UTC. That replaces a human edit timed for
