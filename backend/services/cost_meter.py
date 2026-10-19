@@ -319,21 +319,27 @@ MODEL_RATES: dict[str, dict[str, Decimal]] = {
         "cache_read_per_1k": Decimal("0.000075"),  # $0.075 / 1M tokens
     },
     # Google Gemini 3.5 Flash-Lite — previous default; kept for env-selected fallback
+    # (cache rate verified 2026-10-19)
     "gemini/gemini-3.5-flash-lite": {
         "input_per_1k": Decimal("0.000300"),  # $0.30 / 1M tokens
         "output_per_1k": Decimal("0.002500"),  # $2.50 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000030"),  # $0.03 / 1M tokens
     },
     # Google Gemini 3.1 Flash-Lite — deprecated by Google, shutdown 2027-05-07;
-    # kept for env-selected fallback
+    # kept for env-selected fallback (cache rate verified 2026-10-19)
     "gemini/gemini-3.1-flash-lite": {
         "input_per_1k": Decimal("0.000250"),  # $0.25 / 1M tokens
         "output_per_1k": Decimal("0.001500"),  # $1.50 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000025"),  # $0.025 / 1M tokens (text)
     },
     # Anthropic Claude Sonnet 5 — project fallback model if gemini underperforms
-    # (verified against the Claude API price table 2026-09-10)
+    # (verified against the Claude API price table 2026-09-10; cache hits
+    # 2026-10-19 at platform.claude.com/docs/en/about-claude/pricing). Inert
+    # until a request sets cache_control; cache writes would need their own field.
     "anthropic/claude-sonnet-5": {
         "input_per_1k": Decimal("0.002"),  # $2.00  / 1M tokens
         "output_per_1k": Decimal("0.010"),  # $10.00 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000200"),  # $0.20 / 1M tokens
     },
     # Google Gemini embedding model
     "gemini/gemini-embedding-2": {
