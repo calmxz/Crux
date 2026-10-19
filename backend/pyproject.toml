@@ -12,7 +12,9 @@ dependencies = [
     "sqlalchemy>=2.1.1,<3.0",
     "pydantic>=2.14.1,<3.0",
     "pydantic-settings>=2.15.0",
-    "litellm>=1.104.0,<2.0",
+    # [mcp]: since 1.106 the same tools path imports mcp, declared only under
+    # litellm's extras. See tests/test_llm_deps.py and docs/decisions.md (#610).
+    "litellm[mcp]>=1.106.0,<2.0",
     # litellm.completion() imports litellm.proxy.* -> orjson whenever `tools` is
     # passed, but only declares orjson under its [proxy] extra. Every tutor turn
     # passes tools, so without this the live chat path dies with
