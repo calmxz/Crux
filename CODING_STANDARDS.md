@@ -34,6 +34,8 @@ For each test the diff adds or edits, name the product-code line whose breakage 
 
 A test that asserts a printed or returned value seeds its inputs so every value the assertion could match is distinct. When two inputs are equal, the assertion passes whichever one the code reads. (#600: spend was seeded equal to the limit, so `"$0.5000" in out` passed whether the cost-stop message printed the spend or the limit; the two-axis review passed it and the bug-hunt review caught it.)
 
+A test that checks state left by an earlier test or a fixture seeds values no earlier test could have left. Tests that run in file order as pairs each use their own values. (#641: the failure-path pair reused the passing pair's sentinel, so its check compared the leaked sentinel with itself and passed with the fix removed; the Standards review passed it and the Spec review caught it by running the tests without the fix.)
+
 When a diff makes a value depend on the date (a scheduled rate, a dated config entry), every test that computes an expectation from that value reads it through the same date-aware function or fixes the date. Check the existing tests, not only the new ones. (#622: `test_estimate_zero_delta_only_charges_prompt` computed its expectation from `MODEL_RATES` after pricing moved to `rates_for`, and would have failed on 2027-01-01; the two-axis review passed it and the bug-hunt review caught it.)
 
 ## A removed guard names its backstop's test

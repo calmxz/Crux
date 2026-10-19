@@ -472,6 +472,9 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   teardown that registers, or a direct write to `litellm.model_cost` all leak.
   `tests/test_litellm_price_restore.py` pins the fixture, and fails when a
   litellm upgrade changes the provider sets `register_model` adds to.
+- xfail marks (#641): `backend/tests/test_xfail_guard.py` fails on any
+  `pytest.mark.xfail` without `raises=`. Without it, any failure (a broken setup
+  step, a precondition assert) counts as the expected one and the run stays green.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
