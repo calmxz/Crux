@@ -135,12 +135,12 @@ priced from litellm's map, which production fetches at import, so turns would
 meter at half price until litellm updated its JSON and the backend restarted.
 The per-user and global caps would let through about twice the intended spend.
 
-- **litellm still does the arithmetic.** (Superseded by #643: chat turns now
-  price from usage x `MODEL_RATES` directly.) `register_rates` loads `MODEL_RATES`
+- **litellm still does the arithmetic.** `register_rates` loads `MODEL_RATES`
   into litellm's map, so `completion_cost` keeps handling cached and thinking
   tokens. Metering `usage x MODEL_RATES` directly would have meant
   re-implementing the cache discount. A test pins `completion_cost` to usage
-  times our rates, so the two sources cannot drift.
+  times our rates, so the two sources cannot drift. (Superseded by #643: chat
+  turns now price from usage x `MODEL_RATES` directly.)
 - **The 2027 price is scheduled, not a reminder.** `SCHEDULED_RATES` holds the
   announced rates with their start date, and a running process switches on
   its first turn of 2027-01-01 UTC. That replaces a human edit timed for

@@ -72,9 +72,9 @@ def on_date(monkeypatch):
 
 @pytest.fixture
 def litellm_prices(monkeypatch):
-    """Record every litellm.completion_cost and litellm.register_model call.
-    Recorded, not just raised: pricing catches every exception, so a raise
-    alone would fall through to another price and could pass unnoticed."""
+    """Fail the test on any litellm.completion_cost or litellm.register_model
+    call. Recorded and checked at teardown, not just raised: pricing catches
+    every exception, so a raise alone would fall through to another price."""
     calls: dict[str, list] = {"completion_cost": [], "register_model": []}
 
     def completion_cost(**kwargs):
@@ -87,7 +87,8 @@ def litellm_prices(monkeypatch):
 
     monkeypatch.setattr(litellm, "completion_cost", completion_cost)
     monkeypatch.setattr(litellm, "register_model", register_model)
-    return calls
+    yield calls
+    assert calls == {"completion_cost": [], "register_model": []}
 
 
 @pytest.fixture
@@ -98,7 +99,6 @@ def sentinel_rates(monkeypatch):
 
 def test_rated_model_costs_usage_x_model_rates(sentinel_rates, litellm_prices):
     assert _priced(_resp(1000, 200)) == _usage_x_rates(SENTINEL, 1000, 200)
-    assert litellm_prices == {"completion_cost": [], "register_model": []}
 
 
 def test_cached_prompt_tokens_price_at_the_cache_rate(sentinel_rates, litellm_prices):
@@ -118,7 +118,6 @@ async def test_complete_prices_a_rated_turn_from_model_rates(
     assert completion.cost.quantize(Decimal("0.000001")) == _usage_x_rates(
         SENTINEL, 1000, 200, cached=400
     )
-    assert litellm_prices == {"completion_cost": [], "register_model": []}
 
 
 async def test_stream_prices_a_rated_turn_from_model_rates(
@@ -141,7 +140,6 @@ async def test_stream_prices_a_rated_turn_from_model_rates(
     cost, _usage = ps.priced()
 
     assert cost.quantize(Decimal("0.000001")) == _usage_x_rates(SENTINEL, 1000, 200, cached=400)
-    assert litellm_prices == {"completion_cost": [], "register_model": []}
 
 
 def test_rated_response_without_usage_bills_token_math(
@@ -157,7 +155,6 @@ def test_rated_response_without_usage_bills_token_math(
 
     assert cost > Decimal("0")
     assert cost == provider._token_math(MESSAGES, "reply", tools)
-    assert litellm_prices == {"completion_cost": [], "register_model": []}
 
 
 def test_unrated_model_takes_litellms_price(monkeypatch):

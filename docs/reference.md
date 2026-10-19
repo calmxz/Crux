@@ -580,7 +580,8 @@ model with `rates_for(model)` by `usage_cost`: the response's usage at those
 rates, cached prompt tokens at `cache_read_per_1k` (the input rate when none
 is listed), thinking tokens inside completion tokens. A response without usage
 is priced by token math over the prompt, its tools, the text and tool-call
-arguments, with a warning. A model with no rates is priced by litellm's
+arguments, with a warning; it misses thinking tokens (bills low) and prices
+cached tokens at the input rate (bills high). A model with no rates is priced by litellm's
 `completion_cost`, then by token math if that raises. To change a price, edit
 `MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
 change: `rates_for` is read per call, so the first turn on or after that UTC
