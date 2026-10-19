@@ -280,26 +280,31 @@ class LiteLlmProvider:
     def _completion_cost(
         self, resp, messages, content: str, tools: list[dict] | None = None
     ) -> Decimal:
-        """litellm's price over the response usage, at the MODEL_RATES we
-        registered; on failure, the response's usage at those rates, else
-        token math over the prompt, its `tools` and the reply. Never raises."""
-        if cost_meter.register_rates(settings.model):
+        """A model with MODEL_RATES prices the response usage at rates_for
+        (#643); any other model takes litellm's price. Without either, token
+        math over the prompt, its `tools` and the reply. Never raises."""
+        cost: Decimal | None = None
+        if cost_meter.rates_for(settings.model) is not None:
+            # Usage keeps the thinking and tool-call tokens that token math
+            # over the text misses.
+            try:
+                cost = cost_meter.usage_cost(settings.model, cost_meter.extract_usage(resp))
+            except Exception as e:  # noqa: BLE001 - pricing must not fail the call
+                log.warning("usage cost failed: %s", e)
+            else:
+                if cost is None:
+                    log.warning(
+                        "no usage on the %s response; pricing by token math", settings.model
+                    )
+        else:
             try:
                 # model= supplies the provider prefix: Gemini responses carry
-                # the bare name, which resolves to a different (unregistered)
-                # entry.
-                return _to_decimal(
+                # the bare name, which resolves to a different entry.
+                cost = _to_decimal(
                     litellm.completion_cost(completion_response=resp, model=settings.model)
                 )
             except Exception as e:  # noqa: BLE001 - pricing must not fail the call
                 log.warning("completion_cost failed: %s", e)
-        # Unregistered, litellm's map may hold an old price; usage keeps the
-        # thinking and tool-call tokens that token math over the text misses.
-        try:
-            cost = cost_meter.usage_cost(settings.model, cost_meter.extract_usage(resp))
-        except Exception as e:  # noqa: BLE001
-            log.warning("usage cost failed: %s", e)
-            cost = None
         return cost if cost is not None else self._token_math(messages, content, tools)
 
     def _token_math(self, messages, content: str, tools: list[dict] | None = None) -> Decimal:

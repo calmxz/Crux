@@ -305,9 +305,11 @@ def spend_subquery(user_id: str):
 
 # Per-1000-token USD rates. Verified against ai.google.dev/gemini-api/docs/pricing
 # (standard paid tier) on 2026-08-24; update on model/pricing change.
-# The source of truth for chat pricing: register_rates loads the chat model's
-# entry into litellm's price map, so completion_cost prices from here (#622).
-# cache_read_per_1k is optional; without it litellm keeps its own cache rate.
+# The source of truth for chat pricing: a listed chat model's turn costs its
+# usage at these rates (usage_cost), never litellm's price map (#643).
+# cache_read_per_1k is optional; without it cached tokens price at the input
+# rate. Tiered or cache-write pricing would need its own fields here and in
+# usage_cost.
 MODEL_RATES: dict[str, dict[str, Decimal]] = {
     # Google Gemini 3.8 Flash — default chat model (verified 2026-10-18).
     # Google doubles every rate on 2027-01-01; see SCHEDULED_RATES.
@@ -383,40 +385,6 @@ def usage_cost(model: str, usage: dict) -> Decimal | None:
         + Decimal(cached) * cache_rate
         + Decimal(completion) * rates["output_per_1k"]
     ) / Decimal(1000)
-
-
-# model -> the rates last loaded into litellm's price map.
-_registered: dict[str, dict[str, Decimal]] = {}
-
-
-def register_rates(model: str) -> bool:
-    """Load today's rates for chat `model` into litellm's price map, so
-    completion_cost meters from MODEL_RATES rather than whatever map litellm
-    fetched at import. Re-registers only when the rates change, so a process
-    alive across a SCHEDULED_RATES date picks the new price up on its next
-    call. Unknown models are left to litellm. Returns False only when the
-    registration failed, so litellm's map may be stale. Never raises."""
-    rates = rates_for(model)
-    if rates is None or _registered.get(model) == rates:
-        return True
-    try:
-        output = float(rates["output_per_1k"] / 1000)
-        entry: dict[str, object] = {
-            "input_cost_per_token": float(rates["input_per_1k"] / 1000),
-            "output_cost_per_token": output,
-            "output_cost_per_reasoning_token": output,
-            "litellm_provider": model.split("/", 1)[0],
-            "mode": "chat",
-        }
-        if "cache_read_per_1k" in rates:
-            entry["cache_read_input_token_cost"] = float(rates["cache_read_per_1k"] / 1000)
-        litellm.register_model({model: entry})
-    except Exception as e:  # noqa: BLE001 - metering must not raise
-        log.warning("could not register rates for %s: %s", model, e)
-        return False
-    # A copy, so an in-place edit of the rates still reads as a change.
-    _registered[model] = dict(rates)
-    return True
 
 
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:
