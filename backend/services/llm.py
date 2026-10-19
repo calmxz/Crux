@@ -236,20 +236,26 @@ class LiteLlmProvider:
 
     def _completion_cost(self, resp, messages, content: str) -> Decimal:
         """litellm's price over the response usage, at the MODEL_RATES we
-        registered; on failure, token math over the prompt and the reply.
-        Never raises."""
-        if not cost_meter.register_rates(settings.model):
-            # litellm's map may hold an old price; token math uses ours.
-            return self._token_math(messages, content)
+        registered; on failure, the response's usage at those rates, else
+        token math over the prompt and the reply. Never raises."""
+        if cost_meter.register_rates(settings.model):
+            try:
+                # model= supplies the provider prefix: Gemini responses carry
+                # the bare name, which resolves to a different (unregistered)
+                # entry.
+                return _to_decimal(
+                    litellm.completion_cost(completion_response=resp, model=settings.model)
+                )
+            except Exception as e:  # noqa: BLE001 - pricing must not fail the call
+                log.warning("completion_cost failed: %s", e)
+        # Unregistered, litellm's map may hold an old price; usage keeps the
+        # thinking and tool-call tokens that token math over the text misses.
         try:
-            # model= supplies the provider prefix: Gemini responses carry the
-            # bare name, which resolves to a different (unregistered) entry.
-            return _to_decimal(
-                litellm.completion_cost(completion_response=resp, model=settings.model)
-            )
-        except Exception as e:  # noqa: BLE001 - pricing must not fail the call
-            log.warning("completion_cost failed: %s", e)
-        return self._token_math(messages, content)
+            cost = cost_meter.usage_cost(settings.model, cost_meter.extract_usage(resp))
+        except Exception as e:  # noqa: BLE001
+            log.warning("usage cost failed: %s", e)
+            cost = None
+        return cost if cost is not None else self._token_math(messages, content)
 
     def _token_math(self, messages, content: str) -> Decimal:
         """Prompt tokens plus `content` priced at the chat model's rates.

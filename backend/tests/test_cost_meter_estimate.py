@@ -8,7 +8,7 @@ from decimal import Decimal
 import litellm
 
 from config import settings
-from services.cost_meter import MODEL_RATES, estimate_cancelled_cost
+from services.cost_meter import MODEL_RATES, estimate_cancelled_cost, rates_for
 
 
 def test_model_rates_has_default_model():
@@ -51,7 +51,8 @@ def test_estimate_grows_with_delta_length():
 
 def test_estimate_zero_delta_only_charges_prompt():
     """With delta_text='' and prompt_tokens=1000, cost equals exactly the prompt portion."""
-    rates = MODEL_RATES[settings.model]
+    rates = rates_for(settings.model)
+    assert rates is not None
     expected = (Decimal(1000) * rates["input_per_1k"]) / Decimal(1000)
     cost = estimate_cancelled_cost(
         model=settings.model,

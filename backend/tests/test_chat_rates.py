@@ -58,14 +58,12 @@ SENTINEL = {
 
 
 @pytest.fixture(autouse=True)
-def fresh_registration(monkeypatch):
-    """Each test starts with nothing registered, and leaves litellm's map at
-    today's real rates for the rest of the suite."""
+def fresh_registration():
+    """Each test starts with nothing registered. Clearing again afterwards
+    makes the next pricing call re-register real rates over a sentinel."""
     cost_meter._registered.clear()
     yield
-    monkeypatch.undo()
     cost_meter._registered.clear()
-    cost_meter.register_rates(settings.model)
 
 
 @pytest.fixture
@@ -153,16 +151,39 @@ def test_registration_failure_never_raises(monkeypatch, expect_app_log):
     assert FLASH not in cost_meter._registered  # retried on the next call
 
 
-def test_failed_registration_prices_by_token_math_not_the_map(monkeypatch, on_date, expect_app_log):
+def test_failed_registration_prices_usage_at_our_rates(monkeypatch, on_date, expect_app_log):
     """A map litellm never updated must not meter 2027 turns at the old price."""
     expect_app_log("could not register rates")
     monkeypatch.setattr(settings, "model", FLASH)
     monkeypatch.setattr(
         litellm, "register_model", lambda *a, **k: (_ for _ in ()).throw(ValueError("bad map"))
     )
-    monkeypatch.setattr(
-        litellm, "token_counter", lambda model, **kw: 1000 if "messages" in kw else 200
-    )
     on_date("2027-01-01")
 
-    assert _priced(_resp(1000, 200)) == Decimal("0.003000")
+    # (600 x 0.0015 + 400 x 0.00015 + 200 x 0.0075) / 1000
+    assert _priced(_resp(1000, 200, cached=400)) == Decimal("0.002460")
+
+
+def test_pricing_gap_bills_usage_not_the_visible_text(monkeypatch, expect_app_log):
+    """completion_tokens carries thinking and tool-call tokens; token math over
+    the reply text would drop them."""
+    expect_app_log("completion_cost failed")
+    monkeypatch.setattr(settings, "model", FLASH)
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, FLASH, [])
+
+    def no_price(**kwargs):
+        raise ValueError("unknown model")
+
+    monkeypatch.setattr(litellm, "completion_cost", no_price)
+
+    # (1000 x 0.00075 + 2300 x 0.00375) / 1000
+    assert _priced(_resp(1000, 2300)) == Decimal("0.009375")
+
+
+def test_schedule_order_in_the_list_does_not_matter(monkeypatch, on_date):
+    early, late = {**SENTINEL}, {**SENTINEL, "input_per_1k": Decimal("1")}
+    monkeypatch.setitem(
+        cost_meter.SCHEDULED_RATES, FLASH, [("2027-06-01", late), ("2027-01-01", early)]
+    )
+    on_date("2027-07-01")
+    assert cost_meter.rates_for(FLASH) == late

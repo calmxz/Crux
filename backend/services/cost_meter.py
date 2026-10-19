@@ -361,10 +361,28 @@ def rates_for(model: str) -> dict[str, Decimal] | None:
     """Per-1k rates for `model` in effect today (UTC), or None if unknown."""
     rates = MODEL_RATES.get(model)
     today = _today_utc()
-    for first_day, scheduled in SCHEDULED_RATES.get(model, []):
+    for first_day, scheduled in sorted(SCHEDULED_RATES.get(model, []), key=lambda s: s[0]):
         if today >= first_day:
             rates = scheduled
     return rates
+
+
+def usage_cost(model: str, usage: dict) -> Decimal | None:
+    """USD for an extract_usage dict at rates_for(model): cached prompt tokens
+    at the cache rate (the input rate when none is listed), completion tokens,
+    thinking included, at the output rate. None when the model or the token
+    counts are unknown."""
+    rates = rates_for(model)
+    prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
+    if rates is None or prompt is None or completion is None:
+        return None
+    cached = usage.get("cached_tokens") or 0
+    cache_rate = rates.get("cache_read_per_1k", rates["input_per_1k"])
+    return (
+        Decimal(prompt - cached) * rates["input_per_1k"]
+        + Decimal(cached) * cache_rate
+        + Decimal(completion) * rates["output_per_1k"]
+    ) / Decimal(1000)
 
 
 # model -> the rates last loaded into litellm's price map.
@@ -381,22 +399,23 @@ def register_rates(model: str) -> bool:
     rates = rates_for(model)
     if rates is None or _registered.get(model) == rates:
         return True
-    output = float(rates["output_per_1k"] / 1000)
-    entry: dict[str, object] = {
-        "input_cost_per_token": float(rates["input_per_1k"] / 1000),
-        "output_cost_per_token": output,
-        "output_cost_per_reasoning_token": output,
-        "litellm_provider": model.split("/", 1)[0],
-        "mode": "chat",
-    }
-    if "cache_read_per_1k" in rates:
-        entry["cache_read_input_token_cost"] = float(rates["cache_read_per_1k"] / 1000)
     try:
+        output = float(rates["output_per_1k"] / 1000)
+        entry: dict[str, object] = {
+            "input_cost_per_token": float(rates["input_per_1k"] / 1000),
+            "output_cost_per_token": output,
+            "output_cost_per_reasoning_token": output,
+            "litellm_provider": model.split("/", 1)[0],
+            "mode": "chat",
+        }
+        if "cache_read_per_1k" in rates:
+            entry["cache_read_input_token_cost"] = float(rates["cache_read_per_1k"] / 1000)
         litellm.register_model({model: entry})
     except Exception as e:  # noqa: BLE001 - metering must not raise
         log.warning("could not register rates for %s: %s", model, e)
         return False
-    _registered[model] = rates
+    # A copy, so an in-place edit of the rates still reads as a change.
+    _registered[model] = dict(rates)
     return True
 
 
