@@ -584,16 +584,16 @@ caching makes cached tokens common, and the input rate over-bills them (#644,
 pinned by `test_every_chat_model_lists_a_cache_rate`). A response without usage
 is priced by token math over the prompt, its tools, the text and tool-call
 arguments, with a warning; it misses thinking tokens (bills low) and prices
-cached tokens at the input rate (bills high). Every estimated chat cost does
-the same, because they all go through `_token_math` to
-`cost_meter.estimate_cancelled_cost`, which never reads `cache_read_per_1k`:
-a cancelled or failed stream (`_LiteLlmStream.estimate`), and the prompt-only
+cached tokens at the input rate (bills high). Every estimated chat cost prices
+cached tokens at the input rate too, since all of them go through
+`_token_math` to `cost_meter.estimate_cancelled_cost`, which never reads
+`cache_read_per_1k`. That covers a cancelled or failed stream and one whose
+`stream_chunk_builder` raises (`_LiteLlmStream.estimate`), and the prompt-only
 `completion_prompt_cost` settled for a timed-out completion or a stream whose
-request went out with no stream back. No cached count exists on those paths
-(Gemini reports it in the final chunk, which a cancel never receives), and
-guessing a cached share could bill low, the unsafe direction for a spend cap.
-Billing high is deliberate: the ledger is a daily budget, not a bill (#647).
-A model with no rates is priced by litellm's
+request went out with no stream back. This is deliberate (#647): no cached
+count exists on those paths (Gemini reports it in the final chunk, which a
+cancel never receives), and guessing a cached share could bill low, the unsafe
+direction for a daily budget. A model with no rates is priced by litellm's
 `completion_cost`, then by token math if that raises. To change a price, edit
 `MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
 change: `rates_for` is read per call, so the first turn on or after that UTC
