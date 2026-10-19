@@ -879,7 +879,7 @@ async def test_litellm_stream_pricing_gap_bills_tool_call_arguments(
 def test_unformattable_tool_schema_still_counts_the_messages(monkeypatch, expect_app_log):
     """A tool schema litellm cannot format drops the tools from the count,
     not the whole prompt estimate."""
-    expect_app_log("tool schema token count failed")
+    expect_app_log("tool schema count failed")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     counted = []
 

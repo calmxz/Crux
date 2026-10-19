@@ -149,24 +149,19 @@ class ProviderStream(Protocol):
     @property
     def tool_calls(self) -> list[ToolCall]:
         """The tool calls assembled so far, in index order."""
-        ...
 
     def __aiter__(self) -> AsyncIterator[str]:
         """The text tokens, as they arrive."""
-        ...
 
     def priced(self) -> tuple[Decimal, dict]:
         """(cost, usage) of the finished stream. Never raises."""
-        ...
 
     def estimate(self) -> Decimal:
         """Prompt plus the output received so far (text and tool-call
         arguments), by token math. Never raises."""
-        ...
 
     async def aclose(self) -> None:
         """Release the underlying response."""
-        ...
 
 
 class Provider(Protocol):
@@ -175,18 +170,15 @@ class Provider(Protocol):
     @property
     def chat_model(self) -> str:
         """Model name recorded on completion call log rows."""
-        ...
 
     @property
     def embedding_model(self) -> str:
         """Model name recorded on embedding call log rows."""
-        ...
 
     async def complete(
         self, messages: list[dict], *, temperature: float, timeout: float
     ) -> Completion:
         """One non-streamed chat completion, priced."""
-        ...
 
     async def stream(
         self,
@@ -198,25 +190,20 @@ class Provider(Protocol):
         timeout: float,
     ) -> ProviderStream:
         """Open one streamed chat completion."""
-        ...
 
     def embed(self, texts: list[str]) -> Embedding:
         """One embedding batch, priced."""
-        ...
 
     async def aembed(self, texts: list[str]) -> Embedding:
         """Async form of embed."""
-        ...
 
     def completion_prompt_cost(
         self, messages: list[dict], tools: list[dict] | None = None
     ) -> Decimal:
         """Estimated prompt cost of a completion sent with `tools`. Never raises."""
-        ...
 
     def embedding_prompt_cost(self, texts: list[str]) -> Decimal:
         """Estimated prompt cost of an embedding batch. Never raises."""
-        ...
 
 
 def _to_decimal(v) -> Decimal:
@@ -233,7 +220,7 @@ def _prompt_tokens(messages: list[dict], tools: list | None) -> int:
     except Exception as e:  # noqa: BLE001 - an estimate must not raise
         if tools is None:
             raise
-        log.warning("tool schema token count failed: %s", e)
+        log.warning("tool schema count failed: %s", e)
         return litellm.token_counter(model=settings.model, messages=messages)
 
 
