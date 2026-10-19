@@ -528,7 +528,9 @@ class _FakeProviderStream:
         return self._provider.cost, self._provider._usage()
 
     def estimate(self):
-        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], self.text))
+        # Like the real stream: tool-call arguments received are output too.
+        output = self.text + "".join(tc.arguments for tc in self._tool_calls)
+        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], output))
         return self._provider.partial_cost
 
     async def aclose(self):
