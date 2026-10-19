@@ -27,6 +27,7 @@ fails when one is missing here.
   - Cross-session insights module (G-14)
   - Access-token revocation window (A-01)
   - Cost cap tiers (B-08)
+  - Chat pricing source (#622)
   - Render settings: Blueprint vs dashboard
   - Subtopic eval pattern turns (#601)
 - **Frontend**
@@ -546,6 +547,24 @@ The Render blueprint values are what `render.yaml` pins for the Render
 deploy target: blueprint values, not confirmed deployed. Local dev
 (native uvicorn, docker compose) and tests use `backend/config.py` defaults
 unless `.env` overrides them.
+
+### Chat pricing source (#622)
+
+`cost_meter.MODEL_RATES` is the price source for chat turns, not litellm's map
+(fetched from GitHub at import in production, so it lags Google). Before each
+`completion_cost`, `register_rates(settings.model)` loads `rates_for(model)`
+into the map via `litellm.register_model`; it re-registers only when the rates
+change. To change a price, edit `MODEL_RATES`, or add a dated entry to
+`SCHEDULED_RATES` for an announced change: the first turn on or after that
+UTC day meters at the new rate, with no deploy or restart. Without
+`cache_read_per_1k`, cached prompt tokens keep litellm's cache rate, and every
+field `register_rates` doesn't set (batch, flex, priority) keeps litellm's
+value. If `register_model` or `completion_cost` raises, the turn is priced by
+`usage_cost` (the response's usage at `rates_for`, thinking tokens included),
+and only without usage by token math over the text.
+`completion_cost` gets `model=settings.model` because Gemini responses carry
+the bare name (`gemini-3.8-flash`), a separate map entry that is never
+registered. Embeddings still price through litellm first (`embedding_cost`).
 
 ### Render settings: Blueprint vs dashboard
 

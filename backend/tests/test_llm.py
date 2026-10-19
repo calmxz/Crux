@@ -740,7 +740,7 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
         return built
 
     monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
-    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response: 0.0032)
+    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response, model=None: 0.0032)
     ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
 
     cost, usage = ps.priced()
@@ -761,7 +761,7 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
         litellm, "stream_chunk_builder", lambda chunks, messages=None: SimpleNamespace(usage=None)
     )
 
-    def no_price(completion_response):
+    def no_price(completion_response, model=None):
         raise ValueError("unknown model")
 
     monkeypatch.setattr(litellm, "completion_cost", no_price)
