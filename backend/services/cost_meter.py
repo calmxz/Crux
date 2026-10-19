@@ -394,15 +394,17 @@ def usage_cost(model: str, usage: dict) -> Decimal | None:
 
 
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:
-    """Return an estimated USD cost for a cancelled streaming LLM reply.
+    """Return an estimated USD cost for an LLM call without usage.
 
-    Charges the full prompt cost (all tokens were sent to the model before
-    cancellation) plus the output cost for however many tokens were streamed
-    in `delta_text`.
+    Despite the name, every estimate path uses it (listed in
+    docs/reference.md "Chat pricing source"), embeddings included. Charges the full prompt cost (all
+    tokens were sent to the model) plus the output cost for however many
+    tokens arrived in `delta_text`. Cached prompt tokens are priced at the
+    input rate on purpose; see docs/reference.md "Chat pricing source" (#647).
 
     The returned value is intentionally NOT quantized: record_cost quantizes
-    on write, so accumulating raw sub-cent cancellation costs before truncation
-    preserves arithmetic accuracy across multiple cancelled turns.
+    on write, so accumulating raw sub-cent estimates before truncation
+    preserves arithmetic accuracy across multiple estimated calls.
 
     litellm.token_counter confirmed to return sane (non-zero) counts for
     'gemini/gemini-3.8-flash' — returns 6 for a 6-word phrase — so no
