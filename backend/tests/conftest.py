@@ -191,6 +191,28 @@ def _inline_settle_retry(monkeypatch):
 # The first registration in a test snapshots everything litellm.register_model
 # touches; teardown restores it whatever the outcome. A restore error is left
 # to raise, so it fails the test instead of leaking prices into the next one.
+# Only calls through the litellm.register_model attribute during the test are
+# seen: see docs/reference.md "litellm price state".
+
+# The provider model-name sets litellm 1.106's register_model adds names to.
+_LITELLM_MODEL_SETS = (
+    "open_ai_chat_completion_models",
+    "open_ai_text_completion_models",
+    "cohere_models",
+    "anthropic_models",
+    "openrouter_models",
+    "vercel_ai_gateway_models",
+    "edenai_models",
+    "vertex_text_models",
+    "vertex_code_text_models",
+    "vertex_chat_models",
+    "vertex_code_chat_models",
+    "ai21_models",
+    "nlp_cloud_models",
+    "aleph_alpha_models",
+    "bedrock_models",
+    "novita_models",
+)
 
 
 def _restore_dict(live: dict, saved: dict) -> None:
@@ -230,10 +252,8 @@ def _restore_litellm_prices(monkeypatch):
         if not saved:
             saved["model_cost"] = _snapshot_dict(litellm.model_cost)
             saved["runtime"] = _snapshot_dict(litellm.utils._runtime_registered_model_cost)
-            saved["names"] = {
-                name: (value, set(value))
-                for name, value in vars(litellm).items()
-                if isinstance(value, set)
+            saved["model_sets"] = {
+                name: set(getattr(litellm, name)) for name in _LITELLM_MODEL_SETS
             }
         return original(*args, **kwargs)
 
@@ -245,10 +265,8 @@ def _restore_litellm_prices(monkeypatch):
         return
     _restore_dict(litellm.model_cost, saved["model_cost"])
     _restore_dict(litellm.utils._runtime_registered_model_cost, saved["runtime"])
-    for name, (names, contents) in saved["names"].items():
-        names.intersection_update(contents)
-        names.update(contents)
-        setattr(litellm, name, names)
+    for name, contents in saved["model_sets"].items():
+        getattr(litellm, name).intersection_update(contents)
     litellm.utils._invalidate_model_cost_lowercase_map()
 
 

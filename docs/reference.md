@@ -461,6 +461,17 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   logger or raises its level does not blind it. Third-party loggers and Python
   `warnings` are not covered. `tests/test_app_log_guard.py` pins the fixture, and
   fails when a new top-level backend module or package is missing from the list.
+- litellm price state (#641): an autouse fixture in `backend/tests/conftest.py`
+  wraps `litellm.register_model`, so a test's first registration (normally via
+  `cost_meter.register_rates`) snapshots `litellm.model_cost`, litellm's runtime
+  registrations and the provider model-name sets `register_model` adds to, and
+  teardown restores them in place, with `cost_meter._registered`, whatever the
+  outcome. Only a call through the `litellm.register_model` attribute during a
+  function-scoped test is seen: a module- or session-scoped fixture that
+  registers, a `from litellm import register_model` reference, a later fixture
+  teardown that registers, or a direct write to `litellm.model_cost` all leak.
+  The provider-set list is pinned to litellm 1.106's `register_model`; recheck
+  it on a litellm upgrade. `tests/test_litellm_price_restore.py` pins the fixture.
 - `backend/tests/test_deploy_config.py` enforces bidirectional drift between
   `config.Settings`, `.env.example`, and `render.yaml` `envVars`. A new Settings
   field must be documented in `.env.example` (commented default is fine).
