@@ -199,6 +199,14 @@ def test_configured_model_has_a_cache_rate():
     assert rates is not None and "cache_read_per_1k" in rates
 
 
+def test_every_chat_model_lists_a_cache_rate():
+    """#644: a chat entry without one bills cached tokens at the input rate."""
+    entries = [(m, r) for m, r in cost_meter.MODEL_RATES.items() if m != settings.embedding_model]
+    entries += [(m, r) for m, sched in cost_meter.SCHEDULED_RATES.items() for _, r in sched]
+    assert len(entries) > 1
+    assert [m for m, r in entries if "cache_read_per_1k" not in r] == []
+
+
 def test_flash_rates_before_2027(on_date):
     on_date("2026-12-31")
     assert cost_meter.rates_for(FLASH) == {
@@ -244,6 +252,28 @@ def test_unscheduled_model_keeps_its_model_rates():
         == (cost_meter.MODEL_RATES["gemini/gemini-3.5-flash-lite"])
     )
     assert cost_meter.rates_for("some/unknown-model") is None
+
+
+@pytest.mark.parametrize(
+    ("model", "expected"),
+    [
+        # (200 x 0.0003 + 800 x 0.00003 + 300 x 0.0025) / 1000
+        ("gemini/gemini-3.5-flash-lite", Decimal("0.000834")),
+        # (200 x 0.00025 + 800 x 0.000025 + 300 x 0.0015) / 1000
+        ("gemini/gemini-3.1-flash-lite", Decimal("0.00052")),
+    ],
+)
+def test_fallback_flash_lite_bills_cached_tokens_at_the_cache_rate(model, expected):
+    """#644: implicit caching makes cached_tokens non-zero on most turns, so a
+    missing cache rate over-bills them at the input rate."""
+    usage = {"prompt_tokens": 1000, "cached_tokens": 800, "completion_tokens": 300}
+    assert cost_meter.usage_cost(model, usage) == expected
+
+
+def test_sonnet_fallback_lists_its_cache_rate():
+    """Inert today (no request sets cache_control), recorded for when one does."""
+    rates = cost_meter.MODEL_RATES["anthropic/claude-sonnet-5"]
+    assert rates["cache_read_per_1k"] == Decimal("0.000200")
 
 
 def test_usage_bills_thinking_and_tool_call_tokens(monkeypatch, litellm_prices):
