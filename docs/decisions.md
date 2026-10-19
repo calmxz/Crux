@@ -10,12 +10,15 @@ default of 1.0. Its troubleshooting page warns that values below 1.0 "can
 cause unexpected behavior, such as looping or degraded performance". We sent
 0.3 on tutor turns and 0.0 on summaries.
 
-- **No call sends `temperature`, `top_p` or `top_k`, for any model.** The
+- **The app passes no `temperature`, `top_p` or `top_k`, for any model.** The
   keyword is gone from the adapter and the `Provider` protocol, and both
   settings (`llm_temperature`, `summary_temperature`) are removed. Settings
-  ignore unknown env vars, so a deploy still setting them boots. Accepted
-  trade-off: a swap to a non-Gemini-3 fallback runs at that provider's
-  default temperature. Temperature can come back as part of such a swap.
+  ignore unknown env vars, so a deploy still setting them boots. On the wire,
+  LiteLLM 1.106 itself adds Gemini 3's default `temperature: 1.0` when none is
+  given, so if Google drops the parameter, requests depend on LiteLLM
+  dropping it too. Accepted trade-off: a swap to a non-Gemini-3 fallback runs
+  at that provider's default temperature. Temperature can come back as part
+  of such a swap.
 - **Summaries (`summary`, `rolling_summary`) send `reasoning_effort="low"`**,
   which LiteLLM maps to Gemini 3's `thinking_level`. Tutor turns send none and
   keep the model's dynamic default. The provider sends it only when

@@ -615,15 +615,18 @@ async def test_production_model_calls_carry_no_sampling_params(
     _assert_summary_call(summary, model)
 
 
-@pytest.mark.parametrize("unknown", [False, True])
+@pytest.mark.parametrize(
+    ("model", "lookup_raises"),
+    [("openai/gpt-4.1-mini", False), ("gemini/gemini-3.8-flash", True)],
+)
 async def test_summary_omits_reasoning_effort_when_model_lacks_reasoning(
-    db_session, seeded, fake_litellm, monkeypatch, unknown
+    db_session, seeded, fake_litellm, monkeypatch, model, lookup_raises
 ):
-    """#637: a swap to a model without reasoning support (or one litellm does
-    not know) must not send reasoning_effort, which would raise
+    """#637: a swap to a model without reasoning support (or one whose
+    lookup fails) must not send reasoning_effort, which would raise
     UnsupportedParamsError and silently force the mechanical summary."""
-    _use_model(monkeypatch, "openai/gpt-4.1-mini")
-    if unknown:
+    _use_model(monkeypatch, model)
+    if lookup_raises:
 
         def boom(*args, **kwargs):
             raise ValueError("model not mapped")

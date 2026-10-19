@@ -184,8 +184,7 @@ class Provider(Protocol):
     async def complete(
         self, messages: list[dict], *, reasoning_effort: str | None = None, timeout: float
     ) -> Completion:
-        """One non-streamed chat completion, priced. `reasoning_effort` is
-        sent only to a model that supports reasoning."""
+        """One non-streamed chat completion, priced."""
 
     async def stream(
         self,
@@ -253,6 +252,7 @@ class LiteLlmProvider:
         return settings.embedding_model
 
     async def complete(self, messages, *, reasoning_effort=None, timeout) -> Completion:
+        # reasoning_effort goes only to a model that supports reasoning.
         kwargs = {}
         if reasoning_effort is not None and _supports_reasoning(settings.model):
             kwargs["reasoning_effort"] = reasoning_effort

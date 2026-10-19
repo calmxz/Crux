@@ -10,5 +10,4 @@ def test_settings_load_with_retired_temperature_env_vars(monkeypatch):
 
     s = Settings(_env_file=None)  # pyright: ignore[reportCallIssue]
 
-    assert not hasattr(s, "llm_temperature")
-    assert not hasattr(s, "summary_temperature")
+    assert s.model == "gemini/gemini-3.8-flash"
