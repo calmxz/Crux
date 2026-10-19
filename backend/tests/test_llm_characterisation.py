@@ -275,22 +275,28 @@ CHAT_ATTRIBUTION = {(MODEL, USER_ID, SESSION_ID)}
 EMBEDDING_ATTRIBUTION = {(EMBEDDING_MODEL, USER_ID, SESSION_ID)}
 
 
-def _assert_chat_call(call: dict) -> None:
+SAMPLING_PARAMS = ("temperature", "top_p", "top_k")
+
+
+def _assert_chat_call(call: dict, model: str = MODEL) -> None:
     """The tutor's per-iteration acompletion contract."""
-    assert call["model"] == MODEL
+    assert call["model"] == model
     assert call["stream"] is True
     assert call["tools"] == tools.TOOLS
     assert call["tool_choice"] == "auto"
-    assert call["temperature"] == settings.llm_temperature
+    # #637: no sampling params, and the model's default thinking level.
+    assert not set(SAMPLING_PARAMS) & call.keys()
+    assert "reasoning_effort" not in call
     assert call["timeout"] == settings.llm_timeout_s
 
 
-def _assert_summary_call(call: dict) -> None:
+def _assert_summary_call(call: dict, model: str = MODEL) -> None:
     """The summaries' single non-streamed acompletion contract."""
-    assert call["model"] == MODEL
+    assert call["model"] == model
     assert "stream" not in call
     assert "tools" not in call
-    assert call["temperature"] == settings.summary_temperature
+    assert not set(SAMPLING_PARAMS) & call.keys()
+    assert call["reasoning_effort"] == "low"
     assert call["timeout"] == settings.summary_timeout_s
 
 
@@ -572,6 +578,73 @@ def _seed_messages(db, n: int) -> None:
             )
         )
     db.commit()
+
+
+def _use_model(monkeypatch, model: str) -> None:
+    monkeypatch.setattr(settings, "model", model)
+    monkeypatch.setitem(
+        cost_meter.MODEL_RATES,
+        model,
+        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
+    )
+
+
+async def test_production_model_calls_carry_no_sampling_params(
+    db_session, seeded, fake_litellm, monkeypatch
+):
+    """#637: a tutor turn and both summaries on the configured Gemini 3 model
+    send no temperature/top_p/top_k; only the summaries ask for low thinking."""
+    model = "gemini/gemini-3.8-flash"
+    _use_model(monkeypatch, model)
+    _seed_messages(db_session, 31)
+    fake_litellm.responses = [
+        _litellm_stream(_text_chunk("Hello")),
+        _completion("Earlier the learner practised joins."),
+        _completion("Covered joins."),
+    ]
+    fake_litellm.costs = [0.001, 0.002, 0.002]
+
+    await _run(_ctx(db_session))
+    await summary_service.update_rolling_summary(db_session, SESSION_ID)
+    session = db_session.get(SessionModel, SESSION_ID)
+    await summary_service.generate_and_persist(db_session, session)
+
+    chat, rolling, summary = fake_litellm.acompletion_calls
+    _assert_chat_call(chat, model)
+    _assert_summary_call(rolling, model)
+    _assert_summary_call(summary, model)
+
+
+@pytest.mark.parametrize("unknown", [False, True])
+async def test_summary_omits_reasoning_effort_when_model_lacks_reasoning(
+    db_session, seeded, fake_litellm, monkeypatch, unknown
+):
+    """#637: a swap to a model without reasoning support (or one litellm does
+    not know) must not send reasoning_effort, which would raise
+    UnsupportedParamsError and silently force the mechanical summary."""
+    _use_model(monkeypatch, "openai/gpt-4.1-mini")
+    if unknown:
+
+        def boom(*args, **kwargs):
+            raise ValueError("model not mapped")
+
+        monkeypatch.setattr(litellm, "supports_reasoning", boom)
+    _seed_messages(db_session, 31)
+    fake_litellm.responses = [
+        _completion("Earlier the learner practised joins."),
+        _completion("Covered joins."),
+    ]
+    fake_litellm.costs = [0.002, 0.002]
+
+    rolling = await summary_service.update_rolling_summary(db_session, SESSION_ID)
+    session = db_session.get(SessionModel, SESSION_ID)
+    summary = await summary_service.generate_and_persist(db_session, session)
+
+    assert rolling == "Earlier the learner practised joins."
+    assert summary == "Covered joins."
+    for call in fake_litellm.acompletion_calls:
+        assert "reasoning_effort" not in call
+        assert not set(SAMPLING_PARAMS) & call.keys()
 
 
 @pytest.fixture

@@ -63,7 +63,7 @@ def _timeout():
 
 
 async def _complete():
-    return await llm.get().complete(MESSAGES, meter=_meter(), temperature=0.2, timeout=5)
+    return await llm.get().complete(MESSAGES, meter=_meter(), reasoning_effort="low", timeout=5)
 
 
 # --- happy path ------------------------------------------------------------
@@ -76,7 +76,9 @@ async def test_complete_settles_ledger_and_call_log(db_session, user, fake_llm):
     result = await _complete()
 
     assert (result.text, result.cost) == ("hello", Decimal("0.002"))
-    assert fake_llm.complete_calls == [{"messages": MESSAGES, "temperature": 0.2, "timeout": 5}]
+    assert fake_llm.complete_calls == [
+        {"messages": MESSAGES, "reasoning_effort": "low", "timeout": 5}
+    ]
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0020")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0020"))]
 
@@ -407,7 +409,6 @@ def _stream(**kwargs):
         meter=_meter(purpose="chat"),
         tools=[{"type": "function"}],
         tool_choice="auto",
-        temperature=0.2,
         timeout=5,
         **kwargs,
     )
@@ -432,7 +433,6 @@ async def test_stream_settles_once_on_normal_end(db_session, user, fake_llm):
             "messages": MESSAGES,
             "tools": [{"type": "function"}],
             "tool_choice": "auto",
-            "temperature": 0.2,
             "timeout": 5,
         }
     ]
@@ -688,7 +688,7 @@ def litellm_stream(monkeypatch):
 async def _provider_stream(chunks_state, chunks):
     chunks_state["chunks"] = chunks
     ps = await llm.LiteLlmProvider().stream(
-        MESSAGES, tools=[{"type": "function"}], tool_choice="auto", temperature=0.3, timeout=7
+        MESSAGES, tools=[{"type": "function"}], tool_choice="auto", timeout=7
     )
     tokens = [t async for t in ps]
     return ps, tokens
@@ -717,7 +717,6 @@ async def test_litellm_stream_assembles_tool_calls_from_fragments(litellm_stream
     assert litellm_stream["calls"] == [
         {
             "model": "gemini/m",
-            "temperature": 0.3,
             "messages": MESSAGES,
             "stream": True,
             "timeout": 7,

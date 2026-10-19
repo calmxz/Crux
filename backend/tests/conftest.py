@@ -575,14 +575,13 @@ class FakeLlmProvider:
         self.embed_calls: list[list[str]] = []
         self.aembed_calls: list[list[str]] = []
 
-    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+    async def stream(self, messages, *, tools, tool_choice, timeout):
         # Copy each message: the tutor appends to and prunes its list later.
         self.stream_calls.append(
             {
                 "messages": [dict(m) for m in messages],
                 "tools": tools,
                 "tool_choice": tool_choice,
-                "temperature": temperature,
                 "timeout": timeout,
             }
         )
@@ -596,11 +595,11 @@ class FakeLlmProvider:
     def _usage(self) -> dict:
         return {"prompt_tokens": None, "completion_tokens": None, "cached_tokens": None}
 
-    async def complete(self, messages, *, temperature, timeout):
+    async def complete(self, messages, *, reasoning_effort=None, timeout):
         from services.llm import Completion
 
         self.complete_calls.append(
-            {"messages": messages, "temperature": temperature, "timeout": timeout}
+            {"messages": messages, "reasoning_effort": reasoning_effort, "timeout": timeout}
         )
         reply = self.replies.pop(0) if self.replies else "This is a fake reply."
         if isinstance(reply, BaseException):

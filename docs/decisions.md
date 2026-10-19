@@ -3,6 +3,31 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - No sampling params on LLM calls; summaries ask for low thinking (#637)
+
+Google's Gemini 3 guide strongly recommends keeping `temperature` at its
+default of 1.0. Its troubleshooting page warns that values below 1.0 "can
+cause unexpected behavior, such as looping or degraded performance". We sent
+0.3 on tutor turns and 0.0 on summaries.
+
+- **No call sends `temperature`, `top_p` or `top_k`, for any model.** The
+  keyword is gone from the adapter and the `Provider` protocol, and both
+  settings (`llm_temperature`, `summary_temperature`) are removed. Settings
+  ignore unknown env vars, so a deploy still setting them boots. Accepted
+  trade-off: a swap to a non-Gemini-3 fallback runs at that provider's
+  default temperature. Temperature can come back as part of such a swap.
+- **Summaries (`summary`, `rolling_summary`) send `reasoning_effort="low"`**,
+  which LiteLLM maps to Gemini 3's `thinking_level`. Tutor turns send none and
+  keep the model's dynamic default. The provider sends it only when
+  `litellm.supports_reasoning` says the configured model supports it (an
+  unknown model counts as no). Nothing sets `litellm.drop_params`, so the
+  parameter would otherwise raise on a swap, and every summary would quietly
+  fall back to the mechanical one. Rejected: `get_supported_openai_params`,
+  which lists `reasoning_effort` for `openai/gpt-4.1-mini` (LiteLLM 1.106).
+- **A determinism rule replaces temperature 0.0.** Both summary system prompts
+  say to use only facts stated in the input, not to infer, embellish or invent,
+  and to write no preamble. The untrusted-transcript rule follows it.
+
 ## 2026-10-19 - litellm is declared as litellm[mcp] (#610)
 
 litellm 1.106 imports `mcp` on the tool-calling path, which every tutor turn

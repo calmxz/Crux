@@ -183,7 +183,7 @@ tutor before each stream, the retrieve tool before its embed) instead of
 holding an idle one.
 
 Streams: `async with llm.get().stream(messages, meter=..., tools=...,
-tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
+tool_choice=..., timeout=...) as s:` gates on enter (a
 refusal raises a `CallRefused` before the block runs), then
 `async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
 (`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete
