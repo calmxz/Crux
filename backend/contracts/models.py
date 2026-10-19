@@ -33,11 +33,10 @@ class TopicProfile(BaseModel):
     knowledge_level: Literal["beginner", "intermediate", "advanced"] | None = None
     subtopic_levels: (
         dict[str, Literal["beginner", "intermediate", "advanced"]] | None
-    ) = {}
-    """
-    Per-subtopic knowledge levels keyed by canonicalized (strip+casefold) agent-named subtopic. knowledge_level is the session-wide default for subtopics without an entry.
-
-    """
+    ) = Field(
+        {},
+        description="Per-subtopic knowledge levels keyed by canonicalized (strip+casefold) agent-named subtopic. knowledge_level is the session-wide default for subtopics without an entry.\n",
+    )
     confirmed_gaps: list[ConceptEntry] | None = Field([], validate_default=True)
     mastered_concepts: list[ConceptEntry] | None = Field([], validate_default=True)
     focus_target_gap: str | None = None
@@ -114,84 +113,83 @@ class UpdateTopicProfileArgs(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    session_id: constr(max_length=64)
-    """
-    Ignored; the server injects the authoritative session id.
-    """
-    knowledge_level: Literal["beginner", "intermediate", "advanced"] | None = None
-    """
-    New session-wide level. Requires evidence_type declared or tested; the patch fails without it.
-    """
-    add_confirmed_gap: constr(max_length=200) | None = None
-    """
-    Concept the learner does not yet know. Short noun phrase. Upserted into confirmed_gaps (an existing entry is refreshed, not duplicated) and removed from mastered_concepts if present there.
-    """
-    add_mastered_concept: constr(max_length=200) | None = None
-    """
-    Concept the learner has demonstrated. Recorded only with evidence_type declared (learner said so) or tested; inferred is ignored server-side. Upserted into mastered_concepts and removed from confirmed_gaps if present there.
-    """
-    focus_target_gap: constr(max_length=200) | None = None
-    """
-    Gap to concentrate on. Omit to leave focus unchanged. Send null together with focus_clear_reason to clear it.
-    """
+    session_id: constr(max_length=64) = Field(
+        ..., description="Ignored; the server injects the authoritative session id."
+    )
+    knowledge_level: Literal["beginner", "intermediate", "advanced"] | None = Field(
+        None,
+        description="New session-wide level. Requires evidence_type declared or tested; the patch fails without it.",
+    )
+    add_confirmed_gap: constr(max_length=200) | None = Field(
+        None,
+        description="Concept the learner does not yet know. Short noun phrase. Upserted into confirmed_gaps (an existing entry is refreshed, not duplicated) and removed from mastered_concepts if present there.",
+    )
+    add_mastered_concept: constr(max_length=200) | None = Field(
+        None,
+        description="Concept the learner has demonstrated. Recorded only with evidence_type declared (learner said so) or tested; inferred is ignored server-side. Upserted into mastered_concepts and removed from confirmed_gaps if present there.",
+    )
+    focus_target_gap: constr(max_length=200) | None = Field(
+        None,
+        description="Gap to concentrate on. Omit to leave focus unchanged. Send null together with focus_clear_reason to clear it.",
+    )
     focus_clear_reason: (
         Literal["demonstrated", "tested_correct", "user_redirected"] | None
-    ) = None
-    """
-    Required when focus_target_gap is null. tested_correct is accepted only if a correct check answer for that gap was recorded this session.
-    """
-    evidence_type: Literal["declared", "inferred", "tested"] | None = None
-    """
-    How you know. declared = learner stated it; inferred = observed from engagement; tested = check-question outcome (server-owned; if sent it is stored as declared). Optional for a focus-only patch.
-    """
-    subtopic: constr(min_length=1, max_length=100) | None = None
-    """
-    Subtopic name for a per-subtopic level. Short noun phrase; reuse an existing name when one matches. Must be sent with subtopic_level.
-    """
-    subtopic_level: Literal["beginner", "intermediate", "advanced"] | None = None
-    """
-    Learner's level on subtopic. Must be sent with subtopic. Requires evidence_type declared or tested; the patch fails without it.
-    """
+    ) = Field(
+        None,
+        description="Required when focus_target_gap is null. tested_correct is accepted only if a correct check answer for that gap was recorded this session.",
+    )
+    evidence_type: Literal["declared", "inferred", "tested"] | None = Field(
+        None,
+        description="How you know. declared = learner stated it; inferred = observed from engagement; tested = check-question outcome (server-owned; if sent it is stored as declared). Optional for a focus-only patch.",
+    )
+    subtopic: constr(min_length=1, max_length=100) | None = Field(
+        None,
+        description="Subtopic name for a per-subtopic level. Short noun phrase; reuse an existing name when one matches. Must be sent with subtopic_level.",
+    )
+    subtopic_level: Literal["beginner", "intermediate", "advanced"] | None = Field(
+        None,
+        description="Learner's level on subtopic. Must be sent with subtopic. Requires evidence_type declared or tested; the patch fails without it.",
+    )
 
 
 class RetrieveChunksArgs(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    session_id: constr(max_length=64)
-    """
-    Ignored; the server injects the authoritative session id.
-    """
-    query: constr(max_length=500)
-    """
-    Natural-language search text. Phrase it as the learner's question or the concept name, not as an instruction.
-    """
-    k: conint(ge=1, le=20) | None = 5
-    """
-    Maximum number of chunks to return, 1-20. Default 5.
-    """
+    session_id: constr(max_length=64) = Field(
+        ..., description="Ignored; the server injects the authoritative session id."
+    )
+    query: constr(max_length=500) = Field(
+        ...,
+        description="Natural-language search text. Phrase it as the learner's question or the concept name, not as an instruction.",
+    )
+    k: conint(ge=1, le=20) | None = Field(
+        5, description="Maximum number of chunks to return, 1-20. Default 5."
+    )
 
 
 class Item(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    question: constr(max_length=1000)
-    """
-    The stem only. Do not number or letter the options inside it; the options array is rendered by the UI.
-    """
-    options: list[constr(max_length=200)] = Field(..., max_length=4, min_length=2)
-    """
-    Answer choices, exactly one correct, all plausible.
-    """
-    correct_index: conint(ge=0)
-    """
-    0-based index into options of the correct answer. Must be less than the number of options.
-    """
-    explanation: constr(max_length=500)
-    """
-    One sentence shown to the learner after they answer, whether right or wrong.
-    """
+    question: constr(max_length=1000) = Field(
+        ...,
+        description="The stem only. Do not number or letter the options inside it; the options array is rendered by the UI.",
+    )
+    options: list[constr(max_length=200)] = Field(
+        ...,
+        description="Answer choices, exactly one correct, all plausible.",
+        max_length=4,
+        min_length=2,
+    )
+    correct_index: conint(ge=0) = Field(
+        ...,
+        description="0-based index into options of the correct answer. Must be less than the number of options.",
+    )
+    explanation: constr(max_length=500) = Field(
+        ...,
+        description="One sentence shown to the learner after they answer, whether right or wrong.",
+    )
 
 
 class AskCheckQuestionsArgs(BaseModel):
@@ -210,40 +208,39 @@ class AskCheckQuestionsArgs(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    session_id: constr(max_length=64)
-    """
-    Ignored; the server injects the authoritative session id.
-    """
-    gap: constr(max_length=200)
-    """
-    The single confirmed gap every item in this set probes. Use the exact name from confirmed_gaps so grading updates the right profile entry. Each set carries its own gap.
-    """
-    set_index: conint(ge=1, le=3)
-    """
-    1-based position of this set within the check. set_index=1 starts a new check; each later set must be the previous set_index + 1.
-    """
-    set_total: conint(ge=1, le=3)
-    """
-    Number of sets in this check, declared on set 1 and never changed. Mid-lesson checks default to 1.
-    """
-    items: list[Item] = Field(..., max_length=5, min_length=1)
-    """
-    Ordered questions for this set, all on gap. One set per turn.
-    """
+    session_id: constr(max_length=64) = Field(
+        ..., description="Ignored; the server injects the authoritative session id."
+    )
+    gap: constr(max_length=200) = Field(
+        ...,
+        description="The single confirmed gap every item in this set probes. Use the exact name from confirmed_gaps so grading updates the right profile entry. Each set carries its own gap.",
+    )
+    set_index: conint(ge=1, le=3) = Field(
+        ...,
+        description="1-based position of this set within the check. set_index=1 starts a new check; each later set must be the previous set_index + 1.",
+    )
+    set_total: conint(ge=1, le=3) = Field(
+        ...,
+        description="Number of sets in this check, declared on set 1 and never changed. Mid-lesson checks default to 1.",
+    )
+    items: list[Item] = Field(
+        ...,
+        description="Ordered questions for this set, all on gap. One set per turn.",
+        max_length=5,
+        min_length=1,
+    )
 
 
 class TopicSuggestionItem(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    label: constr(min_length=1, max_length=80)
-    """
-    Short noun phrase naming the subtopic or adjacent topic.
-    """
-    hint: constr(max_length=80) | None = None
-    """
-    Optional one-line note shown beside the label.
-    """
+    label: constr(min_length=1, max_length=80) = Field(
+        ..., description="Short noun phrase naming the subtopic or adjacent topic."
+    )
+    hint: constr(max_length=80) | None = Field(
+        None, description="Optional one-line note shown beside the label."
+    )
 
 
 class TopicSuggestions(BaseModel):
@@ -287,14 +284,13 @@ class PendingCheck(BaseModel):
     gap: str
     current_index: int
     total: int
-    set_index: int | None = None
-    """
-    1-based set position within the check; null for pre-set batches.
-    """
-    set_total: int | None = None
-    """
-    Sets in the check; null for pre-set batches.
-    """
+    set_index: int | None = Field(
+        None,
+        description="1-based set position within the check; null for pre-set batches.",
+    )
+    set_total: int | None = Field(
+        None, description="Sets in the check; null for pre-set batches."
+    )
     items: list[Item1]
 
 
@@ -456,14 +452,14 @@ class Message(BaseModel):
     citations: list[Citation] | None = Field([], validate_default=True)
     tool_calls: list[ToolCallRecord] | None = Field([], validate_default=True)
     check_batch: PendingCheck | None = None
-    topic_suggestions: TopicSuggestions | None = None
-    """
-    The topic card this assistant turn offered (#354), else null.
-    """
-    status: str | None = None
-    """
-    Persistence status for assistant turns: complete, cancelled, error, or partial (streamed text kept after a mid-turn abort). Null for rows persisted before this field existed.
-    """
+    topic_suggestions: TopicSuggestions | None = Field(
+        None,
+        description="The topic card this assistant turn offered (#354), else null.",
+    )
+    status: str | None = Field(
+        None,
+        description="Persistence status for assistant turns: complete, cancelled, error, or partial (streamed text kept after a mid-turn abort). Null for rows persisted before this field existed.",
+    )
 
 
 class SessionDetail(BaseModel):
@@ -712,10 +708,10 @@ class ProfileResponse(BaseModel):
     )
     profile: TopicProfile
     recent_learning_events: list[LearningEventResponse]
-    etag: str
-    """
-    sha256 hex of the serialized profile; send back as If-Match on writes.
-    """
+    etag: str = Field(
+        ...,
+        description="sha256 hex of the serialized profile; send back as If-Match on writes.",
+    )
 
 
 class ProfilePatchRequest(BaseModel):
@@ -895,18 +891,16 @@ class SuggestTopicsArgs(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    session_id: constr(max_length=64)
-    """
-    Ignored; the server injects the authoritative session id.
-    """
-    mode: Literal["broad", "specific"]
-    """
-    broad when the topic spans several subtopics; specific when it is already one narrow concept.
-    """
-    topic: constr(min_length=1, max_length=200)
-    """
-    The session topic as a short noun phrase.
-    """
+    session_id: constr(max_length=64) = Field(
+        ..., description="Ignored; the server injects the authoritative session id."
+    )
+    mode: Literal["broad", "specific"] = Field(
+        ...,
+        description="broad when the topic spans several subtopics; specific when it is already one narrow concept.",
+    )
+    topic: constr(min_length=1, max_length=200) = Field(
+        ..., description="The session topic as a short noun phrase."
+    )
     items: list[TopicSuggestionItem] = Field(..., max_length=5, min_length=2)
 
 
@@ -957,10 +951,9 @@ class DataExport(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
     )
-    format_version: int
-    """
-    Bumped when a field is removed or changes meaning.
-    """
+    format_version: int = Field(
+        ..., description="Bumped when a field is removed or changes meaning."
+    )
     exported_at: datetime
     account: ExportAccount | None
     sessions: list[ExportSession]

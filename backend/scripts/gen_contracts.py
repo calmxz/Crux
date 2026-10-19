@@ -69,7 +69,6 @@ def main() -> int:
         "--target-python-version",
         "3.12",
         "--use-schema-description",
-        "--use-field-description",
         "--collapse-root-models",
         "--disable-timestamp",
         # datamodel-code-generator >=0.30 defaults date-time fields to AwareDatetime,
