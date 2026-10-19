@@ -4,8 +4,10 @@ These tests must FAIL before the implementation is added to cost_meter.py.
 """
 
 from decimal import Decimal
+from types import SimpleNamespace
 
 import litellm
+import pytest
 
 from config import settings
 from services.cost_meter import MODEL_RATES, estimate_cancelled_cost, rates_for
@@ -99,20 +101,63 @@ class _FakeEmbedResp:
     usage = _FakeUsage()
 
 
-def test_embedding_cost_token_math_fallback(monkeypatch, expect_app_log):
-    # completion_cost blows up on the fake object -> token-math fallback via
-    # usage.prompt_tokens against the MODEL_RATES embedding entry.
-    expect_app_log("embedding completion_cost failed")
+EMBED = "gemini/gemini-embedding-2"
+EMBED_RATES = {"input_per_1k": Decimal("0.000200"), "output_per_1k": Decimal("0")}
+
+
+@pytest.fixture
+def embed_rates(monkeypatch):
+    """Pin the embedding model's rates, with no schedule, whatever the date."""
     from services import cost_meter
 
-    monkeypatch.setattr(
-        litellm,
-        "completion_cost",
-        lambda **kw: (_ for _ in ()).throw(ValueError("unknown model")),
+    monkeypatch.setitem(cost_meter.MODEL_RATES, EMBED, EMBED_RATES)
+    monkeypatch.setitem(cost_meter.SCHEDULED_RATES, EMBED, [])
+
+
+def _stale_map_price(**kwargs):
+    return 0.5  # what a stale litellm map would charge
+
+
+def test_embedding_cost_prices_usage_at_our_rates_not_litellms_map(monkeypatch, embed_rates):
+    """#630: a listed model meters at rates_for, whatever litellm's map says."""
+    from services import cost_meter
+
+    monkeypatch.setattr(litellm, "completion_cost", _stale_map_price)
+    # 1000 tokens * 0.0002 / 1000
+    assert cost_meter.embedding_cost(EMBED, _FakeEmbedResp(), ["some query"]) == Decimal("0.0002")
+
+
+def test_embedding_cost_applies_a_scheduled_rate(monkeypatch, embed_rates):
+    from services import cost_meter
+
+    monkeypatch.setattr(litellm, "completion_cost", _stale_map_price)
+    monkeypatch.setitem(
+        cost_meter.SCHEDULED_RATES,
+        EMBED,
+        [("2027-01-01", {"input_per_1k": Decimal("0.000400"), "output_per_1k": Decimal("0")})],
     )
-    cost = cost_meter.embedding_cost("gemini/gemini-embedding-2", _FakeEmbedResp(), ["some query"])
-    # 1000 tokens * 0.000200 / 1000 = 0.0002
-    assert cost == Decimal("0.0002")
+    monkeypatch.setattr(cost_meter, "_today_utc", lambda: "2026-12-31")
+    assert cost_meter.embedding_cost(EMBED, _FakeEmbedResp(), ["q"]) == Decimal("0.0002")
+    monkeypatch.setattr(cost_meter, "_today_utc", lambda: "2027-01-01")
+    assert cost_meter.embedding_cost(EMBED, _FakeEmbedResp(), ["q"]) == Decimal("0.0004")
+
+
+@pytest.mark.parametrize(
+    "resp", [object(), SimpleNamespace(usage=SimpleNamespace(prompt_tokens=0))]
+)
+def test_embedding_cost_counts_the_texts_without_usage_tokens(monkeypatch, embed_rates, resp):
+    from services import cost_meter
+
+    monkeypatch.setattr(litellm, "token_counter", lambda model, text: 500)
+    # 2 texts x 500 tokens x 0.000200 / 1000
+    assert cost_meter.embedding_cost(EMBED, resp, ["a", "b"]) == Decimal("0.0002")
+
+
+def test_unknown_embedding_model_prices_from_litellm(monkeypatch):
+    from services import cost_meter
+
+    monkeypatch.setattr(litellm, "completion_cost", _stale_map_price)
+    assert cost_meter.embedding_cost("nope/nope", _FakeEmbedResp(), ["q"]) == Decimal("0.5")
 
 
 def test_embedding_cost_unknown_model_returns_zero(monkeypatch, expect_app_log):

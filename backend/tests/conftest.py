@@ -472,19 +472,19 @@ def tool_call(name: str, args: dict | str | None = None, id: str | None = None):
     return ToolCall(id=id or f"call_{name}", name=name, arguments=raw)
 
 
-def embedding_response(vectors: list[list[float]]):
-    """A litellm.embedding response the cost meter can price. A bare
-    SimpleNamespace(data=...) has no model, so completion_cost fails and
-    cost_meter logs a warning on every embed."""
+def embedding_response(vectors: list[list[float]], prompt_tokens: int | None = None):
+    """A litellm.embedding response the cost meter can price: its usage
+    carries `prompt_tokens` (default one per vector)."""
     import litellm
     from litellm.types.utils import Usage
 
     from config import settings
 
+    tokens = len(vectors) if prompt_tokens is None else prompt_tokens
     return litellm.EmbeddingResponse(
         model=settings.embedding_model,
         data=[{"embedding": v, "index": i, "object": "embedding"} for i, v in enumerate(vectors)],
-        usage=Usage(prompt_tokens=len(vectors), total_tokens=len(vectors)),
+        usage=Usage(prompt_tokens=tokens, total_tokens=tokens),
     )
 
 
@@ -528,7 +528,9 @@ class _FakeProviderStream:
         return self._provider.cost, self._provider._usage()
 
     def estimate(self):
-        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], self.text))
+        # Like the real stream: tool-call arguments received are output too.
+        output = self.text + "".join(tc.arguments for tc in self._tool_calls)
+        self._provider.estimates.append(("stream", [dict(m) for m in self._messages], output))
         return self._provider.partial_cost
 
     async def aclose(self):
@@ -623,8 +625,8 @@ class FakeLlmProvider:
         self.aembed_calls.append(list(texts))
         return self._embedding(texts)
 
-    def completion_prompt_cost(self, messages) -> Decimal:
-        self.estimates.append(("completion", messages))
+    def completion_prompt_cost(self, messages, tools=None) -> Decimal:
+        self.estimates.append(("completion", messages, tools))
         return self.timeout_cost
 
     def embedding_prompt_cost(self, texts) -> Decimal:

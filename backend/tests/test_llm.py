@@ -17,6 +17,7 @@ import pytest
 import sqlalchemy.exc
 from sqlalchemy import select
 
+from agent import tools
 from config import settings
 from db.models import DailyCostLedger, LlmCallLog, User
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
@@ -361,7 +362,7 @@ async def test_completion_timeout_is_not_retried_and_settles_an_estimate(
         await _complete()
 
     assert len(fake_llm.complete_calls) == 1
-    assert fake_llm.estimates == [("completion", MESSAGES)]
+    assert fake_llm.estimates == [("completion", MESSAGES, None)]
     assert cost_meter.current_spend(db_session, USER_ID) == Decimal("0.0003")
     assert _log_rows(db_session) == [("summary", "fake/chat", Decimal("0.0003"))]
     fake_llm.replies.clear()
@@ -625,7 +626,7 @@ async def test_stream_timeout_is_not_retried_and_settles_a_prompt_estimate(
             await _drain(s)
 
     assert len(fake_llm.stream_calls) == 1
-    assert fake_llm.estimates == [("completion", MESSAGES)]
+    assert fake_llm.estimates == [("completion", MESSAGES, [{"type": "function"}])]
     assert s.cost == Decimal("0.0003")
     assert _log_rows(db_session) == [("chat", "fake/chat", Decimal("0.0003"))]
     fake_llm.streams.clear()
@@ -660,8 +661,9 @@ def _frag(index, *, id=None, name=None, arguments=None):
 @pytest.fixture
 def litellm_stream(monkeypatch):
     """Patch litellm.acompletion to stream `chunks` and record its kwargs;
-    `counted` records every token_counter call."""
-    state = {"chunks": [], "calls": [], "counted": []}
+    `counted` records every token_counter call, `counted_tools` the tools of
+    each prompt count."""
+    state = {"chunks": [], "calls": [], "counted": [], "counted_tools": []}
 
     async def acompletion(**kwargs):
         state["calls"].append(kwargs)
@@ -672,8 +674,10 @@ def litellm_stream(monkeypatch):
 
         return gen()
 
-    def token_counter(model=None, messages=None, text=None, **kwargs):
+    def token_counter(model=None, messages=None, text=None, tools=None, **kwargs):
         state["counted"].append(messages if messages is not None else text)
+        if messages is not None:
+            state["counted_tools"].append(tools)
         return 1000
 
     monkeypatch.setattr(litellm, "acompletion", acompletion)
@@ -735,7 +739,7 @@ async def test_litellm_stream_prices_the_built_response_without_tokenizing(
     )
     seen = {}
 
-    def builder(chunks, messages=None):
+    def builder(chunks, messages=None, count_prompt_tokens=None):
         seen["chunks"], seen["messages"] = len(chunks), messages
         return built
 
@@ -758,7 +762,9 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
     expect_app_log("completion_cost failed: unknown model")
     monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
     monkeypatch.setattr(
-        litellm, "stream_chunk_builder", lambda chunks, messages=None: SimpleNamespace(usage=None)
+        litellm,
+        "stream_chunk_builder",
+        lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
     )
 
     def no_price(completion_response, model=None):
@@ -798,6 +804,107 @@ async def test_litellm_stream_estimate_counts_tool_call_arguments(litellm_stream
     ps.estimate()
 
     assert litellm_stream["counted"] == [MESSAGES, "Q: {}"]
+
+
+async def test_litellm_stream_prompt_counts_include_the_tools(
+    litellm_stream, monkeypatch, expect_app_log
+):
+    """#628: the tool schemas are prompt tokens too, on every fallback count."""
+    expect_app_log("completion_cost failed: unknown model")
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    monkeypatch.setattr(
+        litellm,
+        "stream_chunk_builder",
+        lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
+    )
+
+    def no_price(completion_response, model=None):
+        raise ValueError("unknown model")
+
+    monkeypatch.setattr(litellm, "completion_cost", no_price)
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+
+    ps.estimate()
+    ps.priced()
+
+    assert litellm_stream["counted_tools"] == [[{"type": "function"}]] * 2
+
+
+async def test_litellm_stream_builder_prompt_count_includes_the_tools(litellm_stream, monkeypatch):
+    """#628: chunks without usage leave the prompt count to litellm, which
+    would count the messages alone."""
+    seen = {}
+
+    def builder(chunks, messages=None, count_prompt_tokens=None):
+        seen["prompt_tokens"] = count_prompt_tokens()
+        return SimpleNamespace(usage=None)
+
+    monkeypatch.setattr(litellm, "stream_chunk_builder", builder)
+    monkeypatch.setattr(litellm, "completion_cost", lambda completion_response, model=None: 0.001)
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+
+    ps.priced()
+
+    assert seen == {"prompt_tokens": 1000}
+    assert litellm_stream["counted_tools"] == [[{"type": "function"}]]
+
+
+async def test_litellm_stream_pricing_gap_bills_tool_call_arguments(
+    litellm_stream, monkeypatch, expect_app_log
+):
+    """A finished tool-call turn priced by token math bills its arguments, as
+    the cancelled-stream estimate does."""
+    expect_app_log("completion_cost failed: unknown model")
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    monkeypatch.setattr(
+        litellm,
+        "stream_chunk_builder",
+        lambda chunks, messages=None, **kw: SimpleNamespace(usage=None),
+    )
+
+    def no_price(completion_response, model=None):
+        raise ValueError("unknown model")
+
+    monkeypatch.setattr(litellm, "completion_cost", no_price)
+    ps, _ = await _provider_stream(
+        litellm_stream,
+        [_chunk(content="Q: "), _chunk(tool_calls=[_frag(0, id="a", name="ask", arguments="{}")])],
+    )
+
+    ps.priced()
+
+    assert litellm_stream["counted"] == [MESSAGES, "Q: {}"]
+
+
+def test_unformattable_tool_schema_still_counts_the_messages(monkeypatch, expect_app_log):
+    """A tool schema litellm cannot format drops the tools from the count,
+    not the whole prompt estimate."""
+    expect_app_log("tool schema count failed")
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.5-flash-lite")
+    counted = []
+
+    def token_counter(model=None, messages=None, text=None, tools=None, **kwargs):
+        if tools is not None:
+            raise KeyError("items")
+        counted.append(messages if messages is not None else text)
+        return 1000
+
+    monkeypatch.setattr(litellm, "token_counter", token_counter)
+
+    cost = llm.LiteLlmProvider().completion_prompt_cost(MESSAGES, tools=[{"type": "function"}])
+
+    assert cost == llm.LiteLlmProvider().completion_prompt_cost(MESSAGES)
+    assert cost > Decimal("0")
+
+
+def test_prompt_estimate_with_tools_counts_more_tokens(monkeypatch):
+    """#628, with the real tokenizer: the tutor's tool schemas are counted."""
+    monkeypatch.setattr(settings, "model", "gemini/gemini-3.8-flash")
+    provider = llm.LiteLlmProvider()
+
+    with_tools = provider.completion_prompt_cost(MESSAGES, tools=tools.TOOLS)
+
+    assert with_tools > provider.completion_prompt_cost(MESSAGES)
 
 
 # --- provider resolution -----------------------------------------------------

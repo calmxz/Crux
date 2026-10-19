@@ -456,24 +456,25 @@ def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> 
 def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
     """USD cost of a litellm.embedding response.
 
-    Tries litellm's own accounting first; on failure (pricing-table gap for
-    the model id) falls back to token math against MODEL_RATES so real spend
-    never silently registers as 0 (F-19). Unknown models return 0 with a
-    warning.
+    A model with rates prices its prompt tokens at rates_for(model), not at
+    litellm's import-time map (#630); the tokens come from the response usage,
+    else (none or 0 reported) from counting `texts`. An unknown model falls back to litellm's own
+    accounting, so real spend never silently registers as 0 (F-19), and
+    returns 0 with a warning when that fails too.
     """
-    try:
-        cost = litellm.completion_cost(completion_response=resp)
-        if cost and cost > 0:
-            return _to_decimal(cost)
-    except Exception as e:  # noqa: BLE001 - metering must not raise
-        log.warning("embedding completion_cost failed: %s", e)
-    rates = MODEL_RATES.get(model)
+    rates = rates_for(model)
     if rates is None:
+        try:
+            cost = litellm.completion_cost(completion_response=resp)
+            if cost and cost > 0:
+                return _to_decimal(cost)
+        except Exception as e:  # noqa: BLE001 - metering must not raise
+            log.warning("embedding completion_cost failed: %s", e)
         log.warning("no MODEL_RATES entry for embedding model %s; cost=0", model)
         return Decimal("0")
     try:
         tokens = extract_usage(resp)["prompt_tokens"]
-        if tokens is None:
+        if not tokens:
             tokens = sum(litellm.token_counter(model=model, text=t or "") for t in texts)
         return Decimal(tokens) * rates["input_per_1k"] / Decimal(1000)
     except Exception as e:  # noqa: BLE001
