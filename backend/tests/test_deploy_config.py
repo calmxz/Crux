@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 
@@ -14,7 +15,18 @@ COMPOSE_FILES = (REPO_ROOT / "docker-compose.yml", REPO_ROOT / "docker-compose.p
 BACKUP_WORKFLOW = REPO_ROOT / ".github" / "workflows" / "backup.yml"
 ENV_EXAMPLE = REPO_ROOT / ".env.example"
 BACKEND_DOCKERFILE = REPO_ROOT / "backend" / "Dockerfile"
-DOCKERFILES = (BACKEND_DOCKERFILE, REPO_ROOT / "frontend" / "Dockerfile")
+
+
+def _find_dockerfiles() -> tuple:
+    """Every Dockerfile in the tree, so a new one is checked without a list edit."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(REPO_ROOT):
+        dirnames[:] = [d for d in dirnames if d not in {".git", ".venv", "node_modules"}]
+        found += [Path(dirpath) / f for f in filenames if f.startswith("Dockerfile")]
+    return tuple(sorted(found))
+
+
+DOCKERFILES = _find_dockerfiles()
 
 # G-12: names that may appear in .env.example without being a Settings field.
 # Empty on purpose -- a template var the app never reads is dead config.
@@ -194,21 +206,32 @@ def _dockerfile_text(path) -> str:
     return re.sub(r"\\\n", " ", "\n".join(lines))
 
 
-@pytest.mark.parametrize("dockerfile", DOCKERFILES, ids=lambda p: p.parent.name)
+def test_dockerfile_discovery_finds_both_images():
+    """An empty DOCKERFILES would parametrize the digest test into a skip."""
+    assert {BACKEND_DOCKERFILE, REPO_ROOT / "frontend" / "Dockerfile"} <= set(DOCKERFILES)
+
+
+@pytest.mark.parametrize(
+    "dockerfile", DOCKERFILES, ids=lambda p: p.relative_to(REPO_ROOT).as_posix()
+)
 def test_base_images_are_digest_pinned(dockerfile):
     """#623, #634: a tag alone lets Docker Hub re-push it, and the image then
     builds on bits trivy never scanned. Earlier-stage aliases and `scratch`
-    pull nothing."""
+    pull nothing; Docker matches stage names case-insensitively."""
     stages = set()
     unpinned = []
     froms = _FROM_RE.findall(_dockerfile_text(dockerfile))
     for args in froms:
         tokens = [tok for tok in args.split() if not tok.startswith("--")]
         ref = tokens[0]
-        if ref not in stages and ref != "scratch" and not re.search(r"@sha256:[0-9a-f]{64}$", ref):
+        if (
+            ref.lower() not in stages
+            and ref != "scratch"
+            and not re.search(r"@sha256:[0-9a-f]{64}$", ref)
+        ):
             unpinned.append(ref)
         if len(tokens) >= 3 and tokens[1].lower() == "as":
-            stages.add(tokens[2])
+            stages.add(tokens[2].lower())
     assert froms
     assert not unpinned, f"FROM without a digest: {unpinned}"
 

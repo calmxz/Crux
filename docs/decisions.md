@@ -49,7 +49,8 @@ The #620 review found three gaps in `backend/Dockerfile` that predate it.
   Accepted, since a reviewed, scanned image is the point of the pin.
   `frontend/Dockerfile` is pinned the same way (#634), and that cost mostly
   skips it: its nginx stage runs `apk --no-cache upgrade` at build time, so
-  Alpine fixes land without a Dependabot PR, and its node stage only emits
+  Alpine OS fixes land without a Dependabot PR (nginx itself comes from
+  nginx.org's repo and still waits for one), and its node stage only emits
   static files.
 - **No compiler in the image.** Every package in `uv.lock` ships a wheel for
   cp314, abi3 or py3 on manylinux x86_64, so `build-essential` (~200MB)

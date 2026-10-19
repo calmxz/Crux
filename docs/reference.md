@@ -371,13 +371,12 @@ value from `ingestion_service.INGEST_ERROR_MESSAGES` (or upload.py's fixed
   is valid on newer versions. The base `FROM` is digest-pinned (#623):
   Dependabot bumps its patch (tag and digest together) and opens digest-only
   PRs when Docker Hub rebuilds the same tag with OS fixes; merge those
-  promptly, since the image gets no Debian updates otherwise. Every registry
-  `FROM` in every Dockerfile carries a digest (frontend too, #634);
-  `test_base_images_are_digest_pinned` checks each file in its `DOCKERFILES`
-  list, so a new Dockerfile goes there. CI's
+  promptly, since the image gets no Debian updates otherwise. CI's
   `setup-python` takes the runner's 3.14.x, which can differ from the
   image's patch until the Dependabot patch PR merges; the #623 entry in
-  `docs/decisions.md` has why.
+  `docs/decisions.md` has why. The frontend's `FROM`s are digest-pinned too
+  (#634); `test_base_images_are_digest_pinned` finds every Dockerfile in the
+  tree and fails on any registry `FROM` without a digest.
   Ruff's py314 target formats `except (A, B):` as `except A, B:` (PEP 758);
   that is a tuple of exception types, not Python 2's `except E, name`.
 - `backend/tests/test_openapi_status_codes.py` AST-walks `backend/routes/*.py` and
