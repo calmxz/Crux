@@ -182,8 +182,20 @@ take their own pooled connection, so callers commit before the call (the
 tutor before each stream, the retrieve tool before its embed) instead of
 holding an idle one.
 
+Completions: `await llm.get().complete(messages, meter=...,
+reasoning_effort=..., timeout=...)`. No call passes sampling params
+(`temperature`, `top_p`, `top_k`). `LiteLlmProvider` sends
+`reasoning_effort` only when `litellm.supports_reasoning` reports that the
+configured model supports it; an unknown model counts as no. Nothing sets
+`litellm.drop_params`, so a model without reasoning support would raise
+`UnsupportedParamsError`. Gate any new provider-specific parameter the same
+way. To see the request LiteLLM will build, offline:
+`litellm.utils.get_optional_params(model="gemini-3.8-flash",
+custom_llm_provider="gemini", reasoning_effort="low")` (it shows the
+`thinkingConfig` and the `temperature: 1.0` LiteLLM adds for Gemini 3).
+
 Streams: `async with llm.get().stream(messages, meter=..., tools=...,
-tool_choice=..., temperature=..., timeout=...) as s:` gates on enter (a
+tool_choice=..., timeout=...) as s:` gates on enter (a
 refusal raises a `CallRefused` before the block runs), then
 `async for ev in s` yields `TextDelta`. `s.text` and `s.tool_calls`
 (`ToolCall(id, name, arguments)`, arguments the raw JSON string) are complete

@@ -43,7 +43,7 @@ import time
 from collections.abc import AsyncGenerator, AsyncIterator, Awaitable, Callable
 from dataclasses import dataclass, field
 from decimal import Decimal
-from typing import Protocol, TypeVar
+from typing import Literal, Protocol, TypeVar
 
 import litellm
 
@@ -170,6 +170,10 @@ class ProviderStream(Protocol):
         """Release the underlying response."""
 
 
+# The reasoning_effort values LiteLLM maps for every reasoning provider.
+ReasoningEffort = Literal["minimal", "low", "medium", "high"]
+
+
 class Provider(Protocol):
     """The vendor call and its pricing. Never touches the database."""
 
@@ -182,7 +186,11 @@ class Provider(Protocol):
         """Model name recorded on embedding call log rows."""
 
     async def complete(
-        self, messages: list[dict], *, temperature: float, timeout: float
+        self,
+        messages: list[dict],
+        *,
+        reasoning_effort: ReasoningEffort | None = None,
+        timeout: float,
     ) -> Completion:
         """One non-streamed chat completion, priced."""
 
@@ -192,7 +200,6 @@ class Provider(Protocol):
         *,
         tools: list[dict] | None,
         tool_choice: str | None,
-        temperature: float,
         timeout: float,
     ) -> ProviderStream:
         """Open one streamed chat completion."""
@@ -230,6 +237,16 @@ def _prompt_tokens(messages: list[dict], tools: list | None) -> int:
         return litellm.token_counter(model=settings.model, messages=messages)
 
 
+def _supports_reasoning(model: str) -> bool:
+    """Nothing sets litellm.drop_params, so reasoning_effort sent to a model
+    without reasoning raises UnsupportedParamsError (#637). A model litellm
+    does not know counts as unsupported."""
+    try:
+        return bool(litellm.supports_reasoning(model=model))
+    except Exception:  # noqa: BLE001 - unknown model: omit the parameter
+        return False
+
+
 class LiteLlmProvider:
     """The production provider. Calls through the `litellm` module attribute
     (never `from litellm import ...`) so global patches keep intercepting."""
@@ -242,12 +259,16 @@ class LiteLlmProvider:
     def embedding_model(self) -> str:
         return settings.embedding_model
 
-    async def complete(self, messages, *, temperature, timeout) -> Completion:
+    async def complete(self, messages, *, reasoning_effort=None, timeout) -> Completion:
+        # reasoning_effort goes only to a model that supports reasoning.
+        kwargs = {}
+        if reasoning_effort is not None and _supports_reasoning(settings.model):
+            kwargs["reasoning_effort"] = reasoning_effort
         resp = await litellm.acompletion(
             model=settings.model,
-            temperature=temperature,
             messages=messages,
             timeout=timeout,
+            **kwargs,
         )
         content = resp.choices[0].message.content or ""
         return Completion(
@@ -293,13 +314,12 @@ class LiteLlmProvider:
             log.warning("completion token-math estimate failed: %s", e)
             return Decimal("0")
 
-    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+    async def stream(self, messages, *, tools, tool_choice, timeout):
         kwargs = {}
         if tools is not None:
             kwargs = {"tools": tools, "tool_choice": tool_choice}
         resp = await litellm.acompletion(
             model=settings.model,
-            temperature=temperature,
             messages=messages,
             stream=True,
             timeout=timeout,
@@ -431,10 +451,10 @@ class StubProvider:
     chat_model = "stub"
     embedding_model = "stub"
 
-    async def complete(self, messages, *, temperature, timeout) -> Completion:
+    async def complete(self, messages, *, reasoning_effort=None, timeout) -> Completion:
         raise LlmUnavailable()
 
-    async def stream(self, messages, *, tools, tool_choice, temperature, timeout):
+    async def stream(self, messages, *, tools, tool_choice, timeout):
         system_prompt = next(
             (m.get("content") or "" for m in messages if m.get("role") == "system"), ""
         )
@@ -654,7 +674,6 @@ class LlmStream:
         meter: Meter,
         tools: list[dict] | None,
         tool_choice: str | None,
-        temperature: float,
         timeout: float,
     ):
         self._provider = provider
@@ -663,7 +682,6 @@ class LlmStream:
         self._open_kwargs = {
             "tools": tools,
             "tool_choice": tool_choice,
-            "temperature": temperature,
             "timeout": timeout,
         }
         self._ps: ProviderStream | None = None
@@ -761,7 +779,6 @@ class Llm:
         meter: Meter,
         tools: list[dict] | None = None,
         tool_choice: str | None = None,
-        temperature: float,
         timeout: float,
     ) -> LlmStream:
         return LlmStream(
@@ -770,7 +787,6 @@ class Llm:
             meter=meter,
             tools=tools,
             tool_choice=tool_choice,
-            temperature=temperature,
             timeout=timeout,
         )
 
@@ -820,12 +836,19 @@ class Llm:
         raise RuntimeError("unreachable: retry loop exited without returning or raising")
 
     async def complete(
-        self, messages: list[dict], *, meter: Meter, temperature: float, timeout: float
+        self,
+        messages: list[dict],
+        *,
+        meter: Meter,
+        reasoning_effort: ReasoningEffort | None = None,
+        timeout: float,
     ) -> Completion:
         await run_in_threadpool(_gate, meter, self.provider)
         model = self.provider.chat_model
         result = await self._run_async(
-            lambda: self.provider.complete(messages, temperature=temperature, timeout=timeout),
+            lambda: self.provider.complete(
+                messages, reasoning_effort=reasoning_effort, timeout=timeout
+            ),
             meter=meter,
             model=model,
             estimate=lambda: self.provider.completion_prompt_cost(messages),

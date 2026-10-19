@@ -158,7 +158,6 @@ async def run_streaming(
                 meter=meter,
                 tools=tools.TOOLS,
                 tool_choice="auto",
-                temperature=settings.llm_temperature,
                 timeout=settings.llm_timeout_s,
             )
             try:

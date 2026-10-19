@@ -88,9 +88,7 @@ async def _stream_text(system_prompt: str, user: str) -> tuple[str, list[str], o
         {"role": "system", "content": system_prompt},
         {"role": "user", "content": user},
     ]
-    ps = await llm.StubProvider().stream(
-        messages, tools=[], tool_choice="auto", temperature=0.2, timeout=5
-    )
+    ps = await llm.StubProvider().stream(messages, tools=[], tool_choice="auto", timeout=5)
     tokens = [t async for t in ps]
     return "".join(tokens), tokens, ps
 
@@ -123,9 +121,7 @@ async def test_stub_provider_streams_fresh_marker_without_a_summary(no_litellm):
 
 async def test_stub_provider_complete_raises_unavailable(no_litellm):
     with pytest.raises(llm.LlmUnavailable):
-        await llm.StubProvider().complete(
-            [{"role": "user", "content": "hi"}], temperature=0.2, timeout=5
-        )
+        await llm.StubProvider().complete([{"role": "user", "content": "hi"}], timeout=5)
 
 
 async def test_stub_provider_embeddings_raise_unavailable(no_litellm):
@@ -174,7 +170,7 @@ async def test_stub_stream_skips_the_cost_gate(db_session, monkeypatch, no_litel
         {"role": "user", "content": "hi"},
     ]
 
-    async with llm.get().stream(messages, meter=meter, temperature=0.2, timeout=5) as s:
+    async with llm.get().stream(messages, meter=meter, timeout=5) as s:
         text = "".join([ev.text async for ev in s])
 
     assert text == "[STUB:fresh] Echo: hi"
