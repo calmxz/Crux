@@ -13,7 +13,13 @@ The 1.107 pre-releases keep that shape.
   declaration, so litellm owns the `mcp` range and it moves with litellm
   upgrades. Rejected: a bare `mcp` dependency (we would own a range we don't
   use directly, and it can drift from what litellm needs), and a `<1.106` cap
-  (it would freeze litellm with no upstream fix in sight).
+  (it would freeze litellm with no upstream fix in sight). Also rejected:
+  passing litellm's `_skip_mcp_handler=True`, which skips the MCP branch and
+  its imports entirely (our tools are plain functions). It is a private
+  kwarg: a rename upstream would bring the import back unannounced, failing
+  every tutor turn while the stubbed suite stays green. The cost of the
+  extra (mcp, a second HTTP stack, about 0.9s of import on a process's first
+  tool turn) is small next to that.
 - **Shipped without waiting for Dependabot.** Its PR would only have bumped
   the litellm range, without the extra, and arrived red.
 - **`orjson` stays an explicit dependency.** It is still only under
