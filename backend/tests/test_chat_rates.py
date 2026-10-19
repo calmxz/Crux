@@ -57,15 +57,6 @@ SENTINEL = {
 }
 
 
-@pytest.fixture(autouse=True)
-def fresh_registration():
-    """Each test starts with nothing registered. Clearing again afterwards
-    makes the next pricing call re-register real rates over a sentinel."""
-    cost_meter._registered.clear()
-    yield
-    cost_meter._registered.clear()
-
-
 @pytest.fixture
 def on_date(monkeypatch):
     def set_today(day: str) -> None:

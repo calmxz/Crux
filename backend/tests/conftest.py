@@ -186,6 +186,72 @@ def _inline_settle_retry(monkeypatch):
     )
 
 
+# --- litellm price state (#641) --------------------------------------------
+# cost_meter.register_rates loads rates into litellm's process-wide price map.
+# The first registration in a test snapshots everything litellm.register_model
+# touches; teardown restores it whatever the outcome. A restore error is left
+# to raise, so it fails the test instead of leaking prices into the next one.
+
+
+def _restore_dict(live: dict, saved: dict) -> None:
+    """Put `live` back to `saved` ({key: (object, its top-level contents)}) in
+    place, keeping every object's identity for modules that hold a reference."""
+    for key in live.keys() - saved.keys():
+        del live[key]
+    for key, (obj, contents) in saved.items():
+        if contents is not None and obj != contents:
+            obj.clear()
+            obj.update(contents)
+        if live.get(key) is not obj:
+            live[key] = obj
+
+
+def _snapshot_dict(live: dict) -> dict:
+    # Two levels are enough: register_model updates an entry's top-level keys.
+    return {k: (v, dict(v) if isinstance(v, dict) else None) for k, v in live.items()}
+
+
+@pytest.fixture(autouse=True)
+def _restore_litellm_prices(monkeypatch):
+    import functools
+
+    import litellm
+    import litellm.utils
+
+    from services import cost_meter
+
+    registered = dict(cost_meter._registered)
+    saved: dict[str, Any] = {}
+    original = litellm.register_model
+
+    @functools.wraps(original)
+    def snapshotting_register_model(*args, **kwargs):
+        # Before delegating, so a registration that raises midway is covered.
+        if not saved:
+            saved["model_cost"] = _snapshot_dict(litellm.model_cost)
+            saved["runtime"] = _snapshot_dict(litellm.utils._runtime_registered_model_cost)
+            saved["names"] = {
+                name: (value, set(value))
+                for name, value in vars(litellm).items()
+                if isinstance(value, set)
+            }
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(litellm, "register_model", snapshotting_register_model)
+    yield
+    cost_meter._registered.clear()
+    cost_meter._registered.update(registered)
+    if not saved:
+        return
+    _restore_dict(litellm.model_cost, saved["model_cost"])
+    _restore_dict(litellm.utils._runtime_registered_model_cost, saved["runtime"])
+    for name, (names, contents) in saved["names"].items():
+        names.intersection_update(contents)
+        names.update(contents)
+        setattr(litellm, name, names)
+    litellm.utils._invalidate_model_cost_lowercase_map()
+
+
 # --- Default-engine guard (#579) -------------------------------------------
 # No test may connect on the app's default engine (settings.database_url, a
 # developer's real data/app.db locally). The connect hook records the test
