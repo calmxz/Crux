@@ -10,14 +10,12 @@ test_tool_schema_evidence.py pins the content of one schema-level sentence;
 this pins delivery of every property description.
 """
 
-from pathlib import Path
-
 import pytest
 import yaml
 
 from agent.tools import TOOLS
+from tests.sse_contract import SPEC_PATH
 
-SPEC_PATH = Path(__file__).parent.parent.parent / "docs" / "api" / "openapi.yaml"
 _SCHEMAS = yaml.safe_load(SPEC_PATH.read_text(encoding="utf-8"))["components"]["schemas"]
 
 
@@ -42,10 +40,22 @@ def _resolve_json(node: dict, root: dict) -> dict:
     return node
 
 
+def _unwrap_nullable(spec: dict, gen: dict) -> dict:
+    # YAML `type: [X, "null"]` has no oneOf, but Pydantic emits anyOf[{X}, {null}].
+    branches = gen.get("anyOf")
+    if branches and "oneOf" not in spec and "anyOf" not in spec:
+        non_null = [b for b in branches if b != {"type": "null"}]
+        if len(non_null) == 1:
+            return non_null[0]
+    return gen
+
+
 def _walk(spec: dict, gen: dict, root: dict, path: str, failures: list[str]) -> int:
     """Compare property descriptions under spec/gen; return the number of properties seen."""
     spec = _resolve_yaml(spec)
-    gen = _resolve_json(gen, root)
+    gen = _resolve_json(_unwrap_nullable(spec, _resolve_json(gen, root)), root)
+    if "allOf" in spec:
+        failures.append(f"{path}: allOf is not walked; extend this test")
     seen = 0
     for name, spec_prop in spec.get("properties", {}).items():
         prop_path = f"{path}.{name}"
@@ -59,12 +69,19 @@ def _walk(spec: dict, gen: dict, root: dict, path: str, failures: list[str]) -> 
         if want is not None and (got is None or _flat(got) != _flat(want)):
             failures.append(f"{prop_path}: want {_flat(want)!r}, got {got!r}")
         seen += _walk(spec_prop, gen_prop, root, prop_path, failures)
-    if "items" in spec and "items" in gen:
-        seen += _walk(spec["items"], gen["items"], root, f"{path}[]", failures)
-    for key in ("oneOf", "anyOf"):
-        spec_branches = spec.get(key, [])
+    if "items" in spec:
+        if "items" in gen:
+            seen += _walk(spec["items"], gen["items"], root, f"{path}[]", failures)
+        else:
+            failures.append(f"{path}: array items missing from parameters")
+    spec_branches = spec.get("oneOf", spec.get("anyOf", []))
+    if spec_branches:
         gen_branches = gen.get("anyOf", gen.get("oneOf", []))
-        if spec_branches and len(spec_branches) == len(gen_branches):
+        if len(spec_branches) != len(gen_branches):
+            failures.append(
+                f"{path}: {len(spec_branches)} spec branches vs {len(gen_branches)} generated"
+            )
+        else:
             for i, (s, g) in enumerate(zip(spec_branches, gen_branches, strict=True)):
                 seen += _walk(s, g, root, f"{path}<{i}>", failures)
     return seen
