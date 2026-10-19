@@ -46,6 +46,12 @@ from decimal import Decimal
 from typing import Protocol, TypeVar
 
 import litellm
+
+# litellm.acompletion() imports this lazily on the first call that passes tools
+# (litellm's proxy modules, mcp, httpx2, uvicorn, opentelemetry: ~0.9s).
+# Importing it here moves that cost from a process's first tutor turn to its
+# startup, and a missing piece fails the boot instead of every turn (#610).
+import litellm.responses.mcp.chat_completions_handler  # noqa: F401
 import sqlalchemy.exc
 from sqlalchemy import func, select
 from starlette.concurrency import run_in_threadpool
