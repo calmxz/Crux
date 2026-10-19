@@ -149,19 +149,24 @@ class ProviderStream(Protocol):
     @property
     def tool_calls(self) -> list[ToolCall]:
         """The tool calls assembled so far, in index order."""
+        ...
 
     def __aiter__(self) -> AsyncIterator[str]:
         """The text tokens, as they arrive."""
+        ...
 
     def priced(self) -> tuple[Decimal, dict]:
         """(cost, usage) of the finished stream. Never raises."""
+        ...
 
     def estimate(self) -> Decimal:
         """Prompt plus the output received so far (text and tool-call
         arguments), by token math. Never raises."""
+        ...
 
     async def aclose(self) -> None:
         """Release the underlying response."""
+        ...
 
 
 class Provider(Protocol):
@@ -170,15 +175,18 @@ class Provider(Protocol):
     @property
     def chat_model(self) -> str:
         """Model name recorded on completion call log rows."""
+        ...
 
     @property
     def embedding_model(self) -> str:
         """Model name recorded on embedding call log rows."""
+        ...
 
     async def complete(
         self, messages: list[dict], *, temperature: float, timeout: float
     ) -> Completion:
         """One non-streamed chat completion, priced."""
+        ...
 
     async def stream(
         self,
@@ -190,12 +198,15 @@ class Provider(Protocol):
         timeout: float,
     ) -> ProviderStream:
         """Open one streamed chat completion."""
+        ...
 
     def embed(self, texts: list[str]) -> Embedding:
         """One embedding batch, priced."""
+        ...
 
     async def aembed(self, texts: list[str]) -> Embedding:
         """Async form of embed."""
+        ...
 
     def completion_prompt_cost(
         self, messages: list[dict], tools: list[dict] | None = None
@@ -205,10 +216,25 @@ class Provider(Protocol):
 
     def embedding_prompt_cost(self, texts: list[str]) -> Decimal:
         """Estimated prompt cost of an embedding batch. Never raises."""
+        ...
 
 
 def _to_decimal(v) -> Decimal:
     return v if isinstance(v, Decimal) else Decimal(str(v or 0))
+
+
+def _prompt_tokens(messages: list[dict], tools: list | None) -> int:
+    """Prompt tokens of the chat model for `messages` sent with `tools`.
+    litellm's tool formatter skips `$defs` and `$ref`, so the count errs low:
+    it puts the tutor's tools at about 1.1k tokens, their JSON at 2.7k. A schema it cannot
+    format at all drops the tools from the count rather than the whole count."""
+    try:
+        return litellm.token_counter(model=settings.model, messages=messages, tools=tools)
+    except Exception as e:  # noqa: BLE001 - an estimate must not raise
+        if tools is None:
+            raise
+        log.warning("tool schema token count failed: %s", e)
+        return litellm.token_counter(model=settings.model, messages=messages)
 
 
 class LiteLlmProvider:
@@ -233,11 +259,13 @@ class LiteLlmProvider:
         content = resp.choices[0].message.content or ""
         return Completion(
             text=content,
-            cost=self._completion_cost(resp, messages, content, tools=None),
+            cost=self._completion_cost(resp, messages, content),
             usage=cost_meter.extract_usage(resp),
         )
 
-    def _completion_cost(self, resp, messages, content: str, tools) -> Decimal:
+    def _completion_cost(
+        self, resp, messages, content: str, tools: list[dict] | None = None
+    ) -> Decimal:
         """litellm's price over the response usage, at the MODEL_RATES we
         registered; on failure, the response's usage at those rates, else
         token math over the prompt, its `tools` and the reply. Never raises."""
@@ -260,11 +288,11 @@ class LiteLlmProvider:
             cost = None
         return cost if cost is not None else self._token_math(messages, content, tools)
 
-    def _token_math(self, messages, content: str, tools) -> Decimal:
+    def _token_math(self, messages, content: str, tools: list[dict] | None = None) -> Decimal:
         """Prompt tokens, the tool schemas included (#628), plus `content`
         priced at the chat model's rates. Never raises."""
         try:
-            pt = litellm.token_counter(model=settings.model, messages=messages, tools=tools)
+            pt = _prompt_tokens(messages, tools)
             return cost_meter.estimate_cancelled_cost(settings.model, content, pt)
         except Exception as e:  # noqa: BLE001 - an estimate must not raise
             # Local tokenization only; no credential in the exception.
@@ -372,20 +400,28 @@ class _LiteLlmStream:
 
     def priced(self) -> tuple[Decimal, dict]:
         try:
-            built = litellm.stream_chunk_builder(self._chunks, messages=self._messages)
+            # Without usage in the chunks, litellm counts the prompt itself;
+            # this count keeps the tool schemas in it (#628).
+            built = litellm.stream_chunk_builder(
+                self._chunks,
+                messages=self._messages,
+                count_prompt_tokens=lambda: _prompt_tokens(self._messages, self._tools),
+            )
         except Exception as e:  # noqa: BLE001 - pricing must not fail the call
             log.warning("stream_chunk_builder failed: %s", e)
             return self.estimate(), {}
         # F-19: a pricing-table gap falls back to token math, never $0.
         return (
-            self._provider._completion_cost(built, self._messages, self.text, self._tools),
+            self._provider._completion_cost(built, self._messages, self._output(), self._tools),
             cost_meter.extract_usage(built),
         )
 
-    def estimate(self) -> Decimal:
+    def _output(self) -> str:
         # Tool-call arguments received so far are billed output too.
-        args = "".join(slot["args"] for slot in self._frags.values())
-        return self._provider._token_math(self._messages, self.text + args, self._tools)
+        return self.text + "".join(slot["args"] for slot in self._frags.values())
+
+    def estimate(self) -> Decimal:
+        return self._provider._token_math(self._messages, self._output(), self._tools)
 
     async def aclose(self) -> None:
         close = getattr(self._resp, "aclose", None)

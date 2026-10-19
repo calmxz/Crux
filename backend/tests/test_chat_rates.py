@@ -45,7 +45,7 @@ def _usage_x_rates(rates, prompt: int, completion: int, cached: int = 0) -> Deci
 
 
 def _priced(resp) -> Decimal:
-    cost = llm.LiteLlmProvider()._completion_cost(resp, [], "hi", None)
+    cost = llm.LiteLlmProvider()._completion_cost(resp, [], "hi")
     return cost.quantize(Decimal("0.000001"))
 
 

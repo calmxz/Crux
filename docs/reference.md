@@ -561,13 +561,19 @@ UTC day meters at the new rate, with no deploy or restart. Without
 field `register_rates` doesn't set (batch, flex, priority) keeps litellm's
 value. If `register_model` or `completion_cost` raises, the turn is priced by
 `usage_cost` (the response's usage at `rates_for`, thinking tokens included),
-and only without usage by token math over the text. Token math counts the
-call's tool schemas as prompt tokens (#628).
+and only without usage by token math over the text and tool-call arguments.
+Every prompt count litellm or token math makes (a stream's chunks without
+usage included) counts the call's tool schemas (#628, `_prompt_tokens`). It
+errs low: litellm's tool formatter skips `$defs` and `$ref`, so it puts the
+tutor's tools at about 1.1k tokens, their JSON at 2.7k. A schema it cannot
+format drops the tools from the count, with a warning.
 `completion_cost` gets `model=settings.model` because Gemini responses carry
 the bare name (`gemini-3.8-flash`), a separate map entry that is never
 registered. Embeddings price the response's prompt tokens at `rates_for`
 directly, with no `register_model` (`embedding_cost`, #630); litellm prices an
-embedding model only when `rates_for` returns None for it.
+embedding model only when `rates_for` returns None for it. Every embedded
+input is text, priced at `input_per_1k`; without usage tokens, the texts are
+counted with litellm's default tokenizer, an approximation of Gemini's.
 
 ### Render settings: Blueprint vs dashboard
 
