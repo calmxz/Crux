@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`GLOSSARY.md`** at the repo root — the glossary / ubiquitous language for this project.
-- **`docs/decisions.md`** — ADR-lite decision log, one dated section per decision. Read the sections that touch the area you're about to work in. This repo uses a single file, not a `docs/adr/` directory.
+- **`docs/decisions.md`** — ADR-lite decision log, one dated section per decision. Read the sections that touch the area you're about to work in. This repo uses a single file, not a `docs/adr/` directory. While Crux v1 is being re-specified, decisions live in the closed tickets of the pinned wayfinder map instead; the file starts fresh when a decision first needs a home outside the map.
 - **`docs/reference.md`** — technical reference (how things work, gotchas, conventions). Not a decision log; look here for "how", look in `decisions.md` for "why".
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill (reached via `/grill-with-docs` and `/improve-codebase-architecture`) creates them lazily when terms or decisions actually get resolved.
@@ -24,7 +24,7 @@ Single-context repo:
 └── frontend/
 ```
 
-When a skill says "write an ADR", append a new section to `docs/decisions.md` in the existing format rather than creating a file under `docs/adr/`.
+When a skill says "write an ADR", append a new dated section to `docs/decisions.md` rather than creating a file under `docs/adr/`.
 
 ## Use the glossary's vocabulary
 

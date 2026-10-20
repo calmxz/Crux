@@ -1,7 +1,7 @@
 # Crux frontend
 
 The Crux web client: a Vue 3 + Vite + PrimeVue + Pinia single-page app.
-See [`../README.md`](../README.md) for the full project (backend, API, deployment).
+This is the previous, frozen version; see [`../README.md`](../README.md) for the project's status.
 
 ## Project Setup
 
