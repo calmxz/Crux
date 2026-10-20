@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14"
 
 [[package]]
@@ -462,7 +462,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.20.0,<2.0" },
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.40.2,<1.41" },
     { name = "boto3", specifier = ">=1.43.108,<2.0" },
-    { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.80.0,<0.81" },
+    { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.81.0,<0.82" },
     { name = "fastapi", specifier = ">=0.141.1,<0.141.2" },
     { name = "httpx", specifier = ">=0.28.1,<1.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
@@ -556,7 +556,7 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.80.0"
+version = "0.81.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -569,9 +569,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/43/4625c352f24485f2b763bddebe7fbe097b65469720be11cd069a7989cd87/datamodel_code_generator-0.80.0.tar.gz", hash = "sha256:601ebe7e6b2330d0637aea124d86c21d51e49ccd0ce315232a321f6b0618cf04", size = 2901400, upload-time = "2026-09-12T23:37:42.02Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/41/a1/87deb406ca27b0ae25cda946940208dfe2a2953b7fef20f8a968746e6b36/datamodel_code_generator-0.81.0.tar.gz", hash = "sha256:3b4d1639cc7430f7e34fddc3827fb5d3eb0a4f5394750890c46ba2a9d56e3ee2", size = 2912162, upload-time = "2026-09-14T00:05:20.43Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/b1/63d5551429b301d823591866208f607cd52965470252fbf166fd0c2d9568/datamodel_code_generator-0.80.0-py3-none-any.whl", hash = "sha256:797355a83f57dc4b20287f8de39c8c67b1c8cf6682bab4f885a4f99b664feef3", size = 719493, upload-time = "2026-09-12T23:37:39.769Z" },
+    { url = "https://files.pythonhosted.org/packages/84/30/acea9e8d4c5e7819c10b25581accfa805e5368ec564fc210c8f4c4ffd666/datamodel_code_generator-0.81.0-py3-none-any.whl", hash = "sha256:82ff0c295685065a83c530ce42ec03fc75b7ca01e72083eb8232d68f7637013a", size = 721675, upload-time = "2026-09-14T00:05:18.451Z" },
 ]
 
 [[package]]
@@ -1116,14 +1116,14 @@ wheels = [
 
 [[package]]
 name = "mako"
-version = "1.3.12"
+version = "1.4.2"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "markupsafe" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/00/62/791b31e69ae182791ec67f04850f2f062716bbd205483d63a215f3e062d3/mako-1.3.12.tar.gz", hash = "sha256:9f778e93289bd410bb35daadeb4fc66d95a746f0b75777b942088b7fd7af550a", size = 400219, upload-time = "2026-04-28T19:01:08.512Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/05/7f/0b891a82379ffd96d2d8cc6d435fb1055cdaed52829287f81d2a43fd71cb/mako-1.4.2.tar.gz", hash = "sha256:7227a060ee3af55a493af61d73d6beef13044b81dba9586736c13945f09464ce", size = 412231, upload-time = "2026-09-22T20:40:55.06Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/bc/b1/a0ec7a5a9db730a08daef1fdfb8090435b82465abbf758a596f0ea88727e/mako-1.3.12-py3-none-any.whl", hash = "sha256:8f61569480282dbf557145ce441e4ba888be453c30989f879f0d652e39f53ea9", size = 78521, upload-time = "2026-04-28T19:01:10.393Z" },
+    { url = "https://files.pythonhosted.org/packages/f0/bb/0e4c30a18858adebc75496ea8a8c3fb65cbf4b36ea1c5028ed8a0a5fa196/mako-1.4.2-py3-none-any.whl", hash = "sha256:e70a2a4308952b33a21208bfd6725da79fae5a8c224578f8cfdeb60e5ace03df", size = 80163, upload-time = "2026-09-22T20:40:56.423Z" },
 ]
 
 [[package]]
