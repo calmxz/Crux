@@ -431,8 +431,8 @@ class _LiteLlmStream:
             # The chunks may still carry the provider's exact usage (#648).
             try:
                 usage = self._reported_usage()
-            except Exception as e:  # noqa: BLE001 - pricing must not fail the call
-                log.warning("reading stream chunk usage failed: %s", e)
+            except Exception as read_error:  # noqa: BLE001 - pricing must not fail the call
+                log.warning("reading stream chunk usage failed: %s", read_error)
                 usage = None
             if usage is None:
                 return self.estimate(), {}
@@ -444,39 +444,20 @@ class _LiteLlmStream:
         )
 
     def _reported_usage(self) -> "litellm.Usage | None":
-        """The usage the kept chunks report, merged as stream_chunk_builder
-        merges it: a later non-zero count replaces an earlier one, and the
-        last reported token details win. Without include_usage, litellm
-        moves each chunk's usage into its _hidden_params. None when no chunk
-        carries usage; a usage missing a count reads it as 0, as the builder
-        does."""
-        prompt = completion = details = completion_details = None
-        for chunk in self._chunks:
+        """The usage on the last chunk that carries one. Without include_usage,
+        litellm moves each chunk's usage into its _hidden_params and stamps
+        the stream's merged total on the final chunk, so the last one is the
+        total. None when it has no prompt tokens: litellm stamps 0/0 when the
+        provider reported nothing, and pricing that would bill $0 (F-19)."""
+        for chunk in reversed(self._chunks):
             usage = getattr(chunk, "usage", None)
             if usage is None:
                 usage = (getattr(chunk, "_hidden_params", None) or {}).get("usage")
-            if usage is None:
-                continue
-            if isinstance(usage, dict):
-                usage = litellm.Usage(**usage)
-            if usage.prompt_tokens is not None and (usage.prompt_tokens > 0 or prompt is None):
-                prompt = usage.prompt_tokens
-            if usage.completion_tokens is not None and (
-                usage.completion_tokens > 0 or completion is None
-            ):
-                completion = usage.completion_tokens
-            details = getattr(usage, "prompt_tokens_details", None) or details
-            completion_details = (
-                getattr(usage, "completion_tokens_details", None) or completion_details
-            )
-        if prompt is None or completion is None:
-            return None
-        return litellm.Usage(
-            prompt_tokens=prompt,
-            completion_tokens=completion,
-            prompt_tokens_details=details,
-            completion_tokens_details=completion_details,
-        )
+            if usage is not None:
+                if isinstance(usage, dict):
+                    usage = litellm.Usage(**usage)
+                return usage if usage.prompt_tokens else None
+        return None
 
     def _output(self) -> str:
         # Tool-call arguments received so far are billed output too.

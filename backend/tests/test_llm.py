@@ -835,32 +835,20 @@ async def test_litellm_stream_builder_failure_prices_the_chunk_usage(
     assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
 
 
-async def test_litellm_stream_builder_failure_merges_usage_as_the_builder_does(
+async def test_litellm_stream_builder_failure_reads_the_last_usage(
     litellm_stream, monkeypatch, expect_app_log
 ):
-    """A later non-zero count replaces an earlier one; a later 0 does not.
-    The last reported details win; a chunk without details keeps them."""
+    """litellm stamps the stream's merged total on the final chunk, so the
+    last usage wins over an earlier partial one."""
     expect_app_log("stream_chunk_builder failed")
     monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
     _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(
         litellm_stream,
         [
-            _usage_chunk(
-                {
-                    "prompt_tokens": 1500,
-                    "completion_tokens": 10,
-                    "prompt_tokens_details": {"cached_tokens": 300},
-                }
-            ),
-            _usage_chunk(
-                {
-                    "prompt_tokens": 0,
-                    "completion_tokens": 20,
-                    "prompt_tokens_details": {"cached_tokens": 1100},
-                }
-            ),
-            _usage_chunk({"prompt_tokens": 0, "completion_tokens": 200}),
+            _usage_chunk({"prompt_tokens": 1500, "completion_tokens": 10}),
+            _chunk(content="hi"),
+            _usage_chunk(USAGE_DICT),
         ],
     )
 
@@ -869,15 +857,25 @@ async def test_litellm_stream_builder_failure_merges_usage_as_the_builder_does(
     assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
 
 
+@pytest.mark.parametrize(
+    "tail",
+    [[], [_usage_chunk({"prompt_tokens": 0, "completion_tokens": 0})]],
+    ids=["no-usage", "stamped-zero"],
+)
 async def test_litellm_stream_builder_failure_without_usage_estimates(
-    litellm_stream, monkeypatch, expect_app_log
+    litellm_stream, monkeypatch, expect_app_log, tail
 ):
+    """No usage, or the 0/0 total litellm stamps on the final chunk when the
+    provider reported none: token math, never $0 (F-19)."""
     expect_app_log("stream_chunk_builder failed")
     monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
     _pin_rates(monkeypatch)
-    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi"), *tail])
 
-    assert ps.priced() == (ps.estimate(), {})
+    cost, got = ps.priced()
+
+    assert (cost, got) == (ps.estimate(), {})
+    assert cost > Decimal("0")
 
 
 async def test_litellm_stream_builder_failure_unrated_model_matches_the_built_response(

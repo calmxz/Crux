@@ -599,9 +599,11 @@ deliberate (#647): Gemini reports the cached count in the final chunk, which
 they almost never receive, and guessing a cached share could bill low, the
 unsafe direction for a daily budget. A finished stream whose
 `stream_chunk_builder` raises has that chunk, so it prices and logs the usage
-its chunks report, merged as the builder would (#648). Without
-`stream_options.include_usage`, litellm moves each chunk's usage into
-`chunk._hidden_params["usage"]`, so that is where `_reported_usage` reads it.
+its chunks report (#648). Without `stream_options.include_usage`, litellm
+moves each chunk's usage into `chunk._hidden_params["usage"]` and stamps the
+stream's merged total on the final chunk, so `_reported_usage` reads the last
+chunk that carries usage. That stamp is 0/0 when the provider reported
+nothing; a usage with no prompt tokens counts as unreported and estimates.
 A model with no rates is priced by litellm's
 `completion_cost`, then by token math if that raises. To change a price, edit
 `MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
