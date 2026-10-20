@@ -591,13 +591,19 @@ cached tokens at the input rate too, since all of them go through
 also with no cached count, then $0). The estimate paths
 (`_LiteLlmStream.estimate`) are a cancelled stream, a stream that timed out or
 failed after a chunk arrived (other failures with nothing received settle $0),
-and a stream whose `stream_chunk_builder` raises; plus the prompt-only
+and a stream whose `stream_chunk_builder` raises and no kept chunk carries
+usage; plus the prompt-only
 `completion_prompt_cost` settled for a timed-out completion or a stream whose
 request went out with no stream back. For cancels and timeouts this is
 deliberate (#647): Gemini reports the cached count in the final chunk, which
 they almost never receive, and guessing a cached share could bill low, the
-unsafe direction for a daily budget. The `stream_chunk_builder` path is not:
-its kept chunks can hold that usage, and it discards it (#648).
+unsafe direction for a daily budget. A finished stream whose
+`stream_chunk_builder` raises has that chunk, so it prices and logs the usage
+its chunks report (#648). Without `stream_options.include_usage`, litellm
+moves each chunk's usage into `chunk._hidden_params["usage"]` and stamps the
+stream's merged total on the final chunk, so `_reported_usage` reads the last
+chunk that carries usage. That stamp is 0/0 when the provider reported
+nothing; a usage with no prompt tokens counts as unreported and estimates.
 A model with no rates is priced by litellm's
 `completion_cost`, then by token math if that raises. To change a price, edit
 `MODEL_RATES`, or add a dated entry to `SCHEDULED_RATES` for an announced
