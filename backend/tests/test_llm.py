@@ -838,21 +838,35 @@ async def test_litellm_stream_builder_failure_prices_the_chunk_usage(
 async def test_litellm_stream_builder_failure_merges_usage_as_the_builder_does(
     litellm_stream, monkeypatch, expect_app_log
 ):
-    """A later non-zero count replaces an earlier one; a later 0 does not."""
+    """A later non-zero count replaces an earlier one; a later 0 does not.
+    The last reported details win; a chunk without details keeps them."""
     expect_app_log("stream_chunk_builder failed")
     monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
     _pin_rates(monkeypatch)
     ps, _ = await _provider_stream(
         litellm_stream,
         [
-            _usage_chunk({"prompt_tokens": 1500, "completion_tokens": 10}),
+            _usage_chunk(
+                {
+                    "prompt_tokens": 1500,
+                    "completion_tokens": 10,
+                    "prompt_tokens_details": {"cached_tokens": 300},
+                }
+            ),
+            _usage_chunk(
+                {
+                    "prompt_tokens": 0,
+                    "completion_tokens": 20,
+                    "prompt_tokens_details": {"cached_tokens": 1100},
+                }
+            ),
             _usage_chunk({"prompt_tokens": 0, "completion_tokens": 200}),
         ],
     )
 
     _cost, got = ps.priced()
 
-    assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": None}
+    assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
 
 
 async def test_litellm_stream_builder_failure_without_usage_estimates(

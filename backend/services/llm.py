@@ -446,10 +446,11 @@ class _LiteLlmStream:
     def _reported_usage(self) -> "litellm.Usage | None":
         """The usage the kept chunks report, merged as stream_chunk_builder
         merges it: a later non-zero count replaces an earlier one, and the
-        prompt token details are last-wins. Without include_usage, litellm
-        moves each chunk's usage into its _hidden_params. None unless both
-        counts were reported."""
-        prompt = completion = details = None
+        last reported token details win. Without include_usage, litellm
+        moves each chunk's usage into its _hidden_params. None when no chunk
+        carries usage; a usage missing a count reads it as 0, as the builder
+        does."""
+        prompt = completion = details = completion_details = None
         for chunk in self._chunks:
             usage = getattr(chunk, "usage", None)
             if usage is None:
@@ -465,10 +466,16 @@ class _LiteLlmStream:
             ):
                 completion = usage.completion_tokens
             details = getattr(usage, "prompt_tokens_details", None) or details
+            completion_details = (
+                getattr(usage, "completion_tokens_details", None) or completion_details
+            )
         if prompt is None or completion is None:
             return None
         return litellm.Usage(
-            prompt_tokens=prompt, completion_tokens=completion, prompt_tokens_details=details
+            prompt_tokens=prompt,
+            completion_tokens=completion,
+            prompt_tokens_details=details,
+            completion_tokens_details=completion_details,
         )
 
     def _output(self) -> str:
