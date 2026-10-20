@@ -1,4 +1,7 @@
 version: 2
+# Paused 2026-10-20: open-pull-requests-limit 0 stops version-update PRs
+# while the code is frozen for the v1 respec (#661). To resume, restore 5 on
+# uv and npm and drop the line elsewhere (Dependabot's default).
 updates:
   # #609: bumps arrive as reviewed uv.lock changes, the only versions that
   # CI, e2e and the image install.
@@ -9,7 +12,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "backend"
@@ -21,7 +24,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 0
     # primevue 5.x is the PrimeUI relicense: requires a configured license
     # key (Community or Commercial) and renders an "Invalid PrimeUI License"
     # watermark without one. Stay on MIT 4.x; revisit deliberately.
@@ -62,6 +65,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 0
     # codeql-action init/autobuild/analyze must stay on the same version;
     # separate per-subaction PRs fail the Analyze jobs with a version mismatch.
     groups:
@@ -79,6 +83,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 0
     # #609: the uv image moves by hand, in lockstep with the setup-uv
     # `version:` pins in .github/workflows.
     ignore:
@@ -101,6 +106,7 @@ updates:
       interval: "weekly"
     cooldown:
       default-days: 7
+    open-pull-requests-limit: 0
     labels:
       - "dependencies"
       - "docker"
