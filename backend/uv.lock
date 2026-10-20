@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.14"
 
 [[package]]
@@ -462,7 +462,7 @@ requires-dist = [
     { name = "alembic", specifier = ">=1.20.0,<2.0" },
     { name = "basedpyright", marker = "extra == 'dev'", specifier = ">=1.40.2,<1.41" },
     { name = "boto3", specifier = ">=1.43.108,<2.0" },
-    { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.80.0,<0.81" },
+    { name = "datamodel-code-generator", marker = "extra == 'dev'", specifier = ">=0.83.0,<0.84" },
     { name = "fastapi", specifier = ">=0.141.1,<0.141.2" },
     { name = "httpx", specifier = ">=0.28.1,<1.0" },
     { name = "httpx", marker = "extra == 'dev'", specifier = ">=0.28.1" },
@@ -556,7 +556,7 @@ wheels = [
 
 [[package]]
 name = "datamodel-code-generator"
-version = "0.80.0"
+version = "0.83.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "argcomplete" },
@@ -569,9 +569,9 @@ dependencies = [
     { name = "pyyaml" },
     { name = "typing-extensions" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/16/43/4625c352f24485f2b763bddebe7fbe097b65469720be11cd069a7989cd87/datamodel_code_generator-0.80.0.tar.gz", hash = "sha256:601ebe7e6b2330d0637aea124d86c21d51e49ccd0ce315232a321f6b0618cf04", size = 2901400, upload-time = "2026-09-12T23:37:42.02Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/cf/ad/bd0c954c4c4671e586b340059139ead38570ba916a237086e245982ab14d/datamodel_code_generator-0.83.0.tar.gz", hash = "sha256:30d841e31b82095c4ef11f3dbfc99525f559a146250b9e685e2a2e4a196ca0a1", size = 3074761, upload-time = "2026-09-24T08:56:40.622Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/af/b1/63d5551429b301d823591866208f607cd52965470252fbf166fd0c2d9568/datamodel_code_generator-0.80.0-py3-none-any.whl", hash = "sha256:797355a83f57dc4b20287f8de39c8c67b1c8cf6682bab4f885a4f99b664feef3", size = 719493, upload-time = "2026-09-12T23:37:39.769Z" },
+    { url = "https://files.pythonhosted.org/packages/3a/4e/4a0231a7d3d4043cd27a746a50be87bc7637463023d7db9991610cd5fe56/datamodel_code_generator-0.83.0-py3-none-any.whl", hash = "sha256:371d80be360b2a57bc48462169553af57fa30225c0264ad85ae5f0d59b9d143a", size = 751087, upload-time = "2026-09-24T08:56:38.791Z" },
 ]
 
 [[package]]
