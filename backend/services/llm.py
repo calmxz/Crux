@@ -373,7 +373,8 @@ class LiteLlmProvider:
 
 class _LiteLlmStream:
     """litellm's streamed chunks, reduced to text tokens plus assembled tool
-    calls. Pricing reads the kept chunks back through stream_chunk_builder."""
+    calls. Pricing reads the kept chunks back through stream_chunk_builder,
+    or, if that raises, prices the usage they report (#648)."""
 
     def __init__(
         self, provider: LiteLlmProvider, resp, messages: list[dict], tools: list[dict] | None
@@ -427,11 +428,47 @@ class _LiteLlmStream:
             )
         except Exception as e:  # noqa: BLE001 - pricing must not fail the call
             log.warning("stream_chunk_builder failed: %s", e)
-            return self.estimate(), {}
+            # The chunks may still carry the provider's exact usage (#648).
+            try:
+                usage = self._reported_usage()
+            except Exception as e:  # noqa: BLE001 - pricing must not fail the call
+                log.warning("reading stream chunk usage failed: %s", e)
+                usage = None
+            if usage is None:
+                return self.estimate(), {}
+            built = litellm.ModelResponse(usage=usage)
         # F-19: a pricing-table gap falls back to token math, never $0.
         return (
             self._provider._completion_cost(built, self._messages, self._output(), self._tools),
             cost_meter.extract_usage(built),
+        )
+
+    def _reported_usage(self) -> "litellm.Usage | None":
+        """The usage the kept chunks report, merged as stream_chunk_builder
+        merges it: a later non-zero count replaces an earlier one, and the
+        prompt token details are last-wins. Without include_usage, litellm
+        moves each chunk's usage into its _hidden_params. None unless both
+        counts were reported."""
+        prompt = completion = details = None
+        for chunk in self._chunks:
+            usage = getattr(chunk, "usage", None)
+            if usage is None:
+                usage = (getattr(chunk, "_hidden_params", None) or {}).get("usage")
+            if usage is None:
+                continue
+            if isinstance(usage, dict):
+                usage = litellm.Usage(**usage)
+            if usage.prompt_tokens is not None and (usage.prompt_tokens > 0 or prompt is None):
+                prompt = usage.prompt_tokens
+            if usage.completion_tokens is not None and (
+                usage.completion_tokens > 0 or completion is None
+            ):
+                completion = usage.completion_tokens
+            details = getattr(usage, "prompt_tokens_details", None) or details
+        if prompt is None or completion is None:
+            return None
+        return litellm.Usage(
+            prompt_tokens=prompt, completion_tokens=completion, prompt_tokens_details=details
         )
 
     def _output(self) -> str:

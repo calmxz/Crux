@@ -685,15 +685,18 @@ def litellm_stream(monkeypatch):
     return state
 
 
-def _pin_rates(monkeypatch, model: str = "gemini/gemini-3.5-flash-lite") -> None:
+def _pin_rates(
+    monkeypatch,
+    model: str = "gemini/gemini-3.5-flash-lite",
+    cache_read_per_1k: Decimal | None = None,
+) -> None:
     """Price the chat `model` at fixed rates with no schedule, so a pricing
     update to MODEL_RATES does not read as a behaviour change."""
     monkeypatch.setattr(settings, "model", model)
-    monkeypatch.setitem(
-        cost_meter.MODEL_RATES,
-        model,
-        {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")},
-    )
+    rates = {"input_per_1k": Decimal("0.000300"), "output_per_1k": Decimal("0.002500")}
+    if cache_read_per_1k is not None:
+        rates["cache_read_per_1k"] = cache_read_per_1k
+    monkeypatch.setitem(cost_meter.MODEL_RATES, model, rates)
     monkeypatch.setitem(cost_meter.SCHEDULED_RATES, model, [])
 
 
@@ -791,6 +794,104 @@ async def test_litellm_stream_pricing_gap_falls_back_to_token_math(
         for r in caplog.records
         if r.name == "services.llm" and r.levelno >= logging.WARNING
     ] == ["no usage on the gemini/gemini-3.5-flash-lite response; pricing by token math"]
+
+
+def _builder_raises(chunks, messages=None, count_prompt_tokens=None):
+    raise ValueError("builder broke")
+
+
+def _usage_chunk(usage):
+    """A final chunk as litellm yields it without include_usage: `usage` moved
+    off the chunk into its hidden params."""
+    chunk = _chunk()
+    chunk._hidden_params = {"usage": usage}
+    return chunk
+
+
+USAGE_DICT = {
+    "prompt_tokens": 1500,
+    "completion_tokens": 200,
+    "prompt_tokens_details": {"cached_tokens": 1100},
+}
+
+
+@pytest.mark.parametrize(
+    "usage", [litellm.Usage(**USAGE_DICT), USAGE_DICT], ids=["usage-object", "dict"]
+)
+async def test_litellm_stream_builder_failure_prices_the_chunk_usage(
+    litellm_stream, monkeypatch, expect_app_log, usage
+):
+    """#648: a builder failure still prices the usage the chunks carry,
+    cached tokens at the cache rate."""
+    expect_app_log("stream_chunk_builder failed")
+    monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
+    _pin_rates(monkeypatch, cache_read_per_1k=Decimal("0.000030"))
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi"), _usage_chunk(usage)])
+
+    cost, got = ps.priced()
+
+    # (400 x 0.0003 + 1100 x 0.00003 + 200 x 0.0025) / 1000
+    assert cost == Decimal("0.000653")
+    assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
+
+
+async def test_litellm_stream_builder_failure_merges_usage_as_the_builder_does(
+    litellm_stream, monkeypatch, expect_app_log
+):
+    """A later non-zero count replaces an earlier one; a later 0 does not."""
+    expect_app_log("stream_chunk_builder failed")
+    monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
+    _pin_rates(monkeypatch)
+    ps, _ = await _provider_stream(
+        litellm_stream,
+        [
+            _usage_chunk({"prompt_tokens": 1500, "completion_tokens": 10}),
+            _usage_chunk({"prompt_tokens": 0, "completion_tokens": 200}),
+        ],
+    )
+
+    _cost, got = ps.priced()
+
+    assert got == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": None}
+
+
+async def test_litellm_stream_builder_failure_without_usage_estimates(
+    litellm_stream, monkeypatch, expect_app_log
+):
+    expect_app_log("stream_chunk_builder failed")
+    monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
+    _pin_rates(monkeypatch)
+    ps, _ = await _provider_stream(litellm_stream, [_chunk(content="hi")])
+
+    assert ps.priced() == (ps.estimate(), {})
+
+
+async def test_litellm_stream_builder_failure_unrated_model_matches_the_built_response(
+    litellm_stream, monkeypatch, expect_app_log
+):
+    """With no MODEL_RATES entry, the chunk usage prices as a built response
+    with that usage would: litellm's price, then token math."""
+    expect_app_log("stream_chunk_builder failed")
+    monkeypatch.setattr(settings, "model", "gemini/gemini-2.5-flash")
+    assert cost_meter.rates_for(settings.model) is None
+    chunks = [_chunk(content="hi"), _usage_chunk(USAGE_DICT)]
+
+    monkeypatch.setattr(
+        litellm,
+        "stream_chunk_builder",
+        lambda chunks, messages=None, **kw: litellm.ModelResponse(
+            usage=litellm.Usage(**USAGE_DICT)
+        ),
+    )
+    built, _ = await _provider_stream(litellm_stream, chunks)
+    expected = built.priced()
+
+    monkeypatch.setattr(litellm, "stream_chunk_builder", _builder_raises)
+    ps, _ = await _provider_stream(litellm_stream, chunks)
+
+    assert ps.priced() == expected
+    assert expected[0] != ps.estimate()
+    assert expected[1] == {"prompt_tokens": 1500, "completion_tokens": 200, "cached_tokens": 1100}
 
 
 async def test_litellm_stream_estimate_is_prompt_plus_text_received(litellm_stream, monkeypatch):
