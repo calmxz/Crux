@@ -188,7 +188,7 @@ def _parse_profile(raw: str | None) -> TopicProfile:
     raw = raw or "{}"
     try:
         data = json.loads(raw)
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         log.warning("unparseable topic_profile_json; using empty profile")
         return TopicProfile()
     if not isinstance(data, dict):
@@ -433,18 +433,27 @@ def apply_patch(db: Session, ctx: ToolContext, args: UpdateTopicProfileArgs) -> 
         # not be reported to the model as "Profile updated".
         return ToolResult(ok=False, status="failed", error="empty patch: no fields provided")
 
-    # F-12: lock before the read so the load-mutate-save span is one atomic
-    # unit; taken after the pure-arg checks above so a patch that fails
-    # validation never takes the lock.
-    lock_session_row(db, ctx.session_id)
-    profile = load_profile(db, ctx.session_id)
-
     if (args.subtopic is None) != (args.subtopic_level is None):
         return ToolResult(
             ok=False,
             status="failed",
             error="subtopic and subtopic_level must be provided together",
         )
+    if args.subtopic is not None and evidence not in ("declared", "tested"):
+        # #614: a subtopic level needs the same evidence as knowledge_level
+        # (F-39). Checked before any write, so the whole patch fails.
+        return ToolResult(
+            ok=False,
+            status="failed",
+            error="subtopic_level change requires evidence_type 'declared' or 'tested'",
+        )
+
+    # F-12: lock before the read so the load-mutate-save span is one atomic
+    # unit; taken after the pure-arg checks above so a patch that fails
+    # validation never takes the lock.
+    lock_session_row(db, ctx.session_id)
+    profile = load_profile(db, ctx.session_id)
+
     if args.subtopic is not None:
         key = canon(args.subtopic)
         if not key:

@@ -1,9 +1,5 @@
 node_modules
 dist
-.firebase-data
-functions/venv
-functions/__pycache__
-functions/**/__pycache__
 .env.local
 .git
 .vscode

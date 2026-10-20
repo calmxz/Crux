@@ -12,7 +12,7 @@ from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, UsageCounter, User
 from db.models import Session as SessionModel
-from services import check_question_service, rate_limit
+from services import check_service, rate_limit
 
 USER_ID = "u_cap_1"
 
@@ -22,7 +22,7 @@ def resolved_batch_session(db_session):
     """Session with a fully-answered (resolved) pending check batch.
 
     Answered incorrectly so a quiz cooldown is always written on resolution
-    (see check_question_service.build_quiz_cooldown) -- lets the cap test
+    (see check_service._build_cooldown) -- lets the cap test
     assert the cooldown persists even when the follow-up turn is skipped.
     """
     db_session.add(User(id=USER_ID))
@@ -40,7 +40,7 @@ def resolved_batch_session(db_session):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -53,7 +53,7 @@ def resolved_batch_session(db_session):
             ],
         ),
     )
-    check_question_service.answer(db_session, session.id, index=0, selected_index=1)
+    check_service.answer(db_session, session.id, index=0, selected_index=1)
     return session.id, USER_ID
 
 
@@ -75,7 +75,7 @@ def open_batch_session(db_session):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -145,8 +145,8 @@ def test_cap_hit_skips_followup_but_batch_still_clears(
     assert '"reason": "daily_cap"' in body
     assert "assistant_delta" not in body  # no LLM turn ran
     # batch cleared and cooldown written despite the cap
-    assert check_question_service.get_pending_check(db_session, sid) is None
-    assert check_question_service.get_quiz_cooldown(db_session, sid) is not None
+    assert check_service.open_set(db_session.get(SessionModel, sid)) is None
+    assert check_service.quiz_cooldown(db_session.get(SessionModel, sid)) is not None
 
 
 def test_answer_and_skip_do_not_touch_counter(client, db_session, open_batch_session):

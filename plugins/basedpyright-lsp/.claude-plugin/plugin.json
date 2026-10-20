@@ -1,0 +1,34 @@
+{
+  "name": "basedpyright-lsp",
+  "version": "1.0.0",
+  "author": {
+    "name": "calmxz"
+  },
+  "description": "basedpyright language server for the backend, reading backend/pyrightconfig.json and its committed baseline",
+  "lspServers": {
+    "basedpyright": {
+      "command": "uv",
+      "args": [
+        "run",
+        "--project",
+        "${CLAUDE_PROJECT_DIR}/backend",
+        "--locked",
+        "--extra",
+        "dev",
+        "--inexact",
+        "basedpyright-langserver",
+        "--stdio"
+      ],
+      "workspaceFolder": "${CLAUDE_PROJECT_DIR}/backend",
+      "settings": {
+        "basedpyright": {
+          "disableTaggedHints": true
+        }
+      },
+      "extensionToLanguage": {
+        ".py": "python",
+        ".pyi": "python"
+      }
+    }
+  }
+}

@@ -423,7 +423,11 @@ def test_oversized_body_413_leaves_no_document_row(client, seeded, db_session, m
     assert db_session.query(Document).count() == 0
 
 
-def test_storage_write_failure_marks_failed_and_507(client, seeded, db_session, monkeypatch):
+def test_storage_write_failure_marks_failed_and_507(
+    client, seeded, db_session, monkeypatch, expect_app_log
+):
+    expect_app_log("upload storage write failed")
+
     class FailingStore:
         def put(self, key, data):
             raise OSError("disk full")
@@ -439,11 +443,13 @@ def test_storage_write_failure_marks_failed_and_507(client, seeded, db_session, 
 
 
 def test_storage_write_failure_507_holds_even_if_mark_failed_commit_raises(
-    client, seeded, db_session, monkeypatch
+    client, seeded, db_session, monkeypatch, expect_app_log
 ):
     """F-29 hardening: if the mark-failed commit itself raises (e.g. dropped
     connection), the 507 contract must still hold instead of leaking a 500
     and leaving the row stuck 'pending'."""
+    expect_app_log("upload storage write failed")
+    expect_app_log("could not mark upload row failed")
 
     class FailingStore:
         def put(self, key, data):
@@ -472,10 +478,13 @@ def test_storage_write_failure_507_holds_even_if_mark_failed_commit_raises(
     assert r.json()["detail"]["code"] == "STORAGE_WRITE_FAILED"
 
 
-def test_store_construction_failure_marks_failed_and_507(client, seeded, db_session, monkeypatch):
+def test_store_construction_failure_marks_failed_and_507(
+    client, seeded, db_session, monkeypatch, expect_app_log
+):
     """F-29: object_store.get_store() itself (not just store.put) can raise
     -- e.g. bad R2 config -- and must still hit the 507-plus-marked-failed
     contract, not a bare 500."""
+    expect_app_log("upload storage write failed")
 
     def boom_get_store():
         raise RuntimeError("bad R2 config")

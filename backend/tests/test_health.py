@@ -26,7 +26,9 @@ def test_ready_ok_when_db_reachable(client):
     assert response.json() == {"status": "ok"}
 
 
-def test_ready_unavailable_when_db_raises(client, monkeypatch):
+def test_ready_unavailable_when_db_raises(client, monkeypatch, expect_app_log):
+    expect_app_log("readiness probe failed")
+
     def boom(_db):
         raise RuntimeError("connection refused")
 

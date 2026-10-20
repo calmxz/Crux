@@ -10,6 +10,8 @@ inline instead of using a constant here. Spellings are API: do not rename.
 DAILY_CAP_REACHED = "daily_cap_reached"
 DAILY_COST_CAP_REACHED = "daily_cost_cap_reached"
 GLOBAL_COST_CAP_REACHED = "global_cost_cap_reached"
+# Every code cost_meter.assert_within_caps refuses a call with (#605).
+COST_CAP_CODES = frozenset({DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED})
 CHUNK_LIMIT_EXCEEDED = "chunk_limit_exceeded"
 TOO_MANY_REQUESTS = "too_many_requests"
 # Upload-time page-count gate (PDF/PPTX), see routes/upload.py.
@@ -44,3 +46,5 @@ INVALID_VALUE = "invalid_value"
 # Tutor stream (SSE `error` event).
 MAX_ITERS_REACHED = "max_iters_reached"
 LLM_FAILED = "llm_failed"
+# The adapter's provider refuses the call (stub mode, #413). Not a cap code.
+LLM_UNAVAILABLE = "llm_unavailable"

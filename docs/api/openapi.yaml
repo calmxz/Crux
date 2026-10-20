@@ -529,7 +529,7 @@ paths:
   /api/sessions/{session_id}/check/answer:
     post:
       tags: [sessions]
-      summary: Answer the current item of the open check batch.
+      summary: Answer a pending item of the open check batch.
       operationId: answerCheck
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -562,7 +562,7 @@ paths:
   /api/sessions/{session_id}/check/skip:
     post:
       tags: [sessions]
-      summary: Skip the current item of the open check batch (no LearningEvent).
+      summary: Skip a pending item of the open check batch (no LearningEvent).
       operationId: skipCheck
       parameters:
         - $ref: "#/components/parameters/SessionId"
@@ -1152,14 +1152,16 @@ components:
       type: object
       additionalProperties: false
       required: [session_id]
+      # The evidence sentence below is pinned by
+      # backend/tests/test_tool_schema_evidence.py.
       description: |
         Patch operation for a session's TopicProfile. Sending
         `focus_target_gap: null` together with `focus_clear_reason` clears
         focus; omitting the field leaves focus unchanged.
         `focus_clear_reason=tested_correct` is verified server-side against
         the session's learning events. `evidence_type` (`declared` or
-        `tested`) is required whenever `knowledge_level` or `add_mastered_concept` is present;
-        omitting it makes the patch fail. `subtopic` and `subtopic_level`
+        `tested`) is required whenever `knowledge_level`, `add_mastered_concept`
+        or `subtopic_level` is present; omitting it makes the patch fail. `subtopic` and `subtopic_level`
         must be provided together (service-enforced cross-field rule).
       properties:
         session_id:
@@ -1229,7 +1231,9 @@ components:
             - $ref: "#/components/schemas/KnowledgeLevel"
             - type: "null"
           default: null
-          description: Learner's level on subtopic. Must be sent with subtopic.
+          description: >-
+            Learner's level on subtopic. Must be sent with subtopic. Requires
+            evidence_type declared or tested; the patch fails without it.
 
     RetrieveChunksArgs:
       type: object
@@ -1265,7 +1269,7 @@ components:
         Per-item correct_index must be < len(options), set_index must be
         <= set_total, and a later set must continue the current check
         (same set_total, set_index = previous + 1); those cross-field rules are
-        enforced in check_question_service, not here.
+        enforced in check_service, not here.
       properties:
         session_id:
           type: string
@@ -2161,7 +2165,8 @@ components:
 # ---------------------------------------------------------------------------
 # SSE event contract reference (vendor extension — not processed by codegen)
 # Describes the Server-Sent Events emitted by POST /chat/stream and the
-# sessions check/complete and check/stop streams.
+# sessions check/complete and check/stop streams. followup_skipped comes only
+# from /check/complete and /check/stop.
 # Backend tests validate every emitted StreamEvent against this block
 # (backend/tests/conftest.py); an unlisted field fails.
 # ---------------------------------------------------------------------------
@@ -2302,8 +2307,8 @@ x-sse-events:
 # ---------------------------------------------------------------------------
 # Error-code list (vendor extension - not processed by codegen)
 # Every `code` the backend sends: in `detail.code` of an HTTP error
-# (CodedErrorDetail), in an SSE `error` event, or (tool_failed only) in
-# `tool_call_done.error`. backend/lib/error_codes.py must hold exactly these
+# (CodedErrorDetail), in an SSE `error` event, or (the entries with
+# `via: tool_call_done.error`) in `tool_call_done.error`. backend/lib/error_codes.py must hold exactly these
 # keys and frontend/src/lib/errorCodes.js a subset; tests enforce both.
 # Keys: status = HTTP status, sse = true when sent as an SSE `error` event,
 # via = any other carrier, when = one line on when it is sent.
@@ -2316,10 +2321,13 @@ x-error-codes:
   daily_cost_cap_reached:
     status: 429
     sse: true
-    when: The per-user daily LLM spend hit its hard cap, before a turn or upload (429) or mid-turn (SSE).
+    via: tool_call_done.error
+    when: The per-user daily LLM spend hit its hard cap, before a turn or upload (429), mid-turn (SSE), or on a retrieve_chunks embedding (tool_call_done.error).
   global_cost_cap_reached:
     status: 429
-    when: The service-wide daily LLM spend ceiling is reached.
+    sse: true
+    via: tool_call_done.error
+    when: The service-wide daily LLM spend ceiling is reached, before a turn or upload (429), mid-turn (SSE), or on a retrieve_chunks embedding (tool_call_done.error).
   chunk_limit_exceeded:
     status: 413
     when: An upload would produce more chunks than the per-document limit.
@@ -2383,3 +2391,7 @@ x-error-codes:
   llm_failed:
     sse: true
     when: The LLM call failed mid-turn; the partial reply is kept.
+  llm_unavailable:
+    sse: true
+    via: tool_call_done.error
+    when: No LLM provider can serve the call (the stub provider refuses completions and embeddings). Mapped mid-turn (SSE) and on a retrieve_chunks embedding (tool_call_done.error), but not sent today, since stub turns make no tool calls and the stub stream never refuses.

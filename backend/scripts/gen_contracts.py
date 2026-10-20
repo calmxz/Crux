@@ -39,8 +39,8 @@ def main() -> int:
     if importlib.util.find_spec("datamodel_code_generator") is None:
         print(
             "error: datamodel_code_generator not installed in this Python. "
-            "Install dev deps:\n"
-            f"  {sys.executable} -m pip install -e backend[dev]",
+            "Install dev deps (from backend/):\n"
+            "  uv sync --locked --extra dev",
             file=sys.stderr,
         )
         return 1
@@ -69,7 +69,9 @@ def main() -> int:
         "--target-python-version",
         "3.12",
         "--use-schema-description",
-        "--use-field-description",
+        # No --use-field-description: it turns property descriptions into attribute
+        # docstrings, which Pydantic ignores, so they never reach the LLM tool schemas
+        # (#617; enforced by tests/test_tool_arg_descriptions.py).
         "--collapse-root-models",
         "--disable-timestamp",
         # datamodel-code-generator >=0.30 defaults date-time fields to AwareDatetime,

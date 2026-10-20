@@ -11,8 +11,7 @@ def test_session_has_quiz_cooldown_column(db_session):
     assert "quiz_cooldown_json" in cols
 
 
-from services import check_question_service as cqs
-from services import pending_check_store
+from services import check_service as cqs
 
 
 def _seed_session(db, sid="s1", uid="u1"):
@@ -46,12 +45,12 @@ def _resolved_pc(results):
 
 def test_build_quiz_cooldown_none_when_all_correct():
     pc = _resolved_pc(["correct", "correct"])
-    assert cqs.build_quiz_cooldown(pc) is None
+    assert cqs._build_cooldown(pc) is None
 
 
 def test_build_quiz_cooldown_set_on_miss():
     pc = _resolved_pc(["correct", "wrong"])
-    cd = cqs.build_quiz_cooldown(pc)
+    cd = cqs._build_cooldown(pc)
     assert cd == {
         "gap": "derivatives",
         "last_score": "1/2",
@@ -61,20 +60,10 @@ def test_build_quiz_cooldown_set_on_miss():
 
 def test_build_quiz_cooldown_set_on_skip():
     pc = _resolved_pc(["correct", "skip"])
-    cd = cqs.build_quiz_cooldown(pc)
+    cd = cqs._build_cooldown(pc)
     assert cd is not None
     assert cd["gap"] == "derivatives"
     assert cd["last_score"] == "1/1"  # graded excludes skips
-
-
-def test_set_get_clear_quiz_cooldown_roundtrip(db_session):
-    db = db_session
-    _seed_session(db)
-    assert cqs.get_quiz_cooldown(db, "s1") is None
-    cqs.set_quiz_cooldown(db, "s1", {"gap": "g", "last_score": "0/1", "missed": ["q0"]})
-    assert cqs.get_quiz_cooldown(db, "s1") == {"gap": "g", "last_score": "0/1", "missed": ["q0"]}
-    cqs.set_quiz_cooldown(db, "s1", None)
-    assert cqs.get_quiz_cooldown(db, "s1") is None
 
 
 from datetime import datetime, timezone
@@ -112,7 +101,7 @@ def test_register_blocked_when_suppress_check(db_session):
     )
     res = cqs.register(db, ctx, _one_item_args())
     assert res.ok is False
-    assert cqs.get_pending_check(db, "s1") is None  # no batch opened
+    assert cqs.open_set(db.get(SessionModel, "s1")) is None  # no batch opened
 
 
 def test_register_allowed_when_not_suppressed(db_session):
@@ -126,25 +115,25 @@ def test_register_allowed_when_not_suppressed(db_session):
     )
     res = cqs.register(db, ctx, _one_item_args())
     assert res.ok is True
-    assert cqs.get_pending_check(db, "s1") is not None
+    assert cqs.open_set(db.get(SessionModel, "s1")) is not None
 
 
-def test_get_quiz_cooldown_from_row_matches_db_variant():
+def test_quiz_cooldown_matches_db_variant():
     row = SessionModel(
         user_id="u", topic="t", quiz_cooldown_json='{"gap": "g", "last_score": "1/2", "missed": []}'
     )
-    cd = cqs.get_quiz_cooldown_from_row(row)
+    cd = cqs.quiz_cooldown(row)
     assert cd == {"gap": "g", "last_score": "1/2", "missed": []}
 
 
-def test_get_quiz_cooldown_from_row_bad_json_returns_none():
+def test_quiz_cooldown_bad_json_returns_none():
     row = SessionModel(user_id="u", topic="t", quiz_cooldown_json="{nope")
-    assert cqs.get_quiz_cooldown_from_row(row) is None
+    assert cqs.quiz_cooldown(row) is None
 
 
-def test_get_pending_check_from_row_parses():
+def test_open_set_parses_the_row():
     row = SessionModel(user_id="u", topic="t", pending_check_json='{"gap": "g", "items": []}')
-    assert pending_check_store.get_pending_check_from_row(row) == {"gap": "g", "items": []}
+    assert cqs.open_set(row) == {"gap": "g", "items": []}
 
 
 def test_build_quiz_cooldown_missed_carries_chosen_vs_correct():
@@ -169,5 +158,5 @@ def test_build_quiz_cooldown_missed_carries_chosen_vs_correct():
             },
         ],
     }
-    cd = cqs.build_quiz_cooldown(pc)
+    cd = cqs._build_cooldown(pc)
     assert cd["missed"] == [{"question": "Q1?", "chosen": "a", "correct": "b"}]

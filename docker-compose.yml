@@ -25,7 +25,7 @@ services:
     environment:
       ENV: dev
       GEMINI_API_KEY: ${GEMINI_API_KEY}
-      MODEL: ${MODEL:-gemini/gemini-3.5-flash-lite}
+      MODEL: ${MODEL:-gemini/gemini-3.8-flash}
       EMBEDDING_MODEL: ${EMBEDDING_MODEL:-gemini/gemini-embedding-2}
       DAILY_CAP: ${DAILY_CAP:-50}
       DATABASE_URL: ${DATABASE_URL}

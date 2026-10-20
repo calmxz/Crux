@@ -57,7 +57,7 @@ def test_done_no_longer_lists_total_cost_usd():
 
 
 def test_check_question_requires_set_position():
-    # The only producer (check_question_service.register) always sends 1..3.
+    # The only producer (check_service.register) always sends 1..3.
     base = {"gap": "g", "total": 0, "items": [], "set_index": 1, "set_total": 3}
     validate_event("check_question", base)
     for field in ("set_index", "set_total"):

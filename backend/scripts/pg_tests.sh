@@ -15,11 +15,19 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-if [ -x .venv/Scripts/python.exe ]; then
-  PY=.venv/Scripts/python.exe
-elif [ -x .venv/bin/python ]; then
-  PY=.venv/bin/python
-else
+# A git worktree has no venv of its own, so fall back to the main checkout's
+# backend/.venv. Run from this backend/, it imports this tree's code.
+MAIN_BACKEND="$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")/backend"
+PY=""
+for venv in .venv "$MAIN_BACKEND/.venv"; do
+  if [ -x "$venv/Scripts/python.exe" ]; then
+    PY="$venv/Scripts/python.exe"
+  elif [ -x "$venv/bin/python" ]; then
+    PY="$venv/bin/python"
+  fi
+  [ -n "$PY" ] && break
+done
+if [ -z "$PY" ]; then
   echo "[ERROR] backend/.venv not found; run: uv sync --extra dev --inexact" >&2
   exit 1
 fi

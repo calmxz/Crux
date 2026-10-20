@@ -24,7 +24,7 @@ def _passes_floor(chunk: dict) -> bool:
         return True
     try:
         similarity = 1.0 - float(score)
-    except (TypeError, ValueError):
+    except TypeError, ValueError:
         # Unparseable score: fall back to surfacing the chunk rather than
         # silently hiding a retrieval hit.
         return True

@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     )
 
     gemini_api_key: str = ""
-    model: str = "gemini/gemini-3.5-flash-lite"
+    model: str = "gemini/gemini-3.8-flash"
     embedding_model: str = "gemini/gemini-embedding-2"
     daily_cap: int = 50
     database_url: str = f"sqlite:///{(_DATA_DIR / 'app.db').as_posix()}"
@@ -70,8 +70,6 @@ class Settings(BaseSettings):
     # check that rejects a document before a worker loads and tokenises it.
     max_pages: int = 400
     global_daily_cost_cap_usd: float | None = None
-    llm_temperature: float = 0.3
-    summary_temperature: float = 0.0
     retrieval_fallback_threshold: float = 0.75
     # G-11: cosine-similarity floor for surfacing a retrieved chunk as a
     # citation; None-scored chunks pass.

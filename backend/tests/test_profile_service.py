@@ -362,12 +362,13 @@ def test_focus_clear_user_redirected_ok(session_row, ctx, db_session):
     assert profile.focus_target_gap is None
 
 
-def test_load_profile_tolerates_legacy_fields(session_row, db_session):
+def test_load_profile_tolerates_legacy_fields(session_row, db_session, expect_app_log):
     """Regression (review #2): a topic_profile_json written under an older schema
     (carrying since-removed fields) must not raise ValidationError -> 500 on load.
     Unknown keys are dropped; known data is preserved. TopicProfile has
     extra="forbid", and load_profile re-parses the stored column, so without the
     tolerant parser this row would 500 every read (and the /profile aggregate)."""
+    expect_app_log("repaired topic_profile on load")
     row = db_session.get(SessionModel, SESSION_ID)
     row.topic_profile_json = json.dumps(
         {
@@ -420,9 +421,10 @@ def test_mastered_concept_with_declared_promotes(session_row, ctx, db_session):
     )
 
 
-def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session):
+def test_load_profile_falls_back_on_unparseable_blob(session_row, db_session, expect_app_log):
     """Regression (review #2): a non-JSON / corrupt blob degrades to an empty
     profile rather than raising."""
+    expect_app_log("unparseable topic_profile_json")
     row = db_session.get(SessionModel, SESSION_ID)
     row.topic_profile_json = "not valid json {"
     db_session.commit()
@@ -448,7 +450,10 @@ def _seed_one_bad_entry(db_session):
     db_session.commit()
 
 
-def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_session):
+def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(
+    session_row, db_session, expect_app_log
+):
+    expect_app_log("repaired topic_profile on load")
     _seed_one_bad_entry(db_session)
 
     profile = profile_service.load_profile(db_session, SESSION_ID)
@@ -458,7 +463,10 @@ def test_one_bad_concept_entry_keeps_the_rest_of_the_profile(session_row, db_ses
     assert profile.last_session_summary == "covered joins"
 
 
-def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_session):
+def test_write_after_salvaged_read_does_not_wipe_the_profile(
+    session_row, db_session, expect_app_log
+):
+    expect_app_log("repaired topic_profile on load")
     _seed_one_bad_entry(db_session)
 
     profile_service.apply_user_patch(db_session, SESSION_ID, add_gap="subqueries")
@@ -470,18 +478,21 @@ def test_write_after_salvaged_read_does_not_wipe_the_profile(session_row, db_ses
     assert stored["last_session_summary"] == "covered joins"
 
 
-def test_invalid_level_is_dropped_lists_are_kept():
+def test_invalid_level_is_dropped_lists_are_kept(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile('{"knowledge_level": "expert", "mastered_concepts": [{"name": "joins"}]}')
     assert p.knowledge_level is None
     assert concept_names(p.mastered_concepts) == ["joins"]
 
 
-def test_bad_subtopic_level_dropped_others_kept():
+def test_bad_subtopic_level_dropped_others_kept(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile('{"subtopic_levels": {"a": "beginner", "b": "wizard"}}')
     assert p.subtopic_levels == {"a": "beginner"}
 
 
-def test_salvage_drops_bad_elements_and_unlistable_fields():
+def test_salvage_drops_bad_elements_and_unlistable_fields(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile(
         json.dumps(
             {
@@ -500,9 +511,10 @@ def test_salvage_drops_bad_elements_and_unlistable_fields():
     [("Views", None), ("indexes", "indexes"), ("unlisted", "unlisted")],
     ids=["on-dropped-gap", "on-kept-gap", "outside-gaps"],
 )
-def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected):
+def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expected, expect_app_log):
     """F-22: dropping the focused gap would leave focus dangling. A focus
     outside confirmed_gaps is legal on its own and survives."""
+    expect_app_log("repaired topic_profile on load")
     p = _parse_profile(
         json.dumps(
             {
@@ -518,7 +530,8 @@ def test_salvage_clears_focus_only_when_its_gap_entry_was_dropped(focus, expecte
     assert p.focus_target_gap == expected
 
 
-def test_salvage_warning_carries_no_learner_text(caplog):
+def test_salvage_warning_carries_no_learner_text(caplog, expect_app_log):
+    expect_app_log("salvaged")
     with caplog.at_level("WARNING", logger="services.profile_service"):
         _parse_profile(
             json.dumps(
@@ -533,7 +546,7 @@ def test_salvage_warning_carries_no_learner_text(caplog):
             )
         )
     text = caplog.text
-    assert "salvaged" in text
+    assert "salvaged" in text  # caplog saw the record, so the absence checks bite
     for secret in ("secret-concept", "secret-gap", "secret summary", "secret-sub"):
         assert secret not in text
 
@@ -743,7 +756,9 @@ def test_parse_accepts_mixed_legacy_and_new_elements():
     assert p.mastered_concepts[1].evidence_type == "tested"
 
 
-def test_parse_still_drops_unknown_keys_and_never_raises():
+def test_parse_still_drops_unknown_keys_and_never_raises(expect_app_log):
+    expect_app_log("repaired topic_profile on load")
+    expect_app_log("unparseable topic_profile_json")
     raw = '{"mastered_concepts": ["limits"], "retired_field": 1}'
     p = _parse_profile(raw)
     assert concept_names(p.mastered_concepts) == ["limits"]
@@ -851,12 +866,95 @@ def test_apply_patch_sets_subtopic_level(session_row, db_session):
     from services import profile_service
 
     ctx, args = _ctx_args(
-        db_session, session_row, subtopic="  Integration BY Parts ", subtopic_level="beginner"
+        db_session,
+        session_row,
+        subtopic="  Integration BY Parts ",
+        subtopic_level="beginner",
+        evidence_type="declared",
     )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert res.ok
     p = profile_service.load_profile(db_session, session_row.id)
     assert p.subtopic_levels == {"integration by parts": "beginner"}
+
+
+@pytest.mark.parametrize("evidence", [None, "inferred"])
+def test_apply_patch_subtopic_level_without_evidence_fails(session_row, db_session, evidence):
+    # #614: a subtopic level needs the same declared/tested evidence as
+    # knowledge_level (F-39); omitted or inferred fails and writes nothing.
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="chain rule",
+        subtopic_level="beginner",
+        evidence_type=evidence,
+    )
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert not res.ok and res.status == "failed"
+    assert res.error == "subtopic_level change requires evidence_type 'declared' or 'tested'"
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "advanced"}
+
+
+@pytest.mark.parametrize("evidence", ["declared", "tested"])
+def test_apply_patch_subtopic_level_with_evidence_writes(session_row, db_session, evidence):
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="Chain Rule",
+        subtopic_level="beginner",
+        evidence_type=evidence,
+    )
+    assert profile_service.apply_patch(db_session, ctx, args).ok
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "beginner"}
+
+
+def test_apply_patch_rejected_subtopic_level_saves_no_other_field(session_row, db_session):
+    from services import profile_service
+
+    p = profile_service.load_profile(db_session, session_row.id)
+    p.focus_target_gap = "limits"
+    p.subtopic_levels = {"chain rule": "advanced"}
+    profile_service.save_profile(db_session, session_row.id, p)
+
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="chain rule",
+        subtopic_level="beginner",
+        add_confirmed_gap="u-substitution",
+        focus_target_gap="u-substitution",
+    )
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert res.error == "subtopic_level change requires evidence_type 'declared' or 'tested'"
+    p = profile_service.load_profile(db_session, session_row.id)
+    assert p.subtopic_levels == {"chain rule": "advanced"}
+    assert p.confirmed_gaps == []
+    assert p.focus_target_gap == "limits"
+
+
+@pytest.mark.parametrize("evidence", [None, "declared"])
+def test_apply_patch_subtopic_pair_rule_checked_before_evidence(session_row, db_session, evidence):
+    # With evidence omitted, the evidence gate would also reject this patch:
+    # the pair error proves the pair rule runs first.
+    from services import profile_service
+
+    ctx, args = _ctx_args(db_session, session_row, subtopic="chain rule", evidence_type=evidence)
+    res = profile_service.apply_patch(db_session, ctx, args)
+    assert res.error == "subtopic and subtopic_level must be provided together"
 
 
 def test_apply_patch_subtopic_requires_pair(session_row, db_session):
@@ -875,19 +973,33 @@ def test_apply_patch_subtopic_cap(session_row, db_session):
     p.subtopic_levels = {f"topic {i}": "beginner" for i in range(20)}
     profile_service.save_profile(db_session, session_row.id, p)
 
-    ctx, args = _ctx_args(db_session, session_row, subtopic="one more", subtopic_level="advanced")
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="one more",
+        subtopic_level="advanced",
+        evidence_type="declared",
+    )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert not res.ok and "full" in res.error
 
     # updating an existing key is always allowed
-    ctx, args = _ctx_args(db_session, session_row, subtopic="topic 3", subtopic_level="advanced")
+    ctx, args = _ctx_args(
+        db_session,
+        session_row,
+        subtopic="topic 3",
+        subtopic_level="advanced",
+        evidence_type="declared",
+    )
     assert profile_service.apply_patch(db_session, ctx, args).ok
 
 
 def test_apply_patch_subtopic_empty_after_strip(session_row, db_session):
     from services import profile_service
 
-    ctx, args = _ctx_args(db_session, session_row, subtopic="   ", subtopic_level="beginner")
+    ctx, args = _ctx_args(
+        db_session, session_row, subtopic="   ", subtopic_level="beginner", evidence_type="declared"
+    )
     res = profile_service.apply_patch(db_session, ctx, args)
     assert not res.ok
     assert "empty" in res.error

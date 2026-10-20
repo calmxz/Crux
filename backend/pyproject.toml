@@ -5,14 +5,16 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "crux-backend"
 version = "0.1.0"
-requires-python = ">=3.12"
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.141.1,<0.141.2",  # MAL-2026-4750: 0.136.3 flagged malicious by pip-audit (amazon-inspector)
     "uvicorn[standard]>=0.54.0,<1.0",
     "sqlalchemy>=2.1.1,<3.0",
     "pydantic>=2.14.1,<3.0",
     "pydantic-settings>=2.15.0",
-    "litellm>=1.104.0,<2.0",
+    # [mcp]: since 1.106 the same tools path imports mcp, declared only under
+    # litellm's extras. See tests/test_llm_deps.py and docs/decisions.md (#610).
+    "litellm[mcp]>=1.106.0,<2.0",
     # litellm.completion() imports litellm.proxy.* -> orjson whenever `tools` is
     # passed, but only declares orjson under its [proxy] extra. Every tutor turn
     # passes tools, so without this the live chat path dies with
@@ -43,6 +45,7 @@ dev = [
     "pyyaml>=6.0.3",
     "ruff>=0.16.10,<1.0",
     "jsonschema>=4.26.0",
+    "basedpyright>=1.40.2,<1.41",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,14 +54,14 @@ where = ["."]
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
-addopts = "--cov=services --cov=lib --cov=worker --cov=routes --cov=agent --cov=db --cov-report=term-missing --cov-fail-under=75"
+addopts = "-p pytester --cov=services --cov=lib --cov=worker --cov=routes --cov=agent --cov=db --cov-report=term-missing --cov-fail-under=75"
 
 [tool.coverage.run]
 omit = ["tests/*", "scripts/*"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py314"
 extend-exclude = ["contracts/models.py"]
 
 [tool.ruff.format]
@@ -68,8 +71,11 @@ exclude = ["db/alembic/versions/*"]
 [tool.ruff.lint]
 select = ["E", "F", "B", "I"]
 ignore = ["B008", "E501"]
+# Only a bare `_` counts as intentionally unused: CodeQL flags `_name` loop
+# variables that ruff's default pattern lets through.
+dummy-variable-rgx = "^_$"
 
 [tool.ruff.lint.per-file-ignores]
 "db/alembic/env.py" = ["E402"]
-"db/alembic/versions/*.py" = ["E402"]
+"db/alembic/versions/*.py" = ["E402", "B007"]
 "tests/*" = ["E402"]

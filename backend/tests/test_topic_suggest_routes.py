@@ -8,9 +8,8 @@ import pytest
 from contracts import TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from routes import chat as chat_route
 from routes import sessions as sessions_route
-from services import topic_suggest_service
+from services import prompt_state, topic_suggest_service
 
 USER_ID = "u_ts_routes"
 
@@ -119,18 +118,21 @@ def test_session_detail_returns_topic_suggestions(client, user, db_session):
     assert msgs[1]["topic_suggestions"] is None
 
 
-def test_chat_prompt_state_carries_topic_suggest_state():
-    row = SessionModel(id="x", user_id="u", topic="t", topic_suggest_state="awaiting_level")
-    state = chat_route._build_prompt_state(
-        session=row,
-        profile=TopicProfile(knowledge_level="beginner"),
-        ingestion_status=None,
-        retrieval_required=False,
-        review_gaps=False,
-        pending_check=None,
-        quiz_cooldown=None,
+def test_chat_prompt_state_carries_topic_suggest_state(db_session):
+    row = SessionModel(
+        id="x",
+        user_id="u",
+        topic="t",
+        topic_profile_json=TopicProfile(knowledge_level="beginner").model_dump_json(),
+        topic_suggest_state="awaiting_level",
     )
-    assert state["topic_suggest_state"] == "awaiting_level"
+    state = prompt_state.assemble(
+        prompt_state.gather_session_inputs(
+            db_session, row, learner_prefs={}, ingestion_status=None
+        ),
+        prompt_state.TurnInputs(retrieval_required=False),
+    )
+    assert state.topic_suggest_state == "awaiting_level"
 
 
 def test_followup_after_graded_diagnostic_makes_the_card_due(user, db_session):

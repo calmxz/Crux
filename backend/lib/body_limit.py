@@ -61,7 +61,7 @@ class BodySizeLimitMiddleware:
         if content_length is not None:
             try:
                 declared = int(content_length)
-            except (TypeError, ValueError):
+            except TypeError, ValueError:
                 declared = None  # unparsable: fall through to counting
             if declared is not None and declared > self.max_bytes:
                 await self._send_413(send)

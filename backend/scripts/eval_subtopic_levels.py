@@ -12,30 +12,50 @@ turn-feeding, and profile-reload wiring: an in-memory StaticPool sqlite DB,
 one seeded Session per run, turns fed one at a time through
 tutor.run_streaming with the profile reloaded after each turn.
 
+A pattern turn is a chat message (a string) or the structured answer step
+{"action": "answer_checks_correctly"}: it answers every pending Item of the
+open check Set correctly through check_service.answer, Closes the Set through
+check_service.complete and runs the follow-up turn on the results summary,
+as the learner's clicks and Done button do in the app. When a follow-up poses
+the Check's next Set, the step answers that too (at most 3 Sets): one more
+paid call per extra Set. Every pattern is
+validated before the first run; a malformed one exits 4 having spent nothing.
+
 Usage:
     GEMINI_API_KEY=... python backend/scripts/eval_subtopic_levels.py --runs 10
+    ... --pattern tested_progression --runs 10 --max-cost 1   # one pattern
 
-Each run hits the live LLM and is metered against your daily cap; the
-default 10 runs across 2 patterns x up to 3 turns each = a few dozen calls.
-Use --runs 3 for a quick smoke check.
+Each run hits the live LLM and is billed by the provider. Metering lands in
+the script's in-memory DB with a fresh user per run: the per-user cap never
+trips, and none of it reaches your real ledger. --max-cost (default $5) stops
+starting new runs once this process's recorded spend reaches it, so a run
+can overshoot it by one run; a cost stop prints no verdict and exits 3.
+GLOBAL_DAILY_COST_CAP_USD (counting this process's spend) still applies: a
+call any cost cap refuses ends the eval the same way (exit 3), discarding
+the run it hit. The default 10 runs per pattern: declared_level makes 3
+calls a run, tested_progression 3 to 5 (one follow-up per Set), so 60 to 80
+calls for both. Use --runs 3 for a quick smoke check.
 """
 
 from __future__ import annotations
 
 import argparse
 import asyncio
+import dataclasses
+import io
 import json
 import os
 import sys
 import uuid
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 
 # Force an in-memory DB before importing anything that touches db.database.
-os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
+# Assigned, not defaulted: an exported DATABASE_URL must not reach it (#596).
+os.environ["DATABASE_URL"] = "sqlite:///:memory:"
 
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, func, select
 from sqlalchemy.pool import StaticPool
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -45,15 +65,83 @@ if str(ROOT) not in sys.path:
 from agent import prompts, tutor  # noqa: E402
 from agent.types import ToolContext  # noqa: E402
 from contracts import TopicProfile  # noqa: E402
-from db.database import Base  # noqa: E402
+from db.database import Base, SessionLocal  # noqa: E402
+from db.models import DailyCostLedger, LearningEvent, User  # noqa: E402
 from db.models import Session as SessionModel  # noqa: E402
-from db.models import User  # noqa: E402
-from services import profile_service  # noqa: E402
+from lib import error_codes  # noqa: E402
+from services import check_service, profile_service, prompt_state  # noqa: E402
 
 PATTERN_DIR = Path(__file__).parent / "subtopic_patterns"
 PATTERNS = ("declared_level", "tested_progression")
+ANSWER_STEP = {"action": "answer_checks_correctly"}
+# Sets per Check: openapi.yaml caps AskCheckQuestionsArgs.set_total at 3.
+MAX_SETS = 3
 RUNS_PER_PATTERN = 10
 THRESHOLD = 0.85
+DEFAULT_MAX_COST = Decimal("5")
+# Distinct from a threshold failure (1) and an argparse usage error (2).
+COST_STOP_EXIT = 3
+BAD_PATTERN_EXIT = 4
+
+
+@dataclasses.dataclass
+class EvalOutcome:
+    results: dict[str, tuple[float, int]]
+    completed: int
+    planned: int
+    spend: Decimal
+    cost_stopped: bool
+    # The refusal code when a cost cap refused a tutor call (#605).
+    cap_refused: str | None = None
+
+
+class _CapRefused(Exception):
+    """#605: a cost cap refused a tutor call; the refused call never reached
+    the model. `_main_async` catches it before its per-run `except Exception`."""
+
+    def __init__(self, code: str):
+        super().__init__(code)
+        self.code = code
+
+
+def _positive_usd(value: str) -> Decimal:
+    try:
+        usd = Decimal(value)
+    except InvalidOperation:
+        raise argparse.ArgumentTypeError(f"not a number: {value!r}") from None
+    if not usd.is_finite() or usd <= 0:
+        raise argparse.ArgumentTypeError(f"must be a positive amount, got {value!r}")
+    return usd
+
+
+def _total_spend(SessionLocal) -> Decimal:
+    # Every date, not cost_meter.global_spend: that filters to today (UTC), so
+    # a run crossing UTC midnight would read $0. This DB only ever holds this
+    # invocation's spend.
+    with SessionLocal() as db:
+        total = db.scalar(select(func.coalesce(func.sum(DailyCostLedger.cost_usd), 0)))
+    return Decimal(str(total))
+
+
+def _valid_turn(turn) -> bool:
+    return isinstance(turn, str) or turn == ANSWER_STEP
+
+
+def _load_pattern(path: Path) -> dict:
+    """A pattern fixture, refusing a malformed one here rather than failing
+    every paid run of it."""
+    pattern = json.loads(path.read_text(encoding="utf-8"))
+    for n, turn in enumerate(pattern["turns"], start=1):
+        if not _valid_turn(turn):
+            raise ValueError(f"{path.name} turn {n}: unknown turn {turn!r}")
+    missing = {"subtopic", "levels", "by_turn"} - set(pattern.get("expected", {}))
+    if missing:
+        raise ValueError(f"{path.name}: expected lacks {sorted(missing)}")
+    return pattern
+
+
+def _load_patterns(names) -> dict[str, dict]:
+    return {name: _load_pattern(PATTERN_DIR / f"{name}.json") for name in names}
 
 
 def _matches(profile, expected) -> bool:
@@ -74,7 +162,10 @@ def _make_session_factory():
         poolclass=StaticPool,
     )
     Base.metadata.create_all(bind=engine)
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    # The LLM adapter opens its own sessions (cap gate, settlement, call log)
+    # from db.database.SessionLocal; bind it here so they reach this DB too.
+    SessionLocal.configure(bind=engine)
+    return SessionLocal
 
 
 def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:
@@ -97,6 +188,133 @@ def _seed_session(SessionLocal, pattern: dict) -> tuple[str, str]:
         db.close()
 
 
+@dataclasses.dataclass
+class _Trace:
+    """#612: one run's tool calls and turn errors, each labelled with the
+    pattern turn it happened in as it is written, so a turn that raises
+    midway keeps its labels."""
+
+    turn: int = 0
+    lines: list[str] = dataclasses.field(default_factory=list)
+
+    def add(self, line: str) -> None:
+        self.lines.append(f"turn {self.turn} {line}")
+
+
+def _shown_args(name: str, args: dict) -> dict:
+    if name == "ask_check_questions":
+        return {"gap": args.get("gap")}
+    return {k: v for k, v in args.items() if k != "session_id"}
+
+
+async def _stream_reply(
+    messages: list[dict], system_prompt: str, ctx: ToolContext, trace: _Trace
+) -> str:
+    """The tutor's reply text. #612: appends every tool call with its outcome,
+    and any error that ended the turn, to `trace` as the events stream, so
+    a turn that persists nothing still shows what it did. Raises _CapRefused
+    once the stream ends if a cost cap refused the call."""
+    reply_parts: list[str] = []
+    started: dict[str, tuple[str, dict]] = {}
+    cap_code: str | None = None
+    async for ev in tutor.run_streaming(messages, system_prompt, ctx):
+        if ev.type == "assistant_delta":
+            reply_parts.append(ev.data.get("text", ""))
+        elif ev.type == "tool_call_start":
+            started[ev.data["id"]] = (ev.data["name"], ev.data.get("args") or {})
+        elif ev.type == "tool_call_done":
+            name, args = started.pop(ev.data["id"], ("?", {}))
+            line = f"{name} {_shown_args(name, args)!r} {ev.data['status']}"
+            if ev.data.get("error"):
+                line += f": {ev.data['error']}"
+            trace.add(line)
+        elif ev.type == "error" and ev.data.get("code") in error_codes.COST_CAP_CODES:
+            cap_code = ev.data["code"]
+        elif ev.type == "error":
+            trace.add(f"turn ended with error {ev.data!r}")
+    if cap_code is not None:
+        raise _CapRefused(cap_code)
+    return "".join(reply_parts)
+
+
+async def _chat_turn(
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
+) -> None:
+    # The seed has no level; keep the diagnostic off so the eval
+    # measures subtopic patching, as it was calibrated.
+    state = dataclasses.replace(
+        prompt_state.assemble(
+            prompt_state.gather_session_inputs(db, db.get(SessionModel, session_id)),
+            prompt_state.TurnInputs(retrieval_required=False),
+        ),
+        diagnostic_required=False,
+    )
+    ctx = ToolContext(
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
+        turn_started_at=datetime.now(timezone.utc),
+    )
+    reply = await _stream_reply(messages, prompts.build_system_prompt(state), ctx, trace)
+    messages.append({"role": "assistant", "content": reply})
+
+
+async def _answer_step(
+    db, session_id: str, user_id: str, messages: list[dict], trace: _Trace
+) -> bool:
+    """Answer the open Set correctly, as the learner's clicks and Done button
+    do, then every later Set a follow-up poses. A follow-up that replies
+    without posing the next Set leaves the Check between Sets, as in the app.
+    Returns False, doing nothing, when no Set is open."""
+    answered = False
+    for _ in range(MAX_SETS):
+        pc = check_service.open_set(db.get(SessionModel, session_id))
+        if pc is None:
+            break
+        await _answer_set(db, session_id, user_id, messages, pc, trace)
+        answered = True
+    return answered
+
+
+async def _answer_set(
+    db, session_id: str, user_id: str, messages: list[dict], pc: dict, trace: _Trace
+) -> None:
+    """Answer every pending Item of Set `pc` correctly, Close it and run the
+    follow-up turn."""
+    for index, item in enumerate(pc["items"]):
+        if item.get("status", "pending") == "pending":
+            check_service.answer(db, session_id, index, item["correct_index"])
+    summary, cooldown = check_service.complete(db, session_id)
+
+    # Mirrors routes/sessions.py::_followup_context, less its daily message
+    # cap (a fresh user per run never reaches it).
+    inputs = dataclasses.replace(
+        prompt_state.gather_session_inputs(
+            db, db.get(SessionModel, session_id), learner_prefs={}, gap_accuracy={}
+        ),
+        rolling_summary=None,
+        pending_check=None,
+        current_check=None,
+        quiz_cooldown=cooldown,
+    )
+    state = dataclasses.replace(
+        prompt_state.assemble(inputs, prompt_state.TurnInputs(retrieval_required=False)),
+        diagnostic_required=False,
+    )
+    ctx = ToolContext(
+        db=db,
+        session_id=session_id,
+        user_id=user_id,
+        turn_started_at=datetime.now(timezone.utc),
+        suppress_check=True,
+        diagnostic_required=(inputs.profile.knowledge_level is None),
+    )
+    # The summary turn is not persisted in the app, so later turns never see it.
+    followup = [*messages, {"role": "user", "content": summary}]
+    reply = await _stream_reply(followup, prompts.build_system_prompt(state), ctx, trace)
+    messages.append({"role": "assistant", "content": reply})
+
+
 async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
     """One run of a pattern. Feeds `pattern["turns"]` one at a time, reloading
     the profile after each turn, and records the earliest turn at which
@@ -104,61 +322,107 @@ async def _run_pattern_once(SessionLocal, pattern: dict) -> bool:
     `pattern["expected"]["by_turn"]`."""
     user_id, session_id = _seed_session(SessionLocal, pattern)
     db = SessionLocal()
+    expected = pattern["expected"]
+    trace = _Trace()
+    matched_at: int | None = None
     try:
         messages: list[dict] = []
-        expected = pattern["expected"]
-        matched_at: int | None = None
-
-        for turn_idx, user_turn in enumerate(pattern["turns"], start=1):
-            messages.append({"role": "user", "content": user_turn})
-
-            profile = profile_service.load_profile(db, session_id)
-            session_row = db.get(SessionModel, session_id)
-            prompt_state = {
-                "topic": session_row.topic,
-                "profile": profile,
-                "ingestion_status": None,
-                "retrieval_required": False,
-                "seed_mode": None,
-                "last_session_summary": None,
-            }
-            system_prompt = prompts.build_system_prompt(prompt_state)
-
-            ctx = ToolContext(
-                db=db,
-                session_id=session_id,
-                user_id=user_id,
-                turn_started_at=datetime.now(timezone.utc),
-            )
-            reply_parts: list[str] = []
-            async for ev in tutor.run_streaming(messages, system_prompt, ctx):
-                if ev.type == "assistant_delta":
-                    reply_parts.append(ev.data.get("text", ""))
-            reply = "".join(reply_parts)
-            messages.append({"role": "assistant", "content": reply})
+        for turn_idx, turn in enumerate(pattern["turns"], start=1):
+            trace.turn = turn_idx
+            if isinstance(turn, str):
+                messages.append({"role": "user", "content": turn})
+                await _chat_turn(db, session_id, user_id, messages, trace)
+            elif not _valid_turn(turn):
+                raise ValueError(f"turn {turn_idx}: unknown turn {turn!r}")
+            elif not await _answer_step(db, session_id, user_id, messages, trace):
+                print(
+                    f"  [{pattern['name']}] turn {turn_idx}: no open check Set; "
+                    "answer step skipped",
+                    file=sys.stderr,
+                )
 
             updated = profile_service.load_profile(db, session_id)
             if matched_at is None and _matches(updated, expected):
                 matched_at = turn_idx
 
-        if matched_at is None:
-            return False
-        return matched_at <= expected["by_turn"]
+        ok = matched_at is not None and matched_at <= expected["by_turn"]
+        if not ok:
+            when = (
+                "no match"
+                if matched_at is None
+                else f"matched at turn {matched_at}, expected by turn {expected['by_turn']}"
+            )
+            _report_miss(db, session_id, pattern["name"], when, trace)
+        return ok
+    except _CapRefused:
+        # Not a miss: the refused call never reached the model.
+        raise
+    except BaseException:
+        # A run that raises (Ctrl-C included) is a failure too, and its calls
+        # were billed: show what it did first.
+        _report_miss(db, session_id, pattern["name"], f"raised at turn {trace.turn}", trace)
+        raise
     finally:
         db.close()
 
 
-async def _main_async(runs_per_pattern: int) -> dict[str, tuple[float, int]]:
+def _report_miss(db, session_id: str, name: str, when: str, trace: _Trace) -> None:
+    """#612: what the tutor did in a failed run, so a miss can be told apart:
+    no patch, a patch under another subtopic name, a refused patch, a late
+    one, or a turn that errored or raised."""
+    try:
+        # After a raise the session may hold a failed transaction.
+        db.rollback()
+        profile = profile_service.load_profile(db, session_id)
+        events = db.scalars(
+            select(LearningEvent).where(LearningEvent.session_id == session_id)
+        ).all()
+        correct = sum(1 for e in events if e.correct)
+        state = (
+            f"subtopic_levels={(profile.subtopic_levels or {})!r}; "
+            f"graded {correct}/{len(events)} correct"
+        )
+    except Exception as e:  # noqa: BLE001
+        # The trace still prints when the database cannot be read.
+        state = f"profile unreadable ({type(e).__name__})"
+    lines = [f"  [{name}] miss ({when}): {state}", *(f"    {line}" for line in trace.lines)]
+    # Model-written names can hold characters a cp1252 console cannot print.
+    text = "\n".join(lines).encode("ascii", "backslashreplace").decode("ascii")
+    print(text, file=sys.stderr)
+
+
+async def _main_async(
+    patterns: dict[str, dict], runs_per_pattern: int, max_cost: Decimal
+) -> EvalOutcome:
+    """Runs every pattern `runs_per_pattern` times, checking recorded spend
+    against `max_cost` before each run (never mid-run). On reaching it, starts
+    no further runs and returns with `cost_stopped` set. A cost cap refusing
+    a call mid-run discards that run and returns with `cap_refused` set."""
     SessionLocal = _make_session_factory()
     results: dict[str, tuple[float, int]] = {}
+    planned = runs_per_pattern * len(patterns)
+    completed = 0
 
-    for pattern_name in PATTERNS:
-        path = PATTERN_DIR / f"{pattern_name}.json"
-        pattern = json.loads(path.read_text(encoding="utf-8"))
+    for pattern_name, pattern in patterns.items():
         passes = []
         for run_idx in range(runs_per_pattern):
+            spend = _total_spend(SessionLocal)
+            if spend >= max_cost:
+                return EvalOutcome(results, completed, planned, spend, cost_stopped=True)
             try:
                 ok = await _run_pattern_once(SessionLocal, pattern)
+                if not ok:
+                    # Closes the miss trace printed just above it.
+                    print(f"  [{pattern_name} run={run_idx}] fail", file=sys.stderr)
+            except _CapRefused as refused:
+                return EvalOutcome(
+                    results,
+                    completed,
+                    planned,
+                    _total_spend(SessionLocal),
+                    cost_stopped=False,
+                    cap_refused=refused.code,
+                )
             except Exception as e:  # noqa: BLE001
                 print(
                     f"  [{pattern_name} run={run_idx}] error: {e}",
@@ -166,9 +430,10 @@ async def _main_async(runs_per_pattern: int) -> dict[str, tuple[float, int]]:
                 )
                 ok = False
             passes.append(ok)
+            completed += 1
         rate = sum(passes) / len(passes) if passes else 0.0
         results[pattern_name] = (rate, len(passes))
-    return results
+    return EvalOutcome(results, completed, planned, _total_spend(SessionLocal), cost_stopped=False)
 
 
 def main() -> int:
@@ -179,7 +444,27 @@ def main() -> int:
         default=RUNS_PER_PATTERN,
         help=f"Runs per pattern (default {RUNS_PER_PATTERN}).",
     )
+    parser.add_argument(
+        "--max-cost",
+        type=_positive_usd,
+        default=DEFAULT_MAX_COST,
+        help=(
+            "Start no new run once recorded spend reaches this many USD "
+            f"(default {DEFAULT_MAX_COST}). Checked between runs, so spend can "
+            "overshoot it by one run."
+        ),
+    )
+    parser.add_argument(
+        "--pattern",
+        action="append",
+        choices=PATTERNS,
+        help="Run only this pattern; repeat for more (default: every pattern).",
+    )
     args = parser.parse_args()
+    # Model-written text reaches stderr (errors, traces); a cp1252 console
+    # cannot encode all of it, and a print that raises would end the eval.
+    if isinstance(sys.stderr, io.TextIOWrapper):
+        sys.stderr.reconfigure(errors="backslashreplace")
 
     if os.environ.get("LLM_STUB") == "1":
         print(
@@ -188,11 +473,41 @@ def main() -> int:
             file=sys.stderr,
         )
 
-    results = asyncio.run(_main_async(args.runs))
+    # Every pattern before the first paid run, so a bad one costs nothing.
+    try:
+        patterns = _load_patterns(args.pattern or PATTERNS)
+    except (OSError, ValueError, KeyError) as e:
+        print(f"Bad pattern fixture: {e}", file=sys.stderr)
+        return BAD_PATTERN_EXIT
+
+    try:
+        outcome = asyncio.run(_main_async(patterns, args.runs, args.max_cost))
+        return _report(outcome, args.max_cost)
+    finally:
+        # Also on Ctrl-C or a crash: the calls made so far are billed.
+        # _main_async binds SessionLocal before its first await.
+        print(f"\nTotal spend: ${_total_spend(SessionLocal):.4f}")
+
+
+def _report(outcome: EvalOutcome, max_cost: Decimal) -> int:
+    if outcome.cap_refused is not None:
+        print(
+            f"\nCost cap refused a call ({outcome.cap_refused}): spent ${outcome.spend:.4f}. "
+            f"Completed {outcome.completed} of {outcome.planned} planned runs. "
+            "No verdict over partial results."
+        )
+        return COST_STOP_EXIT
+    if outcome.cost_stopped:
+        print(
+            f"\nCost limit reached: spent ${outcome.spend:.4f}, limit ${max_cost:.4f}. "
+            f"Completed {outcome.completed} of {outcome.planned} planned runs. "
+            "No verdict over partial results."
+        )
+        return COST_STOP_EXIT
 
     print("\n=== Subtopic-level reliability (R4.1 AC3) ===")
     failed = []
-    for pattern_name, (rate, n) in results.items():
+    for pattern_name, (rate, n) in outcome.results.items():
         flag = "PASS" if rate >= THRESHOLD else "FAIL"
         print(f"  {pattern_name:20s} {rate * 100:5.1f}%  ({n} runs)  [{flag}]")
         if rate < THRESHOLD:
@@ -203,7 +518,7 @@ def main() -> int:
             f"\nFAILED patterns: {failed}. Threshold {THRESHOLD * 100:.0f}%.",
         )
         return 1
-    print(f"\nAll {len(PATTERNS)} patterns >= {THRESHOLD * 100:.0f}%.")
+    print(f"\nAll {len(outcome.results)} patterns >= {THRESHOLD * 100:.0f}%.")
     return 0
 
 

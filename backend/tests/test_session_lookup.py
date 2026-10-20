@@ -100,11 +100,12 @@ def test_blank_topic_returns_empty(client, db_session):
     assert body == {"active_match": None, "ended_match": None}
 
 
-def test_legacy_profile_shape_does_not_500(client, db_session):
+def test_legacy_profile_shape_does_not_500(client, db_session, expect_app_log):
     """C-01: lookup must use the tolerant parser. TopicProfile is codegen'd
     with extra="forbid", so a row written under an older schema (retired
     field still present) would 500 every lookup on that topic under a strict
     model_validate_json."""
+    expect_app_log("repaired topic_profile on load")
     db_session.add(User(id=USER_ID))
     db_session.add(
         SessionModel(

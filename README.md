@@ -8,7 +8,7 @@ Pick a topic, drop in your course PDFs, and chat with a tutor that builds a live
 
 [![CI](https://github.com/calmxz/Crux/actions/workflows/ci.yml/badge.svg)](https://github.com/calmxz/Crux/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.14](https://img.shields.io/badge/python-3.14-blue.svg)](https://www.python.org/downloads/)
 [![Vue 3](https://img.shields.io/badge/vue-3-42b883.svg)](https://vuejs.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688.svg)](https://fastapi.tiangolo.com/)
 [![pgvector](https://img.shields.io/badge/pgvector-0.8.x-336791.svg)](https://github.com/pgvector/pgvector)
@@ -70,12 +70,12 @@ Most "AI tutors" today are a chat box bolted onto a generic LLM. They ask the sa
 | Layer | Tech | Why |
 |---|---|---|
 | Frontend | Vue 3, Vite, Pinia, PrimeVue | Reactive SPA, fast dev loop, accessible components out of the box |
-| Backend | FastAPI, Uvicorn, Python 3.12 | Typed routes, automatic OpenAPI, async-friendly |
+| Backend | FastAPI, Uvicorn, Python 3.14 | Typed routes, automatic OpenAPI, async-friendly |
 | ORM / DB | SQLAlchemy + Supabase Postgres 17 | Managed Postgres + Alembic migrations; pooled connection via Supabase pgbouncer |
 | Vector store | pgvector 0.8.x in Supabase Postgres | Co-located with app schema; `ivfflat` cosine index on `chunk_embeddings` |
 | Auth | Supabase Auth (email/password) | JWT verified server-side against Supabase JWKS |
 | LLM gateway | LiteLLM direct | One client, swap providers via env var (Gemini default, Anthropic fallback) |
-| LLM | `gemini/gemini-3.5-flash-lite` (chat), `gemini/gemini-embedding-2` (embeddings) | Cheap, fast, large context |
+| LLM | `gemini/gemini-3.8-flash` (chat), `gemini/gemini-embedding-2` (embeddings) | Cheap, fast, large context |
 | Tests | pytest, vitest, Playwright | Backend unit/integration, frontend unit, e2e |
 | Deploy | Docker Compose; ngrok for public demo | Reproducible local stack; tunneled public preview |
 
@@ -131,7 +131,7 @@ The system prompt is split: an immutable rules block (`backend/agent/prompts.py`
 
 Local development runs the app natively (Postgres + pgvector and Auth are Supabase-managed, so there is no local DB container):
 
-- Python 3.12 (`python --version`)
+- Python 3.14 (`python --version`)
 - Node.js 20.x or newer + npm 10.x (`node --version`, `npm --version`)
 - For RAG (PDF upload + retrieval): a Supabase Postgres connection string in `DATABASE_URL`. Without it the backend falls back to a local SQLite file (`sqlite:///./data/app.db`) — fine for a quick spin, but pgvector retrieval requires Postgres.
 
@@ -176,16 +176,17 @@ See the [Configuration](#configuration) section for the full variable reference.
 **Backend** — from `backend/`:
 
 ```bash
-python -m venv .venv
+uv sync --locked --extra dev
 
 # Windows PowerShell:
 .venv\Scripts\Activate.ps1
 # macOS / Linux:
 source .venv/bin/activate
 
-pip install -e .[dev]
 uvicorn main:app --reload
 ```
+
+Dependencies come from the committed `uv.lock`, the same set CI and the Docker image install. Change them with `uv add` / `uv remove`, never by editing `pyproject.toml` alone.
 
 Or from the repo root: `uvicorn main:app --reload --app-dir backend`. `config.py` anchors `.env` and `data/` to the repo root, so cwd doesn't matter. `data/uploads/` auto-creates on first boot (plus `data/app.db` if you're on the SQLite fallback). Postgres + pgvector live in Supabase — there's no local DB to start.
 
@@ -224,7 +225,7 @@ The backend reads `.env` at the repo root. For the production stack, the same `.
 
 | Variable | Purpose | Default |
 |---|---|---|
-| `MODEL` | LiteLLM-prefixed chat model id. Swap to `anthropic/claude-sonnet-5` if reliability checkpoints fail. | `gemini/gemini-3.5-flash-lite` |
+| `MODEL` | LiteLLM-prefixed chat model id. Swap to `anthropic/claude-sonnet-5` if reliability checkpoints fail. | `gemini/gemini-3.8-flash` |
 | `EMBEDDING_MODEL` | Embedding model used by pgvector ingestion + retrieval. | `gemini/gemini-embedding-2` |
 | `DAILY_CAP` | Per-user daily request cap. | `50` |
 | `DATABASE_URL` | SQLAlchemy connection string (Supabase pooler URI; bare `postgresql://` auto-converted to `postgresql+psycopg://`). | `sqlite:///./data/app.db` (legacy default; Phase 7+ requires Supabase Postgres URL) |

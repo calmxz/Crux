@@ -1992,6 +1992,16 @@ describe('session store — streaming', () => {
     })
   })
 
+  // #412: the tutor honours the global ceiling between calls; the backend
+  // persists that abort as 'partial' too.
+  it('handleAbortError pushes streamed text as status=partial for a global-ceiling abort', () => {
+    const s = useSessionStore()
+    s.streamingMessage = { role: 'assistant', content: 'draft', tool_calls: [], citations: [] }
+    s.streamState = 'streaming'
+    s.handleAbortError('global_cost_cap_reached')
+    expect(s.messages.at(-1)).toMatchObject({ status: 'partial', content: 'draft' })
+  })
+
   it('handleAbortError pushes streamed text as status=partial for max_iters_reached', () => {
     const s = useSessionStore()
     s.streamingMessage = { role: 'assistant', content: 'draft', tool_calls: [], citations: [] }

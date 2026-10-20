@@ -3,6 +3,278 @@
 Durable "why": decisions, findings, tradeoffs. Newest first. Technical
 how-it-works lookup belongs in `docs/reference.md` instead.
 
+## 2026-10-19 - Chat turns price from usage x MODEL_RATES, not litellm's map (#643)
+
+Supersedes the "litellm still does the arithmetic" bullet of the #622 entry.
+A chat model listed in `MODEL_RATES` now prices a turn with
+`cost_meter.usage_cost`, and nothing writes into litellm's price map.
+
+- **The reason for keeping litellm's arithmetic no longer holds.** #622 kept
+  `completion_cost` to avoid re-implementing the cache discount, but
+  `usage_cost` already prices cached prompt tokens at `cache_read_per_1k` and
+  counts thinking tokens inside completion tokens. On litellm 1.106 the two
+  agreed to 8 decimal places for the configured model.
+- **Registration cost more than it saved.** `register_model` wrote into
+  litellm's process-wide map and merged into its builtin entry, so fields we
+  never set (batch, flex, priority, grounding) kept litellm's import-time
+  values. In tests it leaked prices between tests and needed the #641
+  snapshot-and-restore fixture, which is now gone.
+- **Unrated models still use litellm.** A model with no `MODEL_RATES` entry is
+  priced by `completion_cost`, then by token math, with no registration first.
+- **Accepted gap:** a rated model that needs tiered, long-context or
+  cache-write pricing must add those fields to `MODEL_RATES` and `usage_cost`;
+  litellm no longer covers them for rated models. None applies today: the
+  backend sends no `cache_control`, `service_tier` or grounding.
+- **The #622 scheduled-rates bullet stands.** `rates_for` is read per call, so
+  a running process still switches at a `SCHEDULED_RATES` date.
+
+## 2026-10-19 - No sampling params on LLM calls; summaries ask for low thinking (#637)
+
+Google's Gemini 3 guide strongly recommends keeping `temperature` at its
+default of 1.0. Its troubleshooting page warns that values below 1.0 "can
+cause unexpected behavior, such as looping or degraded performance". We sent
+0.3 on tutor turns and 0.0 on summaries.
+
+- **The app passes no `temperature`, `top_p` or `top_k`, for any model.** The
+  keyword is gone from the adapter and the `Provider` protocol, and both
+  settings (`llm_temperature`, `summary_temperature`) are removed. Settings
+  ignore unknown env vars, so a deploy still setting them boots. On the wire,
+  LiteLLM 1.106 itself adds Gemini 3's default `temperature: 1.0` when none is
+  given, so if Google drops the parameter, requests depend on LiteLLM
+  dropping it too. Accepted trade-off: a swap to a non-Gemini-3 fallback runs
+  at that provider's default temperature. Temperature can come back as part
+  of such a swap.
+- **Summaries (`summary`, `rolling_summary`) send `reasoning_effort="low"`**,
+  which LiteLLM maps to Gemini 3's `thinking_level`. Tutor turns send none and
+  keep the model's dynamic default. The provider sends it only when
+  `litellm.supports_reasoning` says the configured model supports it (an
+  unknown model counts as no). Nothing sets `litellm.drop_params`, so the
+  parameter would otherwise raise on a swap, and every summary would quietly
+  fall back to the mechanical one. Rejected: `get_supported_openai_params`,
+  which lists `reasoning_effort` for `openai/gpt-4.1-mini` (LiteLLM 1.106).
+  LiteLLM also sets `includeThoughts: True` with it, so summaries get thought
+  summaries back that we discard (only `content` is read). Accepted: thinking
+  tokens are billed either way, and opting out means passing a raw Gemini
+  `thinkingConfig` the swap gate would not cover.
+- **A grounding rule replaces temperature 0.0.** Both summary system prompts
+  say to base every statement on what the topic, profile (session summary
+  only) and transcript show, not to embellish or invent, and to write no
+  preamble. The untrusted-transcript rule follows it. Rejected: "do not
+  infer", which the brief suggested. The same prompts ask what the learner
+  understood and what gaps remain, which are judgements drawn from the
+  transcript, and forbidding inference would push the model to drop them.
+
+## 2026-10-19 - litellm is declared as litellm[mcp] (#610)
+
+litellm 1.106 imports `mcp` on the tool-calling path, which every tutor turn
+takes, but declares it only under its `[proxy]` extra and a new `[mcp]` extra.
+The 1.107 pre-releases keep that shape.
+
+- **Depend on `litellm[mcp]>=1.106.0,<2.0`.** The extra is upstream's own
+  declaration, so litellm owns the `mcp` range and it moves with litellm
+  upgrades. Rejected: a bare `mcp` dependency (we would own a range we don't
+  use directly, and it can drift from what litellm needs), and a `<1.106` cap
+  (it would freeze litellm with no upstream fix in sight). Also rejected:
+  passing litellm's `_skip_mcp_handler=True`, which skips the MCP branch and
+  its imports entirely (our tools are plain functions). It is a private
+  kwarg: a rename upstream would bring the import back unannounced, failing
+  every tutor turn while the stubbed suite stays green. The cost of the
+  extra (mcp, a second HTTP stack, about 0.9s of import) is small next to
+  that.
+- **The tool path is imported at startup.** litellm imports it lazily on a
+  process's first call with tools, so the first tutor turn after each deploy
+  or restart waited the extra ~0.9s. `services/llm.py` imports it at module
+  level, so every process that loads the adapter pays it at startup. A
+  broken import now fails the boot, which Render treats as a failed deploy
+  and keeps the old instance serving, instead of failing every tutor turn.
+  With no old instance (a restart) the whole API is down, not just tutor
+  turns; accepted, since CI's collection fails on the same import first.
+  Rejected: a lifespan pre-import that logs and carries on when the import
+  fails. It hid a missing `mcp`: the app booted green and every turn failed.
+- **Shipped without waiting for Dependabot.** Its PR would only have bumped
+  the litellm range, without the extra, and arrived red.
+- **`orjson` stays an explicit dependency.** It is still only under
+  `[proxy]`, and `[proxy]` would pull the whole proxy server.
+- `tests/test_llm_deps.py` fails if the `[mcp]` extra is dropped.
+
+## 2026-10-19 - The backend image is digest-pinned, and CI's Python patch may lead it (#623)
+
+The #620 review found three gaps in `backend/Dockerfile` that predate it.
+
+- **The base image is pinned by digest**, `python:3.14.8-slim@sha256:...`,
+  like the uv image. Before this a Docker Hub re-push of the tag reached
+  Render on bits trivy never scanned. Dependabot bumps the tag and digest
+  together, and opens digest-only PRs when Docker Hub rebuilds the same tag.
+  The cost: Debian security fixes in those rebuilds, which the next Render
+  build used to pick up silently, now wait for that PR (7-day cooldown).
+  Accepted, since a reviewed, scanned image is the point of the pin.
+  `frontend/Dockerfile` is pinned the same way (#634), and that cost mostly
+  skips it: its nginx stage runs `apk --no-cache upgrade` at build time, so
+  Alpine OS fixes land without a Dependabot PR (nginx itself comes from
+  nginx.org's repo and still waits for one), and its node stage only emits
+  static files.
+- **No compiler in the image.** Every package in `uv.lock` ships a wheel for
+  cp314, abi3 or py3 on manylinux x86_64, so `build-essential` (~200MB)
+  compiled nothing. A future package without a wheel fails
+  `uv sync --locked` in the image build, which CI runs on every PR, so the
+  failure shows up in review, not on Render.
+- **CI and the image may run different 3.14 patches; accepted.**
+  `backend/.python-version` stays at `3.14`, so setup-python takes whatever
+  3.14.x the runner has, while the image moves on Dependabot patch PRs.
+  Rejected: pinning the patch there, as #609 did for uv. Dependabot bumps the
+  image's patch automatically (#620) but cannot edit `.python-version`, so
+  every patch PR would need a hand edit, or a CI check tying the two, which
+  makes every automatic PR manual. uv can be pinned exactly because
+  Dependabot skips the uv image. A patch gap within one minor is small, and
+  it closes once the patch PR merges and the runners catch up.
+
+## 2026-10-19 - MODEL_RATES prices chat turns, with Google's dated price changes (#622)
+
+Google doubles every `gemini-3.8-flash` rate on 2027-01-01. Chat turns were
+priced from litellm's map, which production fetches at import, so turns would
+meter at half price until litellm updated its JSON and the backend restarted.
+The per-user and global caps would let through about twice the intended spend.
+
+- **litellm still does the arithmetic.** `register_rates` loads `MODEL_RATES`
+  into litellm's map, so `completion_cost` keeps handling cached and thinking
+  tokens. Metering `usage x MODEL_RATES` directly would have meant
+  re-implementing the cache discount. A test pins `completion_cost` to usage
+  times our rates, so the two sources cannot drift. (Superseded by #643: chat
+  turns now price from usage x `MODEL_RATES` directly.)
+- **The 2027 price is scheduled, not a reminder.** `SCHEDULED_RATES` holds the
+  announced rates with their start date, and a running process switches on
+  its first turn of 2027-01-01 UTC. That replaces a human edit timed for
+  New Year.
+
+## 2026-10-19 - gemini-3.8-flash is the model for every LLM purpose (#602)
+
+Production moved from `gemini-3.5-flash-lite` to `gemini-3.8-flash`, and #621
+made it the configured default.
+
+- **Decision:** 3.8 Flash for chat, follow-up and summary calls. The maintainer
+  judges Flash capable for all of them and Lite not worth the quality loss.
+- **Accepted cost:** about 5x per turn, roughly $0.014 against $0.003 (estimated
+  2026-10-18 from eval measurements and production `llm_call_log`), and twice
+  that from 2027-01-01 when Google doubles the rates (see the #622 entry).
+- **Safeguards:** the per-user message cap and soft/hard USD caps, plus a global
+  daily cap (`GLOBAL_DAILY_COST_CAP_USD`, set by the maintainer in #603).
+- **Deferred:** routing the cheaper purposes (follow-up, summary) to Lite, a
+  hybrid setup, waits on a maintainer decision. 3.5 Flash-Lite stays in
+  `MODEL_RATES` as the env-selectable cheap fallback.
+
+## 2026-10-18 - basedpyright with a baseline types the backend, in CI and the editor (#607, #616)
+
+The backend had a pyright config but nothing ran it, and fixing its 95
+errors to zero would touch about 20 files during the #493 refactor.
+
+- **basedpyright, not pyright.** Its built-in baseline makes CI fail only on
+  new errors, with no custom baseline script. `--baselinemode=lock` also
+  fails (exit 3) when a fixed error stays in the baseline, so the baseline
+  only shrinks unless a PR rewrites it with `--writebaseline`, which shows up
+  in review. #607 asked that fixing a baselined error never fail CI; #616's
+  shrink-only rule wins, and the fix is one local run.
+- **The editor uses it too.** The official `pyright-lsp` plugin can't read a
+  baseline, so it reported all 95 errors after every edit, on lines the edit
+  never touched. A repo-local plugin runs basedpyright's language server on
+  the same config and baseline. Its server still sends baselined errors as
+  hints, which reached Claude after every edit in testing, so the plugin
+  sets `disableTaggedHints` and only new errors come back. `pyright-lsp` is
+  turned off for this repo only.
+- **The plugin is enabled locally.** `.claude/` stays gitignored, so each
+  checkout adds the marketplace and `enabledPlugins` lines itself
+  (`docs/reference.md` "Backend typecheck") rather than the repo tracking the
+  hook setup.
+
+## 2026-10-18 - Graded Set scores reach subtopic_levels through the tutor (#612, #614)
+
+R4.1 AC3's `tested_progression` eval scored 0: every Item was graded
+correct, yet `subtopic_levels` stayed `{}`. Nothing tied a graded Check to a
+subtopic level. The rules only said to set one when the learner "declares or
+demonstrates" it, and server grading writes mastery, gaps and (for a
+Diagnostic) `knowledge_level`, never `subtopic_levels`.
+
+- **The tutor writes the level, from a prompt rule.** On a `[check results]`
+  turn of an ordinary Check whose Set has an answered Item and whose gap is a
+  subtopic of the TOPIC, the tutor patches `subtopic` + `subtopic_level` with
+  `evidence_type="tested"`. The level uses the Diagnostic thresholds
+  (`_level_for_score`) over answered Items, the score the summary shows; a
+  Diagnostic also counts skips.
+  AC3 measures how reliably the LLM patches subtopic levels. Also, the server
+  can't tell a subtopic ("u-substitution") from a one-off misconception gap
+  ("sign error in the chain rule"), so a server write would fill the
+  `MAX_SUBTOPICS` cap with junk keys. Diagnostic Sets still write only
+  `knowledge_level`.
+- **Fallback, if the rule can't reach 85%: a hybrid.** The tutor creates
+  entries; server grading updates levels on existing keys only. That needs a
+  new triage decision.
+- **A tutor subtopic patch needs evidence (#614).** `apply_patch` fails the
+  whole patch unless `evidence_type` is "declared" or "tested", the F-39
+  standard for `knowledge_level`. The learner's own edits on the profile
+  route stay ungated: editing your own level is declaring it.
+
+## 2026-10-18 - Every backend install uses the committed uv.lock (#609)
+
+Locally the backend was installed with uv against `backend/uv.lock`, but the
+lock was gitignored. CI, e2e and the Render image ran `pip install`, which
+re-resolves the `pyproject.toml` ranges on every run and deploy. litellm
+1.106.0 showed the cost: it needs `mcp` on the tool-calling path, CI went red
+on an unrelated PR, and the next deploy would have failed every tutor turn,
+while local stayed on 1.105.0 and passed.
+
+- **Commit the lock and install it everywhere with `uv sync --locked`.**
+  Upstream releases reach CI and production only as reviewed Dependabot lock
+  PRs (ecosystem `uv`). Rejected: capping litellm only (fixes this release,
+  not the next one), and committing the lock while keeping pip (pip ignores
+  `uv.lock`, so nothing would change).
+- **The image keeps pip's shape.** The venv is at `/opt/venv`, root-owned
+  outside the chowned `/app`: inside `/app`, the chown copied the whole venv
+  into a new layer (+700MB). Bytecode is compiled at install
+  (`UV_COMPILE_BYTECODE`), as pip did; without it, cold starts recompiled
+  every package under `PYTHONDONTWRITEBYTECODE`. The app is not installed as
+  a package: the old `pip install .` ran before the code was copied, so it
+  installed none either, and a project install would build with an unlocked
+  setuptools. Verified locally: the old and new images both migrate a fresh
+  Postgres and serve `/ready` in about 10s.
+- **uv is an exact pin in five places, bumped by hand in lockstep.** The
+  Dockerfile's uv image and every setup-uv `version:`; Dependabot skips the
+  image. Rejected: one range in `[tool.uv] required-version` read by
+  setup-uv. A range lets CI float to a newer patch than the image, and uv
+  enforces it on every uv that reads the project, including Dependabot's own:
+  once that moves past the range, every lock PR fails and updates stop.
+- **The backup job installs the full locked set**, not boto3 alone. A
+  boto3-only install through constraints lost uv's hash checks, on the job
+  that holds the database and R2 credentials. `--locked` cannot fail there by
+  itself: CI fails the same commit first.
+- **The lock was refreshed before it shipped.** Gitignored, it had aged
+  behind what pip resolved: its export carried 19 known CVEs in six packages
+  (starlette, anyio, urllib3, cryptography, multidict, fsspec), which this
+  change would have downgraded production to. Those six were moved to fixed
+  versions with `uv lock --upgrade-package`; everything else stays as locked.
+- **The litellm/mcp question is deferred to #610**, decided when Dependabot
+  proposes 1.106 or later. Decided early: see the 2026-10-19 #610 entry.
+
+## 2026-10-17 - A failed tool rolls back the turn's session (#569)
+
+On Postgres a tool that raised left `ctx.db` aborted, so a valid write later
+in the same batch failed with InFailedSqlTransaction, and a failed flush made
+the loop's next commit raise and end the turn `llm_failed`.
+
+- **A rollback in `dispatch`, not a savepoint around the call.** Every write
+  tool commits its own work, and a commit ends the transaction a savepoint
+  lives in. The loop commits each iteration and each write tool commits
+  itself, so the rollback discards no other tool's write.
+- **Only on an exception.** Ok and refused returns are untouched, so the
+  happy path issues no extra statements. Rejected: ending the transaction
+  after every call (closes the gap for any future swallowing tool, but adds a
+  round trip per tool and was outside the brief).
+- **A tool that swallows its own SQL error rolls back itself.** `retrieve`
+  catches its failures and returns `retrieval_failed`, so it rolls back in
+  that except arm. Rejected: a `core_savepoint` around the vector query, as
+  the pre-flight reads use (#567). It leaves the embed's commit and the
+  connection reopened after the embed uncovered, and costs two statements on
+  every successful call; the arm rollback costs nothing on success and
+  discards nothing, since the embed committed and the query only reads.
+
 ## 2026-10-14 - The card-look spec is a required check of its own (#453)
 
 #453's spec is the card refactor's only check that a move keeps the look,
@@ -721,6 +993,11 @@ terms (Check, Set, Item, Close, Recap, Diagnostic) are now in `CONTEXT.md`.
   (commit, then raise). Never by rollback: register and the message-id stamp
   run inside the tutor turn, whose flushed ledger writes must survive. No
   public function takes `commit=`.
+
+  **Amended 2026-10-17 (#569):** the ledger reason went stale with #411
+  (spend settles in the adapter's own transaction). The module still never
+  rolls back, but when register raises, the tool dispatcher now rolls the
+  turn's session back.
 - **Session end is the one named exception.** Abandon joins the caller's
   transaction and takes the lock itself, so F-33's single write window in
   `generate_and_persist` stays. Rejected: callers always commit (moves B-02's
@@ -866,6 +1143,20 @@ a test fake).
   retry was rejected because a streamed call settles synchronously in its
   exit, where a pause would either block the event loop or need a shield;
   `pool_pre_ping` already absorbs stale connections.
+  **Amended 2026-10-15 (#411):** the "no deferred retry" line is reversed;
+  the inline-retry rejection stands. A failed settlement now commits the
+  `LlmCallLog` row on its own and retries the ledger write once on a daemon
+  timer 5 s later (`_defer_ledger`), off the request path and off the event
+  loop, so it hits neither objection to an inline retry. Why: dropping the
+  spend undercounts the cap for the rest of the day, and the retry is
+  cheap. Bounds: at most 2 retries waiting per process (each holds a pooled
+  connection), booked to the original day, and every deferral logs at
+  error level so a retry lost to a restart is still on record. Durable
+  reconciliation (a pending flag plus a sweep) was rejected in #558; see
+  `.out-of-scope/llm-settlement-reconciliation.md`. Lock timeouts, also
+  #411: `SETTLE_LOCK_TIMEOUT` is 5 s. The tutor commits each iteration's
+  `record_cost` before tool dispatch, and the `retrieve` tool commits its
+  embedding metering, so no ledger row is held across slow work.
 - **A streamed call settles itself exactly once on every exit.**
   `async with stream()` yields typed events. The exit settles the real
   price, or an estimate on cancel (always) and on error (if output arrived or
@@ -879,6 +1170,29 @@ a test fake).
   user. Completions do not retry timeouts (a 30 s timeout retried twice
   would keep the user waiting 90 s or more); embeddings still do. A failed
   attempt with no output settles $0, except a timeout.
+  **Amended 2026-10-15 (#412):** a stream retries only while no chunk of any
+  kind has arrived, not merely no text event. A tool-call fragment is output
+  the vendor bills, so an attempt that received one settles its estimate
+  (prompt plus text plus tool-call arguments) and is not retried. "A failed
+  attempt with no output settles $0" stands, including an attempt whose
+  stream opened and then failed before its first chunk; that stream is
+  closed before the retry. Billing such an attempt (on the premise that the
+  vendor processed the prompt) was tried in review and reverted: it charged
+  learners during an outage with no reply. #561 settled the premise: the
+  Gemini API billing FAQ ("Am I charged for failed requests?") says a request
+  that fails with a 400 or 500 error is not charged for its tokens, though it
+  counts against quota, so $0 matches the bill for 429, 503 and 500. A
+  connection dropped mid-stream with no error status is not covered by the
+  FAQ; it is left at $0, a bounded undercount the daily budget absorbs
+  (`.out-of-scope/llm-settlement-reconciliation.md`). The tutor and the `retrieve` tool now
+  write no ledger row themselves (every call settles in the adapter), so the
+  previous amendment's "commits each iteration's `record_cost`" and
+  "commits its embedding metering" no longer apply. The retrieve tool's
+  embedding goes through `llm.get().embed`; a `CostCapExceeded` there is a
+  tool error result (code in `error`), and the next stream's gate emits the
+  cap event. The tutor's mid-turn refusal carries the exception's code, so a
+  global-ceiling refusal reports `global_cost_cap_reached` and the frontend
+  keeps the streamed text as `partial`.
 - **One module-level active adapter, one test fake.** `llm.get()` resolves
   per call. Tests install a fake provider under the real shell, so the gate,
   retry and settlement run in every test. Explicit injection was rejected
@@ -899,6 +1213,13 @@ a test fake).
   **Amended 2026-09-30 (B5):** #435 makes the stub's `embed` and `aembed`
   return deterministic fake vectors (cost 0, no network); `complete` still
   raises. Stub-mode ingestion now reaches ready.
+  **Amended 2026-10-15 (#413):** stub mode wins over a provider a test
+  installs, so `llm.get()` alone reads the flag; the `fake_llm` fixture pins
+  stub mode off instead. The shell skips the cost gate for the stub, which
+  never spends, so stub-mode output does not depend on ledger state (a capped
+  user still gets the mechanical rolling summary, not the cap's None).
+  `LlmUnavailable` carries its own code, `llm_unavailable`, so the tutor and
+  `retrieve` catch `CallRefused` without mistaking it for a cap.
 - **Tracer-bullet order.** #410 characterisation, then #411 (core plus
   summary, retrieval and ingestion), #412 (streaming and the tutor), #413
   (stub). The core is proven on low-risk callers before `run_streaming` is
@@ -1049,6 +1370,17 @@ a pure `assemble`. The renderer accepts only `PromptState`.
   inputs (retrieval, prefetch, review target, `diagnostic_accepted`) differ
   from a chat turn. Part 1 passes the omitted values as explicit blanks so
   the refactor itself stays byte-identical.
+  **Amended 2026-10-15 (#395):** the blanks include the Check pointer
+  (`current_check`), which the follow-up also omitted; the golden's set-1-of-2
+  case fails if it leaks. Gap accuracy is injectable too, and the follow-up
+  passes `{}`: a query it then discarded would also, on Postgres, abort the
+  follow-up's transaction whenever it failed.
+- **Injectable inputs default to `NOT_LOADED`, not None (#395).**
+  `gather_session_inputs` queries only what the caller did not pass, but an
+  ingestion status of None is a real value (no documents). With None as the
+  "not passed" marker, a document-less chat turn would re-query and break the
+  statement budget, so the injectable inputs (learner prefs, ingestion
+  status, gap accuracy) use a sentinel.
 - **The follow-up's `ToolContext.diagnostic_required` moves in #396, not
   #395.** In part 1 the follow-up's prompt state carries a blanked
   `diagnostic_required = False` to keep the rendered prompt identical (the

@@ -90,7 +90,7 @@ def from_tool_calls(tool_calls_json: str | None) -> TopicSuggestions | None:
     calls; None when it made no successful suggest_topics call."""
     try:
         calls = json.loads(tool_calls_json or "[]")
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return None
     if not isinstance(calls, list):
         return None

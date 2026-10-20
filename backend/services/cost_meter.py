@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from db.models import DailyCostLedger, LlmCallLog
 from lib.error_codes import DAILY_COST_CAP_REACHED, GLOBAL_COST_CAP_REACHED
+from lib.llm_errors import CallRefused
 from services.sql_dialect import dialect_insert
 
 log = logging.getLogger(__name__)
@@ -77,15 +78,18 @@ def current_spend(db: Session, user_id: str) -> Decimal:
     return _to_decimal(total)
 
 
-def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
+def _upsert_delta(
+    db: Session, user_id: str, delta: Decimal, date_utc: str | None = None
+) -> Decimal:
     """One atomic INSERT .. ON CONFLICT DO UPDATE .. RETURNING against today's
-    ledger row; returns the post-write total. `delta` may be negative.
+    ledger row (or `date_utc`'s); returns the post-write total. `delta` may be
+    negative.
 
     Shared by record_cost / reserve_cost / adjust_cost so all three serialize
     on the same row the same way (F-17).
     """
     ins = dialect_insert(db)(DailyCostLedger).values(
-        user_id=user_id, date_utc=_today_utc(), cost_usd=delta
+        user_id=user_id, date_utc=date_utc or _today_utc(), cost_usd=delta
     )
     stmt = ins.on_conflict_do_update(
         index_elements=["user_id", "date_utc"],
@@ -98,8 +102,9 @@ def _upsert_delta(db: Session, user_id: str, delta: Decimal) -> Decimal:
     return _to_decimal(db.execute(stmt).scalar_one())
 
 
-def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
-    """Atomically add `cost_usd` to today's ledger row for `user_id` and
+def record_cost(db: Session, user_id: str, cost_usd, *, date_utc: str | None = None) -> Decimal:
+    """Atomically add `cost_usd` to today's ledger row for `user_id` (or the
+    `date_utc` row, for a deferred write booked to the day it was spent) and
     return the new total (F-17: INSERT .. ON CONFLICT DO UPDATE, so two
     concurrent writers serialize on the row instead of read-modify-writing
     a stale total). Safe to call with 0 (no-op write avoided). Flushes into
@@ -108,7 +113,7 @@ def record_cost(db: Session, user_id: str, cost_usd) -> Decimal:
     cost = _quantize(_to_decimal(cost_usd))
     if cost <= _ZERO:
         return current_spend(db, user_id)
-    return _upsert_delta(db, user_id, cost)
+    return _upsert_delta(db, user_id, cost, date_utc)
 
 
 def reserve_cost(db: Session, user_id: str, amount) -> Decimal:
@@ -156,9 +161,10 @@ def log_call(
     prompt_tokens: int | None = None,
     completion_tokens: int | None = None,
     cached_tokens: int | None = None,
-) -> None:
+) -> bool:
     """Best-effort per-call attribution row. Never raises: a failed log
-    write must not fail the user's turn. Cap gating stays on the daily
+    write must not fail the user's turn. Returns False when the write failed,
+    so a caller that owes a reconciliation record can log one. Cap gating stays on the daily
     ledger; this table is analytics-only (roadmap R3 consumes it).
 
     The write happens inside a SAVEPOINT (`db.begin_nested()`): if the flush
@@ -172,7 +178,7 @@ def log_call(
     try:
         cost = _to_decimal(cost_usd)
         if cost <= _ZERO:
-            return
+            return True
         with db.begin_nested():
             db.add(
                 LlmCallLog(
@@ -186,8 +192,10 @@ def log_call(
                     cached_tokens=cached_tokens,
                 )
             )
+        return True
     except Exception as e:  # noqa: BLE001 - isolation by design
         log.warning("llm_call_log write failed: %s", e)
+        return False
 
 
 def extract_usage(resp) -> dict:
@@ -238,7 +246,7 @@ def check_cap(db: Session, user_id: str) -> CapStatus:
     return check_cap_from_spend(current_spend(db, user_id))
 
 
-class CostCapExceeded(Exception):
+class CostCapExceeded(CallRefused):
     """Raised by assert_within_caps when a spend cap blocks the operation."""
 
     def __init__(self, code: str, cap: CapStatus | None = None):
@@ -297,23 +305,41 @@ def spend_subquery(user_id: str):
 
 # Per-1000-token USD rates. Verified against ai.google.dev/gemini-api/docs/pricing
 # (standard paid tier) on 2026-08-24; update on model/pricing change.
+# The source of truth for chat pricing: a listed chat model's turn costs its
+# usage at these rates (usage_cost), never litellm's price map (#643).
+# cache_read_per_1k is optional; without it cached tokens price at the input
+# rate. Tiered or cache-write pricing would need its own fields here and in
+# usage_cost.
 MODEL_RATES: dict[str, dict[str, Decimal]] = {
-    # Google Gemini 3.5 Flash-Lite — default chat model
+    # Google Gemini 3.8 Flash — default chat model (verified 2026-10-18).
+    # Google doubles every rate on 2027-01-01; see SCHEDULED_RATES.
+    "gemini/gemini-3.8-flash": {
+        "input_per_1k": Decimal("0.000750"),  # $0.75 / 1M tokens
+        "output_per_1k": Decimal("0.003750"),  # $3.75 / 1M tokens (incl. thinking)
+        "cache_read_per_1k": Decimal("0.000075"),  # $0.075 / 1M tokens
+    },
+    # Google Gemini 3.5 Flash-Lite — previous default; kept for env-selected fallback
+    # (cache rate verified 2026-10-19)
     "gemini/gemini-3.5-flash-lite": {
         "input_per_1k": Decimal("0.000300"),  # $0.30 / 1M tokens
         "output_per_1k": Decimal("0.002500"),  # $2.50 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000030"),  # $0.03 / 1M tokens
     },
     # Google Gemini 3.1 Flash-Lite — deprecated by Google, shutdown 2027-05-07;
-    # kept for env-selected fallback
+    # kept for env-selected fallback (cache rate verified 2026-10-19)
     "gemini/gemini-3.1-flash-lite": {
         "input_per_1k": Decimal("0.000250"),  # $0.25 / 1M tokens
         "output_per_1k": Decimal("0.001500"),  # $1.50 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000025"),  # $0.025 / 1M tokens (text)
     },
     # Anthropic Claude Sonnet 5 — project fallback model if gemini underperforms
-    # (verified against the Claude API price table 2026-09-10)
+    # (verified against the Claude API price table 2026-09-10; cache hits
+    # 2026-10-19 at platform.claude.com/docs/en/about-claude/pricing). Inert
+    # until a request sets cache_control; cache writes would need their own field.
     "anthropic/claude-sonnet-5": {
         "input_per_1k": Decimal("0.002"),  # $2.00  / 1M tokens
         "output_per_1k": Decimal("0.010"),  # $10.00 / 1M tokens
+        "cache_read_per_1k": Decimal("0.000200"),  # $0.20 / 1M tokens
     },
     # Google Gemini embedding model
     "gemini/gemini-embedding-2": {
@@ -322,25 +348,72 @@ MODEL_RATES: dict[str, dict[str, Decimal]] = {
     },
 }
 
+# Announced price changes: model -> [(first UTC day, rates)], oldest first.
+# rates_for applies the latest one in effect, else the MODEL_RATES entry.
+SCHEDULED_RATES: dict[str, list[tuple[str, dict[str, Decimal]]]] = {
+    # Verified against ai.google.dev/gemini-api/docs/pricing 2026-10-18.
+    "gemini/gemini-3.8-flash": [
+        (
+            "2027-01-01",
+            {
+                "input_per_1k": Decimal("0.001500"),  # $1.50 / 1M tokens
+                "output_per_1k": Decimal("0.007500"),  # $7.50 / 1M tokens (incl. thinking)
+                "cache_read_per_1k": Decimal("0.000150"),  # $0.15 / 1M tokens
+            },
+        ),
+    ],
+}
+
+
+def rates_for(model: str) -> dict[str, Decimal] | None:
+    """Per-1k rates for `model` in effect today (UTC), or None if unknown."""
+    rates = MODEL_RATES.get(model)
+    today = _today_utc()
+    for first_day, scheduled in sorted(SCHEDULED_RATES.get(model, []), key=lambda s: s[0]):
+        if today >= first_day:
+            rates = scheduled
+    return rates
+
+
+def usage_cost(model: str, usage: dict) -> Decimal | None:
+    """USD for an extract_usage dict at rates_for(model): cached prompt tokens
+    at the cache rate (the input rate when none is listed), completion tokens,
+    thinking included, at the output rate. None when the model or the token
+    counts are unknown."""
+    rates = rates_for(model)
+    prompt, completion = usage.get("prompt_tokens"), usage.get("completion_tokens")
+    if rates is None or prompt is None or completion is None:
+        return None
+    cached = usage.get("cached_tokens") or 0
+    cache_rate = rates.get("cache_read_per_1k", rates["input_per_1k"])
+    return (
+        Decimal(prompt - cached) * rates["input_per_1k"]
+        + Decimal(cached) * cache_rate
+        + Decimal(completion) * rates["output_per_1k"]
+    ) / Decimal(1000)
+
 
 def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> Decimal:
-    """Return an estimated USD cost for a cancelled streaming LLM reply.
+    """Return an estimated USD cost for an LLM call without usage.
 
-    Charges the full prompt cost (all tokens were sent to the model before
-    cancellation) plus the output cost for however many tokens were streamed
-    in `delta_text`.
+    Despite the name, every estimate path uses it (listed in
+    docs/reference.md "Chat pricing source"), embeddings included. Charges the full prompt cost (all
+    tokens were sent to the model) plus the output cost for however many
+    tokens arrived in `delta_text`. Cached prompt tokens are priced at the
+    input rate on purpose; see docs/reference.md "Chat pricing source" (#647).
 
     The returned value is intentionally NOT quantized: record_cost quantizes
-    on write, so accumulating raw sub-cent cancellation costs before truncation
-    preserves arithmetic accuracy across multiple cancelled turns.
+    on write, so accumulating raw sub-cent estimates before truncation
+    preserves arithmetic accuracy across multiple estimated calls.
 
     litellm.token_counter confirmed to return sane (non-zero) counts for
-    'gemini/gemini-3.5-flash-lite' — returns 6 for a 6-word phrase — so no
+    'gemini/gemini-3.8-flash' — returns 6 for a 6-word phrase — so no
     fallback guard is needed for this model id.
 
-    Unknown models fall back to litellm.cost_per_token, then to 0.
+    Prices at rates_for(model); unknown models fall back to
+    litellm.cost_per_token, then to 0.
     """
-    rates = MODEL_RATES.get(model)
+    rates = rates_for(model)
     output_tokens = litellm.token_counter(model=model, text=delta_text or "")
     if rates is not None:
         prompt_cost = Decimal(prompt_tokens) * rates["input_per_1k"]
@@ -359,24 +432,25 @@ def estimate_cancelled_cost(model: str, delta_text: str, prompt_tokens: int) -> 
 def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
     """USD cost of a litellm.embedding response.
 
-    Tries litellm's own accounting first; on failure (pricing-table gap for
-    the model id) falls back to token math against MODEL_RATES so real spend
-    never silently registers as 0 (F-19). Unknown models return 0 with a
-    warning.
+    A model with rates prices its prompt tokens at rates_for(model), not at
+    litellm's import-time map (#630); the tokens come from the response usage,
+    else (none or 0 reported) from counting `texts`. An unknown model falls back to litellm's own
+    accounting, so real spend never silently registers as 0 (F-19), and
+    returns 0 with a warning when that fails too.
     """
-    try:
-        cost = litellm.completion_cost(completion_response=resp)
-        if cost and cost > 0:
-            return _to_decimal(cost)
-    except Exception as e:  # noqa: BLE001 - metering must not raise
-        log.warning("embedding completion_cost failed: %s", e)
-    rates = MODEL_RATES.get(model)
+    rates = rates_for(model)
     if rates is None:
+        try:
+            cost = litellm.completion_cost(completion_response=resp)
+            if cost and cost > 0:
+                return _to_decimal(cost)
+        except Exception as e:  # noqa: BLE001 - metering must not raise
+            log.warning("embedding completion_cost failed: %s", e)
         log.warning("no MODEL_RATES entry for embedding model %s; cost=0", model)
         return Decimal("0")
     try:
         tokens = extract_usage(resp)["prompt_tokens"]
-        if tokens is None:
+        if not tokens:
             tokens = sum(litellm.token_counter(model=model, text=t or "") for t in texts)
         return Decimal(tokens) * rates["input_per_1k"] / Decimal(1000)
     except Exception as e:  # noqa: BLE001
@@ -384,37 +458,3 @@ def embedding_cost(model: str, resp, texts: list[str]) -> Decimal:
         # nosemgrep: python.lang.security.audit.logging.logger-credential-leak.python-logger-credential-disclosure
         log.warning("embedding token-math fallback failed: %s", e)
         return Decimal("0")
-
-
-def meter_embedding_response(
-    db: Session,
-    resp,
-    *,
-    user_id: str,
-    session_id,
-    texts: list[str],
-    purpose: str = "embedding",
-) -> Decimal:
-    """Record an embedding call on the capped ledger and the analytics log
-    (F-19). Never raises: metering must not fail the calling feature.
-
-    Returns the metered cost (Decimal("0") if metering failed outright), so
-    callers can re-record real vendor spend after a later transaction
-    rollback (F-27).
-    """
-    try:
-        cost = embedding_cost(settings.embedding_model, resp, texts)
-        record_cost(db, user_id, cost)
-        log_call(
-            db,
-            user_id=user_id,
-            session_id=session_id,
-            purpose=purpose,
-            model=settings.embedding_model,
-            cost_usd=cost,
-            **extract_usage(resp),
-        )
-        return cost
-    except Exception as e:  # noqa: BLE001
-        log.warning("embedding metering failed: %s", e)
-        return _ZERO

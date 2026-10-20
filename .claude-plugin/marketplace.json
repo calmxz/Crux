@@ -1,0 +1,14 @@
+{
+  "name": "crux-local",
+  "owner": {
+    "name": "calmxz"
+  },
+  "description": "Repo-local Claude Code plugins for Crux",
+  "plugins": [
+    {
+      "name": "basedpyright-lsp",
+      "description": "basedpyright language server for the backend, reading backend/pyrightconfig.json and its committed baseline",
+      "source": "./plugins/basedpyright-lsp"
+    }
+  ]
+}

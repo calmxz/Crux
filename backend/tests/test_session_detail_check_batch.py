@@ -9,7 +9,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, LearningEvent, User
 from db.models import Session as SessionModel
-from services import check_question_service
+from services import check_service
 
 USER_ID = "u_detail_1"
 SID = "s_detail_1"
@@ -76,7 +76,7 @@ def test_open_batch_message_suppressed(client, seeded):
         user_id=USER_ID,
         turn_started_at=datetime(2026, 1, 1, tzinfo=timezone.utc),
     )
-    check_question_service.register(
+    check_service.register(
         db,
         ctx,
         AskCheckQuestionsArgs(
@@ -90,10 +90,12 @@ def test_open_batch_message_suppressed(client, seeded):
         ),
     )
     m = _msg(db)
-    check_question_service.attach_message_id(db, SID, m.id)
-    # Answer one item -> per-answer write stamps check_batch_json while OPEN.
-    check_question_service.answer(db, SID, index=0, selected_index=0)
-    check_question_service.write_check_batch(db, check_question_service.get_pending_check(db, SID))
+    check_service.stamp_message_id(db, SID, m.id)
+    # Clicks no longer write the Recap (#419), but rows written by older code
+    # can still carry one while the set is open; stamp it by hand.
+    check_service.answer(db, SID, index=0, selected_index=0)
+    check_service._freeze_recap(db, check_service.open_set(db.get(SessionModel, SID)))
+    db.commit()
 
     r = client.get(f"/api/sessions/{SID}?user_id={USER_ID}")
     msg = next(x for x in r.json()["messages"] if x["id"] == m.id)

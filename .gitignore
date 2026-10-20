@@ -14,7 +14,6 @@ docs/dev/debug-accounts.txt
 *.pem
 *.crt
 service-account*.json
-firebase-*.json
 .claude/
 # MCP server config (env-var refs only, no secrets) — local-only like .claude/.
 .mcp.json
@@ -42,7 +41,6 @@ backend/.pytest_cache/
 backend/htmlcov/
 backend/.coverage
 .coverage
-backend/uv.lock
 
 # Data volumes (never commit SQLite, uploads, or ChromaDB).
 # Both `data/` at repo root and `backend/data/` matter: when uvicorn is
@@ -75,8 +73,6 @@ Thumbs.db
 
 
 CLAUDE.md
-DESIGN.md
-PRODUCT.md
 .superpowers/
 
 .playwright-mcp/

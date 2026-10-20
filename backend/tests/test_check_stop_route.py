@@ -17,8 +17,7 @@ from config import settings
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import ChatMessage, User
 from db.models import Session as SessionModel
-from services import check_question_service as cq
-from services import pending_check_store as pcs
+from services import check_service as cq
 from services import profile_service, rate_limit
 
 USER_ID = "u_check_stop"
@@ -116,9 +115,9 @@ def test_stop_mid_set_grades_remaining_as_skipped_and_reacts(client, db_session,
     assert "  Q2 skipped." in last["content"]
     assert captured["ctx"].suppress_check is True
     db_session.expire_all()
-    assert cq.get_pending_check(db_session, SESSION_ID) is None
-    assert pcs.get_current_check(db_session, SESSION_ID) is None
-    assert cq.get_quiz_cooldown(db_session, SESSION_ID)["gap"] == "glycolysis"
+    assert cq.open_set(db_session.get(SessionModel, SESSION_ID)) is None
+    assert cq.current_check(db_session.get(SessionModel, SESSION_ID)) is None
+    assert cq.quiz_cooldown(db_session.get(SessionModel, SESSION_ID))["gap"] == "glycolysis"
     # The synthetic summary is never persisted as a user turn.
     assert db_session.query(ChatMessage).filter_by(session_id=SESSION_ID, role="user").count() == 0
 
@@ -127,7 +126,7 @@ def test_stop_between_sets_records_where_the_learner_stopped(client, db_session,
     _register(db_session, 1, 3, "glycolysis")
     cq.answer(db_session, SESSION_ID, 0, 0)
     cq.answer(db_session, SESSION_ID, 1, 0)
-    cq.close_set(db_session, SESSION_ID, cq.get_pending_check(db_session, SESSION_ID))
+    cq.complete(db_session, SESSION_ID)
     captured = _fake_tutor(monkeypatch)
 
     status, _body = _stop(client)
@@ -135,7 +134,7 @@ def test_stop_between_sets_records_where_the_learner_stopped(client, db_session,
     assert status == 200
     assert captured["messages"][-1]["content"] == ("[check results] learner stopped at set 1 of 3.")
     db_session.expire_all()
-    assert pcs.get_current_check(db_session, SESSION_ID) is None
+    assert cq.current_check(db_session.get(SessionModel, SESSION_ID)) is None
 
 
 def test_stop_mid_diagnostic_prompts_from_the_graded_profile(client, db_session, monkeypatch):
@@ -184,7 +183,7 @@ def test_stop_at_daily_cap_still_stops_but_skips_the_reaction(client, db_session
     assert status == 200
     assert "followup_skipped" in body
     db_session.expire_all()
-    assert cq.get_pending_check(db_session, SESSION_ID) is None
+    assert cq.open_set(db_session.get(SessionModel, SESSION_ID)) is None
 
 
 def test_chat_message_mid_set_leaves_the_set_open(client, db_session, monkeypatch):
@@ -202,16 +201,16 @@ def test_chat_message_mid_set_leaves_the_set_open(client, db_session, monkeypatc
     assert captured["messages"][-1] == {"role": "user", "content": LEARNER_TEXT}
     assert '"current_question": {"question": "glycolysis Q1?"' in captured["system_prompt"]
     db_session.expire_all()
-    pc = cq.get_pending_check(db_session, SESSION_ID)
+    pc = cq.open_set(db_session.get(SessionModel, SESSION_ID))
     assert pc is not None and pc["current_index"] == 1
-    assert pcs.get_current_check(db_session, SESSION_ID)["last_set_index"] == 1
+    assert cq.current_check(db_session.get(SessionModel, SESSION_ID))["last_set_index"] == 1
 
 
 def test_chat_between_sets_tells_the_tutor_to_pose_the_next_set(client, db_session, monkeypatch):
     _register(db_session, 1, 3, "glycolysis")
     cq.answer(db_session, SESSION_ID, 0, 0)
     cq.answer(db_session, SESSION_ID, 1, 0)
-    cq.close_set(db_session, SESSION_ID, cq.get_pending_check(db_session, SESSION_ID))
+    cq.complete(db_session, SESSION_ID)
     captured = _fake_tutor(monkeypatch)
 
     _stream(client, "/api/chat/stream", json={"session_id": SESSION_ID, "message": "ok"})

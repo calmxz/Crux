@@ -3,7 +3,8 @@
 TOOLS exposes OpenAI-format function declarations to the LLM. dispatch()
 validates incoming JSON args via the generated contract models before
 routing to the corresponding service. Any exception is converted to a
-ToolResult(ok=False) so the agent loop can surface it back to the LLM.
+ToolResult(ok=False) so the agent loop can surface it back to the LLM, and
+the session is rolled back so the failure stays the tool's own (#569).
 """
 
 import logging
@@ -21,7 +22,7 @@ from contracts import (
 )
 from lib import error_codes
 from services import (
-    check_question_service,
+    check_service,
     profile_service,
     retrieval_service,
     topic_suggest_service,
@@ -46,8 +47,8 @@ TOOLS = [
                 " things the user explicitly stated, tested for server-graded"
                 " check-question outcomes, and inferred for observed behaviour."
                 " Inferred mastery is ignored server-side."
-                " Setting knowledge_level REQUIRES evidence_type declared or"
-                " tested; without it the patch fails."
+                " Setting knowledge_level or a subtopic_level REQUIRES"
+                " evidence_type declared or tested; without it the patch fails."
                 " To clear focus_target_gap, send it as null AND provide focus_clear_reason;"
                 " omitting focus_target_gap leaves focus unchanged."
                 " Provide subtopic and subtopic_level together to record the"
@@ -127,9 +128,7 @@ def dispatch(name: str, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
         if name == "retrieve_chunks":
             return retrieval_service.retrieve(ctx.db, ctx, RetrieveChunksArgs.model_validate(args))
         if name == "ask_check_questions":
-            return check_question_service.register(
-                ctx.db, ctx, AskCheckQuestionsArgs.model_validate(args)
-            )
+            return check_service.register(ctx.db, ctx, AskCheckQuestionsArgs.model_validate(args))
         if name == "suggest_topics":
             return topic_suggest_service.register(
                 ctx.db, ctx, SuggestTopicsArgs.model_validate(args)
@@ -139,9 +138,33 @@ def dispatch(name: str, args: dict[str, Any], ctx: ToolContext) -> ToolResult:
         # The model authored these args and needs the field-level detail to
         # repair the call, so this message is deliberately not coarsened.
         log.warning("tool dispatch failed name=%s error=%s", name, e)
+        _rollback(ctx, name)
         return ToolResult(ok=False, status="failed", error=str(e))
     except Exception as e:
         # G-04: internal exception text (session ids, SQL, file paths) is
         # operator detail, not model input. Log it; hand back a coarse code.
         log.warning("tool dispatch failed name=%s error=%s", name, e)
+        _rollback(ctx, name)
         return ToolResult(ok=False, status="failed", error=error_codes.TOOL_FAILED)
+
+
+def _rollback(ctx: ToolContext, name: str) -> None:
+    """#569: release whatever transaction state the failed tool left on
+    ctx.db. On Postgres a failed statement aborts the transaction, so the next
+    tool in the batch and the loop's next commit would fail with it.
+
+    A rollback, not a savepoint around the call: every write tool commits its
+    own work, and a commit ends the outer transaction a savepoint lives in.
+    The tutor commits at the top of every iteration and each write tool
+    commits itself, so this discards no other tool's write. Runs on the
+    dispatch thread, before the loop touches ctx.db again. Never raises."""
+    try:
+        ctx.db.rollback()
+    except Exception as e:
+        log.warning(
+            "tool dispatch rollback failed name=%s session_id=%s user_id=%s error=%s",
+            name,
+            ctx.session_id,
+            ctx.user_id,
+            e,
+        )

@@ -14,7 +14,7 @@ from services import cost_meter
 
 
 def test_log_call_writes_row(db_session):
-    cost_meter.log_call(
+    written = cost_meter.log_call(
         db_session,
         user_id="u1",
         session_id="s1",
@@ -22,6 +22,7 @@ def test_log_call_writes_row(db_session):
         model="gemini/gemini-3.5-flash-lite",
         cost_usd=Decimal("0.0032"),
     )
+    assert written is True
     row = db_session.query(LlmCallLog).one()
     assert row.purpose == "chat" and row.session_id == "s1"
     assert row.cost_usd == Decimal("0.0032")
@@ -39,9 +40,10 @@ def test_log_call_zero_cost_skipped(db_session):
     assert db_session.query(LlmCallLog).count() == 0
 
 
-def test_log_call_failure_is_isolated(db_session):
+def test_log_call_failure_is_isolated(db_session, expect_app_log):
+    expect_app_log("llm_call_log write failed")
     with patch.object(db_session, "add", side_effect=RuntimeError("boom")):
-        cost_meter.log_call(
+        written = cost_meter.log_call(
             db_session,
             user_id="u1",
             session_id="s1",
@@ -49,15 +51,17 @@ def test_log_call_failure_is_isolated(db_session):
             model="m",
             cost_usd=Decimal("0.01"),
         )  # must not raise
+    assert written is False  # the adapter error-logs a lost row on False
 
 
-def test_log_call_flush_failure_does_not_break_session(db_session):
+def test_log_call_flush_failure_does_not_break_session(db_session, expect_app_log):
     """Stronger isolation check: a failure during flush (not just db.add)
     must not leave the session in SQLAlchemy's rollback-required state --
     otherwise the caller's next unguarded db.commit() (e.g. persisting the
     assistant message) would raise and fail the user's turn."""
+    expect_app_log("llm_call_log write failed")
     with patch.object(db_session, "flush", side_effect=RuntimeError("boom")):
-        cost_meter.log_call(
+        written = cost_meter.log_call(
             db_session,
             user_id="u1",
             session_id="s1",
@@ -65,6 +69,7 @@ def test_log_call_flush_failure_does_not_break_session(db_session):
             model="m",
             cost_usd=Decimal("0.01"),
         )  # must not raise
+    assert written is False  # the adapter error-logs a lost row on False
 
     # Session must still be usable: no row was committed (savepoint rolled
     # back), and further work on the session must not raise.

@@ -43,14 +43,14 @@ FORMAT_VERSION = 1
 def _citations(raw: str | None) -> list[Citation]:
     try:
         return [Citation(**c) for c in json.loads(raw or "[]")]
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return []
 
 
 def _options(raw: str | None) -> list[str]:
     try:
         data = json.loads(raw or "[]")
-    except (ValueError, TypeError):
+    except ValueError, TypeError:
         return []
     if not isinstance(data, list) or not all(isinstance(o, str) for o in data):
         return []

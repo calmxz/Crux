@@ -15,18 +15,15 @@ immediately deletes rows, but you should not be poking prod with tests.
 
 from __future__ import annotations
 
+import asyncio
 import os
-import uuid
 
 import pytest
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 from config import settings
-from db.database import _normalized_url
-from db.models import Document, User
-from db.models import Session as SessionModel
-from services import pgvector_store
+from db.models import Document
+from services import pgvector_store, retrieval_service
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 
@@ -36,27 +33,20 @@ pytestmark = pytest.mark.skipif(
 )
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """One engine per module. prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(
-        _normalized_url(TEST_DB),
-        connect_args={"prepare_threshold": None},
-    )
+@pytest.fixture(scope="module", autouse=True)
+def _vector_extension(pg_engine):
     # Ensure the extension + tables exist. Caller is expected to have run
     # `alembic upgrade head` against the test DB; this is a belt-and-braces
     # check so the failure mode is a useful message, not a SQL error.
-    with eng.connect() as conn:
+    with pg_engine.connect() as conn:
         conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         conn.commit()
-    yield eng
-    eng.dispose()
 
 
 @pytest.fixture
-def db(engine):
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    s = Session()
+def db(pg_seed):
+    # On pg_seed's factory, so this session closes before the seed teardown.
+    s = pg_seed.Session()
     try:
         yield s
     finally:
@@ -76,23 +66,10 @@ def _vec(slot: int) -> list[float]:
 
 
 @pytest.fixture
-def seeded_session(db):
-    """Seed a unique user/session/document/chunks tuple. Cleans up on teardown
-    so successive test runs don't accumulate rows in shared test DBs."""
-    user_id = f"u-{uuid.uuid4().hex[:8]}"
-    session_id = f"s-{uuid.uuid4().hex[:8]}"
-
-    db.add(User(id=user_id))
-    db.flush()
-    db.add(
-        SessionModel(
-            id=session_id,
-            user_id=user_id,
-            topic="vector-test",
-            topic_profile_json="{}",
-        )
-    )
-    db.flush()
+def seeded_session(db, pg_seed):
+    """Seed a unique user/session/document/chunks tuple, removed by the
+    shared teardown (conftest pg_seed)."""
+    _, user_id, session_id = pg_seed("vec-pg", topic="vector-test", topic_profile_json="{}")
     doc = Document(session_id=session_id, filename="t.pdf", status="ready")
     db.add(doc)
     db.commit()
@@ -112,21 +89,7 @@ def seeded_session(db):
     )
     db.commit()
 
-    yield {"session_id": session_id, "doc_id": doc.id, "user_id": user_id}
-
-    # Teardown: delete in FK order. Wrapped in try/except so a partial seed
-    # doesn't leave the test in error state on cleanup failure.
-    try:
-        db.execute(
-            text("DELETE FROM chunk_embeddings WHERE session_id = :sid"),
-            {"sid": session_id},
-        )
-        db.execute(text("DELETE FROM documents WHERE session_id = :sid"), {"sid": session_id})
-        db.execute(text("DELETE FROM sessions WHERE id = :sid"), {"sid": session_id})
-        db.execute(text("DELETE FROM users WHERE id = :uid"), {"uid": user_id})
-        db.commit()
-    except Exception:
-        db.rollback()
+    return {"session_id": session_id, "doc_id": doc.id, "user_id": user_id}
 
 
 def test_cosine_query_returns_nearest_first(db, seeded_session):
@@ -143,6 +106,49 @@ def test_cosine_query_returns_nearest_first(db, seeded_session):
     assert hits[0].score is not None and hits[0].score < 0.01
     for h in hits[1:]:
         assert h.score is not None and h.score > 0.5
+
+
+def test_prefetch_searches_inside_its_savepoint(db, seeded_session):
+    """#567: prefetch_for_prompt's search runs in a savepoint, with the HNSW
+    tuning's own savepoint nested in it. The search still returns the
+    nearest chunk, and the transaction-scoped tuning survives both RELEASEs
+    (query_vec is passed in, so nothing commits and no ready check runs, #571)."""
+    chunks = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db,
+            seeded_session["session_id"],
+            seeded_session["user_id"],
+            "joins",
+            k=3,
+            query_vec=_vec(1),
+        )
+    )
+    assert chunks is not None and "joins" in chunks[0]["text"]
+    ef_search = db.execute(text("SELECT current_setting('hnsw.ef_search')")).scalar_one()
+    assert ef_search == str(int(settings.hnsw_ef_search))
+
+
+def test_prefetch_with_vector_skips_document_gone_non_ready(db, seeded_session, caplog):
+    """#571: with a query_vec there is no ready check, so the document going
+    non-ready after the fallback's check is caught only by the search's
+    status filter (F-27). Its chunks are never served, and no failure is
+    logged: the None comes from no hits, not from the except path."""
+    doc = db.get(Document, seeded_session["doc_id"])
+    doc.status = "pending"
+    db.commit()
+
+    chunks = asyncio.run(
+        retrieval_service.prefetch_for_prompt(
+            db,
+            seeded_session["session_id"],
+            seeded_session["user_id"],
+            "joins",
+            k=3,
+            query_vec=_vec(1),
+        )
+    )
+    assert chunks is None
+    assert "prefetch_for_prompt failed" not in caplog.text
 
 
 def test_query_respects_session_isolation(db, seeded_session):
@@ -203,8 +209,3 @@ def test_delete_document_chunks_removes_only_that_document(db, seeded_session):
     # Target's chunks gone; the other document's chunk survives.
     survivors = pgvector_store.query_chunks(db, session_id=sid, query_embedding=_vec(4), k=10)
     assert [c.doc_id for c in survivors] == [other.id]
-
-    # Teardown for the extra doc (seeded_session only cleans its own rows).
-    db.execute(text("DELETE FROM chunk_embeddings WHERE document_id = :d"), {"d": other.id})
-    db.execute(text("DELETE FROM documents WHERE id = :d"), {"d": other.id})
-    db.commit()

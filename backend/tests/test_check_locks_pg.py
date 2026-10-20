@@ -9,10 +9,10 @@ Reaching the waiter count is what proves each request blocked; no sleeps
 order anything.
 
 State is seeded as raw JSON on the session row (shapes documented in
-services/check_question_service.py and services/pending_check_store.py), not
-through service functions, so this file survives the check-module refactor
-(#419, #420). test_message_id_stamp_and_answer_both_land is the only test
-that calls a service by name (attach_message_id).
+services/check_service.py), not through service functions, so this file
+survives the check-module refactor (#419, #420).
+test_message_id_stamp_and_answer_both_land is the only test that calls a
+service by name (stamp_message_id).
 
 **Opt-in**: skipped unless `TEST_DATABASE_URL` is set, same as
 test_pgvector_retrieval.py (CI sets it and runs `alembic upgrade head`
@@ -25,23 +25,21 @@ from __future__ import annotations
 import json
 import os
 import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 
 import pytest
 from fastapi.testclient import TestClient
-from sqlalchemy import create_engine, delete, func, select, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import func, select, text
 
 from config import settings
 from contracts import TopicProfile
-from db.database import _normalized_url, get_db
-from db.models import ChatMessage, DailyCostLedger, LearningEvent, LlmCallLog, UsageCounter, User
+from db.database import get_db
+from db.models import ChatMessage, LearningEvent
 from db.models import Session as SessionModel
 from lib.error_codes import CHECK_CONFLICT, NO_OPEN_CHECK, NO_RESOLVED_BATCH
 from main import app
-from services import check_question_service, velocity_limit
+from services import check_service, velocity_limit
 from services.auth import current_user_id
 from tests.conftest import _fake_current_user_id
 
@@ -54,57 +52,25 @@ pytestmark = pytest.mark.skipif(
 
 # Request connections carry this name so the waiter poll counts only them.
 APP_NAME = "crux-check-locks-pg"
+PG_CONNECT_ARGS = {"application_name": APP_NAME}  # read by conftest pg_engine
 WAIT_TIMEOUT_S = 5.0
 JOIN_TIMEOUT_S = 15.0
 
 
-@pytest.fixture(scope="module")
-def engine():
-    """prepare_threshold=None matches prod (Supabase pooler)."""
-    eng = create_engine(
-        _normalized_url(TEST_DB),
-        connect_args={"prepare_threshold": None, "application_name": APP_NAME},
-    )
-    yield eng
-    eng.dispose()
-
-
 @pytest.fixture
-def seeded(engine):
-    """A unique user + session + asking assistant message per test; every
-    row the requests write is deleted on teardown (Postgres enforces the FKs,
-    so children go first). Yields (Session factory, uid, sid, message id)."""
-    Session = sessionmaker(bind=engine, autocommit=False, autoflush=False)
-    uid = f"lock-pg-{uuid.uuid4().hex[:12]}"
-    sid = f"lock-pg-s-{uuid.uuid4().hex[:12]}"
+def seeded(pg_seed):
+    """A unique user + session + asking assistant message per test, removed
+    by the shared teardown (conftest pg_seed). Returns (Session factory, uid,
+    sid, message id)."""
+    Session, uid, sid = pg_seed(
+        "lock-pg", topic="sql", topic_profile_json=TopicProfile().model_dump_json()
+    )
     with Session() as db:
-        db.add(User(id=uid))
-        db.flush()
-        db.add(
-            SessionModel(
-                id=sid,
-                user_id=uid,
-                topic="sql",
-                topic_profile_json=TopicProfile().model_dump_json(),
-            )
-        )
-        db.flush()
         msg = ChatMessage(session_id=sid, role="assistant", content="Quick check.")
         db.add(msg)
         db.commit()
         msg_id = msg.id
-    try:
-        yield Session, uid, sid, msg_id
-    finally:
-        with Session() as db:
-            db.execute(delete(LlmCallLog).where(LlmCallLog.user_id == uid))
-            db.execute(delete(LearningEvent).where(LearningEvent.session_id == sid))
-            db.execute(delete(ChatMessage).where(ChatMessage.session_id == sid))
-            db.execute(delete(DailyCostLedger).where(DailyCostLedger.user_id == uid))
-            db.execute(delete(UsageCounter).where(UsageCounter.user_id == uid))
-            db.execute(delete(SessionModel).where(SessionModel.id == sid))
-            db.execute(delete(User).where(User.id == uid))
-            db.commit()
+    return Session, uid, sid, msg_id
 
 
 @pytest.fixture
@@ -216,19 +182,22 @@ class _HeldRowLock:
 
 
 @pytest.fixture
-def pool():
+def pool(pg_seed):
+    """Depends on `pg_seed` so request threads finish before the seed
+    teardown deletes their rows."""
     with ThreadPoolExecutor(max_workers=2) as ex:
         yield ex
 
 
 @pytest.fixture
-def hold(engine, pool):
+def hold(pg_seed, pool):
     """Depends on `pool` so a failed test releases the lock before the pool
-    waits on the threads blocked behind it."""
+    waits on the threads blocked behind it, and on `pg_seed` so it is
+    released before the seed teardown deletes the locked row."""
     held: list[_HeldRowLock] = []
 
     def _hold(sid: str) -> _HeldRowLock:
-        lock = _HeldRowLock(engine)
+        lock = _HeldRowLock(pg_seed.engine)
         held.append(lock)  # before locking, so teardown closes it either way
         lock.lock(sid)
         return lock
@@ -300,19 +269,6 @@ def _follow_ups(Session, sid: str, msg_id: int) -> int:
                 ChatMessage.id > msg_id,
             )
         ).scalar_one()
-
-
-def _xfail_if_recap_overwritten(recap: dict, after_answer: list[str]) -> None:
-    """Lock bug found by this file, reported on #418: the answer route writes
-    the Recap after its commit, outside the row lock, so a Close (Stop or
-    session end) that freezes the Recap in that gap is overwritten with the
-    Set as the answer left it (`after_answer`, still holding a "pending"
-    Item). Only that exact snapshot xfails, and callers first assert what
-    proves the Close itself skipped the rest (cooldown, grade), so a Close
-    that stops skipping still fails red. #419 removes the write and this
-    guard."""
-    if [it["status"] for it in recap["items"]] == after_answer:
-        pytest.xfail("#419: unlocked Recap write after the answer commit overwrote the Close")
 
 
 def test_two_answers_on_one_set_serialize(app_on_postgres, hold, pool):
@@ -409,7 +365,6 @@ def test_answer_racing_stop_never_splits_the_set(app_on_postgres, hold, pool, an
         assert events == []
         expected = ["skipped", "skipped"]
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap, ["answered", "pending"])
     assert [it["status"] for it in recap["items"]] == expected
     skipped = {it["question"] for it in recap["items"] if it["status"] == "skipped"}
     assert not any(e.question in skipped for e in events)
@@ -446,7 +401,7 @@ def test_message_id_stamp_and_answer_both_land(app_on_postgres, hold, pool):
 
     def stamp():
         with Session() as db:
-            check_question_service.attach_message_id(db, sid, msg_id)
+            check_service.stamp_message_id(db, sid, msg_id)
 
     lock = hold(sid)
     answer = pool.submit(
@@ -503,18 +458,11 @@ def test_session_end_racing_a_diagnostic_answer(app_on_postgres, hold, pool):
     assert pc is None and cc is None
     assert profile.last_session_summary
 
-    events = _events(Session, sid)
-    if ra.status_code == 200:
-        # The answer landed: its event exists and the forced grade counts it
-        # (2 of 3 correct).
-        assert [e.question for e in events] == ["Q0?", "Q1?"]
-        assert profile.knowledge_level == "intermediate"
-        expected = ["answered", "answered", "skipped"]
-    else:
-        assert ra.status_code == 409
-        assert [e.question for e in events] == ["Q0?"]
-        assert profile.knowledge_level == "beginner"
-        expected = ["answered", "skipped", "skipped"]
+    # #420: the answer queued behind the end's claim rechecks ended_at under
+    # the lock and is refused, so the end grades from item 0 alone (1 of 3).
+    assert ra.status_code == 409
+    assert ra.json()["detail"] == {"code": "session_ended"}
+    assert [e.question for e in _events(Session, sid)] == ["Q0?"]
+    assert profile.knowledge_level == "beginner"
     recap = _recap(Session, msg_id)
-    _xfail_if_recap_overwritten(recap, ["answered", "answered", "pending"])
-    assert [it["status"] for it in recap["items"]] == expected
+    assert [it["status"] for it in recap["items"]] == ["answered", "skipped", "skipped"]

@@ -1,7 +1,7 @@
 """TDD: learning_events per-answer detail columns (migration 0013).
 
 record_from_answer gains optional selected_index/correct_index/options/purpose
-params; the batch answer() path in check_question_service is the sole caller
+params; the batch answer() path in check_service is the sole caller
 and must populate them from the same item dict it already grades from.
 """
 
@@ -13,7 +13,7 @@ from agent.types import ToolContext
 from contracts import AskCheckQuestionsArgs, TopicProfile
 from db.models import LearningEvent, User
 from db.models import Session as SessionModel
-from services import check_question_service, learning_event_service
+from services import check_service, learning_event_service
 
 USER_ID = "u_detail_1"
 _T0 = datetime(2026, 1, 1, tzinfo=timezone.utc)
@@ -54,7 +54,7 @@ def open_batch_session(db_session):
     db_session.add(row)
     db_session.commit()
     ctx = ToolContext(db=db_session, session_id=row.id, user_id=USER_ID, turn_started_at=_T0)
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -97,7 +97,7 @@ def diagnostic_batch_session(db_session):
         turn_started_at=_T0,
         diagnostic_required=True,
     )
-    check_question_service.register(
+    check_service.register(
         db_session,
         ctx,
         AskCheckQuestionsArgs(
@@ -147,9 +147,9 @@ def test_record_from_answer_detail_defaults_null(db, seeded_session_id):
 
 def test_batch_answer_path_populates_detail(db, open_batch_session):
     sid, _user_id = open_batch_session
-    pc = check_question_service.get_pending_check(db, sid)
+    pc = check_service.open_set(db.get(SessionModel, sid))
     item = pc["items"][0]
-    check_question_service.answer(db, sid, index=0, selected_index=item["correct_index"])
+    check_service.answer(db, sid, index=0, selected_index=item["correct_index"])
     row = (
         db.query(LearningEvent)
         .filter(LearningEvent.session_id == sid)
@@ -164,9 +164,9 @@ def test_batch_answer_path_populates_detail(db, open_batch_session):
 
 def test_batch_answer_path_marks_diagnostic_purpose(db, diagnostic_batch_session):
     sid, _user_id = diagnostic_batch_session
-    pc = check_question_service.get_pending_check(db, sid)
+    pc = check_service.open_set(db.get(SessionModel, sid))
     item = pc["items"][0]
-    check_question_service.answer(db, sid, index=0, selected_index=item["correct_index"])
+    check_service.answer(db, sid, index=0, selected_index=item["correct_index"])
     row = (
         db.query(LearningEvent)
         .filter(LearningEvent.session_id == sid)
