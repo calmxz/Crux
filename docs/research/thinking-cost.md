@@ -23,7 +23,7 @@ A **sitting** here is what the cost notes call a "typical session": one visit of
 ## How it was measured
 
 - **Tutor.** The LearnLM guide's math-coach system instruction, verbatim, as in #684 [S6], at temperature 1.0, through the SDK's chat. The SDK sends thought signatures back automatically [S2]. Every reply carried one.
-- **Setups.** `gemini-3.5-flash-lite` at `low`; `gemini-3.8-flash` at `low` and at `medium` (its default) [S2]. `minimal` on 3.8 Flash returns HTTP 400, "Thinking level MINIMAL is not supported for this model", so `low` is its floor.
+- **Setups.** `gemini-3.5-flash-lite` at `low`; `gemini-3.8-flash` at `low` and at `medium`. The thinking guide gives `medium` as 3.8 Flash's default [S2], and AI Studio shows `medium` for it (checked 2026-10-21), so `medium` is the level that passed in #684 [S6]. Google's Gemini 3 page says instead that Gemini 3 defaults to `high` [S3], so Crux should always set the level explicitly. `minimal` on 3.8 Flash returns HTTP 400, "Thinking level MINIMAL is not supported for this model", so `low` is its floor.
 - **Learner.** 3.5 Flash-Lite at `minimal` played the three #684 learners: the one who gets it, the stuck one, and the one with the sign misconception. Their opening lines were verbatim from #684, and the rest were kept under 50 words. When the tutor wrapped up, the learner took a harder equation, so every sitting ran 15 learner turns. Each learner ran twice per setup: 6 sittings and 90 replies per setup.
 - **Read per reply** from `usage_metadata`: `prompt_token_count`, `cached_content_token_count`, `candidates_token_count`, `thoughts_token_count` [S2].
 - **Signature input.** Measured as the prompt's growth from one call to the next, minus the previous visible reply and the new learner message (`count_tokens`). Fitted against the previous reply's thinking tokens, it was 1.0 + 1.000 x thinking on Flash-Lite `low` and 3.8 Flash `low`, and 1.1 + 1.000 x on 3.8 Flash `medium` (84 turn pairs each).
@@ -71,7 +71,6 @@ The "signatures not sent back" columns assume thinking stays the same without th
 - **One subject, simulated learners.** All sittings were linear-equation algebra with a model playing the learner. Real learners and other subjects may draw different thinking.
 - **Six sittings per setup.** The spread between sittings is wide (finding 5). The means are rough.
 - **Why the cache never hit** was not investigated, and neither was the Interactions API's stateful mode [S7].
-- **3.8 Flash's default level.** The thinking guide's table gives `medium` [S2]. Google's Gemini 3 page says "If thinking_level is not specified, Gemini 3 will default to high" [S3]. These runs set the level explicitly, so the figures stand. Which level the #684 AI Studio run used is not certain.
 - **Flash-Lite's caching minimum** is still not listed on the caching page [S4]. Its prompts here never reached 4,096 anyway.
 - **Teaching at 3.8 Flash `low`** is still untested. Transcripts exist but were not scored; this note is cost only.
 - **Dropping signatures:** its effect on thinking and on teaching was not measured.
