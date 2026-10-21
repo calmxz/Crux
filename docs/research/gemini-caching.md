@@ -10,11 +10,11 @@ Research for issue #689 (child of #661). Measured on **2026-10-21** through the 
    - Hits survived 90-second gaps between turns.
    - Sittings that share a system instruction also share its cache: a second sitting got 2,034 cached tokens on its very first call.
 2. **3.8 Flash got no cache hits at all.** There were 56 calls at or above its documented 4,096-token minimum [S2], with prompts up to 9,400 tokens, between 09:44 and 10:46, on both routes. No hits on 3.8 Flash from this project as of today.
-3. **The route does not change caching.** The Interactions API's stateful mode cached the same share as `generateContent` (0.59 against 0.60), in the same 2,000-token steps.
+3. **The route does not change caching.** Google says the Interactions API's stateful mode "allows the system to more easily utilize implicit caching for the conversation history" [S5]. Here it cached the same share as `generateContent` (0.59 against 0.60), in the same 2,000-token steps.
 4. **The route does change how much thinking comes back as input.**
    - On `generateContent`, each reply's thinking returns as input one-for-one, as #688 found.
    - On Interactions, the prompt grew by 58% of the previous thinking in one sitting and by 3% in the other.
-   - In that second sitting, the prompt on several turns grew by less than the visible text alone. The server seems to trim or condense the history, and Google's docs do not describe this.
+   - In that second sitting, the prompt on several turns grew by less than the visible text alone. Either the server trims the history, or its output count includes tokens that are not sent back. Google's docs describe neither.
 5. **Which sittings-per-$5 figure to budget on:**
 
 | Setup | Cached as #688 modeled it | Cached as observed | No cache hits |
@@ -23,9 +23,9 @@ Research for issue #689 (child of #661). Measured on **2026-10-21** through the 
 | 3.8 Flash `low`, to 2026-12-31 / from 2027-01-01 | 67 / 33 | (no hits seen) | **35 / 17** |
 | 3.8 Flash `medium`, to 2026-12-31 / from 2027-01-01 | 55 / 27 | (no hits seen) | **29 / 14** |
 
-   Budget Flash-Lite on about 110, with 83 as the floor if caching stops. Budget 3.8 Flash on the no-hit figures. If 3.8 Flash ever caches like Flash-Lite does, its figures would be 51 / 25 at `low` and 44 / 22 at `medium`.
+   Budget Flash-Lite on about 110, with 83 as the floor if caching stops. This replaces #688's advice to budget everything on the no-hit figures, for Flash-Lite only. Budget 3.8 Flash on the no-hit figures. If 3.8 Flash ever caches like Flash-Lite does, its figures would be 51 / 25 at `low` and 44 / 22 at `medium`.
 6. **For the stack, the route is close to cost-neutral.** On Flash-Lite with caching, Interactions gives 110 to 112 against 110 to 111. Without hits, it is worth 1 to 7 sittings per $5, because it carries back less thinking: 3.8 Flash `medium` gets 32 to 36 instead of 29. Two things weigh against it, and neither was checked:
-   - its history handling is not documented (finding 4);
+   - its history accounting is not documented (finding 4);
    - it stores interactions on Google's servers by default [S3], which means learner conversations held server-side.
 
 ## How it was measured
