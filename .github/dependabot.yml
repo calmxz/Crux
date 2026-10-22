@@ -7,7 +7,6 @@ updates:
   # CI, e2e and the image install.
   - package-ecosystem: "uv"
     directory: "/backend"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
     cooldown:
@@ -19,7 +18,6 @@ updates:
 
   - package-ecosystem: "npm"
     directory: "/frontend"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
     cooldown:
@@ -60,7 +58,6 @@ updates:
 
   - package-ecosystem: "github-actions"
     directory: "/"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
     cooldown:
@@ -78,7 +75,6 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/backend"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
     cooldown:
@@ -101,7 +97,6 @@ updates:
 
   - package-ecosystem: "docker"
     directory: "/frontend"
-    target-branch: "dev"
     schedule:
       interval: "weekly"
     cooldown:
