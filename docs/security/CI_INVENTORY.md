@@ -4,8 +4,7 @@
 **Companion to:** `.github/workflows/ci.yml`. The 2026-05-23 security review it was written against is archived in git history (see `docs/decisions.md`).
 **Phase introduced:** Phase 6 (`phase/6-ci-security-tests`, 2026-05-23).
 
-Every job below blocks PR merge: branch protection is live on `dev` (staging)
-and `main` (prod). See "Branch protection — current state" at the end of this
+Every job below blocks PR merge: branch protection is live on `main`. See "Branch protection — current state" at the end of this
 file.
 
 ---
@@ -64,25 +63,27 @@ refactor reintroducing the finding will fail CI deterministically.
 
 ---
 
-## Branch protection — current state (verified 2026-10-14 via `gh api`)
+## Branch protection — current state (verified 2026-10-22 via `gh api`)
 
-Branch model:
-- `dev` = staging (PRs land here first)
-- `main` = production (promoted from `dev` after staging verification)
+Branch model: feature branches open PRs straight into `main`. The `dev`
+staging branch was retired on 2026-10-22 (solo maintainer).
 
-| Setting | `dev` | `main` |
-|---|---|---|
-| Required checks | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Card look (Playwright)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)` | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)`, `Analyze (python)` |
-| Required approving reviews | 1 (solo maintainer merges with `--admin`) | none |
-| Include administrators (enforce_admins) | OFF | OFF |
-| Require signed commits | OFF | ON |
-| Force pushes / deletions | blocked | blocked |
+`main` is covered by classic branch protection plus the `main Protection`
+ruleset:
+
+| Setting | `main` |
+|---|---|
+| Required checks | `Backend (pytest)`, `Frontend (Vitest + lint)`, `Security (SAST + deps + secrets + images)`, `Analyze (javascript-typescript)`, `Analyze (python)` |
+| Pull request | required, 1 approving review (ruleset; the solo maintainer bypasses with `--admin`) |
+| Include administrators (enforce_admins) | OFF |
+| Require signed commits | ON |
+| Require linear history | ON (ruleset) |
+| Force pushes / deletions | blocked |
 
 Deviations from the Phase 6 plan, recorded in `docs/decisions.md` (2026-09-23):
-`dev` requires one review instead of zero, `enforce_admins` is off on both,
-`Playwright (chromium)` is not a required check, and `Analyze (python)` is
-required on `main` only. `Card look (Playwright)` (2026-10-14) is required on
-`dev` only, as the card refactor's gate (`docs/decisions.md`, 2026-10-14).
+`enforce_admins` is off, and `Playwright (chromium)` is not a required check.
+`Card look (Playwright)` (2026-10-14) was required on `dev` only, as the card
+refactor's gate, and was not carried over to `main` when `dev` was retired.
 
 CodeQL: the `Analyze (*)` checks come from `.github/workflows/codeql.yml`
 (advanced setup). GitHub's code-scanning *default setup* is `not-configured`.
@@ -92,6 +93,7 @@ GitHub does not allow both; enabling default setup would require removing
 Verify or reapply:
 
 ```bash
-gh api repos/calmxz/Crux/branches/dev/protection --jq '.required_status_checks.contexts'
+gh api repos/calmxz/Crux/branches/main/protection --jq '.required_status_checks.contexts'
+gh api repos/calmxz/Crux/rules/branches/main --jq '.[].type'
 gh api repos/calmxz/Crux/branches/main/protection/required_signatures --jq '.enabled'
 ```

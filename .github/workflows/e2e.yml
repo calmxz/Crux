@@ -2,12 +2,12 @@ name: E2E
 
 on:
   # No paths filter, so e2e runs on every PR. It is advisory: not a required
-  # branch-protection check on dev or main (docs/decisions.md). If it is ever
+  # branch-protection check on main (docs/decisions.md). If it is ever
   # made required, keep it unfiltered: a PR skipped by a paths filter would
   # leave the check stuck at "Expected - Waiting for status" forever.
   pull_request:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
