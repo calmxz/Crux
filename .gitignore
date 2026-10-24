@@ -42,13 +42,12 @@ backend/htmlcov/
 backend/.coverage
 .coverage
 
-# Data volumes (never commit SQLite, uploads, or ChromaDB).
+# Data volumes (never commit SQLite or uploads).
 # Both `data/` at repo root and `backend/data/` matter: when uvicorn is
 # launched from `backend/`, UPLOADS_PATH / sqlite default to cwd-relative
 # `./data` which lands under `backend/`.
 data/*.db
 data/uploads/
-data/chroma/
 backend/data/
 
 # Playwright artifacts
