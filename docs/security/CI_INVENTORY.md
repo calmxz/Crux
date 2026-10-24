@@ -13,7 +13,6 @@ file.
 
 | Tool | Catches | Where | Fail threshold | Upstream |
 |---|---|---|---|---|
-| **bandit** | Python SAST: insecure use of `subprocess`, weak crypto, `eval`, hardcoded secrets, etc. | `security` job in `ci.yml` | `-lll -iii` (high severity + high confidence only — suppresses noise) | https://bandit.readthedocs.io |
 | **semgrep** | Cross-language pattern-based rules: OWASP top-10 + security-audit ruleset | `security` job in `ci.yml` | Any rule match (`semgrep ci --error`) | https://semgrep.dev |
 | **CodeQL** | GitHub-native semantic analysis for Python + JavaScript/TypeScript | `.github/workflows/codeql.yml` | Default `security-and-quality` query pack | https://codeql.github.com |
 

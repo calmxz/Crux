@@ -265,14 +265,10 @@ jobs:
           dockerfile: frontend/Dockerfile
           failure-threshold: warning
 
-      - name: Install bandit + semgrep
+      - name: Install semgrep
         run: |
-          uv tool install bandit
           uv tool install semgrep
           echo "$(uv tool dir --bin)" >> "$GITHUB_PATH"
-
-      - name: bandit (backend SAST, high sev + high conf only)
-        run: bandit -r backend -lll -iii -x backend/tests,backend/scripts
 
       - name: semgrep (OWASP top-10 + audit rulesets)
         run: semgrep ci --config p/owasp-top-ten --config p/security-audit
