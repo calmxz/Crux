@@ -21,8 +21,9 @@ file.
 
 | Tool | Catches | Where | Fail threshold | Upstream |
 |---|---|---|---|---|
-| **pip-audit** | Known CVEs in Python deps (the locked set: `uv export` of `backend/uv.lock`, hash-pinned) | `security` job in `ci.yml` | Any advisory | https://github.com/pypa/pip-audit |
-| **npm audit** | Known CVEs in npm prod deps (skips devDeps) | `security` job in `ci.yml` | `--audit-level=high` | https://docs.npmjs.com/cli/v10/commands/npm-audit |
+| **uv audit** | Known CVEs in Python deps (the locked set in `backend/uv.lock`, every extra and default group; OSV database) | `security` job in `ci.yml`: every push to `main`, and a PR only when it changes `backend/uv.lock` or `pyproject.toml`; daily in `audit.yml` | Any advisory | https://docs.astral.sh/uv/ |
+| **npm audit** | Known CVEs in npm prod deps (skips devDeps) | `security` job in `ci.yml`: every push to `main`, and a PR only when it changes `frontend/package-lock.json` or `package.json`; daily in `audit.yml` | `--audit-level=high` | https://docs.npmjs.com/cli/v10/commands/npm-audit |
+| **Daily audit alert** | Advisories published after a lockfile last changed, which no PR would see | `.github/workflows/audit.yml` (02:30 UTC) | Opens a `dependency-audit` issue, or comments when the findings change | — |
 | **Dependabot** | Weekly automated PRs to bump outdated deps (uv + npm + github-actions + docker) | `.github/dependabot.yml` | Opens PRs, doesn't fail CI directly | https://docs.github.com/en/code-security/dependabot |
 
 ## Container and Dockerfile

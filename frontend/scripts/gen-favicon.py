@@ -6,9 +6,8 @@ ImageDraw at a supersampled size and downscales with LANCZOS for each
 target icon size. Colours are the light (non-dark-mode) variant only,
 since .ico has no media-query support.
 
-Run:
-    pip install pillow   # if not already installed
-    python frontend/scripts/gen-favicon.py
+Run, from the repo root:
+    uv run --no-project --with pillow python frontend/scripts/gen-favicon.py
 """
 
 from pathlib import Path
