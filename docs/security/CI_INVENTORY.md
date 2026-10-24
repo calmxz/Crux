@@ -30,8 +30,8 @@ file.
 | Tool | Catches | Where | Fail threshold | Upstream |
 |---|---|---|---|---|
 | **hadolint** (backend + frontend) | Dockerfile lint: unsafe `apt-get`, missing `USER`, latest tags, etc. | `security` job in `ci.yml` | `warning+` | https://github.com/hadolint/hadolint |
-| **trivy** (backend image) | OS + lang-pkg CVEs in the built backend image | `security` job in `ci.yml` | `CRITICAL` only (with `ignore-unfixed`) | https://aquasecurity.github.io/trivy |
-| **trivy** (frontend image) | OS + lang-pkg CVEs in the built frontend (nginx) image | `security` job in `ci.yml` | `CRITICAL` only | same |
+| **trivy** (backend image) | OS-package CVEs in the built backend image (`vuln-type: os`; uv audit owns the Python deps) | `security` job in `ci.yml` | `CRITICAL` only (with `ignore-unfixed`) | https://aquasecurity.github.io/trivy |
+| **trivy** (frontend image) | OS-package CVEs in the built frontend (nginx) image (`vuln-type: os`; npm audit owns the npm deps) | `security` job in `ci.yml` | `CRITICAL` only (with `ignore-unfixed`) | same |
 
 ## Secrets
 
@@ -84,6 +84,8 @@ Deviations from the Phase 6 plan, recorded in `docs/decisions.md` (2026-09-23):
 `enforce_admins` is off, and `Playwright (chromium)` is not a required check.
 `Card look (Playwright)` (2026-10-14) was required on `dev` only, as the card
 refactor's gate, and was not carried over to `main` when `dev` was retired.
+With the refactor done (#453-#458) the job was removed; `card-look.spec.js`
+still runs in the advisory e2e job.
 
 CodeQL: the `Analyze (*)` checks come from `.github/workflows/codeql.yml`
 (advanced setup). GitHub's code-scanning *default setup* is `not-configured`.
