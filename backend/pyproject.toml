@@ -69,13 +69,18 @@ extend-exclude = ["contracts/models.py"]
 exclude = ["db/alembic/versions/*"]
 
 [tool.ruff.lint]
-select = ["E", "F", "B", "I"]
-ignore = ["B008", "E501"]
+# S is flake8-bandit, standing in for the bandit CI step.
+select = ["E", "F", "B", "I", "S"]
+# S110 (try-except-pass) is code hygiene, not a security finding.
+ignore = ["B008", "E501", "S110"]
 # Only a bare `_` counts as intentionally unused: CodeQL flags `_name` loop
 # variables that ruff's default pattern lets through.
 dummy-variable-rgx = "^_$"
 
 [tool.ruff.lint.per-file-ignores]
 "db/alembic/env.py" = ["E402"]
-"db/alembic/versions/*.py" = ["E402", "B007"]
-"tests/*" = ["E402"]
+"db/alembic/versions/*.py" = ["E402", "B007", "S608"]
+"scripts/*" = ["S603"]
+# Import-time invariant between two constants, not input validation.
+"services/review_queue_service.py" = ["S101"]
+"tests/*" = ["E402", "S101", "S105", "S106", "S307", "S603"]
