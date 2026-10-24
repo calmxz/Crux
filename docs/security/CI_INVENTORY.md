@@ -58,7 +58,7 @@ refactor reintroducing the finding will fail CI deterministically.
 | H-3 (maxLength caps) | `test_field_rejects_above_max_length` / `test_field_accepts_at_max_length` (15 parametrized cases each) | `backend/tests/test_max_length_validation.py` |
 | H-4 (sessions/end ownership 404) | `test_post_end_404_for_wrong_user` | `backend/tests/test_sessions_route.py` |
 | H-4 (profile ownership 404) | `test_profile_route_404_for_wrong_user` (pre-existing, retained) | `backend/tests/test_profile_route.py` |
-| H-5 (generic retrieval error, no internal leak) | `test_chroma_exception_returns_failed` + `test_chroma_exception_does_not_leak_internal_message` | `backend/tests/test_retrieval_service.py` |
+| H-5 (generic retrieval error, no internal leak) | `test_pgvector_exception_returns_failed` + `test_pgvector_exception_does_not_leak_internal_message` | `backend/tests/test_retrieval_service.py` |
 | M-3 (chunk wrapper present + payload preserved + immutable-rule warns) | `test_retrieved_chunks_wrapped_as_untrusted_in_tool_message`, `test_immutable_rules_warn_about_document_excerpt_tags`, and citation-cleanliness assertion at line 155 (all pre-existing from Phase 3, retained) | `backend/tests/test_tutor_loop.py` |
 
 ---
