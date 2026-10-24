@@ -211,24 +211,40 @@ jobs:
         with:
           version: '0.13.1'  # lockstep: backend/Dockerfile uv image
 
-      # #609: audit what ships, the locked set, not a fresh resolve of the
-      # pyproject ranges. Hashes make pip-audit take the pins as-is.
-      - name: Export locked backend deps
-        run: >-
-          uv export --directory backend --locked --all-extras --no-emit-project
-          --format requirements-txt -o "$RUNNER_TEMP/backend-requirements.txt"
+      # An audit fails on advisories published after a lockfile last changed,
+      # so on a PR the dependency audits run only when that PR changes the
+      # dependencies; a push to main always runs them, and audit.yml runs
+      # them daily and opens an issue. Gated per step, not by a paths filter:
+      # this job is a required check and must always report.
+      - name: Which dependencies changed
+        id: deps
+        shell: bash
+        env:
+          EVENT: ${{ github.event_name }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if [ "$EVENT" != "pull_request" ]; then
+            echo "backend=true" >> "$GITHUB_OUTPUT"
+            echo "frontend=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          changed() { git diff --quiet "$BASE_SHA" HEAD -- "$@" && echo false || echo true; }
+          echo "backend=$(changed backend/uv.lock backend/pyproject.toml)" >> "$GITHUB_OUTPUT"
+          echo "frontend=$(changed frontend/package-lock.json frontend/package.json)" >> "$GITHUB_OUTPUT"
 
-      - name: pip-audit (backend deps, locked)
-        uses: pypa/gh-action-pip-audit@1220774d901786e6f652ae159f7b6bc8fea6d266  # v1.1.0
-        with:
-          inputs: ${{ runner.temp }}/backend-requirements.txt
-          require-hashes: true
+      # #609: audit what ships, the locked set in backend/uv.lock (every extra
+      # and default group), not a fresh resolve of the pyproject ranges.
+      - name: uv audit (backend deps, locked)
+        if: steps.deps.outputs.backend == 'true'
+        run: uv audit --directory backend --locked
 
       - name: npm install (frontend, for audit)
+        if: steps.deps.outputs.frontend == 'true'
         working-directory: frontend
         run: npm ci
 
       - name: npm audit (frontend, prod deps, high+)
+        if: steps.deps.outputs.frontend == 'true'
         working-directory: frontend
         run: npm audit --omit=dev --audit-level=high
 

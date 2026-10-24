@@ -1,0 +1,92 @@
+name: dependency-audit
+
+# Daily audit of the locked dependencies on main. ci.yml audits a PR only
+# when that PR changes its dependencies, so an advisory published later
+# shows up here instead of failing unrelated PRs.
+on:
+  schedule:
+    - cron: "30 2 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  # The failure alert opens/comments on an issue via the gh CLI.
+  issues: write
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884  # v10.3.0
+        with:
+          version: '0.13.1'  # lockstep: backend/Dockerfile uv image
+
+      # Same audits as the security job in ci.yml. Both run even if the
+      # first fails, so the alert lists everything found.
+      - name: uv audit (backend deps, locked)
+        id: uv
+        continue-on-error: true
+        shell: bash
+        run: uv audit --directory backend --locked 2>&1 | tee "$RUNNER_TEMP/audit-backend.txt"
+
+      - name: npm install (frontend, for audit)
+        working-directory: frontend
+        run: npm ci
+
+      - name: npm audit (frontend, prod deps, high+)
+        id: npm
+        continue-on-error: true
+        working-directory: frontend
+        shell: bash
+        run: npm audit --omit=dev --audit-level=high 2>&1 | tee "$RUNNER_TEMP/audit-frontend.txt"
+
+      # One open issue at a time. A comment is added only when the findings
+      # differ from what the issue already records, so a fix blocked upstream
+      # does not post the same report every night.
+      - name: Open or update the audit issue
+        if: steps.uv.outcome == 'failure' || steps.npm.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          UV_OUTCOME: ${{ steps.uv.outcome }}
+          NPM_OUTCOME: ${{ steps.npm.outcome }}
+        run: |
+          set -euo pipefail
+          gh label create dependency-audit \
+            --color B60205 \
+            --description "Daily dependency audit found advisories on main" \
+            || true
+          findings="$RUNNER_TEMP/findings.txt"
+          : > "$findings"
+          if [ "$UV_OUTCOME" = "failure" ]; then
+            { echo "### Backend (uv audit)"; echo '```'; cat "$RUNNER_TEMP/audit-backend.txt"; echo '```'; } >> "$findings"
+          fi
+          if [ "$NPM_OUTCOME" = "failure" ]; then
+            { echo "### Frontend (npm audit)"; echo '```'; cat "$RUNNER_TEMP/audit-frontend.txt"; echo '```'; } >> "$findings"
+          fi
+          marker="<!-- audit:$(sha256sum "$findings" | cut -c1-16) -->"
+          body="$RUNNER_TEMP/body.md"
+          { echo "Run: $RUN_URL"; echo; cat "$findings"; echo; echo "$marker"; } > "$body"
+          existing=$(gh issue list --label dependency-audit --state open --limit 1 --json number --jq '.[0].number // empty')
+          if [ -z "$existing" ]; then
+            gh issue create \
+              --title "Dependency audit failing on main" \
+              --label dependency-audit \
+              --body-file "$body"
+          else
+            recorded=$(gh issue view "$existing" --json body,comments --jq '.body, .comments[].body')
+            case "$recorded" in
+              *"$marker"*) ;;
+              *) gh issue comment "$existing" --body-file "$body" ;;
+            esac
+          fi
+          exit 1
