@@ -21,7 +21,7 @@ What the learner brings to start a session: their own words, files, or both. It 
 _Avoid_: query, prompt
 
 **File**:
-A PDF, image, PowerPoint or Word document the learner gives the tutor, with their request or later in a session: course material, a problem sheet, a past exam paper, a syllabus. The session keeps it, and the tutor teaches from it.
+A PDF, image, PowerPoint or Word document the learner gives the tutor, with their request or later in a session: course material, a problem sheet, a past exam paper, a syllabus. The session keeps it, and the tutor teaches from it. A photo of the learner's own working, given as an answer in a mastery check, is not a file.
 _Avoid_: lesson file, document, attachment, upload
 
 **Session**:
@@ -44,6 +44,10 @@ _Avoid_: goal, outcome, skill
 A learning objective the learner has proven during teaching by solving a fresh problem with no help, in a way that shows the method. It decides when the mastery check is offered, and never earns mastery.
 _Avoid_: done, learned, completed
 
+**Passed**:
+A learning objective the learner has got right in a mastery check. Unlike shown, it counts toward mastery, and it stays passed.
+_Avoid_: mastered (for an objective)
+
 **Slip**:
 A careless mistake in a method the learner knows, which they fix themselves once the tutor points at it. Unlike a misconception, it changes nothing.
 _Avoid_: typo, error
@@ -57,11 +61,15 @@ A problem the tutor writes in the same shape as one the learner brought, with di
 _Avoid_: look-alike, clone
 
 **Mastery**:
-The verdict that a learner has proven they know something, earned only by passing a mastery check.
+The verdict that a learner has proven they know a topic: every learning objective not dropped has passed a mastery check, in one check or across several. It is yes or no, with no levels.
 
 **Mastery check**:
-The short test the tutor offers once the learner has shown every learning objective not dropped. Passing it is the only way to earn mastery.
+The short written test the tutor offers once the learner has shown every learning objective not dropped: closed book, with no help, and each answer marked against its model answer. Passing it is the only way to earn mastery; after a fail, the next one covers only the objectives missed.
 _Avoid_: quiz, exam, test
+
+**Model answer**:
+The worked answer the tutor writes for a mastery check problem, checked before the learner sees the problem. The learner's answer is marked against it, and the learner sees it in the result.
+_Avoid_: answer key, solution
 
 **Related topic**:
 A topic next to one the learner has just mastered, offered as what to learn next. It continues in the same session.
