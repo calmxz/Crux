@@ -12,6 +12,10 @@ _Avoid_: user, student
 The AI that teaches the learner, tracks which learning objectives they have shown, and offers a mastery check once every one not dropped is shown.
 _Avoid_: agent, bot, assistant
 
+**Owner**:
+The person who runs Crux, shares it, and decides whether a paid launch follows. Only the owner sees how many learners reached each step and what they said in feedback.
+_Avoid_: admin
+
 **Preference**:
 How the learner likes to be taught, such as with real-world examples, remembered across sessions only when the learner agrees.
 _Avoid_: profile
