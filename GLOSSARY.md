@@ -21,12 +21,16 @@ What the learner brings to start a session: their own words, files, or both. It 
 _Avoid_: query, prompt
 
 **File**:
-A PDF, image, PowerPoint or Word document the learner gives the tutor, with their request or later in a session: course material, a problem sheet, a past exam paper, a syllabus. The session keeps it, and the tutor teaches from it. A photo of the learner's own working, given as an answer in a mastery check, is not a file.
+A PDF, image, PowerPoint or Word document the learner gives the tutor, with their request or later in a session: course material, a problem sheet, a past exam paper, a syllabus. The session keeps it, within the learner's storage allowance, and the tutor teaches from it. A photo of the learner's own working, given as an answer in a mastery check, is not a file.
 _Avoid_: lesson file, document, attachment, upload
 
 **Session**:
-One line of learning that starts from a learner's request and holds its topic, any prerequisite topics, and the related topics that follow. A learner can have several sessions and resume any of them. The tutor suggests a new one for something unrelated, or for a switch away from a topic not yet mastered. The learner can decline: the new topic then follows a mastered one in the session, or replaces an unfinished one.
+One line of learning that starts from a learner's request and holds its topic, any prerequisite topics, and the related topics that follow. A learner can have several sessions and resume any of them; the tutor names each one, and the learner can rename or delete it. The tutor suggests a new one for something unrelated, or for a switch away from a topic not yet mastered. The learner can decline: the new topic then follows a mastered one in the session, or replaces an unfinished one.
 _Avoid_: chat, thread, conversation
+
+**Sitting**:
+One continuous stretch of learning in one visit. A topic is reached in a sitting or two.
+_Avoid_: lesson, visit
 
 **Topic**:
 The bounded thing a learner sets out to master: small enough to be set out as (usually) 3 to 5 learning objectives and reached in a sitting or two, and something the learner can show they know in writing. A request too broad to master (such as "calculus" or "derivatives") is narrowed into a topic (such as "the chain rule") before teaching starts; one too narrow (a single problem) is widened to the topic that contains it.
@@ -45,8 +49,12 @@ A learning objective the learner has proven during teaching by solving a fresh p
 _Avoid_: done, learned, completed
 
 **Passed**:
-A learning objective the learner has got right in a mastery check. Unlike shown, it counts toward mastery, and it stays passed.
+A learning objective the learner has got right in a mastery check. Unlike shown, it counts toward mastery, and it stays passed, in every one of the learner's sessions, unless its session is deleted.
 _Avoid_: mastered (for an objective)
+
+**Record**:
+Every topic the learner has mastered and every learning objective they have passed, across all their sessions. Every session's tutor relies on it, and the learner sees it in one list.
+_Avoid_: profile, progress, history
 
 **Slip**:
 A careless mistake in a method the learner knows, which they fix themselves once the tutor points at it. Unlike a misconception, it changes nothing.
