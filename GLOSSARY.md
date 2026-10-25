@@ -25,7 +25,7 @@ A PDF, image, PowerPoint or Word document the learner gives the tutor, with thei
 _Avoid_: lesson file, document, attachment, upload
 
 **Session**:
-One line of learning that starts from a learner's request and holds its topic, any prerequisite topics, and the related topics that follow. A learner can have several sessions and resume any of them. The tutor suggests a new one for something unrelated, or for a switch away from a topic not yet mastered.
+One line of learning that starts from a learner's request and holds its topic, any prerequisite topics, and the related topics that follow. A learner can have several sessions and resume any of them. The tutor suggests a new one for something unrelated, or for a switch away from a topic not yet mastered. The learner can decline: the new topic then follows a mastered one in the session, or replaces an unfinished one.
 _Avoid_: chat, thread, conversation
 
 **Topic**:
@@ -72,4 +72,4 @@ The worked answer the tutor writes for a mastery check problem, checked before t
 _Avoid_: answer key, solution
 
 **Related topic**:
-A topic next to one the learner has just mastered, offered as what to learn next. It continues in the same session.
+A topic the learner takes on after mastering one, in the same session: one their request or files cover, or one that builds directly on the topic just mastered. The tutor offers 2 or 3 at each mastery.
