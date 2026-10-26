@@ -8,6 +8,10 @@ Crux is an adaptive tutor: it teaches a learner a topic until they prove they ha
 The person learning with Crux.
 _Avoid_: user, student
 
+**Account**:
+What a learner signs up for and signs in to, known by one email address. It holds their sessions and their record.
+_Avoid_: profile, user
+
 **Tutor**:
 The AI that teaches the learner, tracks which learning objectives they have shown, and offers a mastery check once every one not dropped is shown.
 _Avoid_: agent, bot, assistant
