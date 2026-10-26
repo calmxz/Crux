@@ -20,6 +20,14 @@ _Avoid_: agent, bot, assistant
 The person who runs Crux, shares it, and decides whether a paid launch follows. Only the owner sees how many learners reached each step and what they said in feedback.
 _Avoid_: admin
 
+**Budget**:
+The money Crux may spend on tutoring in a month, of which no single day may spend more than a set part. When it, or the day's part, runs out, no learner is tutored until it resets, except to finish a mastery check already under way.
+_Avoid_: quota
+
+**Tutoring limit**:
+How much tutoring one learner may use, counted in what it costs: a day's worth and a week's worth, whichever runs out first. When it runs out, the learner is not tutored until it resets, except to finish a mastery check already under way.
+_Avoid_: allowance, quota, credits
+
 **Preference**:
 How the learner likes to be taught, such as with real-world examples, remembered across sessions only when the learner agrees.
 _Avoid_: profile
