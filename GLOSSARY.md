@@ -9,8 +9,16 @@ The person learning with Crux.
 _Avoid_: user, student
 
 **Account**:
-What a learner signs up for and signs in to, known by one email address. It holds their sessions and their record.
+What a learner signs up for and signs in to, known by one email address. It holds their sessions and their record. A learner can close it; it is erased a week later unless they sign back in and choose to keep it. One with no visit for 12 months is closed after two warnings.
 _Avoid_: profile, user
+
+**Guest**:
+Someone using Crux without an account, before it opens: on the public link, a sample topic or a short run on their own topic, or with a trial code. Nothing about who they are is kept.
+_Avoid_: visitor, anonymous user
+
+**Trial code**:
+A code the owner gives someone for the trial before Crux opens: the whole learning loop, typed only, within a learner's tutoring limit, with sessions kept under the code until the trial ends or the code is switched off.
+_Avoid_: invite, password
 
 **Tutor**:
 The AI that teaches the learner, tracks which learning objectives they have shown, and offers a mastery check once every one not dropped is shown.
