@@ -1,11 +1,12 @@
 # Coding Standards
 
-Two kinds of rule. **While writing** holds the few rules that bind as code is written and that no linter yet enforces; read it before writing code or changing a dependency. Everything after it is judgement calls for the reviewer, each flagged by a reviewer on a real PR. Mechanical rules a tool already enforces (formatting, lint, banned patterns) live in oxlint, ruff, prettier, and CI, not here.
+Two kinds of rule. **While writing** holds the few rules that bind as code is written and checked and that no linter yet enforces; read it before writing code, changing a dependency or running checks. Everything after it is judgement calls for the reviewer, each flagged by a reviewer on a real PR. Mechanical rules a tool already enforces (formatting, lint, banned patterns) live in oxlint, ruff, prettier, and CI, not here.
 
 ## While writing
 
 - No emojis in code or comments.
 - Change dependencies through the package manager, never by editing manifests or lockfiles: `npm install/update/uninstall/audit fix` (from `frontend/`) for `package.json` / `package-lock.json`; `uv add/remove` (from `backend/`) for `pyproject.toml` / `uv.lock`. Commit whatever the tool writes.
+- Stop and report on any failed verification step.
 
 ## The backend is Python 3.14
 
@@ -21,7 +22,7 @@ A comment that states an invariant ("only X writes this", "true while Y") is che
 
 ## One idiom per concern
 
-A concern that already has a helper or documented pattern uses it; a diff adds no second way. Before accepting a hand-rolled guard, check `docs/reference.md` for an existing pattern. Example: async actions in `stores/session.js` gate writes with `_epochGuard()` / `live()` and report errors through `_setError(e, live)` (see "Reset epoch (#414)"), never with an inline epoch comparison.
+A concern that already has a helper or documented pattern uses it; a diff adds no second way. Before accepting a hand-rolled guard, check `docs/reference.md` (removed; `git show e68424e:docs/reference.md`) for an existing pattern. Example: async actions in `stores/session.js` gate writes with `_epochGuard()` / `live()` and report errors through `_setError(e, live)` (see "Reset epoch (#414)"), never with an inline epoch comparison.
 
 When a diff repeats the same guard by hand in three or more places, flag it as a candidate for a shared helper rather than blocking the PR.
 
@@ -67,7 +68,7 @@ A diff that adds or routes to a fallback lists what the primary path measures (f
 
 ## Session totals changes walk the ordering matrix
 
-A diff that changes how `stores/session.js` moves `activeTotal` / `endedTotal`, or what a landing list replays, is checked against every row of the ordering matrix in `docs/reference.md` ("Sidebar session window"). For each row, name the totals once everything settles, or the residue entry in `docs/decisions.md` that accepts them. Its store tests seed sessions with `seedSession`, which holds a session in every copy the store reads. A test that seeds only the window row is testing a state the app never holds. (#533: the brief called the in-window case "already exact" and the test seeded only the window row, so the open session's separate copy double-counted. The first review fix then missed the "landed, then a later list in flight" row. Both reached review.)
+A diff that changes how `stores/session.js` moves `activeTotal` / `endedTotal`, or what a landing list replays, is checked against every row of the ordering matrix in `docs/reference.md` ("Sidebar session window"; removed, `git show e68424e:docs/reference.md`). For each row, name the totals once everything settles, or the residue entry in `docs/decisions.md` (removed; `git show e68424e:docs/decisions.md`) that accepts them. Its store tests seed sessions with `seedSession`, which holds a session in every copy the store reads. A test that seeds only the window row is testing a state the app never holds. (#533: the brief called the in-window case "already exact" and the test seeded only the window row, so the open session's separate copy double-counted. The first review fix then missed the "landed, then a later list in flight" row. Both reached review.)
 
 ## A new await re-checks what follows it
 
@@ -75,4 +76,4 @@ When a diff adds an `await` inside an async store action, everything after it is
 
 ## New patterns get a reference entry
 
-A diff that introduces a convention other code must follow (a guard, a sentinel, a dedupe rule) adds or updates its section in `docs/reference.md` in the same PR.
+A diff that introduces a convention other code must follow (a guard, a sentinel, a dedupe rule) adds or updates its section in `docs/reference.md` (removed; `git show e68424e:docs/reference.md`) in the same PR.
