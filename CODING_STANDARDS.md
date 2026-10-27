@@ -1,6 +1,11 @@
 # Coding Standards
 
-Judgement calls for the reviewer. Mechanical rules (formatting, lint, banned patterns) live in oxlint, ruff, prettier, and CI, not here. Each rule below was flagged by a reviewer on a real PR.
+Two kinds of rule. **While writing** holds the few rules that bind as code is written and that no linter yet enforces; read it before writing code or changing a dependency. Everything after it is judgement calls for the reviewer, each flagged by a reviewer on a real PR. Mechanical rules a tool already enforces (formatting, lint, banned patterns) live in oxlint, ruff, prettier, and CI, not here.
+
+## While writing
+
+- No emojis in code or comments.
+- Change dependencies through the package manager, never by editing manifests or lockfiles: `npm install/update/uninstall/audit fix` (from `frontend/`) for `package.json` / `package-lock.json`; `uv add/remove` (from `backend/`) for `pyproject.toml` / `uv.lock`. Commit whatever the tool writes.
 
 ## The backend is Python 3.14
 
