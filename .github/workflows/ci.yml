@@ -136,6 +136,25 @@ jobs:
       - name: Build
         run: npm run build
 
+  file-size:
+    name: File size (5,000-token limit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          fetch-depth: 0  # the diff needs the base commit
+
+      # The local pre-commit hook, run over every file this PR or push
+      # changed. CI is the enforcing copy: core.hooksPath is per-clone, so
+      # fresh clones and cloud agents skip the hook, and --no-verify skips it.
+      - name: Check changed files
+        env:
+          BASE_SHA: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || github.event.before }}
+        run: sh .githooks/pre-commit "$BASE_SHA"
+
   security:
     name: Security (SAST + deps + secrets + images)
     runs-on: ubuntu-latest

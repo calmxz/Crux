@@ -1,3 +1,4 @@
 *.sh text eol=lf
+.githooks/* text eol=lf
 # Byte-compared prompt goldens (#395): CRLF on checkout would fail them.
 backend/tests/fixtures/prompt_golden/*.txt text eol=lf
