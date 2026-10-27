@@ -58,6 +58,17 @@ pytest tests/test_foo.py::test_bar   # single test
 
 Tests use in-memory SQLite — no filesystem dependency.
 
+## Typecheck
+
+From `backend/`, not the repo root, so it picks up `backend/pyrightconfig.json` and its baseline:
+
+```bash
+.venv/Scripts/basedpyright      # Windows
+# .venv/bin/basedpyright        # macOS/Linux
+```
+
+CI runs `basedpyright --baselinemode=lock`, which fails on any error outside `.basedpyright/baseline.json`.
+
 ## Docker
 
 Local dev does **not** use Docker for app infra. `docker-compose.yml` is a no-op anchor (`services: {}`) — `docker compose up` brings up nothing. Postgres + pgvector and Auth are Supabase-managed (external cloud), so there is no local DB or vector-store container.

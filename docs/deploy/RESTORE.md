@@ -5,6 +5,8 @@ R2 bucket, produced by `.github/workflows/backup.yml`. Retention: newest 7.
 
 **Never restore straight over production. Always restore into a scratch DB first.**
 
+`backend/tests/test_backup_workflow.py` reads this file and asserts it still mentions `pg_restore`, `--clean` and a scratch database; keep all three when editing.
+
 ## Steps
 
 1. List available dumps (or use the R2 dashboard):
