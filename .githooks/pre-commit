@@ -1,0 +1,86 @@
+#!/bin/sh
+# Blocks commits that stage a file over 5,000 tokens (tokens = bytes / 4).
+# Measures the staged blob, so unstaged edits do not count.
+# Enable once per clone: git config core.hooksPath .githooks
+
+MAX_TOKENS=5000
+MAX_BYTES=$((MAX_TOKENS * 4))
+
+# Files nobody writes by hand: lockfiles, codegen output, tool output,
+# vendored code, license text. Binary files are skipped automatically.
+is_exempt() {
+	case "$1" in
+	backend/uv.lock) return 0 ;;
+	frontend/package-lock.json) return 0 ;;
+	backend/contracts/*) return 0 ;;                  # gen_contracts.py output
+	backend/.basedpyright/baseline.json) return 0 ;;  # basedpyright --writebaseline
+	frontend/.oxlint/anti-slop/*) return 0 ;;         # vendored, see UPSTREAM.md
+	LICENSE) return 0 ;;
+	esac
+	return 1
+}
+
+# "added<TAB>deleted<TAB>path" per file; added is "-" for binaries.
+# --no-renames keeps paths plain (a rename shows as an add).
+# With a base commit (CI: .githooks/pre-commit <sha>), checks the files
+# changed in <sha>...HEAD as committed, instead of the staged ones.
+if [ -n "$1" ]; then
+	if ! git rev-parse --verify --quiet "$1^{commit}" >/dev/null; then
+		echo "[ERROR] file-size check: base commit '$1' not found (shallow clone?)" >&2
+		exit 1
+	fi
+	blob="HEAD:" scope="changed"
+	list=$(git -c core.quotePath=false diff --numstat --no-renames --diff-filter=ACM "$1...HEAD") || exit 1
+else
+	blob=":" scope="staged"
+	list=$(git -c core.quotePath=false diff --cached --numstat --no-renames --diff-filter=ACM) || exit 1
+fi
+
+over=""
+tab=$(printf '\t')
+while IFS="$tab" read -r added _deleted path; do
+	[ -z "$path" ] && continue
+	[ "$added" = "-" ] && continue
+	is_exempt "$path" && continue
+	bytes=$(git cat-file -s "$blob$path") || exit 1
+	if [ "$bytes" -gt "$MAX_BYTES" ]; then
+		over="$over  $path: $((bytes / 4)) tokens ($bytes bytes)
+"
+	fi
+done <<EOF
+$list
+EOF
+
+[ -z "$over" ] && exit 0
+
+cat >&2 <<EOF
+[ERROR] file-size check: $scope files over the $MAX_TOKENS-token limit (tokens = bytes / 4, max $MAX_BYTES bytes):
+
+$over
+Split each file along its responsibilities so every resulting file is under the limit:
+
+  1. Find the seams. List the file's top-level units (classes, functions, route
+     groups, components, describe blocks, headings) and group the ones that
+     change together. Each group becomes a file.
+  2. Split by file type:
+     - Tests (*.test.js, test_*.py): one file per top-level describe block or
+       feature under test, e.g. sessionStore.test.js -> sessionStore.load.test.js,
+       sessionStore.stream.test.js. Move shared setup into a helpers module or
+       conftest.py instead of copying it.
+     - Python / JS modules: move a cohesive group of functions into a sibling
+       module (services/llm.py -> services/llm_stream.py) and import it back.
+       Update every importer to the new path; do not leave re-export shims.
+     - Vue components: extract child components for distinct template regions
+       and move stateful logic into a composable (useThing.js).
+     - Markdown / YAML docs: one file per top-level section, with the original
+       kept as a short index that links to the parts.
+  3. Do not shrink the file instead of splitting it: no minifying, deleting
+     comments or tests, shortening names, or part1/part2 cuts through the
+     middle of a unit.
+  4. Stage the new files and the shrunk original (git add <files>), run the
+     tests for the touched area, then commit again.
+
+If a listed file is generated or vendored (not written by hand), add its path
+to is_exempt() in .githooks/pre-commit instead of splitting it.
+EOF
+exit 1
