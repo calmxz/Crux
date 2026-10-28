@@ -73,7 +73,7 @@ A learning objective the learner has proven during teaching by solving a fresh p
 _Avoid_: done, learned, completed
 
 **Passed**:
-A learning objective the learner has got right in a mastery check. Unlike shown, it counts toward mastery, and it stays passed, in every one of the learner's sessions, unless its session is deleted.
+A learning objective the learner has got right in a mastery check. Unlike shown, it counts toward mastery, and it stays passed, in every one of the learner's sessions, unless its session is deleted, or a re-mark after a marking fault finds the answer wrong.
 _Avoid_: mastered (for an objective)
 
 **Record**:
