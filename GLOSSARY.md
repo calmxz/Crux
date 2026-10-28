@@ -29,8 +29,11 @@ The person who runs Crux, shares it, and decides whether a paid launch follows. 
 _Avoid_: admin
 
 **Budget**:
-The money Crux may spend on tutoring in a month, of which no single day may spend more than a set part. When it, or the day's part, runs out, no learner is tutored until it resets, except to finish a mastery check already under way.
+The money Crux may spend on tutoring in a month, guests and trial codes included, of which no single day may spend more than a set part. The owner's own tutoring is not in it. When it, or the day's part, runs out, no learner is tutored until it resets, except to finish a mastery check already under way.
 _Avoid_: quota
+
+**Owner's share**:
+The money the owner's own tutoring may spend in a month, kept apart from the budget. When it runs out, only the owner's account stops until the owner raises it.
 
 **Tutoring limit**:
 How much tutoring one learner may use, counted in what it costs: a day's worth and a week's worth, whichever runs out first. When it runs out, the learner is not tutored until it resets, except to finish a mastery check already under way.
