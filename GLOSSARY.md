@@ -13,12 +13,12 @@ What a learner signs up for and signs in to, known by one email address. It hold
 _Avoid_: profile, user
 
 **Guest**:
-Someone using Crux without an account, before it opens: on the public link, a sample topic or a short run on their own topic, or with a trial code. Nothing about who they are is kept.
+Someone using Crux without an account, before it opens: on the public link, a sample topic or a short run on their own topic, or with a trial link. Nothing about who they are is kept.
 _Avoid_: visitor, anonymous user
 
-**Trial code**:
-A code the owner gives someone for the trial before Crux opens: the whole learning loop, typed only, within a learner's tutoring limit, with sessions kept under the code until the trial ends or the code is switched off.
-_Avoid_: invite, password
+**Trial link**:
+The private link Crux emails when the owner approves someone's request for the trial before Crux opens: the whole learning loop, typed only, within a learner's tutoring limit, with sessions kept under the link until the trial ends or the owner switches it off.
+_Avoid_: invite, code, password
 
 **Tutor**:
 The AI that teaches the learner, tracks which learning objectives they have shown, and offers a mastery check once every one not dropped is shown.
@@ -29,7 +29,7 @@ The person who runs Crux, shares it, and decides whether a paid launch follows. 
 _Avoid_: admin
 
 **Budget**:
-The money Crux may spend on tutoring in a month, guests and trial codes included, of which no single day may spend more than a set part. The owner's own tutoring is not in it. When it, or the day's part, runs out, no learner is tutored until it resets, except to finish a mastery check already under way.
+The money Crux may spend on tutoring in a month, guests and trial links included, of which no single day may spend more than a set part. The owner's own tutoring is not in it. When it, or the day's part, runs out, no learner is tutored until it resets, except to finish a mastery check already under way.
 _Avoid_: quota
 
 **Owner's share**:
