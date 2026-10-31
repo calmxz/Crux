@@ -13,11 +13,11 @@ What a learner signs up for and signs in to, linked to one email address. It hol
 _Avoid_: profile, user
 
 **Guest**:
-Someone who uses Crux without an account, before Crux opens. A guest uses either the public link, for a sample topic or a short run on their own topic, or a trial link. Crux keeps nothing about who they are.
+Someone who uses Crux without an account, before Crux opens. A guest uses either the public link, for a sample topic or a short run on their own topic, or a trial link. Crux keeps no record of who they are.
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
-The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives the whole learning loop, by typing only (no files or photo answers), within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends or the owner switches the link off.
+The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends or the owner switches the link off.
 _Avoid_: invite, code, password
 
 **Tutor**:
