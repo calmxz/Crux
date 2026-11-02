@@ -33,7 +33,7 @@ The most money Crux can spend on tutoring in a month, including tutoring for gue
 _Avoid_: quota
 
 **Owner's share**:
-The most money the owner's own tutoring can spend in a month. It is separate from the budget. When it runs out, only the owner's account stops, until the owner raises the share.
+The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault. It is separate from the budget. When it runs out, only the owner's account and re-marks stop, until the owner raises the share.
 
 **Tutoring limit**:
 The most tutoring one learner can use, measured by what it costs. There is a daily limit and a weekly limit, and whichever runs out first applies. When it runs out, the learner is not tutored until it resets. The one exception: they can finish a mastery check that has already started.
@@ -74,7 +74,7 @@ _Avoid_: remedial topic
 **Learning objective**:
 One thing the learner should be able to do, as part of a topic. A topic usually has 3 to 5. It has fewer only if the learner wants nothing added, and either a file covers the topic only briefly or the learner has dropped some.
 
-The tutor writes the learning objectives, using the learner's files when there are any. The learner sees them and can ask for changes. A dropped learning objective stays on the list, but it is not taught or checked unless it is added back.
+The tutor writes the learning objectives, using the learner's files when there are any. The learner sees them and can ask for changes. Once the topic is mastered, its learning objectives are fixed. A dropped learning objective stays on the list, but it is not taught or checked unless it is added back, which can happen even after mastery.
 _Avoid_: goal, outcome, skill
 
 **Shown**:
