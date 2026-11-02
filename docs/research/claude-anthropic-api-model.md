@@ -31,7 +31,7 @@ Part of "Can Crux's AI layer run on Claude through Anthropic's API?" (issue #727
 
 That holds when a request leaves `prefix_mismatch_behavior` unset. Older accounts get no error; "failing blocks reach the model" [S13].
 
-**Three different outcomes, often mixed up:**
+**Four outcomes, often mixed up:**
 
 | What happens | When | Source |
 |---|---|---|
