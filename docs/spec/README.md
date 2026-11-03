@@ -86,30 +86,30 @@ The owner approves this list before any area file is written ([#680](https://git
 
 Sizes estimate the current rules, stated without reasons. Source tickets decided the subject; "+" marks later tickets that changed its rules. A file states its rules once and links the shared rules above.
 
-| File (to be written) | Covers | Source tickets | Est. words |
+| File | Covers | Source tickets | Est. words |
 |---|---|---|---|
-| `learning-loop.md` | The loop end to end; requests and narrowing; topics, learning objectives and changes to them; what happens after mastery | 662, 664, 665, 666, 670 (+667, 668, 671, 677, 679) | 1,550 |
-| `teaching.md` | How the tutor teaches; objective statuses and readiness; the help ladder; the diagnostic; detours and prerequisite topics; the never-ready menu; preferences | 663, 668 (+667, 670, 671) | 750 |
-| `mastery-check.md` | The offer, problems and model answers, marking and the pass rule, disputes, fails, half-done checks, photo answers | 663, 669 (+667, 671, 677, 678, 679, 716, 722) | 1,050 |
-| `files.md` | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+671, 675, 677, 679, 716, 717, 722) | 1,300 |
-| `sessions.md` | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 676, 678, 716) | 800 |
-| `accounts.md` | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
-| `age.md` | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
-| `spending.md` | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+676, 677, 678, 679, 716, 717, 722) | 1,100 |
-| `trial.md` | Guest mode, Request access and trial links, the advisory opinion, ending the trial at opening | 677, 722 (+717) | 1,750 |
-| `privacy.md` | Terms of Use, Privacy Policy and processors, when the owner reads sessions, misuse and harm, deleting and retention | 677 (+679, 681, 716, 717, 722) | 1,800 |
-| `feedback.md` | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722) | 1,200 |
-| `ai-layer.md` | Route and projects, models and call settings, the topic slice, the maths library | 679, 684 (+716) | 1,100 |
-| `hosting.md` | Hosting and runtime, the database, backups, environments and staging, logs, email sending, errors, uptime and owner messages | 716, 717 (+675, 678, 679) | 1,700 |
-| `quality-bar.md` | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+680, 716, 717, 722) | 1,650 |
-| `ai-tests.md` | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, live faults, switch-offs and re-marks, what stops a round | 678 (+679, 680, 716) | 1,400 |
-| `spec-process.md` | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
+| [`learning-loop.md`](learning-loop.md) | The loop end to end; requests and narrowing; topics, learning objectives and changes to them; what happens after mastery | 662, 664, 665, 666, 670 (+667, 668, 671, 677, 679) | 1,550 |
+| [`teaching.md`](teaching.md) | How the tutor teaches; objective statuses and readiness; the help ladder; the diagnostic; detours and prerequisite topics; the never-ready menu; preferences | 663, 668 (+667, 670, 671) | 750 |
+| [`mastery-check.md`](mastery-check.md) | The offer, problems and model answers, marking and the pass rule, disputes, fails, half-done checks, photo answers | 663, 669 (+667, 671, 677, 678, 679, 716, 722) | 1,050 |
+| `files.md` (to be written) | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+671, 675, 677, 679, 716, 717, 722) | 1,300 |
+| `sessions.md` (to be written) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 676, 678, 716) | 800 |
+| `accounts.md` (to be written) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
+| `age.md` (to be written) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
+| `spending.md` (to be written) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+676, 677, 678, 679, 716, 717, 722) | 1,100 |
+| `trial.md` (to be written) | Guest mode, Request access and trial links, the advisory opinion, ending the trial at opening | 677, 722 (+717) | 1,750 |
+| `privacy.md` (to be written) | Terms of Use, Privacy Policy and processors, when the owner reads sessions, misuse and harm, deleting and retention | 677 (+679, 681, 716, 717, 722) | 1,800 |
+| `feedback.md` (to be written) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722) | 1,200 |
+| `ai-layer.md` (to be written) | Route and projects, models and call settings, the topic slice, the maths library | 679, 684 (+716) | 1,100 |
+| `hosting.md` (to be written) | Hosting and runtime, the database, backups, environments and staging, logs, email sending, errors, uptime and owner messages | 716, 717 (+675, 678, 679) | 1,700 |
+| `quality-bar.md` (to be written) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+680, 716, 717, 722) | 1,650 |
+| `ai-tests.md` (to be written) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, live faults, switch-offs and re-marks, what stops a round | 678 (+679, 680, 716) | 1,400 |
+| `spec-process.md` (to be written) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
 
 ## Gaps
 
 These are not decided yet. Do not build them from guesses.
 
-- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. Two gaps no ticket was given are marked in their area files when written.
+- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The two gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731).
 - **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
