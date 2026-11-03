@@ -24,7 +24,7 @@ flowchart TD
   menu -->|stop for now| leave([Learner leaves])
 ```
 
-- The loop runs as drawn. A prerequisite topic pauses the current topic inside it (see [`teaching.md`](teaching.md)) ([#664], [#668], [#669], [#670]).
+- The loop runs as drawn. A prerequisite topic pauses the current topic inside it (see [`teaching.md`](teaching.md)) ([#664], [#668], [#670]).
 - The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see `accounts.md` and `trial.md`) ([#674], [#677], [#722]).
 - The learner can leave at any step and resume the session at the step they left. What the tutor does on return is in `sessions.md` ([#664], [#671]).
 - At any step, a learner who says they are under 18 gets the age question (see `age.md`) ([#681]).
@@ -64,14 +64,14 @@ flowchart TD
 - Options are always topic-sized: 3 to 5, as many as the request has good starting points. They are numbered, each with a one-line hook ([#665], [#666]).
 - The best fit is marked up front, with its reason. Every options message ends "pick a number, name your own, or say 'you pick'". "You pick" takes the marked option ([#666]).
 - If the learner still cannot choose, the tutor picks the best fit and says why ([#665]).
-- For an unsure request, the options are the common starting points of each area at the learner's level, not niche picks. They come from the tutor's own knowledge, since v1 has no web search ([#666], [#679]).
+- For an unsure request, the options are the common starting points of each area at the learner's level, not niche picks. They come from the tutor's own knowledge, with no web search in v1 ([#666], [#679]).
 - A turned request asks goal and level in the same message as the turn. Its options say what the mastery check covers ([#666]).
 
 ### Ambiguous requests
 
 - With nothing to go on, such as an ambiguous first message, the tutor asks which meaning. The meanings are numbered, with no pick marked ([#665], [#666]).
 - When the conversation points one way, the tutor states its guess at the top of the objectives message: "I'll take this as the chain rule in calculus, since we've been working on derivatives. If you meant the chain rule in probability, say 'probability'." ([#666])
-- The learner's mastered topics, from any session, count as something to go on. If they and the conversation disagree, the conversation wins ([#671]).
+- The learner's mastered topics, from any session, count as something to go on. If they and the conversation disagree, the conversation wins, and the other meaning is still offered at the top of the objectives message ([#671]).
 
 ### A single problem
 
@@ -86,14 +86,14 @@ flowchart TD
 - A topic has fewer than 3 only by the learner's choice. Either a file covers it too thinly and they want nothing added (see `files.md`), or they decline a replacement for a drop ([#667], [#668]).
 - The tutor drafts the objectives, in the files' order where there are files, otherwise in teaching order. It teaches them top to bottom without asking ([#665], [#668]).
 - Teaching waits for the reply to the objectives message: "go", "I know some of this" (the diagnostic, see [`teaching.md`](teaching.md)), or a change ([#666]).
-- The topic's name follows its objectives ("the chain rule for polynomials"), so mastery never claims more than was proven. The name narrows when an objective is dropped, and returns when it is added back ([#665], [#668]).
+- The topic's name follows its objectives ("the chain rule for polynomials"). The name narrows when an objective is dropped, and returns when it is added back ([#665], [#668]).
 
 ### Changes before the check
 
 - Until the mastery check starts, the learner can ask in the chat to add, drop or reword objectives, within the topic. Never during a check ([#665], [#728]).
-- A drop asked for in the chat gets "why?". If the reason is difficulty, the tutor offers help first, and the learner decides ([#665]). A drop from the never-ready menu skips the "why?" (see [`teaching.md`](teaching.md)) ([#668]).
+- A drop asked for in the chat gets "why?". If the reason is difficulty, the tutor offers help first, and the learner decides ([#665]). A drop from the never-ready menu follows [`teaching.md`](teaching.md) ([#668]).
 - Dropping the topic's core makes it a switch (see [Switching topic mid-way](#switching-topic-mid-way)) ([#665]).
-- A drop that leaves fewer than 3 objectives gets one offer of a close replacement objective, within the topic. From the never-ready menu, the drop happens at once and the offer follows it. Declined, the topic keeps 1 or 2, its name narrows, and the check covers what is left ([#668], [#669], [#731]).
+- A drop that leaves fewer than 3 objectives gets one offer of a close replacement objective, within the topic. From the never-ready menu, the offer follows the drop. Declined, the topic keeps 1 or 2, its name narrows, and the check covers what is left ([#668], [#669], [#731]).
 - The last objective cannot be dropped. Leaving it means stopping, or a new topic ([#668]).
 - A dropped objective stays listed as dropped. It is not taught or checked. Before the check, the learner can pick it back up: it returns to in progress, and the name returns ([#668]).
 
@@ -124,16 +124,16 @@ flowchart TD
 - The tutor proposes topics tagged with their source. Crux sorts them in that order and keeps 2 or 3 (see the main file's "Crux decides") ([#679]).
 - The tutor's own knowledge can always supply sources 3 and 4, so the menu never has fewer than 2 topics. The pick is the first in the order ([#670]).
 - The menu skips topics already mastered in another session, except a named or queued one, shown marked: "Related rates (you mastered this in physics on 14 Jan)". Typed anyway, such a topic follows `sessions.md` ([#671]).
-- After a topic unrelated to the request and files, the 2 or 3 topics come from it. A "Back to" line is added: "Back to derivatives: implicit differentiation (slides 37-45)". A topic replaced mid-way comes first there: "Back to derivatives: the chain rule (starting again)" ([#670]).
+- After a topic unrelated to the request and files, the 2 or 3 topics come from it: its next step and its neighbours. One more line, not counted in the 2 or 3, leads back: "Back to derivatives: implicit differentiation (slides 37-45)". It names the first topic in the request's own order, and picking it starts that topic. A topic replaced mid-way comes first there: "Back to derivatives: the chain rule (starting again)" ([#670]).
 - The skip leaves the "Back to" line and the dropped line alone ([#671]).
 - The same menu follows every route to mastery: a check passed, a dispute won while back in teaching, a re-added objective's check passed, or a failed objective dropped. After a dispute win, teaching stops: "No need to keep going over objective 3" ([#670]).
-- A prerequisite topic's mastery returns to the paused topic, with no menu ([#668], [#670]).
+- A prerequisite topic's mastery has no menu (see [`teaching.md`](teaching.md)) ([#670]).
 - There is no "up next" list during teaching. The learner can ask what comes next at any time. The choice is made at the menu ([#670]).
 
 ### Dropped objectives on the menu
 
 - Objectives dropped from the topic just mastered get their own line, not counted in the 2 or 3: "Finish the chain rule: three-layer composites (you dropped this)". Several share one line ([#670]).
-- Objectives dropped from a prerequisite topic go on the paused topic's menu, on the same line ("Pick up what you dropped: ..."). A prerequisite's mastery has no menu of its own ([#670]).
+- Objectives dropped from a prerequisite topic go on the paused topic's menu, on the same line ("Pick up what you dropped: ...") ([#670]).
 - Each dropped objective has one offer: the line on its topic's menu. It shows at mastery, and each time that menu is rebuilt after "Stop for now" ([#670], [#728]).
 - The offer is used up when the learner picks anything from that menu. Only then does Crux record it as having had its one offer. Showing the line does not use it up ([#671], [#728]).
 - After that, Crux never offers it on its own again. It stays listed as dropped on its topic, and the learner can ask for it at any time ([#670], [#728]).

@@ -6,7 +6,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## The offer
 
-- When every objective not dropped is shown, the tutor offers the check. Passing it is the only way a topic becomes mastered ([#663], [#668]).
+- When the learner is ready (see [`teaching.md`](teaching.md)), the tutor offers the check ([#668]).
 - The offer states the length and the split: "6 problems, 2 each on objectives 2 and 3. Ready?" The learner can say "not yet" and keep learning. The tutor offers again later ([#664], [#669]).
 - The offer states the honour rule: closed book, so no notes, no searching and no other AI. Nothing is enforced ([#669]).
 - There is no early check. A learner who asks before every objective is shown is pointed to the quick route ("I know this": one fresh problem per remaining objective), then offered the check ([#669]).
@@ -17,11 +17,11 @@ This file covers the mastery check, from the offer to the result and what follow
 - Until the result, across visits, the session's files, its earlier teaching and its jump points are hidden. They come back with the result. Opening the session returns to the check ([#669], [#671]).
 - No uploads, except a photo answer. No file can be removed, except by deleting the session (see `sessions.md`) ([#667], [#669], [#671]).
 - No lookup runs, into this session or any other. Other sessions' tutors cannot look into it. The learner's other sessions and "What you've mastered" stay open, under the honour rule ([#671]).
-- Objectives cannot be added, dropped or reworded during a check ([#665]).
 - The one exception to the hiding is reteaching after a refresh miss (see [Half-done checks](#half-done-checks)) ([#731]).
 
 ## Problems
 
+- A check covers every objective not dropped, as they stand when it is offered, including any the diagnostic skipped. Dropped objectives are not on it. After a fail, see [After a fail](#after-a-fail) ([#669]).
 - Written problems, answered with working, shown one at a time as "Problem k of N". No multiple choice ([#669]).
 - Each problem tests its objective as written. A "why" objective needs an explanation ([#669]).
 - Problems are fresh: never seen before in the topic, and never copied from the files. Where there are files, they follow the files' style ([#667], [#669]).
@@ -73,7 +73,8 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## Disputes
 
-- One dispute per problem. A fresh marker checks the model answer first, and corrects it if wrong. Then it re-marks the original answer, never a rewrite. "Still unclear" can be disputed ([#669]).
+- One dispute per problem. The learner can say where their answer covers the point ([#669]).
+- A fresh marker checks the model answer first, and corrects it if wrong. Then it re-marks the original answer, never a rewrite. The result updates, or the mark stands with its reason. "Still unclear" can be disputed ([#669]).
 - A dispute stays open until the next check on that objective starts ([#669]).
 - A late win makes the objective passed, dated the check's date. If it was the last one, the topic is mastered, and the menu follows (see [`learning-loop.md`](learning-loop.md)) ([#669], [#670], [#671]).
 
@@ -93,20 +94,23 @@ This file covers the mastery check, from the offer to the result and what follow
 ### The refresh before a resumed check
 
 - After 7 or more days away, the learner is offered "continue" or "refresh first". Earlier answers count either way ([#669]).
-- A refresh is a short recap of the current objective and the objectives still ahead, then one practice problem on them, with help allowed. Then the check continues ([#669], [#731]).
+- A refresh is a short recap of the current objective and the objectives still ahead. Then comes one practice problem on the objectives still ahead only, with help allowed. Then the check continues ([#669], [#731]).
 - The refresh offer says the learner can also ask for a recap of the objectives already answered. That recap has no problem, and their answers do not change ([#731]).
 - A real miss (not a slip) in the practice problem puts that objective back to in progress, with the trouble mark. The check stays half-done ([#668], [#731]).
-- The tutor then teaches that objective until it is shown again, then the check continues with fresh problems. Earlier answers still count ([#731]).
-- While that objective is taught again, no problem is open. The session's files and earlier teaching come back, and lookup runs as in teaching. All are hidden again before the next check problem ([#731]).
+- The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]).
+- Leaving during that teaching resumes it on return, as at any step ([#664]).
+- While that objective is taught again, no problem is open. The session's files and earlier teaching come back. Both are hidden again before the next check problem ([#731]).
 
 ### Pauses
 
-- A check pauses as half-done in three cases: the owner switches checks off for a fault, the age question is open, or Flash-Lite is down. It resumes under the half-done rules, with the open problem swapped ([#678], [#679]).
-- A check that has started can finish when the learner's tutoring limit or the budget runs out (see `spending.md`) ([#675]).
+- A check pauses as half-done when the owner switches checks off for a fault, or while the age question is open ([#678], [#679]).
+- It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see `spending.md`) ([#675], [#679]).
+- A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
+- Spending limits never stop a check that has started (see `spending.md`) ([#675]).
 
 ## Re-marks after a marking fault
 
-- Once a marking fault is fixed, every check passed since the last passing test round is re-marked from its saved answers. Re-marks run in the Crux project and spend from the owner's share (see the main file's "Money") ([#678], [#728]).
+- Once a marking fault is fixed, every check passed since the last passing test round is re-marked from its saved answers. Who pays is in the main file's "Money" ([#678], [#728]).
 - A re-mark that finds an answer wrong returns the objective to not passed, and its topic to not mastered. Only learners whose marks change are told ([#678]).
 - A problem whose mark changes gets a fresh dispute, beyond the one per problem ([#678]).
 - How checks are switched off, and what starts a re-mark, is in `ai-tests.md`.
@@ -117,11 +121,9 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the offer with its split, "Problem k of N", photo answers, "Marking…", the result with model answers behind a tap, Dispute, the passed status, open file-error flags, and hidden files ([#669], [#716]).
+Layout is not decided (see the main file's Gaps). These rules need: the offer with its split, "Problem k of N", photo answers, "Marking…", the result with model answers behind a tap, Dispute, the passed status, open file-error flags, hidden files, the "paused" messages, and the re-mark message ([#669], [#678], [#716]).
 
-[#663]: https://github.com/calmxz/Crux/issues/663
 [#664]: https://github.com/calmxz/Crux/issues/664
-[#665]: https://github.com/calmxz/Crux/issues/665
 [#667]: https://github.com/calmxz/Crux/issues/667
 [#668]: https://github.com/calmxz/Crux/issues/668
 [#669]: https://github.com/calmxz/Crux/issues/669
