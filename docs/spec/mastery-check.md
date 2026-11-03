@@ -98,6 +98,7 @@ This file covers the mastery check, from the offer to the result and what follow
 - The refresh offer says the learner can also ask for a recap of the objectives already answered. That recap has no problem, and their answers do not change ([#731]).
 - A real miss (not a slip) in the practice problem puts that objective back to in progress, with the trouble mark. The check stays half-done ([#668], [#731]).
 - The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]).
+- When the check continues, that objective gets 2 problems, as any objective with the trouble mark does. If it had 1, the tutor says the check has grown by one ([#669], [#731]).
 - Leaving during that teaching resumes it on return, as at any step ([#664]).
 - While that objective is taught again, no problem is open. The session's files and earlier teaching come back. Both are hidden again before the next check problem ([#731]).
 
