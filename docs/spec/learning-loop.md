@@ -26,12 +26,12 @@ flowchart TD
 
 - The loop runs as drawn. A prerequisite topic pauses the current topic inside it (see [`teaching.md`](teaching.md)) ([#664], [#668], [#670]).
 - The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see `accounts.md` and `trial.md`) ([#674], [#677], [#722]).
-- The learner can leave at any step and resume the session at the step they left. What the tutor does on return is in `sessions.md` ([#664], [#671]).
+- The learner can leave at any step and resume the session at the step they left. What the tutor does on return is in [`sessions.md`](sessions.md) ([#664], [#671]).
 - At any step, a learner who says they are under 18 gets the age question (see `age.md`) ([#681]).
 
 ## Requests
 
-- A request is the learner's typed words, files, or both. The session keeps it as what the learner came for. It has no mastery and no plan ([#662], [#665], [#667]). How files shape a topic is in `files.md`.
+- A request is the learner's typed words, files, or both. The session keeps it as what the learner came for. It has no mastery and no plan ([#662], [#665], [#667]). How files shape a topic is in [`files.md`](files.md).
 - The levels are request, topic and learning objective. Only topics and objectives count toward mastery. Nothing is tracked below an objective ([#665]).
 - A topic's mastery must be something the learner can show in writing in the chat ([#665]).
 
@@ -45,7 +45,7 @@ flowchart TD
 | Too narrow (a single problem) | Widens it to the smallest topic that contains it ([#665]). |
 | Ambiguous | See [Ambiguous requests](#ambiguous-requests). |
 | Not showable in writing | Turns a physical skill toward its knowledge part, and a task toward the skill behind it. The tutor says what the check will and will not cover. Trivia with nothing to turn toward gets "what would you like to learn?" ([#665]). |
-| Harmful | Declined. Harm is as the Terms of Use define it (see `privacy.md`) ([#665], [#677]). |
+| Harmful | Declined. Harm is as the Terms of Use define it (see `privacy.md`) ([#665], [#677]). A harmful file also holds the session until it is removed (see [`files.md`](files.md)) ([#732]). |
 
 ### Narrowing
 
@@ -83,7 +83,7 @@ flowchart TD
 
 - A topic is usually 3 to 5 learning objectives, finished in one or two study blocks. "Calculus" and "derivatives" are too broad; "the chain rule" is a topic ([#665], [#667]).
 - 5 is the most. An objective added past 5 becomes the next topic, queued ([#665]).
-- A topic has fewer than 3 only by the learner's choice. Either a file covers it too thinly and they want nothing added (see `files.md`), or they decline a replacement for a drop ([#667], [#668]).
+- A topic has fewer than 3 only by the learner's choice. Either a file covers it too thinly and they want nothing added (see [`files.md`](files.md)), or they decline a replacement for a drop ([#667], [#668]).
 - The tutor drafts the objectives, in the files' order where there are files, otherwise in teaching order. It teaches them top to bottom without asking ([#665], [#668]).
 - Teaching waits for the reply to the objectives message: "go", "I know some of this" (the diagnostic, see [`teaching.md`](teaching.md)), or a change ([#666]).
 - The topic's name follows its objectives ("the chain rule for polynomials"). The name narrows when an objective is dropped, and returns when it is added back ([#665], [#668]).
@@ -107,9 +107,9 @@ flowchart TD
 
 - When the learner asks for a different topic before the current one is mastered, related or not, the tutor suggests a new session. The current session waits where it stopped. The tutor never judges relatedness mid-topic ([#665]).
 - Declined, the tutor warns that the current topic will be left unfinished, and that coming back means starting it again. Then the new topic replaces it in this session ([#665]).
-- The replaced topic joins the queued topics, so it comes first on the menu ("the chain rule (starting again)"). Started again, the diagnostic skips what the learner had shown, and its passed objectives stay passed, not checked again ([#665], [#670], [#671]).
+- The replaced topic joins the queued topics, so it comes first on the menu ("the chain rule (starting again)"). Started again, the diagnostic skips what the learner had shown. Objectives passed in its own check stay passed, not checked again ([#665], [#670], [#671], [#732]).
 - Two exceptions are learned in the same session, with the current topic paused. A prerequisite topic the learner agrees to learn (see [`teaching.md`](teaching.md)). A mastered topic's dropped objective, asked for mid-topic: it is taught and checked, then the paused topic resumes ([#668], [#670]).
-- A file given later on another topic follows `files.md` ([#667]).
+- A file given later on another topic follows [`files.md`](files.md) ([#667]).
 
 ## After mastery
 
@@ -123,7 +123,7 @@ flowchart TD
   4. A neighbour of the topic just mastered.
 - The tutor proposes topics tagged with their source. Crux sorts them in that order and keeps 2 or 3 (see the main file's "Crux decides") ([#679]).
 - The tutor's own knowledge can always supply sources 3 and 4, so the menu never has fewer than 2 topics. The pick is the first in the order ([#670]).
-- The menu skips topics already mastered in another session, except a named or queued one, shown marked: "Related rates (you mastered this in physics on 14 Jan)". Typed anyway, such a topic follows `sessions.md` ([#671]).
+- The menu skips topics already mastered in another session, except a named or queued one, shown marked: "Related rates (you mastered this in physics on 14 Jan)". Typed anyway, such a topic follows [`sessions.md`](sessions.md) ([#671]).
 - After a topic unrelated to the request and files, the 2 or 3 topics come from it: its next step and its neighbours. One more line, not counted in the 2 or 3, leads back: "Back to derivatives: implicit differentiation (slides 37-45)". It names the first topic in the request's own order, and picking it starts that topic. A topic replaced mid-way comes first there: "Back to derivatives: the chain rule (starting again)" ([#670]).
 - The skip leaves the "Back to" line and the dropped line alone ([#671]).
 - The same menu follows every route to mastery: a check passed, a dispute won while back in teaching, a re-added objective's check passed, or a failed objective dropped. After a dispute win, teaching stops: "No need to keep going over objective 3" ([#670]).
@@ -141,7 +141,7 @@ flowchart TD
 ### Everything covered
 
 - When everything the learner came for is covered, the tutor says so once, at the mastery that completes it. The menu carries on: "That covers everything you came for: derivatives for your exam, all of your slides. Want to keep going?" ([#670])
-- Covered means every part of what the request asked for has been taught. With files and no words narrowing them, every part of the files. With words that pick a part of the files, that part. With words only, the tutor's judgement ([#670]).
+- Covered means every part of what the request asked for has been taught. With files and no words narrowing them, every part of the files, except one the tutor declined (see [`files.md`](files.md)). With words that pick a part of the files, that part. With words only, the tutor's judgement ([#670]).
 - File parts mastered in another session count as covered. A very broad request may never be covered ([#670], [#671]).
 
 ### The next topic
@@ -181,3 +181,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the objectiv
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
+[#732]: https://github.com/calmxz/Crux/issues/732

@@ -17,7 +17,7 @@ Someone who uses Crux without an account, before Crux opens. A guest uses either
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
-The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends or the owner switches the link off.
+The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, or the holder taps Yes to Crux's age question.
 _Avoid_: invite, code, password
 
 **Tutor**:
@@ -82,7 +82,7 @@ A learning objective the learner has proven during teaching. To prove it, the le
 _Avoid_: done, learned, completed
 
 **Passed**:
-A learning objective the learner has answered correctly in a mastery check. Unlike a shown objective, a passed objective counts toward mastery. It stays passed in all of the learner's sessions. Only two things undo it: its session is deleted, or a re-mark after a marking fault finds the answer wrong.
+A learning objective the learner has answered correctly in a mastery check. Unlike a shown objective, a passed objective counts toward mastery. It stays on the learner's record in all of their sessions. Only two things undo it: its session is deleted, or a re-mark after a marking fault finds the answer wrong.
 _Avoid_: mastered (for an objective)
 
 **Record**:

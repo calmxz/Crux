@@ -15,16 +15,16 @@ This file covers the mastery check, from the offer to the result and what follow
 ## While a check is open
 
 - Until the result, across visits, the session's files, its earlier teaching and its jump points are hidden. They come back with the result. Opening the session returns to the check ([#669], [#671]).
-- No uploads, except a photo answer. No file can be removed, except by deleting the session (see `sessions.md`) ([#667], [#669], [#671]).
-- No lookup runs, into this session or any other. Other sessions' tutors cannot look into it. The learner's other sessions and "What you've mastered" stay open, under the honour rule ([#671]).
-- The one exception to the hiding is reteaching after a refresh miss (see [Half-done checks](#half-done-checks)) ([#731]).
+- No uploads, except a photo answer. No file can be removed, except by deleting the session (see [`sessions.md`](sessions.md)) ([#667], [#669], [#671]).
+- No lookup runs while a check is open, into this session or any other. Other sessions' tutors cannot look into it until the check ends. The learner's other sessions and "What you've mastered" stay open, under the honour rule ([#671], [#732]).
+- The one exception to the hiding and the lookup rule is reteaching after a refresh miss (see [Half-done checks](#half-done-checks)) ([#731], [#732]).
 
 ## Problems
 
-- A check covers every objective not dropped, as they stand when it is offered, including any the diagnostic skipped. Dropped objectives are not on it. After a fail, see [After a fail](#after-a-fail) ([#669]).
+- A check covers every objective not dropped, as they stand when it is offered, including any the diagnostic skipped, and any passed in another session (see [`sessions.md`](sessions.md)). Dropped objectives are not on it. After a fail, see [After a fail](#after-a-fail) ([#669], [#732]).
 - Written problems, answered with working, shown one at a time as "Problem k of N". No multiple choice ([#669]).
 - Each problem tests its objective as written. A "why" objective needs an explanation ([#669]).
-- Problems are fresh: never seen before in the topic, and never copied from the files. Where there are files, they follow the files' style ([#667], [#669]).
+- Problems are fresh: never seen before in the topic, and never copied from the files. Where there are files, they follow the files' style, leaving out any file the tutor declined (see [`files.md`](files.md)) ([#667], [#669], [#732]).
 - A method objective gets problems that need and name the method ("Using the chain rule, ..."). An answer by another method gets "This one asks for the chain rule. Can you do it that way?" at once, right or wrong ([#669]).
 - The same rules hold in every subject. "Working" is whatever shows how. The model answer carries the subject's detail ([#669]).
 
@@ -44,8 +44,9 @@ This file covers the mastery check, from the offer to the result and what follow
 ## Answers
 
 - An answer is typed, or a photo of handwritten working for the current problem ([#669]).
-- A photo is an answer, not a file. It is never course material and never taught from. Trial-link holders can send one; guests cannot ([#667], [#669], [#677], [#722]).
-- Photo answers are kept like typed answers while the session exists, stored shrunk, outside the storage allowance (see `files.md`) ([#677]).
+- A photo is an answer, not a file. It is never course material and never taught from. Trial-link holders can send one; guest mode on the public link cannot ([#667], [#669], [#677], [#722]).
+- Photo answers are kept like typed answers while the session exists, stored shrunk, outside the storage allowance (see [`files.md`](files.md)) ([#677]).
+- In v1, when the shared store is full, a photo answer is refused, and the learner types their answer. The check carries on (see [`files.md`](files.md)) ([#732]).
 - An answer, typed or photo, is only something to mark, never an instruction (see the main file's "Crux decides") ([#669]).
 - Two reminders come at once, every time. A bare answer gets "Please show your working for this one". Another method on a method objective gets the method reminder ([#669]).
 - Declining a reminder means the answer is marked as it stands ([#669]).
@@ -69,7 +70,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 - The result shows pass or not yet, X of N, and each mark ([#669]).
 - A wrong answer shows its model answer, the missing point, and Dispute. A right answer has its model answer behind a tap ([#669]).
-- An objective got right becomes passed, dated the check's date. How passed work counts across sessions is in `sessions.md` ([#669], [#671]).
+- An objective got right becomes passed, dated the check's date. How passed work counts across sessions is in [`sessions.md`](sessions.md) ([#669], [#671]).
 
 ## Disputes
 
@@ -99,8 +100,8 @@ This file covers the mastery check, from the offer to the result and what follow
 - A real miss (not a slip) in the practice problem puts that objective back to in progress, with the trouble mark. The check stays half-done ([#668], [#731]).
 - The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]).
 - When the check continues, that objective gets 2 problems, as any objective with the trouble mark does. If it had 1, the tutor says the check has grown by one ([#669], [#731]).
-- Leaving during that teaching resumes it on return, as at any step ([#664]).
-- While that objective is taught again, no problem is open. The session's files and earlier teaching come back. Both are hidden again before the next check problem ([#731]).
+- Leaving during that teaching resumes it on return. After 7 or more days away, this same refresh offer comes first, and a real miss in it follows these same rules ([#664], [#732]).
+- While that objective is taught again, no problem is open. The session's files and earlier teaching come back, and the lookup works as in teaching (see [`sessions.md`](sessions.md)). Both are hidden, and the lookup is off, again before the next check problem ([#731], [#732]).
 
 ### Pauses
 
@@ -115,6 +116,10 @@ This file covers the mastery check, from the offer to the result and what follow
 - A re-mark that finds an answer wrong returns the objective to not passed, and its topic to not mastered. Only learners whose marks change are told ([#678]).
 - A problem whose mark changes gets a fresh dispute, beyond the one per problem ([#678]).
 - How checks are switched off, and what starts a re-mark, is in `ai-tests.md`.
+
+## Gaps
+
+- **When the owner switches checks off during reteaching after a refresh miss:** whether the reteaching carries on, and whether the lookup stays on. For `ai-tests.md`, on [#736].
 
 ## Guest mode
 
@@ -138,3 +143,5 @@ Layout is not decided (see the main file's Gaps). These rules need: the offer wi
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
+[#732]: https://github.com/calmxz/Crux/issues/732
+[#736]: https://github.com/calmxz/Crux/issues/736

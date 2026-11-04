@@ -33,7 +33,7 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 - Every objective shows a status: not started, in progress, shown, passed, or dropped ([#668], [#669]). Crux keeps the statuses and hands them to the tutor (see the main file's "Crux decides").
 - **Shown:** the learner solved a fresh problem on the objective with no help. Their working, or their reply when asked, shows the method ([#668]).
 - **Fresh problem:** one the tutor writes at that point, not seen before in the topic. It is not the learner's own problem, not a twin they were taken through, and not earlier practice ([#668]). The diagnostic, the quick route and the check use the same rule.
-- A real miss (not a slip) on a shown objective puts it back to in progress. This includes a refresh problem after 7 or more days away (see `sessions.md`) ([#668], [#671]). The refresh before a resumed check is in [`mastery-check.md`](mastery-check.md).
+- A real miss (not a slip) on a shown objective puts it back to in progress. This includes a refresh problem after 7 or more days away (see [`sessions.md`](sessions.md)) ([#668], [#671]). The refresh before a resumed check is in [`mastery-check.md`](mastery-check.md).
 - **Trouble mark:** an objective gets it when it goes back to in progress, needs a misconception fixed, or fails a check. It then needs 2 fresh problems in a row, unhelped, to be shown. Using a hint does not give the trouble mark ([#668], [#669]).
 - **Ready:** every objective not dropped is shown. The tutor then offers the check. The learner is never pushed into it ([#663], [#668]).
 - The learner can jump to any objective. If it needs an earlier one not yet shown, the tutor says so and suggests that one first. The learner decides ([#668]).
@@ -80,7 +80,7 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 
 ## Preferences
 
-- A preference is stated by the learner, or noticed by the tutor and confirmed ("use real-world examples"). It carries across sessions. The learner can see and remove it ([#668]). How it is kept is in `sessions.md` ([#671]).
+- A preference is stated by the learner, or noticed by the tutor and confirmed ("use real-world examples"). It carries across sessions. The learner can see and remove it ([#668]). How it is kept is in [`sessions.md`](sessions.md) ([#671]).
 - Nothing the tutor infers about the learner, such as recurring mistakes or strengths, is stored ([#668]).
 
 ## Gaps
