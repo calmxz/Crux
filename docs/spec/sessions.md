@@ -80,7 +80,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 
 - An objective passed in another session, on a topic not yet mastered, is marked in a new topic's objectives: "2 Time of flight (passed in physics on 25 Nov)" ([#671]).
 - The mark opens that session at the check's result. Into a session with an open check, it opens at the check ([#732]).
-- The mark goes with the pass. If the pass is undone, the mark, its link and the tutor's line about it go too. If the earlier topic is mastered later, the mark stays ([#732]).
+- The mark goes with the pass. If the pass is undone, the mark and its link go. What the tutor already said about the pass stays in the conversation, and from then on the tutor does not name the pass. If the earlier topic is mastered later, the mark stays ([#732]).
 - On first reaching that objective in this topic, the tutor names the pass and adds one sentence bridging it to the new topic. It then offers a quick problem to skip the teaching, or teaching as usual ([#732]):
   > "You passed time of flight in physics on 25 Nov. Here it decides how far the ball travels, so we'll need it for Range. Want a quick problem to skip the teaching, or shall I teach it as usual?"
 - The bridge is written from the objective and the new topic. The tutor does not read the other session, and says nothing about what the learner did there ([#732]).
