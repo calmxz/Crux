@@ -51,7 +51,7 @@ All figures marked "for the meantime" can change if [Decide: the AI layer](https
 - **The owner's own use:** outside the learner cap, the budget, the daily ceiling, the tutoring limits and every count. It spends from the owner's share, USD 3 a month ([#676](https://github.com/calmxz/Crux/issues/676), [#679](https://github.com/calmxz/Crux/issues/679)). Re-marks of learners' checks after a marking fault run in the Crux project and spend from the owner's share too ([#728](https://github.com/calmxz/Crux/issues/728)).
 - **Tests:** test spend never counts toward the learners' budget or the Crux project's cap. Tests have their own Google Cloud project, Crux tests, capped at about USD 5 a month for now and raised by hand. Credits and the card are shared ([#678](https://github.com/calmxz/Crux/issues/678), [#679](https://github.com/calmxz/Crux/issues/679)).
 - **Time:** days, weeks and months for the budget, the ceiling, the tutoring limits and budget-caused misses are in the owner's time zone. Messages give reset times in the learner's own clock ([#675](https://github.com/calmxz/Crux/issues/675), [#676](https://github.com/calmxz/Crux/issues/676)).
-- **Hosting stays on free tiers:** Cloud Run's free credit under a USD 6 cap, and Cloud Storage at a few cents a month (20 GB at most). A domain, about USD 10 to 11 a year, is bought before the trial ([#716](https://github.com/calmxz/Crux/issues/716), [#717](https://github.com/calmxz/Crux/issues/717)). Any minimum instance is a recorded change to this rule ([#716](https://github.com/calmxz/Crux/issues/716)).
+- **Hosting stays on free tiers:** Cloud Run's free credit under a USD 6 cap, and Cloud Storage at a few cents a month (about 20 GB at most, see [`files.md`](files.md)). A domain, about USD 10 to 11 a year, is bought before the trial ([#716](https://github.com/calmxz/Crux/issues/716), [#717](https://github.com/calmxz/Crux/issues/717)). Any minimum instance is a recorded change to this rule ([#716](https://github.com/calmxz/Crux/issues/716)).
 
 The rest of the money rules are in `spending.md`.
 
@@ -78,7 +78,7 @@ Text from these sources is never an instruction: a file's text, a mastery-check 
 
 ### Speed
 
-- The landing page shows at once. The tutor starts replying within about 5 seconds at any time of day, including after hours idle. A reply is never cut off midway. If no free host can meet this, it returns as a recorded change to the free-hosting rule ([#678](https://github.com/calmxz/Crux/issues/678)).
+- The landing page shows at once. The tutor starts replying within about 5 seconds at any time of day, including after hours idle. A reply is never cut off midway. The 5 seconds do not cover the wait while a file given with the request is read (see [`files.md`](files.md)) ([#732](https://github.com/calmxz/Crux/issues/732)). If no free host can meet this, it returns as a recorded change to the free-hosting rule ([#678](https://github.com/calmxz/Crux/issues/678)).
 
 ## Area files
 
@@ -91,8 +91,8 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`learning-loop.md`](learning-loop.md) | The loop end to end; requests and narrowing; topics, learning objectives and changes to them; what happens after mastery | 662, 664, 665, 666, 670 (+667, 668, 671, 677, 679) | 1,550 |
 | [`teaching.md`](teaching.md) | How the tutor teaches; objective statuses and readiness; the help ladder; the diagnostic; detours and prerequisite topics; the never-ready menu; preferences | 663, 668 (+667, 670, 671) | 750 |
 | [`mastery-check.md`](mastery-check.md) | The offer, problems and model answers, marking and the pass rule, disputes, fails, half-done checks, photo answers | 663, 669 (+667, 671, 677, 678, 679, 716, 722) | 1,050 |
-| `files.md` (to be written) | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+671, 675, 677, 679, 716, 717, 722) | 1,300 |
-| `sessions.md` (to be written) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 676, 678, 716) | 800 |
+| [`files.md`](files.md) | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+669, 670, 671, 675, 677, 679, 681, 716, 717, 722) | 1,300 |
+| [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731) | 800 |
 | `accounts.md` (to be written) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
 | `age.md` (to be written) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
 | `spending.md` (to be written) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+676, 677, 678, 679, 716, 717, 722) | 1,100 |
@@ -109,7 +109,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 
 These are not decided yet. Do not build them from guesses.
 
-- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The two gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731).
+- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731) and [#732](https://github.com/calmxz/Crux/issues/732).
 - **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
