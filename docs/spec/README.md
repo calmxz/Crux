@@ -91,7 +91,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`learning-loop.md`](learning-loop.md) | The loop end to end; requests and narrowing; topics, learning objectives and changes to them; what happens after mastery | 662, 664, 665, 666, 670 (+667, 668, 671, 677, 679) | 1,550 |
 | [`teaching.md`](teaching.md) | How the tutor teaches; objective statuses and readiness; the help ladder; the diagnostic; detours and prerequisite topics; the never-ready menu; preferences | 663, 668 (+667, 670, 671) | 750 |
 | [`mastery-check.md`](mastery-check.md) | The offer, problems and model answers, marking and the pass rule, disputes, fails, half-done checks, photo answers | 663, 669 (+667, 671, 677, 678, 679, 716, 722) | 1,050 |
-| [`files.md`](files.md) | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+671, 675, 677, 679, 716, 717, 722) | 1,300 |
+| [`files.md`](files.md) | Files: types and limits, how files shape objectives, error flags, storage and conversion, pages sent to the tutor, the allowance | 667 (+669, 670, 671, 675, 677, 679, 681, 716, 717, 722) | 1,300 |
 | [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731) | 800 |
 | `accounts.md` (to be written) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
 | `age.md` (to be written) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
