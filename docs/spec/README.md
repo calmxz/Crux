@@ -114,7 +114,6 @@ These are not decided yet. Do not build them from guesses.
 - **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
-- **Child-protection law:** whether RA 9775 and RA 11930 apply to Crux, see [#743](https://github.com/calmxz/Crux/issues/743). Trial links do not start until it is answered (see [`misuse.md`](misuse.md)).
 - **Open hosting checks:** research [#726](https://github.com/calmxz/Crux/issues/726) (database pooler security, the Cloud Run cap and server time, alerting charges, Zoho's agreement).
 - **The old code, where the new code lives, and bringing the deployment back:** on the map's "Not yet specified" list.
 - **Ideas v1 does not need:** on the map's "Out of scope" list until the lock, then `post-v1` issues ([#680](https://github.com/calmxz/Crux/issues/680)).

@@ -129,7 +129,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - the dated anonymous counts, including the under-18 count, and the cookieless visit count;
 - the sign-in cookie;
 - the human check, the email sender, the code limits and the region check;
-- the misuse flag, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
+- the misuse flag, sealed sessions being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
 - the guest and trial rules;
 - error reports with no learner text;
 - the learner's rights: a copy, correction, deletion, withdrawing consent, and complaining to the National Privacy Commission;

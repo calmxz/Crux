@@ -6,7 +6,6 @@ This file covers the first two of the main file's "Stages": the trial without ac
 
 ## During the trial
 
-- Trial links do not start until the legal advice on [#743] is recorded.
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
 - From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
@@ -164,4 +163,3 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
-[#743]: https://github.com/calmxz/Crux/issues/743

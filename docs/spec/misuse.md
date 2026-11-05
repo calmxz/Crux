@@ -61,12 +61,13 @@ The learner hears only after the owner decides. Each message gives the reason, u
 
 **Sealed flags**
 
-A decline for anything sexual involving minors, or a reply Google blocks as prohibited content, is handled differently, until [#743] sets the legal duties ([#733]):
+A decline for anything sexual involving minors, or a reply Google blocks as prohibited content, is handled differently ([#733]):
 
 - The account locks at once, with no tutoring. The learner sees that it is locked, and how to reply ([#733]).
 - The owner sees only the date and the kind. The session holding the decline, with its files, is sealed, so nobody can open it, the owner included ([#733]).
 - The owner decides from that and from any reply, and closes the account or lifts the lock. Lifting it ends the seal ([#733]).
-- Nothing erases sealed material until [#743] sets how long it stays. The learner cannot delete it, and a closure, a dead trial link or the trial's end leaves it in place ([#733]).
+- The learner cannot delete a sealed session. It is erased when its account or trial link is erased, on the usual schedule ([#733]).
+- If the owner reports it to the authorities, the owner marks it "Reported" on the owner page. It then stays sealed past that erasure until the authorities say what to do, and the owner then erases it ([#733], [#743]).
 
 **A misuse closure**
 
@@ -80,12 +81,12 @@ A decline for anything sexual involving minors, or a reply Google blocks as proh
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the locked account, the message when Google blocks a reply, and the owner page's flagged sessions, with warn, dismiss, close, restore and lift ([#677], [#733]).
+Layout is not decided (see the main file's Gaps). These rules need: the locked account, the message when Google blocks a reply, and the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
 
 ## Gaps
 
 - **Telling prohibited content apart:** whether Google's block categories can pick out this one kind cleanly. A build check; if they cannot, the choice returns to the owner. For `ai-layer.md`, on [#735].
-- **Child-protection law:** whether RA 9775 and RA 11930 apply to Crux, what must be reported, and what must be preserved or erased, including whether sealed material is left out of a copy. Trial links do not start until this is answered, on [#743].
+- **Child-protection law:** the owner chose not to seek advice before the trial. Whether RA 9775 and RA 11930 apply to Crux, and what they require, stays unconfirmed ([#743]).
 
 [#665]: https://github.com/calmxz/Crux/issues/665
 [#667]: https://github.com/calmxz/Crux/issues/667
