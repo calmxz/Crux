@@ -33,7 +33,9 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 - Guest mode is typing only (see the main file's "Stages"). A guest who tries to upload a file or a photo sees "Uploading your own files needs a trial link." with a Request access button while the trial runs, and nothing is stored ([#722], [#733]).
 - Nothing is kept after the tab closes ([#677]).
 - Replies are counted per browser by a random ID. It is never used for counting learners or for analytics ([#677]).
-- Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. After it, the page shows the demo video instead ([#677], [#679]). A mini check already started finishes first, and an open age question still works ([#675], [#679]).
+- Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
+- **When guest mode stops:** at the guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Back on 1 Dec.") and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video ([#734]). A mini check already started finishes first, past all three, and an open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`spending.md`](spending.md) runs ([#734]).
+- When Google's cap stops Crux, a guest sees the month's line and the video. Google refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734]).
 - The owner page has a switch for guest mode (see `ai-tests.md`) ([#678]).
 
 ## Request access
@@ -69,10 +71,10 @@ If the day's emails have run out, an invite or decline waits for the next day. A
 The main file's "Stages" sets the rule. In detail:
 
 - Every step of the learning loop, with files in a session and photo answers in a check, under the rules decided for accounts (see [`files.md`](files.md) and [`mastery-check.md`](mastery-check.md)) ([#722]).
-- The same tutoring limit as an account (see `spending.md`) ([#677]).
+- The same tutoring limit as an account (see [`spending.md`](spending.md)) ([#677]).
 - An account's storage allowance, in the shared store (see [`files.md`](files.md)) ([#722]).
 - Sessions stay under the link until it dies (below). Removing a file or deleting a session erases at once ([#717], [#722]).
-- Anonymous feedback, which is kept (see `feedback.md`) ([#677], [#717]).
+- Anonymous feedback, which is kept. A tap on Yes to the age question removes its words and quote permissions (see [`feedback.md`](feedback.md)) ([#677], [#717], [#734]).
 
 Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You can email me about this", the copy of data by email, Close account, and the let-in list ([#722]).
 
@@ -95,7 +97,7 @@ A link dies when the owner switches it off, its holder taps Yes to the age quest
 Crux has no email for a link, so it uses an on-screen notice at the holder's next visit ([#733]):
 
 - **The Trial Terms change:** the entry ticks show again.
-- **The trial is ending:** a notice with the date, shown ahead of time.
+- **The trial is ending:** a notice with the date, shown ahead of time. It reminds the holder that they can untick a quote or a share until then ([#734]).
 - **A data breach:** a notice saying what happened.
 
 A holder who does not visit cannot be reached ([#733]).
@@ -108,7 +110,7 @@ A holder who does not visit cannot be reached ([#733]).
 
 ## The trial's notices
 
-**The Trial Terms** carry the upload lines decided for accounts (see [`privacy.md`](privacy.md)) ([#722]).
+**The Trial Terms** carry the upload lines decided for accounts (see [`privacy.md`](privacy.md)) ([#722]). They also say a quote tick can't be undone once the link has ended ([#734]).
 
 **The Trial Privacy Notice** says ([#677], [#717], [#722], [#728], [#733]):
 
@@ -130,7 +132,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 ## Ending the trial
 
 - The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and the daily housekeeping job ends the trial on that date ([#733]).
-- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers stay ([#677], [#722], [#733]).
+- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay (see [`feedback.md`](feedback.md)) ([#677], [#722], [#733], [#734]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
 - Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
 - Nothing from the trial is carried into an account ([#677]).
@@ -163,3 +165,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
+[#734]: https://github.com/calmxz/Crux/issues/734

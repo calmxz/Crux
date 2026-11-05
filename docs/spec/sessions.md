@@ -35,7 +35,7 @@ This is what the rules need kept. The data model is not decided yet, see [#719].
 **Across sessions, in no session:**
 
 - Preferences the learner stated or agreed to, visible and removable (see [`teaching.md`](teaching.md)) ([#668], [#671]).
-- On the account: both sign-up ticks, the learner's feedback and quote tick-boxes, and a few marks (see [`accounts.md`](accounts.md) and `feedback.md`) ([#674], [#676]).
+- On the account: both sign-up ticks, the learner's feedback and quote tick-boxes, and a few marks (see [`accounts.md`](accounts.md) and [`feedback.md`](feedback.md)) ([#674], [#676]).
 
 Mastery does not fade in v1. "Mastered" means passed once, and a pass can be undone only as [What crosses sessions](#what-crosses-sessions) says. A later retest is post-v1 (map, Out of scope) ([#664], [#671], [#678]).
 
@@ -53,7 +53,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - Text the lookup finds is reference, never an instruction (see the main file's "Crux decides") ([#671]).
 - No lookup runs while a check is open, into this session or any other. The one exception is while an objective is retaught after a refresh miss: the lookup works as in teaching, and is off again before the next check problem ([#671], [#732]).
 - Another session's tutor cannot look into a session with an open check, retaught objective or not, until the check ends ([#671], [#732]).
-- A lookup's cost counts toward the learner's tutoring limit (see `spending.md`) ([#675]).
+- A lookup's cost counts toward the learner's tutoring limit (see [`spending.md`](spending.md)) ([#675]). A message a limit stopped stays in the conversation, marked as waiting, and goes with its session ([#734]).
 - The owner can switch the lookup off for a fault (see `ai-tests.md`) ([#678]).
 
 ### How it searches
@@ -125,8 +125,8 @@ flowchart TD
   where -->|"any other step"| restate["The tutor restates where it was"]
 ```
 
-- **Mid-teaching:** the tutor picks up where the learner stopped. After 7 or more days away, it first offers "continue" or "refresh first" ([#671]).
-- **The 7 days** count from when that topic was last worked on, so a paused topic gets the offer when it resumes. A detour counts as teaching ([#671]).
+- **Mid-teaching:** the tutor picks up where the learner stopped. After 7 or more days away, it first offers "continue" or "refresh first", with a button for each ([#671], [#734]).
+- **The 7 days** count from when that topic was last worked on, so a paused topic gets the offer when it resumes. A detour counts as teaching ([#671]). Only something the learner sends restarts the 7 days. Opening the app or a background answer does not ([#734]).
 - **A refresh** is a short recap of the objectives so far and one practice problem with help allowed. Then teaching continues ([#671]).
 - Choosing either changes no status. Help being allowed, the refresh problem cannot newly show an objective. A real miss on a shown objective still puts it back to in progress (see [`teaching.md`](teaching.md)) ([#668], [#671]).
 - **Any other step** (mid-narrowing, waiting for "go", the check offer, the never-ready menu, an open dispute, mid-refresh): the tutor restates where it was, with no refresh offer ([#671]).
@@ -141,7 +141,7 @@ flowchart TD
 - The learner can delete a session at any time, a half-done check included, which goes with it ([#671]).
 - A warning names what goes: "This deletes everything in it, including 5 mastered topics from your record" ([#671]).
 - Everything in the session goes, including its files, its mastered topics, and its passed objectives from "What you've mastered". It is erased at once and cannot be undone ([#671], [#677]). What deleting cannot reach at once is in [`privacy.md`](privacy.md) ([#677], [#716]).
-- Preferences stay ([#671]). So do the anonymous dated counts behind the go-public bar and the marks on the account, which are in no session (see `feedback.md`) ([#676]).
+- Preferences stay ([#671]). So do the anonymous dated counts behind the go-public bar and the marks on the account, which are in no session (see [`feedback.md`](feedback.md)) ([#676]).
 - Other sessions keep their conversation as it was. Their menus may now offer topics they used to skip ([#671]).
 
 ## On screen
@@ -165,3 +165,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the session 
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#732]: https://github.com/calmxz/Crux/issues/732
+[#734]: https://github.com/calmxz/Crux/issues/734

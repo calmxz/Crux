@@ -73,7 +73,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Per file:** up to 50 MB ([#667], [#716]).
 - Over either limit: "upload just the chapter you need" ([#667]).
 - **When:** several files, with the request or added later, never during a mastery check ([#667]). A photo answer is the one exception (see [`mastery-check.md`](mastery-check.md)) ([#669]).
-- Reading a file counts toward the learner's tutoring limit, like any reply. No other limit caps how often a learner uploads. A file sent before the limit is read in full (see `spending.md`) ([#675]).
+- Reading a file counts toward the learner's tutoring limit, like any reply. No other limit caps how often a learner uploads. A file sent before the limit is read in full. What happens when a read fills the limit, or a file arrives at a full one, is in [`spending.md`](spending.md) ([#675], [#734]).
 - Looking at files costs no AI, so it works past every spending limit ([#675]).
 
 ## Storing and reading a file
@@ -139,7 +139,6 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged errors, and added pages. Open on [#678] ([#679]).
 - **Whether Gemini can read a topic's pages straight from the bucket**, instead of Crux sending them: a build check, open on [#678] ([#716]).
 - **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
-- **When reading a file given with the request fills the learner's tutoring limit:** one reply past the limit, or the reply waits for the reset. For `spending.md`, on [#734].
 - **When the owner switches files off during "Reading…":** whether the work finishes, and what the waiting tutor says. For `ai-tests.md`, on [#736].
 
 ## On screen

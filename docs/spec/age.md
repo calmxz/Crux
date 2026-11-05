@@ -26,7 +26,7 @@ This file covers what happens when someone says they are under 18. The rule that
 Crux shows its own fixed question, with Yes and No buttons: "Crux is for people 18 and over. Are you under 18?" ([#679])
 
 - The tap decides. The model never ends anyone's access ([#679], [#728] Answer 2).
-- While the question is open, a typed reply gets a short "please tap Yes or No" ([#679]).
+- While the question is open, a typed reply gets a short "please tap Yes or No" ([#679]). The distress check in [`spending.md`](spending.md) runs on it ([#734]).
 - The question holds the whole account or trial link. It shows in every session and on every browser, and there is no tutoring anywhere until the tap ([#733]).
 - It stays open if the session is deleted. Reading past sessions and "What you've mastered" still works ([#733]).
 - For a guest, it lasts as long as the tab ([#733]).
@@ -43,9 +43,9 @@ Crux shows its own fixed question, with Yes and No buttons: "Crux is for people 
 In this order ([#677], [#681]):
 
 1. The learner sees a short message.
-2. The account's marks take 1 off each path and bar count that learner added, in the window each was counted in. A window already judged keeps its verdict. The budget counts are not changed (see `feedback.md`).
+2. The account's marks take 1 off each path and bar count that learner added, in the window each was counted in. A window already judged keeps its verdict. The budget counts are not changed (see [`feedback.md`](feedback.md)).
 3. The owner page's dated under-18 count adds 1, with nothing about who the person was.
-4. The account closes and its data is erased at once. The 7-day undo does not apply (see [`privacy.md`](privacy.md)).
+4. The account closes and its data is erased at once. The 7-day undo does not apply (see [`privacy.md`](privacy.md)). Only a published quote's note, with no words, stays until the owner removes it (see [`feedback.md`](feedback.md)) ([#734]).
 
 The learner may sign up again like anyone new, ticking the box again. Crux keeps nothing about them to block it ([#681]).
 
@@ -55,6 +55,7 @@ Guests and trial-link holders get the same question, buttons and rules above ([#
 
 - **A guest:** the guest session ends, and the entry ticks clear on that browser, so they show again ([#677], [#728] Answer 2, [#733]).
 - **A trial link:** the link is switched off, and its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2). Crux tells the person why their access ended and that their sessions are erased, just before or just after the erasure. A guest gets no such message ([#728] Answer 2).
+- A trial link's ending also removes its feedback words and quote permissions, with the same exception for a published quote's note (see [`feedback.md`](feedback.md)) ([#734]).
 - Each ending adds 1 to the owner page's dated under-18 count, as an account closed as under 18 does. The count keeps nothing about who the person was ([#728]).
 - The trial counts toward no go-public count (see [`trial.md`](trial.md)) ([#677], [#728]).
 - The Trial Privacy Notice says the dated count exists ([#728]).
@@ -77,3 +78,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
+[#734]: https://github.com/calmxz/Crux/issues/734
