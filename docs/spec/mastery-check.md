@@ -105,7 +105,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ### Pauses
 
-- A check pauses as half-done when the owner switches checks off for a fault, or while the age question is open ([#678], [#679]).
+- A check pauses as half-done when the owner switches checks off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
 - It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see `spending.md`) ([#675], [#679]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
 - Spending limits never stop a check that has started (see `spending.md`) ([#675]).
@@ -123,7 +123,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## Guest mode
 
-- A guest's mini check has 2 problems on one objective, typing only. It earns nothing and is not kept (see `trial.md`) ([#677], [#722]).
+- A guest's mini check has 2 problems on one objective, typing only. It earns nothing and is not kept (see [`trial.md`](trial.md)) ([#677], [#722]).
 
 ## On screen
 
@@ -143,5 +143,6 @@ Layout is not decided (see the main file's Gaps). These rules need: the offer wi
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
+[#733]: https://github.com/calmxz/Crux/issues/733
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#736]: https://github.com/calmxz/Crux/issues/736

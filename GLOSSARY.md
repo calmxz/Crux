@@ -9,16 +9,20 @@ The person learning with Crux.
 _Avoid_: user, student
 
 **Account**:
-What a learner signs up for and signs in to, linked to one email address. It holds their sessions and their record. A learner can close their account, and it is erased a week later unless they sign back in and choose to keep it. An account with no visit for 12 months is closed after two warnings.
+What a learner signs up for and signs in to, linked to one email address. It holds their sessions and their record. A learner can close their account, and it is erased a week later unless they come back and choose to keep it. An account with no visit for 12 months is closed after two warnings.
 _Avoid_: profile, user
 
 **Guest**:
-Someone who uses Crux without an account, before Crux opens. A guest uses either the public link, for a sample topic or a short run on their own topic, or a trial link. Crux keeps no record of who they are.
+Someone who uses Crux on the public link without an account, before Crux opens, for a sample topic or a short run on their own topic. Crux keeps no record of who they are.
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
 The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, or the holder taps Yes to Crux's age question.
 _Avoid_: invite, code, password
+
+**Misuse flag**:
+A mark that Crux puts on an account or a trial link after the tutor declines too many harmful requests, or one very serious one. The owner then decides what happens, usually after reading the chat in the sessions where the tutor declined something.
+_Avoid_: strike, report
 
 **Tutor**:
 The AI that teaches the learner and tracks which learning objectives the learner has shown. When the learner has shown every learning objective they have not dropped, the tutor offers a mastery check.

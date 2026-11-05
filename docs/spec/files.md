@@ -7,7 +7,7 @@ This file covers what a file does in Crux, from upload to erasure. How the tutor
 ## Who can add files
 
 - Account holders and trial-link holders can add files ([#667], [#722]).
-- Guest mode on the public link is typing only. Someone in guest mode who tries to upload a file or a photo sees "Uploading your own files needs a trial link." with a Request access button. Nothing is stored ([#722]).
+- Guest mode on the public link is typing only. Someone in guest mode who tries to upload a file or a photo sees "Uploading your own files needs a trial link." with a Request access button while the trial runs. Nothing is stored ([#722]).
 
 ## How files shape a request
 
@@ -52,10 +52,10 @@ The tutor judges this per topic. It never labels a whole file as a lesson, a syl
   - The tutor reports the file through a tool call. The file stays until the learner removes it. Crux sends none of its pages or outline to the tutor, and it gives no topics, session name or check-problem style. It does not count toward "that covers everything you came for" ([#670], [#671], [#732]).
 - Anything learnable (a novel, an article) is a request, and is narrowed ([#667]).
 - Unreadable (blurry, password-protected, empty, broken): the tutor says what went wrong, and offers another file or typing the topic ([#667]). A file Crux processed but cannot follow, such as a blurry photo, stays until the learner removes it, unused, like a file with nothing learnable ([#732]).
-- Harmful: declined like a harmful typed request (see `privacy.md`) ([#667], [#677]). The decline counts once toward the misuse flag, and removing the file does not undo it ([#677], [#732]).
+- Harmful: declined like a harmful typed request (see [`misuse.md`](misuse.md)) ([#667], [#677]). The decline counts once toward the misuse flag, and removing the file does not undo it ([#677], [#732]).
   - The tutor reports the file through a tool call, when the read finds the harm or whenever it spots it later. From then on, Crux sends none of its pages or outline to the tutor, including when the tutor writes check problems ([#679], [#732]).
   - The tutor says: "I can't help with this file. This session can't continue until you remove it." The session waits until the file is removed or the session is deleted. Progress is kept, and the learner's other sessions stay open ([#732]).
-  - During the wait, the age question, the tutor's care for a learner in distress, and disputes on a finished check still work (see `age.md`, `privacy.md` and [`mastery-check.md`](mastery-check.md)). The conversation can still be read. The after-mastery menu waits, and the tutor answers anything else by repeating the message ([#675], [#677], [#681], [#732]).
+  - During the wait, the age question, the tutor's care for a learner in distress, and disputes on a finished check still work (see [`age.md`](age.md), [`misuse.md`](misuse.md) and [`mastery-check.md`](mastery-check.md)). The conversation can still be read. The after-mastery menu waits, and the tutor answers anything else by repeating the message ([#675], [#677], [#681], [#732]).
   - If this happens while a check is open, the check finishes first. The message and the wait come after the result ([#675], [#732]).
 
 ### Text in a file
@@ -130,7 +130,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - What the tutor already said about the file stays in the conversation until the session is deleted. Removing a file tells the learner so: "What the tutor already said about this file stays in the conversation. To erase that too, delete the session." ([#732])
 - Deleting a session removes its files, even during a check (see [`sessions.md`](sessions.md)) ([#671]).
 - A trial link's files, pages and photo answers are erased with its sessions when the link dies: the owner switches it off, the holder taps Yes to Crux's age question, or the trial ends ([#722], [#728]).
-- What closing an account erases, and what deleting cannot reach at once, is in `privacy.md` ([#677], [#716]). The upload lines in the terms are there and in `trial.md` ([#677], [#722]).
+- What closing an account erases, and what deleting cannot reach at once, is in [`privacy.md`](privacy.md) ([#677], [#716]). The upload lines in the terms are there and in [`trial.md`](trial.md) ([#677], [#722]).
 
 ## Gaps
 
@@ -141,7 +141,6 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
 - **When reading a file given with the request fills the learner's tutoring limit:** one reply past the limit, or the reply waits for the reset. For `spending.md`, on [#734].
 - **When the owner switches files off during "Reading…":** whether the work finishes, and what the waiting tutor says. For `ai-tests.md`, on [#736].
-- **What the owner judges from once a harmful file is removed:** the decline alone, or a reason Crux keeps from the tutor. For `privacy.md`, on [#733].
 
 ## On screen
 
@@ -161,6 +160,5 @@ Layout is not decided (see the main file's Gaps). These rules need: uploading an
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
-[#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#736]: https://github.com/calmxz/Crux/issues/736

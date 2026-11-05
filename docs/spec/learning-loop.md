@@ -25,9 +25,9 @@ flowchart TD
 ```
 
 - The loop runs as drawn. A prerequisite topic pauses the current topic inside it (see [`teaching.md`](teaching.md)) ([#664], [#668], [#670]).
-- The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see `accounts.md` and `trial.md`) ([#674], [#677], [#722]).
+- The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see [`accounts.md`](accounts.md) and [`trial.md`](trial.md)) ([#674], [#677], [#722]).
 - The learner can leave at any step and resume the session at the step they left. What the tutor does on return is in [`sessions.md`](sessions.md) ([#664], [#671]).
-- At any step, a learner who says they are under 18 gets the age question (see `age.md`) ([#681]).
+- At any step, a learner who says they are under 18 gets the age question (see [`age.md`](age.md)) ([#681]).
 
 ## Requests
 
@@ -45,7 +45,7 @@ flowchart TD
 | Too narrow (a single problem) | Widens it to the smallest topic that contains it ([#665]). |
 | Ambiguous | See [Ambiguous requests](#ambiguous-requests). |
 | Not showable in writing | Turns a physical skill toward its knowledge part, and a task toward the skill behind it. The tutor says what the check will and will not cover. Trivia with nothing to turn toward gets "what would you like to learn?" ([#665]). |
-| Harmful | Declined. Harm is as the Terms of Use define it (see `privacy.md`) ([#665], [#677]). A harmful file also holds the session until it is removed (see [`files.md`](files.md)) ([#732]). |
+| Harmful | Declined. Harm is as the Terms of Use define it (see [`misuse.md`](misuse.md)) ([#665], [#677]). A harmful file also holds the session until it is removed (see [`files.md`](files.md)) ([#732]). |
 
 ### Narrowing
 
@@ -159,7 +159,7 @@ flowchart TD
 
 ## Guest mode
 
-- A guest's sample topic is a demo of one learning objective, with a 2-problem mini check. It is not a topic in the usual sense. It earns nothing and keeps nothing (see `trial.md`) ([#677]).
+- A guest's sample topic is a demo of one learning objective, with a 2-problem mini check. It is not a topic in the usual sense. It earns nothing and keeps nothing (see [`trial.md`](trial.md)) ([#677]).
 
 ## On screen
 

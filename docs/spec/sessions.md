@@ -9,7 +9,7 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 - A learner has several sessions and picks which to continue. Each resumes at the step left, including mid-diagnostic and mid-check ([#664]).
 - A trial link holds sessions as an account does ([#722]). Guest mode on the public link keeps nothing after the tab closes ([#677], [#722]).
 - Another learner's, guest's or trial link's session or Record gives "not found", on every page and request ([#678]).
-- Conversations and files are kept until the learner deletes the session ([#671]). Closing an account is in `privacy.md`, and a trial link's end in `trial.md` ([#677], [#722]).
+- Conversations and files are kept until the learner deletes the session ([#671]). Closing an account is in [`privacy.md`](privacy.md), and a trial link's end in [`trial.md`](trial.md) ([#677], [#722]).
 
 ### Names and the session list
 
@@ -35,7 +35,7 @@ This is what the rules need kept. The data model is not decided yet, see [#719].
 **Across sessions, in no session:**
 
 - Preferences the learner stated or agreed to, visible and removable (see [`teaching.md`](teaching.md)) ([#668], [#671]).
-- On the account: both sign-up ticks, the learner's feedback and quote tick-boxes, and a few marks (see `accounts.md` and `feedback.md`) ([#674], [#676]).
+- On the account: both sign-up ticks, the learner's feedback and quote tick-boxes, and a few marks (see [`accounts.md`](accounts.md) and `feedback.md`) ([#674], [#676]).
 
 Mastery does not fade in v1. "Mastered" means passed once, and a pass can be undone only as [What crosses sessions](#what-crosses-sessions) says. A later retest is post-v1 (map, Out of scope) ([#664], [#671], [#678]).
 
@@ -140,7 +140,7 @@ flowchart TD
 
 - The learner can delete a session at any time, a half-done check included, which goes with it ([#671]).
 - A warning names what goes: "This deletes everything in it, including 5 mastered topics from your record" ([#671]).
-- Everything in the session goes, including its files, its mastered topics, and its passed objectives from "What you've mastered". It is erased at once and cannot be undone ([#671], [#677]). What deleting cannot reach at once is in `privacy.md` ([#677], [#716]).
+- Everything in the session goes, including its files, its mastered topics, and its passed objectives from "What you've mastered". It is erased at once and cannot be undone ([#671], [#677]). What deleting cannot reach at once is in [`privacy.md`](privacy.md) ([#677], [#716]).
 - Preferences stay ([#671]). So do the anonymous dated counts behind the go-public bar and the marks on the account, which are in no session (see `feedback.md`) ([#676]).
 - Other sessions keep their conversation as it was. Their menus may now offer topics they used to skip ([#671]).
 
