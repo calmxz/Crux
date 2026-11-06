@@ -32,12 +32,12 @@ The Terms state the harm line and what misuse leads to. Both are in [`misuse.md`
 
 The owner reads a conversation only in two cases ([#677]):
 
-- **Shared:** on the feedback page, the learner ticks to share, and picks "this session" or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal". The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see `feedback.md`) ([#677], [#733]).
+- **Shared:** on the feedback page, the learner ticks to share, and picks a named session or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal". The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see [`feedback.md`](feedback.md)) ([#677], [#733]).
 - **Flagged:** a flag opens only the sessions where the tutor declined something, chat text only. The owner reads each one from its start up to the flag, plus any new declines while the flag waits. Access ends when the owner acts on the flag or, after a closure, when the lock ends ([#677], [#733]).
 
 No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread by a script, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
 
-Repairs from a backup are done by script, and the owner sees counts, not content ([#716]). The owner page's feedback rules, including who sent an answer, are in `feedback.md` ([#677]).
+Repairs from a backup are done by script, and the owner sees counts, not content ([#716]). The owner page's feedback rules, including who sent an answer, are in [`feedback.md`](feedback.md) ([#677]).
 
 ## Deleting and closing
 
@@ -54,9 +54,9 @@ Repairs from a backup are done by script, and the owner sees counts, not content
 - Otherwise the account and its data are erased on day 8, in the daily housekeeping job ([#677], [#728] Answer 7).
 - **If they asked for a copy:** on day 8, Crux makes the copy itself, then erases the account and everything else. It keeps only the copy and the address to send it to until the owner marks it sent, and erases both in the next daily job. The daily email reminds the owner. Keeping the account, or a restore, cancels the copy ([#733]).
 - A request that arrives by email during a closing, including a misuse closure, is entered on the owner page, or Crux cannot know about it ([#733]).
-- On day 8, the feedback words leave the owner page. Anonymous counts and yes/no answers stay as tallies. The account's quote permissions are withdrawn too (see `feedback.md`) ([#677]).
+- On day 8, the feedback words leave the owner page. Anonymous counts and yes/no answers stay as tallies. The account's quote permissions are withdrawn too (see [`feedback.md`](feedback.md)) ([#677]).
 - The owner chose the undo for the meantime. Erasing at once is the fallback if the undo causes problems ([#677]).
-- An under-18 closure skips the undo, and takes its counts off first (see [`age.md`](age.md)) ([#677], [#681]). A misuse closure has its own 7 days (see [`misuse.md`](misuse.md)) ([#733]).
+- An under-18 closure skips the undo, and takes its counts off first (see [`age.md`](age.md)) ([#677], [#681]). A published quote's note stays until the owner removes it (see the table below) ([#734]). A misuse closure has its own 7 days (see [`misuse.md`](misuse.md)) ([#733]).
 - A closed account's spot under the cap stays used (see [`accounts.md`](accounts.md)) ([#675], [#677]).
 
 ### Idle accounts
@@ -79,6 +79,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Photo answers | Like typed answers, stored shrunk, outside the file allowance ([#677]) |
 | Preferences | Stored only after the learner agrees, until removed or the account is erased ([#668], [#671]) |
 | Sign-up ticks, with date and terms version | As long as the account exists ([#677]) |
+| A published quote, once withdrawn | Its words, where it was published and the remove-by date, until the owner marks it removed, at most 14 days. After an under-18 ending, only where it was published and the date ([#677], [#734]) |
 | A decline's date and kind | Until the owner acts on the flag, or it drops out of the 7 days with no flag ([#733]) |
 | A misuse warning | As long as the account exists ([#733]) |
 | A copy asked for while closing | Until the owner marks it sent, then the next daily job ([#733]) |
@@ -168,3 +169,4 @@ Layout is not decided (see the main file's Gaps). These rules need: Close accoun
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#734]: https://github.com/calmxz/Crux/issues/734

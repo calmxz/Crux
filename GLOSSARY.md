@@ -37,7 +37,7 @@ The most money Crux can spend on tutoring in a month, including tutoring for gue
 _Avoid_: quota
 
 **Owner's share**:
-The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault. It is separate from the budget. When it runs out, only the owner's account and re-marks stop, until the owner raises the share.
+The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault, and for the check on a message a limit stopped. It is separate from the budget. When it runs out, only those three stop, until the owner raises the share or the month resets.
 
 **Tutoring limit**:
 The most tutoring one learner can use, measured by what it costs. There is a daily limit and a weekly limit, and whichever runs out first applies. When it runs out, the learner is not tutored until it resets. The one exception: they can finish a mastery check that has already started.

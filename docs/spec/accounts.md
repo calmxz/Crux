@@ -6,7 +6,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 ## Before opening
 
-- Sign-up is off during the trial. Sign-in by Google or code works only for the owner's own email addresses ([#677], [#717], [#728] Answer 5).
+- Sign-up is off during the trial. Sign-in by Google or code works only for the owner's own email addresses ([#677], [#717], [#728] Answer 5). A test address goes on the same list (see [`feedback.md`](feedback.md)) ([#734]).
 - No learner signs in during the trial. Trial-link users return through the link only (see [`trial.md`](trial.md)) ([#717], [#728] Answer 5).
 - The rest of this file holds from opening.
 
@@ -62,7 +62,7 @@ The rule is in the main file's "Who Crux is for".
   - "I agree to the Terms, and to Crux keeping my learning progress and what I share with the tutor, as the Privacy Policy explains" ([#677])
 - The Terms and the Privacy Policy are linked from the step ([#674]).
 - The account is made only on Start. A learner who leaves at the step has no account, and nothing is counted ([#674]).
-- Start adds 1 to "signed up" inside a window (see `feedback.md`) ([#674], [#676]).
+- Start adds 1 to "signed up" inside a window (see [`feedback.md`](feedback.md)) ([#674], [#676]).
 - Returning learners never see the step ([#674]).
 - Crux keeps each tick with its date and the version of the Terms and Privacy Policy agreed to, for as long as the account exists. It keeps no birth date or age ([#674], [#677], [#681]).
 
@@ -74,7 +74,7 @@ The cap itself is in the main file's "Money".
 - When the owner raises the cap, everyone who ticked gets one email at once, in no order. There is no waitlist ([#675]).
 - Learners with an account sign in as usual ([#675]).
 - A spot never frees up by itself. A closed account keeps its spot, and a learner who returns after closing signs up afresh and takes a new spot ([#675], [#677]).
-- The owner page's cap line and counts are in `spending.md` ([#675]).
+- The owner page's cap line and counts are in [`spending.md`](spending.md) ([#675]).
 
 ### The let-in list
 
@@ -96,7 +96,7 @@ The cap itself is in the main file's "Money".
 - The tutor uses a name only if the learner types one, and only in that session. A name is not a preference ([#674]).
 - The email is the account. It cannot be changed in v1. A learner who loses the inbox loses the way in, and a new email means a new, empty account ([#674]).
 
-What else an account keeps is in [`sessions.md`](sessions.md), and the marks in `feedback.md`.
+What else an account keeps is in [`sessions.md`](sessions.md), and the marks in [`feedback.md`](feedback.md).
 
 ## Staying signed in
 
@@ -126,3 +126,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
+[#734]: https://github.com/calmxz/Crux/issues/734

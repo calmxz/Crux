@@ -45,15 +45,15 @@ Crux opens in three stages ([#677](https://github.com/calmxz/Crux/issues/677), [
 All figures marked "for the meantime" can change if [Decide: the AI layer](https://github.com/calmxz/Crux/issues/679) is reopened (see Gaps).
 
 - **Learners' budget:** USD 8 a month, for the meantime. Guests and trial links spend from it ([#675](https://github.com/calmxz/Crux/issues/675), [#677](https://github.com/calmxz/Crux/issues/677), [#679](https://github.com/calmxz/Crux/issues/679), [#717](https://github.com/calmxz/Crux/issues/717)).
-- **Daily ceiling:** a quarter of the budget (USD 2), for the meantime. No calendar day spends more. The owner can change it on the owner page ([#675](https://github.com/calmxz/Crux/issues/675), [#679](https://github.com/calmxz/Crux/issues/679)).
+- **Daily ceiling:** a quarter of the budget (USD 2), for the meantime. No calendar day spends more, apart from a started mastery check (see [`spending.md`](spending.md)). The owner can change it on the owner page ([#675](https://github.com/calmxz/Crux/issues/675), [#679](https://github.com/calmxz/Crux/issues/679)).
 - **Changing the budget:** only as a recorded change. The one standing exception is a bigger budget for a re-run after a budget-caused miss, at most one re-run in the whole effort ([#675](https://github.com/calmxz/Crux/issues/675), [#676](https://github.com/calmxz/Crux/issues/676), [#679](https://github.com/calmxz/Crux/issues/679)).
 - **Learner cap:** 25 accounts, for the meantime, counting every account ever made. The owner raises it. An email on the owner's let-in list gets past a full cap (see [`accounts.md`](accounts.md)) ([#675](https://github.com/calmxz/Crux/issues/675), [#679](https://github.com/calmxz/Crux/issues/679)).
-- **The owner's own use:** outside the learner cap, the budget, the daily ceiling, the tutoring limits and every count. It spends from the owner's share, USD 3 a month ([#676](https://github.com/calmxz/Crux/issues/676), [#679](https://github.com/calmxz/Crux/issues/679)). Re-marks of learners' checks after a marking fault run in the Crux project and spend from the owner's share too ([#728](https://github.com/calmxz/Crux/issues/728)).
+- **The owner's own use:** outside the learner cap, the budget, the daily ceiling, the tutoring limits and every count. It spends from the owner's share, USD 3 a month ([#676](https://github.com/calmxz/Crux/issues/676), [#679](https://github.com/calmxz/Crux/issues/679)). Re-marks of learners' checks after a marking fault run in the Crux project and spend from the owner's share too ([#728](https://github.com/calmxz/Crux/issues/728)). So does the distress check in [`spending.md`](spending.md) ([#734](https://github.com/calmxz/Crux/issues/734)).
 - **Tests:** test spend never counts toward the learners' budget or the Crux project's cap. Tests have their own Google Cloud project, Crux tests, capped at about USD 5 a month for now and raised by hand. Credits and the card are shared ([#678](https://github.com/calmxz/Crux/issues/678), [#679](https://github.com/calmxz/Crux/issues/679)).
 - **Time:** days, weeks and months for the budget, the ceiling, the tutoring limits and budget-caused misses are in the owner's time zone. Messages give reset times in the learner's own clock ([#675](https://github.com/calmxz/Crux/issues/675), [#676](https://github.com/calmxz/Crux/issues/676)).
 - **Hosting stays on free tiers:** Cloud Run's free credit under a USD 6 cap, and Cloud Storage at a few cents a month (about 20 GB at most, see [`files.md`](files.md)). A domain, about USD 10 to 11 a year, is bought before the trial ([#716](https://github.com/calmxz/Crux/issues/716), [#717](https://github.com/calmxz/Crux/issues/717)). Any minimum instance is a recorded change to this rule ([#716](https://github.com/calmxz/Crux/issues/716)).
 
-The rest of the money rules are in `spending.md`.
+The rest of the money rules are in [`spending.md`](spending.md).
 
 ### Where data lives
 
@@ -95,11 +95,11 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731) | 800 |
 | [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
 | [`age.md`](age.md) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
-| `spending.md` (to be written) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+676, 677, 678, 679, 716, 717, 722) | 1,100 |
+| [`spending.md`](spending.md) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+667, 671, 674, 676, 677, 678, 679, 716, 717, 722, 728, 731, 733, 734) | 1,100 |
 | [`trial.md`](trial.md) | Guest mode, Request access and trial links, the advisory opinion, ending the trial | 677, 722 (+717) | 1,750 |
 | [`privacy.md`](privacy.md) | Terms of Use, Privacy Policy and processors, when the owner reads sessions, deleting and retention | 677 (+679, 681, 716, 717, 722) | 1,800 |
 | [`misuse.md`](misuse.md) | The harm line, the misuse flag, the owner's decision, sealed flags, misuse closures | 677 (+665, 667, 732, 733) | 700 |
-| `feedback.md` (to be written) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722) | 1,200 |
+| [`feedback.md`](feedback.md) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722, 728, 733, 734) | 1,200 |
 | `ai-layer.md` (to be written) | Route and projects, models and call settings, the topic slice, the maths library | 679, 684 (+716) | 1,100 |
 | `hosting.md` (to be written) | Hosting and runtime, the database, backups, environments and staging, logs, email sending, errors, uptime and owner messages | 716, 717 (+675, 678, 679) | 1,700 |
 | `quality-bar.md` (to be written) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+680, 716, 717, 722) | 1,650 |
@@ -110,7 +110,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 
 These are not decided yet. Do not build them from guesses.
 
-- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731), [#732](https://github.com/calmxz/Crux/issues/732) and [#733](https://github.com/calmxz/Crux/issues/733).
+- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731), [#732](https://github.com/calmxz/Crux/issues/732), [#733](https://github.com/calmxz/Crux/issues/733) and [#734](https://github.com/calmxz/Crux/issues/734).
 - **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
