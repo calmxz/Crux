@@ -6,7 +6,7 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 
 ## How the tutor teaches
 
-- The tutor's instruction is built on the LearnLM prompt guide. Its five principles and moves are kept, the parts that clash are rewritten, and Crux's rules are added. For example, it never asks for a topic it already has ([#668]). Models and settings are in `ai-layer.md`.
+- The tutor's instruction is built on the LearnLM prompt guide. Its five principles and moves are kept, the parts that clash are rewritten, and Crux's rules are added. For example, it never asks for a topic it already has ([#668]). Models and settings are in [`ai-layer.md`](ai-layer.md).
 - Within a topic, the tutor adapts pace, explanation, practice difficulty and examples. It adapts from the learner's answers and from direct asks ("slower", "another way") ([#668]).
 - One step per turn. Every turn ends with something for the learner to do: the next step, a prediction, or "why does that work?" ([#668])
 - Practice asks for brief working. A bare answer is accepted, but it cannot make an objective shown on its own. On a fresh problem, a bare right answer gets "how did you get that?" ([#668])

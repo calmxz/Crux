@@ -34,7 +34,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 ### When the sender runs out
 
-Email sending is in `hosting.md`.
+Email sending, and how many of the day's emails can be codes, is in [`operations.md`](operations.md) ([#735]).
 
 - A code request the sender cannot serve shows: "We can't send codes right now. Use Continue with Google, or try again tomorrow." If the monthly limit ran out, the message says "try again later" instead ([#674]).
 - The owner page shows a dated count of code requests refused because the sender ran out for the day or the month, each email address once per day ([#674], [#728] Answer 6).
@@ -71,7 +71,7 @@ The rule is in the main file's "Who Crux is for".
 The cap itself is in the main file's "Money".
 
 - Past the cap, an email with no account sees, at "One more thing": "Crux is full for now. Try again later.", with a tick-box, "Email me if spots open". No account is made. Only a ticked email is kept, for that one message ([#674], [#675]).
-- When the owner raises the cap, everyone who ticked gets one email at once, in no order. There is no waitlist ([#675]).
+- When the owner raises the cap, everyone who ticked gets one email, as soon as the sender's share allows (see [`operations.md`](operations.md)), in no order. There is no waitlist ([#675], [#735]).
 - Learners with an account sign in as usual ([#675]).
 - A spot never frees up by itself. A closed account keeps its spot, and a learner who returns after closing signs up afresh and takes a new spot ([#675], [#677]).
 - The owner page's cap line and counts are in [`spending.md`](spending.md) ([#675]).
@@ -127,3 +127,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#735]: https://github.com/calmxz/Crux/issues/735
