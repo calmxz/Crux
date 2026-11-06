@@ -39,7 +39,7 @@ This file covers the mastery check, from the offer to the result and what follow
 ### Model answers
 
 - With each problem, the tutor writes a model answer in a fixed format, with "must contain" points. It is checked and saved before the learner sees the problem ([#669], [#679]).
-- The maths library checks it first, where it can read the answer. Otherwise a separate, independent working by the AI checks it. No match, or a disagreement, discards the problem unseen, and a new one is written ([#669], [#679], [#716]). What the library reads and how it compares is in `ai-layer.md`.
+- The maths library checks it first, where it can read the answer. Otherwise a separate, independent working by the AI checks it. No match, or a disagreement, discards the problem unseen, and a new one is written ([#669], [#679], [#716]). What the library reads and how it compares is in [`ai-layer.md`](ai-layer.md).
 
 ## Answers
 
@@ -64,7 +64,7 @@ This file covers the mastery check, from the offer to the result and what follow
 - Course notation and standard notation are both accepted. Where a file has an error, the answer is marked by the correct version, or by what the teacher said if the learner reported it back ([#669]).
 - There is no reminder of file errors before the check. The result names a wrong answer that follows one: "this follows slide 12's error, which we flagged earlier" ([#669]).
 - An unchecked file-error flag is reminded outside the check, never during it. Where it shows is a screens question ([#669]).
-- While marking, "Marking…" may show for up to about 20 seconds ([#716]). Which model and settings each check job uses is in `ai-layer.md` ([#679]).
+- While marking, "Marking…" may show for up to about 20 seconds ([#716]). Which model and settings each check job uses is in [`ai-layer.md`](ai-layer.md) ([#679]).
 
 ## The result
 
@@ -107,6 +107,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 - A check pauses as half-done when the owner switches checks off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
 - It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see [`spending.md`](spending.md)) ([#675], [#679]).
+- If Google blocks marking, the problem is swapped at once, with no mark. Repeated blocks pause the check. A sealed session holds its check half-done (see [`ai-layer.md`](ai-layer.md)) ([#735]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
 - Spending limits never stop a check that has started, apart from reteaching (above). A check accepted when a limit is already full does not start (see [`spending.md`](spending.md)) ([#675], [#734]).
 
@@ -147,3 +148,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the offer wi
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#735]: https://github.com/calmxz/Crux/issues/735

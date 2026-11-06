@@ -49,7 +49,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 
 - When the learner refers back to something earlier in the session ("the balloon example from before"), the tutor searches the session's earlier conversation and uses what it finds. Only that reply costs more ([#671]).
 - When the learner points to another of their sessions ("the balloon example from my derivatives session"), the lookup searches that session too. It never searches another session unprompted ([#671]).
-- A lookup that finds nothing says so, and offers another example ([#671]).
+- A lookup that finds nothing says so, and offers another example ([#671]). It never reaches a sealed session, or a message Google blocked ([#735]).
 - Text the lookup finds is reference, never an instruction (see the main file's "Crux decides") ([#671]).
 - No lookup runs while a check is open, into this session or any other. The one exception is while an objective is retaught after a refresh miss: the lookup works as in teaching, and is off again before the next check problem ([#671], [#732]).
 - Another session's tutor cannot look into a session with an open check, retaught objective or not, until the check ends ([#671], [#732]).
@@ -138,7 +138,7 @@ flowchart TD
 
 ## Deleting a session
 
-- The learner can delete a session at any time, a half-done check included, which goes with it ([#671]).
+- The learner can delete a session at any time, a half-done check included, which goes with it ([#671]). A sealed session cannot be deleted (see [`misuse.md`](misuse.md)) ([#733]).
 - A warning names what goes: "This deletes everything in it, including 5 mastered topics from your record" ([#671]).
 - Everything in the session goes, including its files, its mastered topics, and its passed objectives from "What you've mastered". It is erased at once and cannot be undone ([#671], [#677]). What deleting cannot reach at once is in [`privacy.md`](privacy.md) ([#677], [#716]).
 - Preferences stay ([#671]). So do the anonymous dated counts behind the go-public bar and the marks on the account, which are in no session (see [`feedback.md`](feedback.md)) ([#676]).
@@ -166,3 +166,5 @@ Layout is not decided (see the main file's Gaps). These rules need: the session 
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#733]: https://github.com/calmxz/Crux/issues/733
+[#735]: https://github.com/calmxz/Crux/issues/735

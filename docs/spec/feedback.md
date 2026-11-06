@@ -51,7 +51,7 @@ A trial link keeps "Your feedback" and the once-only notice while it is alive, a
 - Feedback may be quoted publicly only with its quote tick, and never with the learner's name ([#676]).
 - A learner withdraws a quote by unticking it in Settings, under "Your feedback", which lists their answers with their ticks. Withdrawing is by Settings only ([#677], [#733]).
 - When the owner publishes a quote, they mark that answer as published on the owner page and note where ([#677], [#734]).
-- When a published quote is withdrawn, the owner removes it within 14 days. Until the owner marks that done, the page shows its words, where it was published, and the date to remove it by. This holds even after the words would otherwise be erased, apart from an under-18 ending (below) ([#677], [#734]).
+- When a published quote is withdrawn, the owner removes it within 14 days. Until the owner marks that done, the page shows its words, where it was published, and the date to remove it by. If its account has gone, the words stay for those 14 days at most, and the rest until marked. An under-18 ending is below ([#677], [#734], [#735]).
 - An answer never marked as published is erased as usual ([#734]).
 
 ### When an account closes or a link dies
@@ -180,3 +180,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the feedback
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#735]: https://github.com/calmxz/Crux/issues/735

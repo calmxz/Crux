@@ -40,7 +40,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 
 ### The reply that fills the bar
 
-- Teaching stops at the reply that fills the learner's bar. No reply is cut off ([#675], [#678]).
+- Teaching stops at the reply that fills the learner's bar. No reply is cut off, except one Google blocks (see [`ai-layer.md`](ai-layer.md)) ([#675], [#678], [#735]).
 - Crux knows the cost only when the reply arrives, so it adds its own fixed line after that reply: "That's today's tutoring. Answer whenever you like, and the tutor will pick up here tomorrow." It names the reset that applies, such as "on Monday". This costs no AI ([#734]).
 - When the ceiling or the month runs out between replies, the learner's next reply gets the "full" message ([#675]).
 
@@ -72,7 +72,8 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 A limit stops a message before the tutor reads it. So Crux sends only that message to the model and asks one yes-or-no question: is this person in distress? ([#734])
 
 - **Yes:** Crux adds a care line and, on its own line, the crisis line the tutor points to (see [`misuse.md`](misuse.md)). Both are fixed text.
-- **No:** the person sees only the limit message.
+- **No:** the person sees only the limit message. A check that fails or is blocked counts as no (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- The limit message shows at once, and any care line follows it ([#735]).
 - This applies to learners, trial links and guests. It also runs on a typed reply while an age question is open, since the tutor is not reading then (see [`age.md`](age.md)).
 - These checks have a pot of USD 0.05 a day, paid from the owner's share. It is outside the budget and the ceiling, and inside Google's cap as it stands. The owner can change the amount on the owner page ([#734]).
 - When the pot runs out, the share runs out, or Google's cap stops Crux, no check runs ([#734]).
@@ -100,7 +101,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 | The month, or Google's cap | "Crux has used this month's tutoring budget. Back on 1 Dec.", with a tick-box, "Email me when it's back" |
 
 - Reset times are in the learner's own clock (see the main file's "Money") ([#675]).
-- Each ticked learner gets one email when Crux reopens: on the 1st, when a re-run's bigger budget starts, or when an owner's raise reopens it ([#675], [#734]).
+- Each ticked learner gets one email when Crux reopens: on the 1st, when a re-run's bigger budget starts, or when an owner's raise reopens it ([#675], [#734]). Where these stand against the sender's limits is in [`operations.md`](operations.md) ([#735]).
 - A trial link has no tick-box, since Crux keeps no email for it ([#722]).
 - A guest sees the stop in [`trial.md`](trial.md) ([#734]).
 - Anything that costs no AI keeps working: past sessions, "What you've mastered", files, settings and feedback ([#675]).
@@ -120,7 +121,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 - When Google refuses calls, learners see the month's message, and a check it stops is kept as half-done ([#675], [#679]).
 - Before any raise in the money (the budget, a re-run's budget, the owner's share), the owner page reminds the owner to raise Google's cap first ([#679]).
 - Once a day, Crux compares its own total with Google's billing report. A gap over 10% goes in the owner's daily email, with where it is ([#679], [#717]).
-- Tests' cap is in the main file's "Money". The Cloud Run cap is in `hosting.md` ([#678], [#716]).
+- Tests' cap is in the main file's "Money". The Cloud Run cap is in [`hosting.md`](hosting.md) ([#678], [#716]).
 
 ## The owner page
 
@@ -142,7 +143,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 
 ### What the owner is told
 
-How each message reaches the owner is in `hosting.md` ([#717]).
+How each message reaches the owner is in [`operations.md`](operations.md) ([#717]).
 
 - **A push:** when the month's budget runs out; when the ceiling is hit, saying when, at most once a day; when Google's Gemini cap is reached, with Crux's count beside Google's cap; and when the owner's share reaches 100% ([#717], [#728] Answer 8).
 - **The daily email:** the budget at 50% and 80%; the learner cap filled; the owner's share at 80%; a billing gap over 10%; and how many learners were turned away the day before ([#717], [#728] Answer 8).
@@ -157,8 +158,6 @@ How long per-account spend and the "email me" addresses are kept is in [`privacy
 - **Testing the distress check:** it needs an AI test. For `ai-tests.md`, on [#736] ([#734]).
 - **What a sitting costs on Agent Platform:** its cache savings are unmeasured. Open on [#675]. With no cache hits, USD 8 gives about 133 sittings a month, not 176 ([#679]).
 - **Measures that can change the limits:** a week of Crux's count against Google's bill, and sittings per mastery in the trial. See `quality-bar.md` ([#678]).
-- **When a sent email uses up the day's sender:** a reopening email can use up the day's sign-in codes. For `hosting.md`, on [#735] ([#675]).
-- **Hosting costs outside the AI budget,** and whether alerting starts to cost: for `hosting.md`, on [#735] and [#726] ([#716], [#717]).
 
 ## On screen
 
@@ -175,7 +174,6 @@ Layout is not decided (see the main file's Gaps). These rules need: the tutoring
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#722]: https://github.com/calmxz/Crux/issues/722
-[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#733]: https://github.com/calmxz/Crux/issues/733

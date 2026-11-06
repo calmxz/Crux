@@ -60,7 +60,7 @@ The tutor judges this per topic. It never labels a whole file as a lesson, a syl
 
 ### Text in a file
 
-Text in a file is material, never instructions (see the main file's "Crux decides"). Nothing in a file can change the tutor's rules, make it reveal answers or its own instructions, or change its judgements ([#667]). The defences are in `ai-layer.md`, and the planted-file tests in `ai-tests.md` ([#678], [#679]).
+Text in a file is material, never instructions (see the main file's "Crux decides"). Nothing in a file can change the tutor's rules, make it reveal answers or its own instructions, or change its judgements ([#667]). The defences are in [`ai-layer.md`](ai-layer.md), and the planted-file tests in `ai-tests.md` ([#678], [#679]).
 
 ## Types and limits
 
@@ -81,7 +81,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - Files, their pages and photo answers live in a Cloud Storage bucket in the Crux project, in Singapore ([#716]). Soft delete is off on every Crux bucket, so deleting erases ([#677], [#716]).
 - The browser uploads straight to the bucket, with a one-time link from the backend ([#716]).
 - File work is conversion, splitting into pages, and the outline read. It runs on the tasks service through Cloud Tasks, so it carries on if the learner leaves or the phone locks ([#679], [#716]).
-- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]).
+- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]). Overload, or a cap, does not use up a try, and a read Google blocks follows [`ai-layer.md`](ai-layer.md) ([#735]).
 - After the last failed try, Crux erases the file and any pages it made. A line keeps its name, with "Couldn't read this file, so it wasn't added. Try again, or use another file.", until the learner dismisses it. The tutor says what went wrong ([#667], [#716], [#732]).
 
 ### While a file is being read
@@ -94,7 +94,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 ### Converting PowerPoint and Word
 
-- PowerPoint and Word are converted to PDF by Gotenberg (LibreOffice), on its own private Cloud Run service. How that service is locked down is in `hosting.md` ([#716]).
+- PowerPoint and Word are converted to PDF by Gotenberg (LibreOffice), on its own private Cloud Run service. How that service is locked down is in [`hosting.md`](hosting.md) ([#716]).
 - Speaker notes are read separately as text and attached to each slide's page ([#716]).
 - A fidelity test on real decks (Word equations, SmartArt, speaker notes) runs before the trial (see `quality-bar.md`) ([#716], [#722]).
 - If LibreOffice fails that test, learners save as PDF themselves. That is a recorded change to this file ([#716]).
@@ -106,7 +106,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - The tutor can ask Crux for another page range, when the learner names a page or the tutor needs one. The range stays until the topic ends ([#679]).
 - A topic has at most 20 added pages. Past that, the least recently used added range drops out ([#679]).
 - Pages are read again from Crux's own storage whenever needed ([#679]).
-- Crux chooses which pages are sent (see the main file's "Crux decides"). The prompt's order, the models and their settings are in `ai-layer.md` ([#679]).
+- Crux chooses which pages are sent (see the main file's "Crux decides"). The prompt's order, the models and their settings are in [`ai-layer.md`](ai-layer.md) ([#679]).
 - When the owner switches files off for a fault, uploads stop and existing files are kept out of teaching (see `ai-tests.md`) ([#678]).
 
 ## Keeping and removing files
@@ -118,7 +118,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - **Allowance:** 200 MB per account and per trial link, the owner's account included. It counts the learner's files only. The pages Crux makes from a file and shrunk photo answers do not count ([#716], [#722], [#732]).
 - Past the allowance, a new file is refused with a message showing what is using the space. The learner removes a file to add one ([#671]).
-- **Store total:** 20 GB across files, pages and photo answers, for everyone, trial links included. When it is reached, uploads stop for everyone, learning continues, and the owner gets a push (see `hosting.md`) ([#671], [#716], [#717], [#722]).
+- **Store total:** 20 GB across files, pages and photo answers, for everyone, trial links included. When it is reached, uploads stop for everyone, learning continues, and the owner gets a push (see [`operations.md`](operations.md)) ([#671], [#716], [#717], [#722]).
 - The total is checked when a file is uploaded. A file already accepted is read in full, even if its pages go past the total ([#732]).
 - In v1, photo answers stop with uploads. A learner in a check types their answer instead (see [`mastery-check.md`](mastery-check.md)) ([#732]).
 
@@ -161,3 +161,4 @@ Layout is not decided (see the main file's Gaps). These rules need: uploading an
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#735]: https://github.com/calmxz/Crux/issues/735
