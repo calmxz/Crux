@@ -190,6 +190,7 @@ These settle how Google's services behave, while that part is built:
 | Item | Who |
 |---|---|
 | Every AI test passes, including those on files and photo answers ([#678], [#722]) | check |
+| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
 | A deep round, on the version that starts the trial ([#678]) | check |
 | The grader judges its example list correctly ([#678]) | check |
 | Every ordinary test for what guests and trial links can reach passes, including the isolation test ([#678], [#736]) | check |
@@ -220,6 +221,7 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 |---|---|
 | Every ordinary test for what only accounts reach passes: sign-up and sign-in, the code limits, account closing and the idle warnings, the age tick-box, and the rest ([#678], [#717], [#736]) | check |
 | The real-phone tests for opening ([#678]) | owner |
+| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
 | A deep round, on the version that opens ([#678]) | check |
 | The OWASP self-review ([#678]) | owner |
 | The README ([#678]) | check |
