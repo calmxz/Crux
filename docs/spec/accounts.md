@@ -70,7 +70,7 @@ The rule is in the main file's "Who Crux is for".
 
 The cap itself is in the main file's "Money".
 
-- Past the cap, an email with no account sees, at "One more thing": "Crux is full for now. Try again later.", with a tick-box, "Email me if spots open". No account is made. Only a ticked email is kept, for that one message ([#674], [#675]).
+- Past the cap, an email with no account sees, at "One more thing": "Crux is full for now. Try again later.", with a tick-box, "Email me if spots open". No account is made. Only a ticked email is kept, for that one message ([#674], [#675]). To count "told Crux is full" once a day, a scrambled copy of the email is kept for that day only ([#719]).
 - When the owner raises the cap, everyone who ticked gets one email, as soon as the sender's share allows (see [`operations.md`](operations.md)), in no order. There is no waitlist ([#675], [#735]).
 - Learners with an account sign in as usual ([#675]).
 - A spot never frees up by itself. A closed account keeps its spot, and a learner who returns after closing signs up afresh and takes a new spot ([#675], [#677]).
@@ -100,7 +100,7 @@ What else an account keeps is in [`sessions.md`](sessions.md), and the marks in 
 
 ## Staying signed in
 
-- A learner stays signed in on that browser until they sign out, or until 30 days pass without a visit. There is a Sign out button ([#674]).
+- A learner stays signed in on that browser until they sign out, or until 30 days pass without a visit: any signed-in request, opening the app included. There is a Sign out button ([#674], [#719]).
 - This uses a sign-in cookie that the backend checks on each call. It is never used for counting ([#674], [#717]).
 
 ## Steps on opening Crux
@@ -124,6 +124,7 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#717]: https://github.com/calmxz/Crux/issues/717
+[#719]: https://github.com/calmxz/Crux/issues/719
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734

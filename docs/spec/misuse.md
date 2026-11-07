@@ -49,7 +49,7 @@ The owner reads the chat in the flagged sessions (see [`privacy.md`](privacy.md)
 
 - An account has one open flag at a time. A decline that flags at once, arriving while a flag waits, moves that flag to the last row ([#733]).
 - After a warning or a dismissal, the count returns to 0, including declines that arrived while the flag waited. A warning stays on record ([#733]).
-- What is saved with a decline is erased once the message naming it is sent or shown, or when the decline drops out of the 7 days with no flag ([#733]).
+- What is saved with a decline is erased once the message naming it is sent or shown, or when the decline drops out of the 7 days with no flag ([#733]). A decline in a sealed flag stays with its sealed session and goes with it. Once the seal is lifted, this rule applies, with the lift's message as the message naming it ([#719]).
 
 **What the learner is told**
 
@@ -64,10 +64,10 @@ The learner hears only after the owner decides. Each message gives the reason, u
 A decline for anything sexual involving minors is handled differently ([#733]):
 
 - The account locks at once, with no tutoring. The learner sees that it is locked, and how to reply ([#733]).
-- The owner sees only the date and the kind. The session holding the decline, with its files, is sealed, so nobody can open it, the owner included ([#733]).
+- The owner sees only the date and the kind, and for a session marked "Reported", its account's email (below). The session holding the decline, with its files, is sealed, so nobody can open it, the owner included ([#733], [#719]).
 - The owner decides from that and from any reply, and closes the account or lifts the lock. Lifting it ends the seal ([#733]).
 - The learner cannot delete a sealed session. It is erased when its account or trial link is erased, on the usual schedule ([#733]).
-- If the owner reports it to the authorities, the owner marks it "Reported" on the owner page. It then stays sealed past that erasure until the authorities say what to do, and the owner then erases it ([#733], [#743]).
+- If the owner reports it to the authorities, the owner marks it "Reported" on the owner page. It then stays sealed past that erasure until the authorities say what to do, and the owner then erases it ([#733], [#743]). At the erasure it moves to the reported hold, with its files, its flag's date, kind and number, and the account's email, which the owner can see so a report can name the account. A trial link has no email. Until erasure the learner sees no change (see [`data-model.md`](data-model.md)) ([#719]).
 
 A message or reply Google blocks as prohibited content is sealed the same way. The first has no lock on the account, and a second locks it. Google's docs describe this category as "usually" child sexual abuse material, so it is not only that one kind, and nobody can lawfully test it with real examples ([#735]):
 
@@ -106,6 +106,7 @@ Layout is not decided (see the main file's Gaps). These rules need: the locked a
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#717]: https://github.com/calmxz/Crux/issues/717
+[#719]: https://github.com/calmxz/Crux/issues/719
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
