@@ -38,7 +38,7 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
-- **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
+- **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and runs the script ([#735]).
 - The link is signed when the email goes out, so a delayed email cannot use it up. Google's signed links last at most 7 days, so that is how long it works ([#735]).
 - The email says when the link expires, and to keep it private ([#735]).
@@ -141,9 +141,6 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - "email me if spots open" addresses at 3 months, and the misuse block's scrambled email at 12 months ([#677]);
 - a decline's saved details once it drops out of the 7 days with no flag ([#733]);
 - a withdrawn quote's words at 14 days, if its account has gone ([#677], [#735]);
-- a dead trial link's stub, at the trial's end or 12 months after the link died, whichever comes first ([#719]);
-- a dead trial link's feedback answers and quote permissions, 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
-- any scrambled "told Crux is full" email or listed bucket object that its Cloud Tasks job or the erasure missed, and any copy object with no record ([#719]);
 - per-account spend, rolled into totals with no account ([#677]);
 
 **Ending things**
@@ -171,7 +168,6 @@ Layout is not decided (see the main file's Gaps). These rules need: the daily em
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
-[#719]: https://github.com/calmxz/Crux/issues/719
 [#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733

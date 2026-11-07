@@ -107,13 +107,13 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`ai-tests.md`](ai-tests.md) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, what stops a round | 678 (+667, 669, 679, 680, 716, 728, 732, 733, 734, 735, 736) | 1,400 |
 | [`live-faults.md`](live-faults.md) | A fail on the live version: the owner's switches and what each does, re-marks after a marking fault | 678 (+669, 679, 728, 734, 735, 736) | 1,600 |
 | [`spec-process.md`](spec-process.md) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
-| [`data-model.md`](data-model.md) | What Crux stores and what each item belongs to, erasing a home, the backend modules | 719 | 2,300 |
 
 ## Gaps
 
 These are not decided yet. Do not build them from guesses.
 
 - **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731), [#732](https://github.com/calmxz/Crux/issues/732), [#733](https://github.com/calmxz/Crux/issues/733), [#734](https://github.com/calmxz/Crux/issues/734), [#735](https://github.com/calmxz/Crux/issues/735) and [#736](https://github.com/calmxz/Crux/issues/736).
+- **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
 - **Open hosting checks:** research [#726](https://github.com/calmxz/Crux/issues/726) (database pooler security, the Cloud Run cap and server time, alerting charges, Zoho's agreement). See [`hosting.md`](hosting.md) and [`operations.md`](operations.md).

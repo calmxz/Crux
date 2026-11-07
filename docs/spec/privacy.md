@@ -61,7 +61,7 @@ Repairs from a backup are done by script, and the owner sees counts, not content
 
 ### Idle accounts
 
-An account with no visit for 12 months is closed and erased, after emails 30 days and 7 days before. One visit keeps it: any signed-in request, opening the app included ([#719]). A learner who has lost the inbox cannot act on the emails, and the data goes at the deadline ([#677]). If a warning goes out late, the deadline moves, so the full notice is given (see [`operations.md`](operations.md)). The Privacy Policy says so ([#735]).
+An account with no visit for 12 months is closed and erased, after emails 30 days and 7 days before. One visit keeps it. A learner who has lost the inbox cannot act on the emails, and the data goes at the deadline ([#677]). If a warning goes out late, the deadline moves, so the full notice is given (see [`operations.md`](operations.md)). The Privacy Policy says so ([#735]).
 
 ### If Crux closes, or goes paid
 
@@ -80,15 +80,9 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Preferences | Stored only after the learner agrees, until removed or the account is erased ([#668], [#671]) |
 | Sign-up ticks, with date and terms version | As long as the account exists ([#677]) |
 | A published quote, once withdrawn | Where it was published and the remove-by date, until the owner marks it removed. Its words too, for at most 14 days if its account has gone. After an under-18 ending, only where it was published and the date ([#677], [#734], [#735]) |
-| A decline's date and kind | As [`misuse.md`](misuse.md) sets out ([#733], [#719]) |
+| A decline's date and kind | Until the owner acts on the flag, or it drops out of the 7 days with no flag ([#733]) |
 | A misuse warning | As long as the account exists ([#733]) |
 | A copy asked for while closing | Until its 7-day link expires ([#733], [#735]) |
-| A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
-| A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
-| A dead trial link's feedback answers and quote permissions | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
-| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first ([#719]) |
-| "Told Crux is full" email, scrambled | That day only ([#719]) |
-| The learner's time zone | With the account or trial link ([#719]) |
 | Per-account spend | Current day and week only. Older days only as totals with no account ([#677]) |
 | "Email me if spots open" email | Until its one email is sent, or 3 months ([#677]) |
 | "Email me when it's back" email | Until sent ([#677]) |
@@ -134,10 +128,10 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - "If you ask for a copy while closing, we keep it until its link expires, 7 days after it's sent, and no longer.";
 - a date for erasing data moves if a notice goes out late, or if Crux is down, so nobody loses their chance to act ([#735]);
 - the processors below, and where they process data;
-- the dated anonymous counts, including the under-18 count, and the cookieless arrivals count;
+- the dated anonymous counts, including the under-18 count, and the cookieless visit count;
 - the sign-in cookie;
 - the human check, the email sender, the code limits and the region check;
-- the misuse flag, sealed sessions, and the email of their account, being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
+- the misuse flag, sealed sessions being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
 - the guest and trial rules;
 - error reports with no learner text;
 - the learner's rights: a copy, correction, deletion, withdrawing consent, and complaining to the National Privacy Commission;
@@ -169,10 +163,8 @@ Layout is not decided (see the main file's Gaps). These rules need: Close accoun
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
-[#719]: https://github.com/calmxz/Crux/issues/719
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#734]: https://github.com/calmxz/Crux/issues/734
-[#743]: https://github.com/calmxz/Crux/issues/743

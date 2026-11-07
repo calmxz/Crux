@@ -71,7 +71,7 @@ These are the tests the closed tickets sent here, by area.
 - A kept message is answered on opening, oldest first, with the open session ahead.
 - A background answer is not a sitting, opens no check problem, and does not restart the 7 days.
 - A filling read's fixed line shows only for a usable file.
-- A guest's mini check stops at the guest caps, the ceiling and the month, even when an older saved state is resent ([#719]).
+- A guest's started mini check finishes past the guest cap, the ceiling and the month, and is dropped at Google's cap.
 - Re-marks pause at the owner's share. A re-run's ceiling is a quarter of its budget.
 - The owner's pushes and daily email: the ceiling's push at most once a day; the Gemini-cap push with Crux's count beside Google's cap; the other pushes in [`operations.md`](operations.md); and the day's turned-away count in the next morning's email.
 
@@ -104,7 +104,7 @@ These are the tests the closed tickets sent here, by area.
 - A sealed flag locks at once, and the owner sees only the date and the kind.
 - A lock is read-only. A contest holds the erasure. A misuse closure erases on day 8, and blocks the email for 12 months.
 - A blocked reply counts as a decline, tested with a made-up block result. A second prohibited-content block locks the account.
-- A sealed session marked "Reported" stays past its account's erasure, and an unmarked one goes. The erasure tests in [`data-model.md`](data-model.md) pass ([#719]).
+- A sealed session marked "Reported" stays past its account's erasure, and an unmarked one goes.
 
 **The trial** ([#677], [#717], [#722], [#733])
 
@@ -112,7 +112,7 @@ These are the tests the closed tickets sent here, by area.
 - The guest 10-reply limit and its message. The guest cap switching to the video.
 - The key leaves the address bar. A switched-off link fails, and its files, pages and photo answers are gone at once. A network is refused after 10 wrong links. A link on a fourth browser is flagged.
 - A request is declined at 30 days and at trial end, with the email.
-- Arrivals count once per tab and by tag.
+- Visits count once per tab and by tag.
 - The trial's end button and its notice. Ending the trial erases every link's sessions and files.
 
 **Switches and re-marks** ([#678], [#736])
@@ -251,7 +251,6 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
-[#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732

@@ -59,7 +59,7 @@ A trial link keeps "Your feedback" and the once-only notice while it is alive, a
 - **An account closes:** after the 7-day undo, the feedback words leave the owner page, apart from a published quote still to be removed. Anonymous counts and yes/no answers stay as tallies, so a verdict does not change because someone left. Its quotes are withdrawn ([#677]).
 - **An under-18 closure** first takes its counts off (see [Taking counts back](#taking-counts-back)) ([#681]). Its words go at once. As for a link, only a published quote's note and remove-by date stay ([#734]).
 - **A trial link dies after a tap on Yes to the age question:** the link's feedback words and quote permissions are removed at once. For a published quote, only the note of where it was published and the remove-by date stay, until the owner marks it done ([#734]).
-- **A trial link dies in any other way:** its anonymous feedback answers and quote permissions stay, outside the link's home, until 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer, permission and note stay until the owner marks the quote removed ([#719]). The holder can untick until the link dies, and the trial's end notice reminds them. The Trial Terms say a tick can't be undone once the link has ended ([#677], [#734]).
+- **A trial link dies in any other way:** its anonymous feedback answers and quote permissions stay. The holder can untick until the link dies, and the trial's end notice reminds them. The Trial Terms say a tick can't be undone once the link has ended ([#677], [#734]).
 
 ## What the owner counts
 
@@ -81,7 +81,7 @@ Counts of learners, each with a date ([#676]):
 
 - Each count adds 1, with the date, the first time a learner reaches that step in a window. Marks are kept per window ([#676], [#734]).
 - To know who has been counted, the account keeps a few marks: the date of each step first reached, the latest pay answer, and that the first-mastery notice was shown. The counts hold no name or content ([#676]).
-- Deleting a session removes neither the counts nor the marks. The marks go when the account is erased ([#676], [#719]).
+- Deleting a session removes neither the counts nor the marks. The marks go when the account closes ([#676]).
 - Learners let in past a full cap count like any learner ([#679]).
 - The owner's own account and any test accounts are left out of every count. A test account is an address on the owner's own email list (see [`accounts.md`](accounts.md)). It behaves as the owner's account for limits and counts, so limits are tested on staging ([#676], [#734]).
 - Nothing in the trial counts (see [`trial.md`](trial.md)) ([#677]).
@@ -89,7 +89,7 @@ Counts of learners, each with a date ([#676]):
 
 ### Taking counts back
 
-- **An under-18 closure:** before the account and its marks go, Crux takes 1 off each path and bar count that learner added, in the window each was counted in, and takes their feedback answers off the tallies ([#681], [#719]).
+- **An under-18 closure:** before the account and its marks go, Crux takes 1 off each path and bar count that learner added, in the window each was counted in ([#681]).
 - **A pass removed by a re-mark:** it drops from the counts in the window it was counted in ([#678]). A learner stays counted as mastered only if another topic was mastered inside the same window ([#734]).
 - **A pass a re-mark adds:** it counts like a dispute won ([#736]).
 - A window already judged keeps its verdict ([#678], [#681]).
@@ -97,17 +97,17 @@ Counts of learners, each with a date ([#676]):
 
 ### Other counts
 
-- **Arrivals:** see [Arrivals](#arrivals) ([#717], [#719]).
+- **Visits:** see [Visits](#visits) ([#717]).
 - **Turned away:** learners stopped by their own limit, and emails told "Crux is full for now", are in [`spending.md`](spending.md) ([#675]).
 - **Refused sign-in codes:** in [`accounts.md`](accounts.md) ([#674], [#728] Answer 6).
 - **Under-18 endings:** in [`age.md`](age.md) ([#681], [#728]).
 
-### Arrivals
+### Visits
 
-- Crux counts arrivals, opens of the site, itself ([#719]). The app's first call carries the source: the `?src=` tag on the shared link, otherwise the site the visitor came from, otherwise "direct" ([#717]).
+- Crux counts visits itself. The app's first call carries the source: the `?src=` tag on the shared link, otherwise the site the visitor came from, otherwise "direct" ([#717]).
 - Sources map to a fixed list: linkedin, facebook, other sites, direct ([#717]).
-- The backend adds 1 to today's count for that source, once per browser tab. Nothing per person is kept, and the owner's own arrivals are left out ([#717]).
-- The owner page shows arrivals by source for today, the last 7 days, and since the first post ([#717]).
+- The backend adds 1 to today's count for that source, once per browser tab. Nothing per person is kept, and the owner's own visits are left out ([#717]).
+- The owner page shows visits by source for today, the last 7 days, and since the first post ([#717]).
 
 ## The go-public bar
 
@@ -156,7 +156,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 - Only the owner's main address can open it. Every other account, test addresses included, and anyone signed out, is turned away, including at its direct address ([#676], [#678], [#734]).
 - Feedback text shows there as plain text ([#678]).
-- It shows the path, the bar's progress ("14 / 20 mastered"), the feedback answers with unread ones marked, which answers may be quoted, and arrivals by source ([#676], [#677], [#717]).
+- It shows the path, the bar's progress ("14 / 20 mastered"), the feedback answers with unread ones marked, which answers may be quoted, and visits by source ([#676], [#677], [#717]).
 - It shows the days the budget turned a learner away ("Limit hit on 9 of 56 days"), apart from learners stopped by their own limit ([#676]).
 - Its other parts are in the area file that owns each one: [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`trial.md`](trial.md), [`misuse.md`](misuse.md), and [`live-faults.md`](live-faults.md).
 - **The daily email** gives new feedback as a count only, never the words or the sender ("2 new feedback answers"), and any "1 quote permission withdrawn" ([#677], [#717]).
@@ -167,7 +167,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the feedback page and its link, its ticks and the share choices and warning, the after-first-mastery notice, "Your feedback" in Settings, the too-many-sends message, and the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
+Layout is not decided (see the main file's Gaps). These rules need: the feedback page and its link, its ticks and the share choices and warning, the after-first-mastery notice, "Your feedback" in Settings, the too-many-sends message, and the owner page's path, bar progress, feedback list with unread marks, limit-hit line and visits by source ([#676], [#677], [#717], [#733], [#734]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -177,7 +177,6 @@ Layout is not decided (see the main file's Gaps). These rules need: the feedback
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#717]: https://github.com/calmxz/Crux/issues/717
-[#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733

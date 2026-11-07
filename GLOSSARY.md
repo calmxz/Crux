@@ -20,10 +20,6 @@ _Avoid_: visitor, anonymous user
 The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, or the holder taps Yes to Crux's age question.
 _Avoid_: invite, code, password
 
-**Home**:
-What a learner's sessions, files, record and preferences belong to: an account or a trial link. Erasing a home erases everything in it.
-_Avoid_: space, tenant, profile
-
 **Misuse flag**:
 A mark that Crux puts on an account or a trial link after the tutor declines too many harmful requests, or one very serious one. The owner then decides what happens, usually after reading the chat in the sessions where the tutor declined something.
 _Avoid_: strike, report
