@@ -89,7 +89,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 - A typed "yes" at a full limit is kept like any message, since nothing reads it, and the tutor offers the check again ([#734]).
 - **Reteaching stops at the limits.** After a real miss in the refresh, the objective is taught as usual (see [`mastery-check.md`](mastery-check.md)). A limit stops that teaching like any teaching, and the check stays half-done. Earlier answers still count. The problems that follow run past the limits ([#731], [#734]).
 - A check does not finish when the owner switches checks off for a fault, or when Google refuses calls. It pauses as half-done (see [`mastery-check.md`](mastery-check.md)) ([#675], [#678]).
-- A guest's started mini check finishes past the guest cap, the ceiling and the month ([#733], [#734]).
+- A guest's mini check stops at the guest caps, the ceiling and the month like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). A started check on a trial link or an account finishes past them ([#733], [#734]).
 
 ## The messages
 
@@ -127,7 +127,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 
 ### What the owner can change
 
-- At any time: the ceiling, the tutoring limits, the learner cap, the guest cap, the owner's share, the distress check's pot and the let-in list ([#675], [#679], [#734]).
+- At any time: the ceiling, the tutoring limits, the learner cap, the daily and monthly guest caps, the owner's share, the distress check's pot and the let-in list ([#675], [#679], [#734]).
 - The budget changes only as the main file's "Money" says ([#675], [#679]).
 - The switches for each part are in [`live-faults.md`](live-faults.md) ([#678]).
 
@@ -172,6 +172,7 @@ Layout is not decided (see the main file's Gaps). These rules need: the tutoring
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
+[#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731

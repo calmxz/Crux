@@ -19,7 +19,7 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 
 ## Kept between visits
 
-This is what the rules need kept. The data model is not decided yet, see [#719].
+This is what the rules need kept. Where each item lives and what it belongs to is in [`data-model.md`](data-model.md) ([#719]).
 
 **In each session:**
 

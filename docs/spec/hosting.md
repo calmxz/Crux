@@ -84,7 +84,7 @@ A domain is bought through Cloudflare's registrar before the trial, about USD 10
 ## The database
 
 - Supabase Free Postgres in Singapore, reached only by the backend. Supabase never sees the browser ([#716], [#717]).
-- Row-level security is on every table holding a learner's data. The backend connects as a role without the bypass and sets the learner for each transaction, or the rules never run ([#716]). The safe pattern through Supabase's pooler is a research finding on [#726], for [#719].
+- Row-level security is on every table holding a learner's data. The backend connects as a role without the bypass and sets the home (the account or trial link, see [`data-model.md`](data-model.md)) for each transaction, or the rules never run ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups read through rules that name what each may see, not by passing row-level security ([#719]). The safe pattern through Supabase's pooler is a research finding on [#726], for [#719].
 - Every lookup search is limited to the learner's own sessions, in the query and by row-level security (see [`sessions.md`](sessions.md)) ([#716]).
 - The outside check keeps Supabase from pausing (see [`operations.md`](operations.md)) ([#716]).
 - Another database host is out of scope (see the map's Out of scope list) ([#716]).
@@ -95,14 +95,14 @@ Supabase Free has no backups, so Crux makes its own ([#716]).
 
 - **Daily dump:** a `pg_dump` of live, in the daily job. It drops to weekly once the database passes about 100 MB, so Supabase's 5 GB a month of outgoing transfer is not used up.
 - **Before every live migration:** an automatic `pg_dump`.
-- **Who can read the data:** the dump runs as its own read-only role, the one role allowed past row-level security ([#735]).
+- **Who can read the data:** the dump runs as its own read-only role. It and the restore's role, which writes for a restore or a repair, are the only roles allowed past row-level security, and only the release script uses them ([#719], [#735]).
 - **Where they go:** a Cloud Storage bucket with soft delete off, readable only by the release script's account.
 - **How long:** a lifecycle rule deletes each dump after 7 days, and Google applies it within about a day. The Privacy Policy says "deleted data may remain in a backup for up to 8 days", for every deletion (see [`privacy.md`](privacy.md)).
 - **Soft delete** is set to 0 on every Crux bucket, so deleting erases.
 
 ### The restore log
 
-A log outside the database records what a restore must apply again. An entry keeps only IDs, the time and the action, never content, and is deleted once the last dump it applies to has expired ([#716], [#735]). It records:
+A log in its own Cloud Storage bucket, with soft delete off, records what a restore must apply again. The app can only add entries, and only the release script reads them. An entry keeps only IDs, the time and the action, never content, and a lifecycle rule deletes it after 8 days, once the last dump it applies to has expired ([#716], [#719], [#735]). It records:
 
 - every deletion;
 - seals and locks, and the "Reported" mark;
@@ -111,11 +111,12 @@ A log outside the database records what a restore must apply again. An entry kee
 - closures asked for or kept, contests entered, and copies asked for;
 - misuse-block entries;
 - trial links switched off;
-- age-question answers.
+- age-question answers;
+- each home erasure, with its moves and writes and any copy's object ID and expiry, and re-marks that change a mark ([#719]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
-**A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]).
+**A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]). A logged home erasure is applied again by calling the erasure routine in [`data-model.md`](data-model.md), so its moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing ([#719]). A restore may lose a share tick given, which the learner gives again, and a "Start the window" press and let-in entries, which the owner redoes ([#719]).
 
 **A repair** ([#716], [#735]):
 

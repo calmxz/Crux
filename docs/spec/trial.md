@@ -31,10 +31,11 @@ The public link offers two choices ([#677]):
 At the limit: "That's the end of guest mode for your own topic", with links to the sample topics and, while the trial runs, Request access ([#677], [#717], [#733]).
 
 - Guest mode is typing only (see the main file's "Stages"). A guest who tries to upload a file or a photo sees "Uploading your own files needs a trial link." with a Request access button while the trial runs, and nothing is stored ([#722], [#733]).
-- Nothing is kept after the tab closes ([#677]).
-- Replies are counted per browser by a random ID. It is never used for counting learners or for analytics ([#677]).
+- Nothing is kept after the tab closes ([#677]). The tab holds the conversation, signed by Crux, and Crux stores nothing for a guest (see [`data-model.md`](data-model.md)) ([#719]).
+- Replies are counted per browser by a random ID, which the browser holds with the count, signed ([#719]). It is never used for counting learners or for analytics ([#677]).
 - Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
-- **When guest mode stops:** at the guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Back on 1 Dec.") and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video ([#734]). A mini check already started finishes first, past all three, and an open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`spending.md`](spending.md) runs ([#734]).
+- Guest mode also has a monthly cap, USD 2 for the meantime, changeable on the owner page, so guests cannot use most of the month's budget ([#719]).
+- **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Back on 1 Dec.") and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video ([#734]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`spending.md`](spending.md) runs ([#734]).
 - When Google's cap stops Crux, a guest sees the month's line and the video. Google refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734]).
 - The owner page has a switch for guest mode (see [`live-faults.md`](live-faults.md)) ([#678]).
 
@@ -91,7 +92,9 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 
 ### When a link dies
 
-A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]).
+A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719]).
+
+A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason, so a holder returning by key or by cookie sees it. A link that died by a Yes keeps only "ended". The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
 
 ### Telling a link holder
 
@@ -118,11 +121,13 @@ A holder who does not visit cannot be reached ([#733]).
 
 - A request's email is kept at most 30 days.
 - "Your invite is kept in our email provider's log for up to 30 days."
-- Files and photo answers are kept with the link's sessions. They are erased at once when removed or when their session is deleted, and erased with the link when it dies.
+- Files and photo answers are kept with the link's sessions. They are erased at once when removed or when their session is deleted, and erased with the link when it dies, apart from those in a sealed session reported to the authorities ([#719]).
 - Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`privacy.md`](privacy.md)).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
-- A decline saves its date, kind and place in its session, until the owner acts or it drops out of the 7 days.
+- A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
+- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's stay until the owner removes the quote ([#719]).
+- A sealed session is kept longer only if reported to the authorities ([#719]).
 - Deleting a session erases it, but another session may still mention something from it.
 - The owner may read flagged or shared sessions (see [`privacy.md`](privacy.md)).
 - A holder who does not visit cannot be reached with a notice.
@@ -134,7 +139,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 ## Ending the trial
 
 - The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and the daily housekeeping job ends the trial on that date ([#733]).
-- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay (see [`feedback.md`](feedback.md)) ([#677], [#722], [#733], [#734]).
+- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" stays ([#719]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
 - Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
 - Nothing from the trial is carried into an account ([#677]).
@@ -164,6 +169,7 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#680]: https://github.com/calmxz/Crux/issues/680
 [#717]: https://github.com/calmxz/Crux/issues/717
+[#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
