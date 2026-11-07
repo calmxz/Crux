@@ -89,7 +89,7 @@ The re-mark gives what a correct marker would have given at the time ([#736]).
 - In a mastered topic, it is checked again on 2 problems, whenever the learner chooses. If the learner is in another topic, that topic pauses meanwhile, as for a dropped objective (see [`learning-loop.md`](learning-loop.md)).
 - In a topic not yet mastered, it joins the next check, with the objectives still to prove.
 - Several undone objectives in one topic share one check, 2 problems each. The learner is told how many objectives it covers.
-- The topic stays fixed, but the learner may drop the undone objective, as after a fail (see [`mastery-check.md`](mastery-check.md)).
+- The topic stays fixed, but the learner may drop the undone objective, as after a fail (see [`mastery-check.md`](mastery-check.md)). Anything added or reworded becomes the next topic.
 - A re-added dropped objective's pass, undone, returns its topic to the narrower mastery (see [`learning-loop.md`](learning-loop.md)).
 - A failed objective that was dropped, and is now found right, is passed and back in its topic. The topic gets its full name back, and its dropped-objective offer is used up.
 - The go-public counts change as [`feedback.md`](feedback.md) says. A window already judged keeps its verdict ([#678]).
@@ -100,7 +100,7 @@ Only learners whose marks change are told ([#678]).
 
 - **A finished check:** an account gets an email: "We re-marked a check after a fault in our marking. See what changed in Crux." It is a required email (see [`operations.md`](operations.md)). On their next visit, an account or a trial link sees the change on screen ([#736]):
   - Wrong: "We found a fault in our marking and re-marked your check from 20 Feb. Problem 3 was marked right but isn't. Take a check on that objective any time." ([#678])
-  - Unsure: "We can't be sure of Problem 3 after a fault in our marking. Take a check on that objective any time."
+  - Unsure: "We can't be sure of Problem 2 after a fault in our marking. Take a check on it any time."
   - Right: "We found a fault in our marking and re-marked your check from 20 Feb. Problem 2 was marked wrong but is right, so 'chain rule' is passed."
 - **A half-done check:** no email. When the learner next opens it: "A mark in this check changed after a fault in our marking. You'll see it in your result." ([#736])
 

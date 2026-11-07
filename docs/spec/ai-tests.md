@@ -142,7 +142,7 @@ flowchart TD
   LIVE --> MR[Monthly strict round,<br/>from the trial on]
   MR -->|high-risk fail| OFF[Owner switches off the part the test covers]
   OFF --> FIX[Fix, then the round passes]
-  FIX --> RM[Re-mark, if marking failed]
+  FIX --> RM[Re-mark, or re-check model answers,<br/>after a marking or planted-file fault]
   RM --> LIVE
 ```
 

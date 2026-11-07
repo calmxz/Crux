@@ -79,7 +79,7 @@ A message or reply Google blocks as prohibited content is sealed the same way. T
 - If nobody replies, the session stays sealed until it is erased with the account.
 - A guest has no flag (see above). They see the block message, and that guest session ends.
 
-Whichever way it was sealed, nothing reaches a sealed session: no lookup, no share, no background answer and no re-mark. Its waiting messages stay waiting until the seal is lifted ([#735]).
+Whichever way it was sealed, nothing reaches a sealed session: no lookup, no share, no background answer and no re-mark. Its waiting messages stay waiting until the seal is lifted, and a re-mark it missed runs then ([#735], [#736]).
 
 A seal from Google's block stands apart from any open flag. A flag already waiting keeps its choices, and its sessions can still be read, apart from the sealed one. The message on a sealed session carries a flag number, so a reply can be matched, including from a trial link ([#735]).
 
