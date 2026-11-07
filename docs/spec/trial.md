@@ -126,7 +126,7 @@ A holder who does not visit cannot be reached ([#733]).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
-- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's stay until the owner removes the quote ([#719]).
+- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]).
 - A sealed session is kept longer only if reported to the authorities ([#719]).
 - Deleting a session erases it, but another session may still mention something from it.
 - The owner may read flagged or shared sessions (see [`privacy.md`](privacy.md)).

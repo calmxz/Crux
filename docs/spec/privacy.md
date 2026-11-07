@@ -85,7 +85,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A copy asked for while closing | Until its 7-day link expires ([#733], [#735]) |
 | A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
 | A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
-| A dead trial link's feedback answers and quote permissions | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's until the owner removes the quote ([#719]) |
+| A dead trial link's feedback answers and quote permissions | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first ([#719]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
