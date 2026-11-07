@@ -1,6 +1,6 @@
 # The learning loop
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers the loop from request to after mastery. That is requests and narrowing, topics and their learning objectives, changes to them, and the after-mastery menu. How the tutor teaches is in [`teaching.md`](teaching.md). The check itself is in [`mastery-check.md`](mastery-check.md).
 
@@ -100,15 +100,16 @@ flowchart TD
 ### A mastered topic is fixed
 
 - Once a topic is mastered, the learner cannot add, drop or reword its objectives. An addition or rewording asked for after mastery, at any time, becomes the next topic, queued ([#665], [#728]).
-- The one way back in is a dropped objective, through its offer on the menu or when the learner asks for it. It rejoins the topic, is taught, and is checked on its own ([#668], [#670], [#728]).
-- A pass restores the topic's full name and shows the menu again, without the dropped line if none are left. A fail goes back to teaching that objective under the check's rules; the smaller topic stays mastered. Dropping it again returns to the menu ([#670]).
+- One way back in is a dropped objective, through its offer on the menu or when the learner asks for it. It rejoins the topic, is taught, and is checked on its own ([#668], [#670], [#728]).
+- A pass restores the topic's full name and shows the menu again, without the dropped line if none are left. A fail goes back to teaching that objective under the check's rules; the smaller topic stays mastered. Dropping it again returns to the menu ([#670]). A re-mark that undoes that pass works the same way ([#736]).
+- The other way back in is a re-mark that undoes a pass. That objective is checked again on its own, whenever the learner chooses, or dropped as after a fail. A dropped failed objective that a re-mark finds right rejoins the topic, and restores its full name (see [`live-faults.md`](live-faults.md)) ([#736]).
 
 ## Switching topic mid-way
 
 - When the learner asks for a different topic before the current one is mastered, related or not, the tutor suggests a new session. The current session waits where it stopped. The tutor never judges relatedness mid-topic ([#665]).
 - Declined, the tutor warns that the current topic will be left unfinished, and that coming back means starting it again. Then the new topic replaces it in this session ([#665]).
 - The replaced topic joins the queued topics, so it comes first on the menu ("the chain rule (starting again)"). Started again, the diagnostic skips what the learner had shown. Objectives passed in its own check stay passed, not checked again ([#665], [#670], [#671], [#732]).
-- Two exceptions are learned in the same session, with the current topic paused. A prerequisite topic the learner agrees to learn (see [`teaching.md`](teaching.md)). A mastered topic's dropped objective, asked for mid-topic: it is taught and checked, then the paused topic resumes ([#668], [#670]).
+- Three exceptions are learned in the same session, with the current topic paused. A prerequisite topic the learner agrees to learn (see [`teaching.md`](teaching.md)). A mastered topic's dropped objective, asked for mid-topic: it is taught and checked, then the paused topic resumes ([#668], [#670]). An objective a re-mark undid: it is checked, then the paused topic resumes ([#736]).
 - A file given later on another topic follows [`files.md`](files.md) ([#667]).
 
 ## After mastery
@@ -182,3 +183,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the objectiv
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#732]: https://github.com/calmxz/Crux/issues/732
+[#736]: https://github.com/calmxz/Crux/issues/736

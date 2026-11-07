@@ -37,7 +37,7 @@ The most money Crux can spend on tutoring in a month, including tutoring for gue
 _Avoid_: quota
 
 **Owner's share**:
-The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault, for the check on a message a limit stopped, and for the small call that tests whether Google has reopened after its cap. It is separate from the budget. When it runs out, only those stop, until the owner raises the share or the month resets.
+The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault, for the check on a message a limit or a switch stopped, and for the small call that tests whether Google has reopened after its cap. It is separate from the budget. When it runs out, only those stop, until the owner raises the share or the month resets.
 
 **Tutoring limit**:
 The most tutoring one learner can use, measured by what it costs. There is a daily limit and a weekly limit, and whichever runs out first applies. When it runs out, the learner is not tutored until it resets. The one exception: they can finish a mastery check that has already started.
@@ -86,7 +86,7 @@ A learning objective the learner has proven during teaching. To prove it, the le
 _Avoid_: done, learned, completed
 
 **Passed**:
-A learning objective the learner has answered correctly in a mastery check. Unlike a shown objective, a passed objective counts toward mastery. It stays on the learner's record in all of their sessions. Only two things undo it: its session is deleted, or a re-mark after a marking fault finds the answer wrong.
+A learning objective the learner has answered correctly in a mastery check. Unlike a shown objective, a passed objective counts toward mastery. It stays on the learner's record in all of their sessions. Only two things undo it: its session is deleted, or a re-mark after a marking fault finds the answer wrong, or cannot be sure it is right.
 _Avoid_: mastered (for an objective)
 
 **Record**:

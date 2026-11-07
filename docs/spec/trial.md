@@ -1,6 +1,6 @@
 # The trial and opening
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers the first two of the main file's "Stages": the trial without accounts, and the advisory opinion before opening. Sign-up from opening is in [`accounts.md`](accounts.md).
 
@@ -36,7 +36,7 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 - Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
 - **When guest mode stops:** at the guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Back on 1 Dec.") and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video ([#734]). A mini check already started finishes first, past all three, and an open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`spending.md`](spending.md) runs ([#734]).
 - When Google's cap stops Crux, a guest sees the month's line and the video. Google refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734]).
-- The owner page has a switch for guest mode (see `ai-tests.md`) ([#678]).
+- The owner page has a switch for guest mode (see [`live-faults.md`](live-faults.md)) ([#678]).
 
 ## Request access
 
@@ -100,6 +100,7 @@ Crux has no email for a link, so it uses an on-screen notice at the holder's nex
 - **The Trial Terms change:** the entry ticks show again.
 - **The trial is ending:** a notice with the date, shown ahead of time. It reminds the holder that they can untick a quote or a share until then ([#734]).
 - **A data breach:** a notice saying what happened.
+- **A re-mark** that changed a mark (see [`live-faults.md`](live-faults.md)) ([#736]).
 
 A holder who does not visit cannot be reached ([#733]).
 
@@ -149,7 +150,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 
 ## Opening
 
-- The before-opening checklist is in `quality-bar.md`, and it is done before anyone but the owner signs up, even privately to one friend ([#677], [#680]).
+- The before-opening checklist is in [`quality-bar.md`](quality-bar.md), and it is done before anyone but the owner signs up, even privately to one friend ([#677], [#680]).
 - Within 20 days of the first account holder who is not the owner, the owner registers Crux on the Commission's registration system (NPCRS), unless the Commission's answer says it is not needed. It costs about PHP 500, then PHP 350 a year, as summarised in 2023. A private share counts the same as a public one ([#677], [#722]).
 - Trial-link users are not counted toward the 20 days ([#722]).
 
@@ -168,3 +169,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736

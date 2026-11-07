@@ -1,6 +1,6 @@
 # Operations
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers email, knowing when something is wrong, how the owner is told, and the one daily job. What runs where is in [`hosting.md`](hosting.md).
 
@@ -19,7 +19,7 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 |---|---|---|---|
 | Bulk | "It's back" and "spots open" | 40 | 1,200 |
 | Codes | Sign-in codes | 80 | 2,400 |
-| Required | Closure and misuse emails, idle warnings, terms changes, copies of data, trial invites and declines, and the owner's daily email | 100 | 3,000 |
+| Required | Closure and misuse emails, re-mark emails, idle warnings, terms changes, copies of data, trial invites and declines, and the owner's daily email | 100 | 3,000 |
 
 - An email over its share waits for the next day, oldest first. A sign-in code is refused instead, as [`accounts.md`](accounts.md) says ([#674], [#735]).
 - A change to the shares is a recorded change ([#735]).
@@ -80,7 +80,8 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 - when the 20 GB store is full;
 - when the owner's share reaches 100%;
 - for each new access request;
-- for a misuse flag raised at once ([#733]).
+- for a misuse flag raised at once ([#733]);
+- when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]).
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
 
@@ -100,7 +101,8 @@ One email through Resend, about 8 am Philippine time, on days with something in 
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)) ([#733]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
-- a required email still unsent, and a check paused by repeated blocks ([#735]).
+- a required email still unsent, and a check paused by repeated blocks ([#735]);
+- a monthly AI test round that did not run, and a full test cap ([#736]).
 
 ### The services' own emails
 
@@ -171,3 +173,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the daily em
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736

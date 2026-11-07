@@ -1,6 +1,6 @@
 # Privacy, terms and deleting
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers what Crux promises, what the owner may read, and how long data stays. Harm and misuse are in [`misuse.md`](misuse.md). The trial's own notices are in [`trial.md`](trial.md). Where data lives and what is logged are in the main file's "Where data lives".
 

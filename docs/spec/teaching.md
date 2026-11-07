@@ -1,6 +1,6 @@
 # Teaching
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers how the tutor teaches a topic until the learner is ready for the mastery check. Topics, objectives and changes to them are in [`learning-loop.md`](learning-loop.md). The check is in [`mastery-check.md`](mastery-check.md).
 
@@ -34,7 +34,7 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 - **Shown:** the learner solved a fresh problem on the objective with no help. Their working, or their reply when asked, shows the method ([#668]).
 - **Fresh problem:** one the tutor writes at that point, not seen before in the topic. It is not the learner's own problem, not a twin they were taken through, and not earlier practice ([#668]). The diagnostic, the quick route and the check use the same rule.
 - A real miss (not a slip) on a shown objective puts it back to in progress. This includes a refresh problem after 7 or more days away (see [`sessions.md`](sessions.md)) ([#668], [#671]). The refresh before a resumed check is in [`mastery-check.md`](mastery-check.md).
-- **Trouble mark:** an objective gets it when it goes back to in progress, needs a misconception fixed, or fails a check. It then needs 2 fresh problems in a row, unhelped, to be shown. Using a hint does not give the trouble mark ([#668], [#669]).
+- **Trouble mark:** an objective gets it when it goes back to in progress, needs a misconception fixed, or fails a check. It then needs 2 fresh problems in a row, unhelped, to be shown. Using a hint does not give the trouble mark ([#668], [#669]). Nor does a re-mark that undoes a pass ([#736]).
 - **Ready:** every objective not dropped is shown. The tutor then offers the check. The learner is never pushed into it ([#663], [#668]).
 - The learner can jump to any objective. If it needs an earlier one not yet shown, the tutor says so and suggests that one first. The learner decides ([#668]).
 
@@ -100,3 +100,4 @@ Layout is not decided (see the main file's Gaps). These rules need: each objecti
 [#670]: https://github.com/calmxz/Crux/issues/670
 [#671]: https://github.com/calmxz/Crux/issues/671
 [#731]: https://github.com/calmxz/Crux/issues/731
+[#736]: https://github.com/calmxz/Crux/issues/736

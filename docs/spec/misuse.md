@@ -1,6 +1,6 @@
 # Harm and misuse
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers the Terms' harm line, how the tutor applies it, and what happens when a learner keeps crossing it. What the owner may read is in [`privacy.md`](privacy.md).
 
@@ -19,7 +19,7 @@ Google's usage policy also applies, and is linked ([#677]).
 
 - A subject can be studied, not carried out. The chemistry of combustion is taught, and building a device is not. LD50 is taught, and a synthesis route is not ([#677]).
 - The tutor applies the line the same way every time. A cover story ("for my novel", "hypothetically", "for school") does not change a decline. It judges the whole conversation, not each message alone ([#677]).
-- A learner who says something like "I don't want to be here anymore" is not refused. The tutor pauses the lesson, responds with care, and points to a crisis line ([#677]). The line is fixed text: "Philippines: call 1553. Elsewhere: findahelpline.com". The number and the link are checked before each stage (see `quality-bar.md`) ([#735]). A message a limit stopped never reaches the tutor at that moment, so a separate check runs (see [`spending.md`](spending.md)) ([#734]). A request for a method that shows the learner's own distress gets the same care, and is not reported as a decline. One behind a cover story is ([#733]).
+- A learner who says something like "I don't want to be here anymore" is not refused. The tutor pauses the lesson, responds with care, and points to a crisis line ([#677]). The line is fixed text: "Philippines: call 1553. Elsewhere: findahelpline.com". The number and the link are checked before each stage (see [`quality-bar.md`](quality-bar.md)) ([#735]). A message a limit or a switch stopped never reaches the tutor at that moment, so a separate check runs (see [`spending.md`](spending.md)) ([#734], [#736]). A request for a method that shows the learner's own distress gets the same care, and is not reported as a decline. One behind a cover story is ([#733]).
 - Harmful requests and files are declined (see [`learning-loop.md`](learning-loop.md) and [`files.md`](files.md)) ([#665], [#667]).
 
 ## Misuse
@@ -111,3 +111,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the locked a
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#736]: https://github.com/calmxz/Crux/issues/736

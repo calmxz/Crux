@@ -1,6 +1,6 @@
 # Files
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers what a file does in Crux, from upload to erasure. How the tutor teaches is in [`teaching.md`](teaching.md). What the mastery check does with files is in [`mastery-check.md`](mastery-check.md). A photo answer is not a file (see [`mastery-check.md`](mastery-check.md)).
 
@@ -60,7 +60,7 @@ The tutor judges this per topic. It never labels a whole file as a lesson, a syl
 
 ### Text in a file
 
-Text in a file is material, never instructions (see the main file's "Crux decides"). Nothing in a file can change the tutor's rules, make it reveal answers or its own instructions, or change its judgements ([#667]). The defences are in [`ai-layer.md`](ai-layer.md), and the planted-file tests in `ai-tests.md` ([#678], [#679]).
+Text in a file is material, never instructions (see the main file's "Crux decides"). Nothing in a file can change the tutor's rules, make it reveal answers or its own instructions, or change its judgements ([#667]). The defences are in [`ai-layer.md`](ai-layer.md), and the planted-file tests in [`ai-tests.md`](ai-tests.md) ([#678], [#679]).
 
 ## Types and limits
 
@@ -81,7 +81,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - Files, their pages and photo answers live in a Cloud Storage bucket in the Crux project, in Singapore ([#716]). Soft delete is off on every Crux bucket, so deleting erases ([#677], [#716]).
 - The browser uploads straight to the bucket, with a one-time link from the backend ([#716]).
 - File work is conversion, splitting into pages, and the outline read. It runs on the tasks service through Cloud Tasks, so it carries on if the learner leaves or the phone locks ([#679], [#716]).
-- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]). Overload, or a cap, does not use up a try, and a read Google blocks follows [`ai-layer.md`](ai-layer.md) ([#735]).
+- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]). Overload, a cap, or files switched off does not use up a try, and a read Google blocks follows [`ai-layer.md`](ai-layer.md) ([#735]).
 - After the last failed try, Crux erases the file and any pages it made. A line keeps its name, with "Couldn't read this file, so it wasn't added. Try again, or use another file.", until the learner dismisses it. The tutor says what went wrong ([#667], [#716], [#732]).
 
 ### While a file is being read
@@ -96,7 +96,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - PowerPoint and Word are converted to PDF by Gotenberg (LibreOffice), on its own private Cloud Run service. How that service is locked down is in [`hosting.md`](hosting.md) ([#716]).
 - Speaker notes are read separately as text and attached to each slide's page ([#716]).
-- A fidelity test on real decks (Word equations, SmartArt, speaker notes) runs before the trial (see `quality-bar.md`) ([#716], [#722]).
+- A fidelity test on real decks (Word equations, SmartArt, speaker notes) runs before the trial (see [`quality-bar.md`](quality-bar.md)) ([#716], [#722]).
 - If LibreOffice fails that test, learners save as PDF themselves. That is a recorded change to this file ([#716]).
 
 ## Pages sent to the tutor
@@ -107,7 +107,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - A topic has at most 20 added pages. Past that, the least recently used added range drops out ([#679]).
 - Pages are read again from Crux's own storage whenever needed ([#679]).
 - Crux chooses which pages are sent (see the main file's "Crux decides"). The prompt's order, the models and their settings are in [`ai-layer.md`](ai-layer.md) ([#679]).
-- When the owner switches files off for a fault, uploads stop and existing files are kept out of teaching (see `ai-tests.md`) ([#678]).
+- When the owner switches files off for a fault, uploads stop, and existing files are kept out of teaching and check problems. A read under way is dropped, with no try used up and no charge. What the learner sees is in [`live-faults.md`](live-faults.md) ([#678], [#736]).
 
 ## Keeping and removing files
 
@@ -139,7 +139,6 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged errors, and added pages. Open on [#678] ([#679]).
 - **Whether Gemini can read a topic's pages straight from the bucket**, instead of Crux sending them: a build check, open on [#678] ([#716]).
 - **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
-- **When the owner switches files off during "Reading…":** whether the work finishes, and what the waiting tutor says. For `ai-tests.md`, on [#736].
 
 ## On screen
 
