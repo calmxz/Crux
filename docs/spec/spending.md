@@ -1,6 +1,6 @@
 # Spending limits
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers what Crux counts, the tutoring limits, what happens at a limit, Google's caps, and what the owner page changes. The amounts are in the main file's "Money". The learner cap's sign-up step and the let-in list are in [`accounts.md`](accounts.md). Guest mode's cap is in [`trial.md`](trial.md).
 
@@ -49,7 +49,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 - A learner is **turned away** when they send something and a limit stops Crux answering it ([#675]).
 - A message stopped by any limit is kept. It stays in the conversation, marked as waiting. After the reset, opening the app answers every kept message and starts every kept file's read, oldest session first, several in one session together. The cost comes off the new limit ([#675], [#734]).
 - If the limit fills while answering, the rest stay waiting. They also stay waiting on any visit when tutoring cannot run, such as a full limit, an open age question or a lock ([#734]).
-- An owner's raise counts as a reset. If a block clears while the app is open, the answers run then, without reopening, and only once across browsers. Blocks are a tap on the age question, "Keep my account", agreeing to terms, removing a held file, a raise, or midnight passing ([#734]).
+- An owner's raise counts as a reset. If a block clears while the app is open, the answers run then, without reopening, and only once across browsers. Blocks are a tap on the age question, "Keep my account", agreeing to terms, removing a held file, lifting a seal or a lock, a raise, or midnight passing ([#734], [#736]). A message the whole-tutor switch stopped is answered as [`live-faults.md`](live-faults.md) says ([#736]).
 - The session the learner is in goes first, so a new message there still starts within the main file's 5 seconds ([#734]).
 - A background answer never opens a check problem. After reteaching in a half-done check, the next problem waits until the learner opens that session ([#734]).
 - A background answer is not a sitting, and it does not restart the 7-day clock (see [`feedback.md`](feedback.md) and [`sessions.md`](sessions.md)) ([#734]).
@@ -72,9 +72,9 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 A limit stops a message before the tutor reads it. So Crux sends only that message to the model and asks one yes-or-no question: is this person in distress? ([#734])
 
 - **Yes:** Crux adds a care line and, on its own line, the crisis line the tutor points to (see [`misuse.md`](misuse.md)). Both are fixed text.
-- **No:** the person sees only the limit message. A check that fails or is blocked counts as no (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- **No:** the person sees only the limit message, or the switch's paused line. A check that fails or is blocked counts as no (see [`ai-layer.md`](ai-layer.md)) ([#735]).
 - The limit message shows at once, and any care line follows it ([#735]).
-- This applies to learners, trial links and guests. It also runs on a typed reply while an age question is open, since the tutor is not reading then (see [`age.md`](age.md)).
+- This applies to learners, trial links and guests. It also runs on a typed reply while an age question is open, since the tutor is not reading then (see [`age.md`](age.md)). It also runs on a message the whole-tutor or guest-mode switch stopped (see [`live-faults.md`](live-faults.md)) ([#736]).
 - These checks have a pot of USD 0.05 a day, paid from the owner's share. It is outside the budget and the ceiling, and inside Google's cap as it stands. The owner can change the amount on the owner page ([#734]).
 - When the pot runs out, the share runs out, or Google's cap stops Crux, no check runs ([#734]).
 - The tutor still reads a kept message after the reset. A guest's message is never read later ([#734]).
@@ -129,7 +129,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 
 - At any time: the ceiling, the tutoring limits, the learner cap, the guest cap, the owner's share, the distress check's pot and the let-in list ([#675], [#679], [#734]).
 - The budget changes only as the main file's "Money" says ([#675], [#679]).
-- The switches for each part are in `ai-tests.md` ([#678]).
+- The switches for each part are in [`live-faults.md`](live-faults.md) ([#678]).
 
 ### What it shows
 
@@ -155,9 +155,8 @@ How long per-account spend and the "email me" addresses are kept is in [`privacy
 
 ## Gaps
 
-- **Testing the distress check:** it needs an AI test. For `ai-tests.md`, on [#736] ([#734]).
 - **What a sitting costs on Agent Platform:** its cache savings are unmeasured. Open on [#675]. With no cache hits, USD 8 gives about 133 sittings a month, not 176 ([#679]).
-- **Measures that can change the limits:** a week of Crux's count against Google's bill, and sittings per mastery in the trial. See `quality-bar.md` ([#678]).
+- **Measures that can change the limits:** a week of Crux's count against Google's bill, and sittings per mastery in the trial. See [`quality-bar.md`](quality-bar.md) ([#678]).
 
 ## On screen
 

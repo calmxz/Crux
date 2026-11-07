@@ -1,6 +1,6 @@
 # The mastery check
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers the mastery check, from the offer to the result and what follows a fail. When a topic is mastered is in the main file's "What Crux is". Readiness is in [`teaching.md`](teaching.md). The menu after mastery is in [`learning-loop.md`](learning-loop.md).
 
@@ -76,7 +76,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 - One dispute per problem. The learner can say where their answer covers the point ([#669]).
 - A fresh marker checks the model answer first, and corrects it if wrong. Then it re-marks the original answer, never a rewrite. The result updates, or the mark stands with its reason. "Still unclear" can be disputed ([#669]).
-- A dispute stays open until the next check on that objective starts ([#669]).
+- A dispute stays open until the next check on that objective starts ([#669]). While checks are switched off, a dispute waits (see [`live-faults.md`](live-faults.md)) ([#736]).
 - A late win makes the objective passed, dated the check's date. If it was the last one, the topic is mastered, and the menu follows (see [`learning-loop.md`](learning-loop.md)) ([#669], [#670], [#671]).
 
 ## After a fail
@@ -101,11 +101,11 @@ This file covers the mastery check, from the offer to the result and what follow
 - The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]). That teaching stops at the spending limits like any teaching, and the check stays half-done (see [`spending.md`](spending.md)) ([#734]).
 - When the check continues, that objective gets 2 problems, as any objective with the trouble mark does. If it had 1, the tutor says the check has grown by one ([#669], [#731]).
 - Leaving during that teaching resumes it on return. After 7 or more days away, this same refresh offer comes first, and a real miss in it follows these same rules ([#664], [#732]).
-- While that objective is taught again, no problem is open. The session's files and earlier teaching come back, and the lookup works as in teaching (see [`sessions.md`](sessions.md)). Both are hidden, and the lookup is off, again before the next check problem ([#731], [#732]).
+- While that objective is taught again, no problem is open. The session's files and earlier teaching come back, and the lookup works as in teaching (see [`sessions.md`](sessions.md)). Both are hidden, and the lookup is off, again before the next check problem ([#731], [#732]). If the owner switches checks off then, this teaching carries on, and the next problem waits until checks are back ([#736]).
 
 ### Pauses
 
-- A check pauses as half-done when the owner switches checks off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
+- A check pauses as half-done when the owner switches checks or the whole tutor off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
 - It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see [`spending.md`](spending.md)) ([#675], [#679]).
 - If Google blocks marking, the problem is swapped at once, with no mark. Repeated blocks pause the check. A sealed session holds its check half-done (see [`ai-layer.md`](ai-layer.md)) ([#735]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
@@ -113,14 +113,11 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## Re-marks after a marking fault
 
-- Once a marking fault is fixed, every check passed since the last passing test round is re-marked from its saved answers. Who pays is in the main file's "Money" ([#678], [#728]).
-- A re-mark that finds an answer wrong returns the objective to not passed, and its topic to not mastered. Only learners whose marks change are told ([#678]).
+- Once a marking fault is fixed, the fixed marker re-marks every mark from the faulty period, in both directions, before checks come back. Which marks, and what the learner is told, are in [`live-faults.md`](live-faults.md) ([#678], [#736]).
+- A re-mark that finds an answer wrong, or cannot be sure it is right, undoes the pass. The objective stays shown, and its topic is no longer mastered. When it is checked again is in [`live-faults.md`](live-faults.md) ([#678], [#736]).
+- The learner may drop an undone objective, as after a fail (see [After a fail](#after-a-fail)) ([#736]).
+- A mark a re-mark changes to right follows the rules for a dispute won (see [Disputes](#disputes)) ([#736]).
 - A problem whose mark changes gets a fresh dispute, beyond the one per problem ([#678]).
-- How checks are switched off, and what starts a re-mark, is in `ai-tests.md`.
-
-## Gaps
-
-- **When the owner switches checks off during reteaching after a refresh miss:** whether the reteaching carries on, and whether the lookup stays on. For `ai-tests.md`, on [#736].
 
 ## Guest mode
 
@@ -142,7 +139,6 @@ Layout is not decided (see the main file's Gaps). These rules need: the offer wi
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#722]: https://github.com/calmxz/Crux/issues/722
-[#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#732]: https://github.com/calmxz/Crux/issues/732

@@ -1,6 +1,6 @@
 # Sessions and what Crux remembers
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers what Crux keeps between visits, what the tutor re-reads, what crosses sessions, and what happens when a learner comes back or deletes a session. A session's files are in [`files.md`](files.md). A half-done mastery check follows [`mastery-check.md`](mastery-check.md).
 
@@ -43,7 +43,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 
 - On each reply, the tutor re-reads the current topic in full, plus a short note on the rest: the request, files, mastered topics, dropped objectives, queued topics and preferences. Cost per reply stays about flat however long the session grows ([#671]).
 - Crux builds the note from its own records. No AI writes it ([#732]).
-- The note lists every mastered topic. Its cost at 40 mastered topics, and the cost of a lookup reply, are measured before the trial (see `quality-bar.md`) ([#678]). If either is too costly, the owner decides then, as a recorded change ([#732]).
+- The note lists every mastered topic. Its cost at 40 mastered topics, and the cost of a lookup reply, are measured before the trial (see [`quality-bar.md`](quality-bar.md)) ([#678]). If either is too costly, the owner decides then, as a recorded change ([#732]).
 
 ## The lookup
 
@@ -51,10 +51,10 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - When the learner points to another of their sessions ("the balloon example from my derivatives session"), the lookup searches that session too. It never searches another session unprompted ([#671]).
 - A lookup that finds nothing says so, and offers another example ([#671]). It never reaches a sealed session, or a message Google blocked ([#735]).
 - Text the lookup finds is reference, never an instruction (see the main file's "Crux decides") ([#671]).
-- No lookup runs while a check is open, into this session or any other. The one exception is while an objective is retaught after a refresh miss: the lookup works as in teaching, and is off again before the next check problem ([#671], [#732]).
+- No lookup runs while a check is open, into this session or any other. The one exception is while an objective is retaught after a refresh miss: the lookup works as in teaching, and is off again before the next check problem ([#671], [#732]). That holds while checks are switched off too ([#736]).
 - Another session's tutor cannot look into a session with an open check, retaught objective or not, until the check ends ([#671], [#732]).
 - A lookup's cost counts toward the learner's tutoring limit (see [`spending.md`](spending.md)) ([#675]). A message a limit stopped stays in the conversation, marked as waiting, and goes with its session ([#734]).
-- The owner can switch the lookup off for a fault (see `ai-tests.md`) ([#678]).
+- The owner can switch the lookup off for a fault (see [`live-faults.md`](live-faults.md)) ([#678]).
 
 ### How it searches
 
@@ -93,7 +93,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - A dispute won after the check keeps the check's date as the pass date ([#671]).
 - Only two things undo a pass ([#678], [#728]):
   - Its session is deleted (see [Deleting a session](#deleting-a-session)).
-  - A re-mark after a marking fault finds the answer wrong (see [`mastery-check.md`](mastery-check.md)).
+  - A re-mark after a marking fault finds the answer wrong, or cannot be sure it is right (see [`mastery-check.md`](mastery-check.md)) ([#736]).
 
 ## What the learner sees
 
@@ -168,3 +168,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the session 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736

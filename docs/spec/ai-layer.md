@@ -1,6 +1,6 @@
 # The AI layer
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers how Crux reaches its AI, which model does each job, how a prompt is built, what the tutor reports, what happens when a call fails or is blocked, the maths library, and the distress check's call. The amounts are in the main file's "Money". What Crux decides instead of the model is in the main file's "Crux decides". This file is written from [#679] as it stands. Research [#727] may reopen it, and a reopening edits this file ([#680]).
 
@@ -57,7 +57,7 @@ The main file lists these sources. Crux defends against them in layers, with no 
 - The marker never sees files, and Crux applies the pass rule ([#669], [#679]).
 - The tutor's tools only fetch pages and look things up in the current session's earlier conversation, or another session's only when the learner names it ([#679]). Its other tools only tell Crux what happened, and Crux decides what follows.
 - The age answer is Crux's own buttons ([#679]).
-- The strict tests check the rest (see `ai-tests.md`) ([#678], [#679]).
+- The strict tests check the rest (see [`ai-tests.md`](ai-tests.md)) ([#678], [#679]).
 - The tutor has no Google Search tool ([#679]).
 
 ## What the tutor reports
@@ -104,7 +104,7 @@ A blocked call has no tool call, so Crux reads Google's block result itself ([#7
 - After 2 swaps on the same problem, or 2 blocked writes in a row, the check pauses as half-done. The owner's daily email lists it. Opening the check resumes it, with the problem swapped and the count back at 0.
 - A blocked slip fix or walk-through is treated like blocked marking.
 - A blocked dispute stays unused: "We couldn't check that dispute. Try again later."
-- A blocked re-mark leaves the pass standing, and the daily email lists it.
+- A blocked re-mark leaves the mark standing, and the daily email lists it.
 - A prohibited-content result seals the session. The check waits half-done until the seal is lifted.
 
 **Reading a file:** a failed call of this kind follows the failed-read rule in [`files.md`](files.md) after its retry. A harm result gets no retry: prohibited content seals the session, and any other counts as a harmful file. Overload, or a cap, never uses up a read's tries ([#735]).
@@ -129,7 +129,7 @@ The library is SymPy. Where it runs in a check is in [`mastery-check.md`](master
 
 ## The distress check's call
 
-When a limit stops a message, Crux asks the model whether the person is in distress. What follows from the answer is in [`spending.md`](spending.md) ([#734]).
+When a limit or a switch stops a message, Crux asks the model whether the person is in distress. What follows from the answer is in [`spending.md`](spending.md) ([#734]).
 
 - The call sends only the stopped message, and asks one yes-or-no question ([#734]). The answer comes in a fixed format ([#735]).
 - It spends from the distress check's pot, USD 0.05 a day, paid from the owner's share. The owner can change the amount on the owner page ([#734]).

@@ -9,7 +9,7 @@ This is the current set of rules for Crux v1. The closed tickets on the [respec 
 - Read this file first, then the area files your ticket names.
 - Use the terms as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. The glossary holds no rules.
 - A rule that limits more than one area, with no area that owns it, is in this file. Every other rule is in its area file, and other areas link to it.
-- If a file disagrees with the ticket it cites, or a rule you need is missing, see `spec-process.md` (until it is written, [#680](https://github.com/calmxz/Crux/issues/680)). Do not invent the rule.
+- If a file disagrees with the ticket it cites, or a rule you need is missing, see [`spec-process.md`](spec-process.md). Do not invent the rule.
 
 ## What Crux is
 
@@ -32,7 +32,7 @@ Crux opens in three stages ([#677](https://github.com/calmxz/Crux/issues/677), [
 3. Open sign-up with accounts.
 
 - A trial link carries every v1 feature except sign-up, accounts, and what needs a learner's email. Guest mode stays typing only ([#722](https://github.com/calmxz/Crux/issues/722)).
-- What each stage needs before it starts is in `quality-bar.md`, ticked on one stage issue per stage ([#680](https://github.com/calmxz/Crux/issues/680)).
+- What each stage needs before it starts is in [`quality-bar.md`](quality-bar.md), ticked on one stage issue per stage ([#680](https://github.com/calmxz/Crux/issues/680)).
 
 ### Who Crux is for
 
@@ -103,15 +103,16 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed and blocked calls, the maths library, the distress check's call | 679, 684 (+678, 716, 728, 733, 734, 735) | 1,300 |
 | [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735) | 1,800 |
 | [`operations.md`](operations.md) | Email sending, errors, uptime, how the owner is told, the bill, the daily job | 717 (+675, 676, 677, 679, 716, 728, 733, 734, 735) | 1,500 |
-| `quality-bar.md` (to be written) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+680, 716, 717, 722) | 1,650 |
-| `ai-tests.md` (to be written) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, live faults, switch-offs and re-marks, what stops a round | 678 (+679, 680, 716) | 1,400 |
-| `spec-process.md` (to be written) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
+| [`quality-bar.md`](quality-bar.md) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743) | 1,650 |
+| [`ai-tests.md`](ai-tests.md) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, what stops a round | 678 (+667, 669, 679, 680, 716, 728, 732, 733, 734, 735, 736) | 1,400 |
+| [`live-faults.md`](live-faults.md) | A fail on the live version: the owner's switches and what each does, re-marks after a marking fault | 678 (+669, 679, 728, 734, 735, 736) | 1,600 |
+| [`spec-process.md`](spec-process.md) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
 
 ## Gaps
 
 These are not decided yet. Do not build them from guesses.
 
-- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731), [#732](https://github.com/calmxz/Crux/issues/732), [#733](https://github.com/calmxz/Crux/issues/733), [#734](https://github.com/calmxz/Crux/issues/734) and [#735](https://github.com/calmxz/Crux/issues/735).
+- **Conflicts between closed tickets:** found while writing this file, and answered by the owner on [#728](https://github.com/calmxz/Crux/issues/728). An area file takes its answer from there. The gaps no ticket was given were answered by the owner on [#731](https://github.com/calmxz/Crux/issues/731), [#732](https://github.com/calmxz/Crux/issues/732), [#733](https://github.com/calmxz/Crux/issues/733), [#734](https://github.com/calmxz/Crux/issues/734), [#735](https://github.com/calmxz/Crux/issues/735) and [#736](https://github.com/calmxz/Crux/issues/736).
 - **Data model and module split:** not decided yet, see [#719](https://github.com/calmxz/Crux/issues/719).
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.

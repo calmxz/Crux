@@ -1,6 +1,6 @@
 # Hosting
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
@@ -63,7 +63,7 @@ What a background answer is, and when it runs, is in [`spending.md`](spending.md
 
 - They run on the tasks service through Cloud Tasks, so they carry on if the learner leaves ([#735]).
 - Opening the app queues the learner's waiting messages and kept files' reads, oldest session first, with the open session ahead of them ([#734]).
-- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, and asks for finished answers while any are waiting ([#734], [#735]).
+- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, and asks for finished answers while any are waiting ([#734], [#735]). It asks only while its tab is on screen, and less often the longer it waits ([#736]).
 - Crux claims each waiting message in the database before answering it, so a second browser or a second opening does nothing. A claim expires, so a stopped instance cannot hold a message for good ([#734], [#735]).
 - One background answer runs at a time per learner, and Crux checks the limits before each one ([#735]).
 - A new message goes through the backend as usual, and does not wait for this queue. If it runs beside a background answer, the limit can pass by at most that one reply ([#735]).
@@ -123,7 +123,7 @@ A new safety or privacy action joins this list in the same change that adds it, 
 - Real learner data never leaves Supabase or Google Cloud for a repair.
 - Repairs are done by script, and the owner sees counts, not content. Rows changed after the bug keep their newer value, and the log still applies.
 
-A test restore of a dump is on the before-trial checklist (see `quality-bar.md`) ([#716]).
+A test restore of a dump is on the before-trial checklist (see [`quality-bar.md`](quality-bar.md)) ([#716]).
 
 ## Environments
 
@@ -138,7 +138,7 @@ All of this comes from [#716].
 
 - Staging's AI calls count in the test cap. Its Supabase pauses after a quiet week, and is restored by hand before a release ([#716]).
 - Staging sends no real email, and its daily job runs by hand, so it uses neither Resend's limit nor a Cloud Scheduler job ([#735]).
-- The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see `ai-tests.md`) ([#678], [#679]).
+- The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
 
 ## Releases
 
@@ -168,13 +168,13 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 - Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
 - Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]).
-- How the repo is guarded is in `quality-bar.md` ([#717]).
+- How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
 ## Gaps
 
 - **Open hosting checks on [#726]:** the pooler test, and server time per sitting and per upload. The research reads the Cloud Run cap as gross use, so a month of USD 4.80 could trip staging's USD 2 cap at a bill of 0. The first month's report settles it.
 - **Whether the Cloud Run credit holds** with file work in the trial, and how busy a sitting is: open on [#675] ([#716], [#722]).
-- **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in `quality-bar.md` ([#678], [#716]).
+- **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in [`quality-bar.md`](quality-bar.md) ([#678], [#716]).
 
 ## On screen
 
@@ -192,3 +192,4 @@ Layout is not decided (see the main file's Gaps). These rules need: what the sta
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736

@@ -1,6 +1,6 @@
 # Feedback and the go-public bar
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers the feedback page, what the owner counts, who sees the owner page, the go-public bar, and a miss caused by the budget. What the owner may read in a session is in [`privacy.md`](privacy.md).
 
@@ -91,6 +91,7 @@ Counts of learners, each with a date ([#676]):
 
 - **An under-18 closure:** before the account and its marks go, Crux takes 1 off each path and bar count that learner added, in the window each was counted in ([#681]).
 - **A pass removed by a re-mark:** it drops from the counts in the window it was counted in ([#678]). A learner stays counted as mastered only if another topic was mastered inside the same window ([#734]).
+- **A pass a re-mark adds:** it counts like a dispute won ([#736]).
 - A window already judged keeps its verdict ([#678], [#681]).
 - The budget counts are not changed ([#681]).
 
@@ -157,12 +158,12 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 - Feedback text shows there as plain text ([#678]).
 - It shows the path, the bar's progress ("14 / 20 mastered"), the feedback answers with unread ones marked, which answers may be quoted, and visits by source ([#676], [#677], [#717]).
 - It shows the days the budget turned a learner away ("Limit hit on 9 of 56 days"), apart from learners stopped by their own limit ([#676]).
-- Its other parts are in the area file that owns each one: [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`trial.md`](trial.md), [`misuse.md`](misuse.md), and `ai-tests.md`.
+- Its other parts are in the area file that owns each one: [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`trial.md`](trial.md), [`misuse.md`](misuse.md), and [`live-faults.md`](live-faults.md).
 - **The daily email** gives new feedback as a count only, never the words or the sender ("2 new feedback answers"), and any "1 quote permission withdrawn" ([#677], [#717]).
 
 ## Gaps
 
-- **Whether the bar is reachable on real costs:** what a sitting costs on Agent Platform, and sittings per mastery, are not measured. See [`spending.md`](spending.md) and `quality-bar.md` ([#678], [#679]).
+- **Whether the bar is reachable on real costs:** what a sitting costs on Agent Platform, and sittings per mastery, are not measured. See [`spending.md`](spending.md) and [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
 
 ## On screen
 
@@ -181,3 +182,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the feedback
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736

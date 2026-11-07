@@ -1,6 +1,6 @@
 # Accounts and sign-in
 
-**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them. Where this file names an area file not yet written, use that file's source tickets in the main file's index.
+**Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
 This file covers how someone gets an account and comes back to it, from opening on. Who may join is in the main file's "Who Crux is for". The age question is in [`age.md`](age.md). Closing an account is in [`privacy.md`](privacy.md). The way in before opening is in [`trial.md`](trial.md).
 
@@ -44,7 +44,7 @@ Email sending, and how many of the day's emails can be codes, is in [`operations
 - Both buttons show there ([#674]).
 - Crux detects the built-in browser where it can. Tapping Google there sends the learner to the same page in the phone's normal browser ([#674]).
 - On iPhone, or wherever the jump fails, Crux shows its own note, naming the app it is in: "Google sign-in doesn't work inside the LinkedIn app. Open this page in your browser, or use a code." ([#674]).
-- The code works inside these browsers ([#674]). The real-phone tests are in `quality-bar.md` ([#678]).
+- The code works inside these browsers ([#674]). The real-phone tests are in [`quality-bar.md`](quality-bar.md) ([#678]).
 
 ## From the EU or the UK
 
