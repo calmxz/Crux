@@ -101,13 +101,14 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`misuse.md`](misuse.md) | The harm line, the misuse flag, the owner's decision, sealed flags, misuse closures | 677 (+665, 667, 732, 733) | 700 |
 | [`feedback.md`](feedback.md) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722, 728, 733, 734) | 1,200 |
 | [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed and blocked calls, the maths library, the distress check's call | 679, 684 (+678, 716, 728, 733, 734, 735) | 1,300 |
-| [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735) | 1,800 |
+| [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735, 750) | 1,800 |
 | [`operations.md`](operations.md) | Email sending, errors, uptime, how the owner is told, the bill, the daily job | 717 (+675, 676, 677, 679, 716, 728, 733, 734, 735) | 1,500 |
-| [`quality-bar.md`](quality-bar.md) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743) | 1,650 |
+| [`quality-bar.md`](quality-bar.md) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743, 750) | 1,650 |
 | [`ai-tests.md`](ai-tests.md) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, what stops a round | 678 (+667, 669, 679, 680, 716, 728, 732, 733, 734, 735, 736) | 1,400 |
 | [`live-faults.md`](live-faults.md) | A fail on the live version: the owner's switches and what each does, re-marks after a marking fault | 678 (+669, 679, 728, 734, 735, 736) | 1,600 |
-| [`spec-process.md`](spec-process.md) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 | 850 |
+| [`spec-process.md`](spec-process.md) | How this spec changes after the lock, `post-v1` issues, build tickets naming their sections, rule reports, stage issues | 680 (+750) | 850 |
 | [`data-model.md`](data-model.md) | What Crux stores and what each item belongs to, erasing a home, the backend modules | 719 | 2,300 |
+| [`old-code.md`](old-code.md) | The comparison against the old code: the verdict, each backend module's fate, what is copied with its tests, what is left behind | 750 | 800 |
 
 ## Gaps
 
@@ -117,5 +118,5 @@ These are not decided yet. Do not build them from guesses.
 - **Screens and layout:** not decided yet, on the map's "Not yet specified" list. Area files name the screen items their rules need.
 - **The AI layer may change:** research [#727](https://github.com/calmxz/Crux/issues/727) checks Claude through Anthropic's API. If it reopens [#679](https://github.com/calmxz/Crux/issues/679), the route, the models, the grader and the "for the meantime" figures can change.
 - **Open hosting checks:** research [#726](https://github.com/calmxz/Crux/issues/726) (database pooler security, the Cloud Run cap and server time, alerting charges, Zoho's agreement). See [`hosting.md`](hosting.md) and [`operations.md`](operations.md).
-- **The old code, where the new code lives, and bringing the deployment back:** on the map's "Not yet specified" list.
+- **The old code:** the backend's comparison is in [`old-code.md`](old-code.md) ([#750](https://github.com/calmxz/Crux/issues/750)). The frontend's comparison, where the new code lives, and bringing the deployment back are on the map's "Not yet specified" list.
 - **Ideas v1 does not need:** on the map's "Out of scope" list until the lock, then `post-v1` issues ([#680](https://github.com/calmxz/Crux/issues/680)).

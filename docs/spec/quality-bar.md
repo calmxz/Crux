@@ -123,13 +123,14 @@ These are the tests the closed tickets sent here, by area.
 - A re-mark covers every mark from the faulty period, in both directions, and gives what a correct marker would have given then. A wrong or unsure result undoes a pass, and the objective stays shown. Several checks on one objective: any right one passes it. Checks stay off until the re-marks finish.
 - An answer sent to an open check problem while the whole tutor is off is not kept, and the problem is swapped.
 
-**Hosting and operations** ([#716], [#717], [#735])
+**Hosting and operations** ([#716], [#717], [#735], [#750])
 
 - Crux's own logs never write a network address or a request header. Logged paths are route patterns, with a trial key never logged.
 - The tasks service refuses calls from the internet.
 - An error carrying learner text is reported without it.
 - The restore log, one test per listed action. Sender shares. The 26-hour uptime check.
 - Push protection, Betterleaks and osv-scanner each fail on a planted case.
+- Before the trial, hadolint, the image scan and CodeQL each fail on a planted case: a Dockerfile running as root, an image with a known-vulnerable package, and a query built from strings.
 
 ## Real-phone tests
 
@@ -142,6 +143,8 @@ These run on the owner's Android phone ([#678]). iPhone is untested: a known gap
 
 - GitHub push protection refuses known key formats at GitHub. Betterleaks stops a secret at commit on the owner's computer, and fails in CI ([#717]).
 - osv-scanner fails on any known hole in the libraries Crux uses, unless a written exception gives a reason and an expiry date. Dependabot opens fix pull requests ([#717]).
+- osv-scanner also scans the built backend image, under the same rule. hadolint checks the backend Dockerfile ([#750]).
+- CodeQL on the backend blocks a merge on a finding of high or above, until it is fixed or dismissed with GitHub's reason. Medium and low findings show and do not block. CodeQL also runs weekly; a finding there on unchanged code is an alert, fixed by its own pull request ([#750]).
 - Before opening, the owner works through the OWASP Top 10 ([#678]).
 
 ## Knowing when something is wrong
@@ -260,3 +263,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#743]: https://github.com/calmxz/Crux/issues/743
+[#750]: https://github.com/calmxz/Crux/issues/750

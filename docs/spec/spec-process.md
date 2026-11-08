@@ -69,6 +69,7 @@ flowchart TD
 ## Build tickets and pull requests
 
 - Each build ticket names the spec sections it builds, for example "Spec: `mastery-check.md`, Disputes". The owner approves that line with the ticket, before work starts.
+- A backend build ticket also names [`old-code.md`](old-code.md), which says what of the old code its module copies ([#750]).
 - A build pull request names only its ticket ("Closes #n"). A pull request with no ticket, such as a dependency bump, names nothing. A spec-change pull request names its `spec-change` issue.
 - No pull request template is needed.
 
@@ -98,3 +99,4 @@ What each stage needs is listed in [`quality-bar.md`](quality-bar.md), without c
 
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#680]: https://github.com/calmxz/Crux/issues/680
+[#750]: https://github.com/calmxz/Crux/issues/750

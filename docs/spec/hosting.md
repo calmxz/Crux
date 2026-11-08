@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
+This file covers what runs where, the database, backups, environments and releases, the backend's tools, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
 ## What runs where
 
@@ -88,6 +88,8 @@ A domain is bought through Cloudflare's registrar before the trial, about USD 10
 - Every lookup search is limited to the learner's own sessions, in the query and by row-level security (see [`sessions.md`](sessions.md)) ([#716]).
 - The outside check keeps Supabase from pausing (see [`operations.md`](operations.md)) ([#716]).
 - Another database host is out of scope (see the map's Out of scope list) ([#716]).
+- The backend reaches the database through SQLAlchemy 2 with psycopg ([#750]).
+- Alembic runs the migrations. Tables and columns come from the SQLAlchemy models. Row-level security policies and grants are written by hand in each revision ([#750]).
 
 ## Backups
 
@@ -140,11 +142,18 @@ All of this comes from [#716].
 - Staging's AI calls count in the test cap. Its Supabase pauses after a quiet week, and is restored by hand before a release ([#716]).
 - Staging sends no real email, and its daily job runs by hand, so it uses neither Resend's limit nor a Cloud Scheduler job ([#735]).
 - The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
+- CI starts the local stack, then runs `alembic upgrade head` ([#750]).
+
+### The backend's tools
+
+- Python 3.14, uv for dependencies and the lockfile, ruff for style, basedpyright for types ([#750]).
+- The API is contract-first. `docs/api/openapi.yaml` is written by hand, `gen_contracts.py` generates the request and response models from it, and CI fails on drift between them ([#750]).
 
 ## Releases
 
 - A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step ([#716]).
 - Migrations are backward-compatible: add first, remove in a later release. A one-step rollback still works ([#716]).
+- A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` ([#716], [#750]).
 
 ## Logs
 
@@ -194,3 +203,4 @@ Layout is not decided (see the main file's Gaps). These rules need: what the sta
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#750]: https://github.com/calmxz/Crux/issues/750
