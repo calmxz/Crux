@@ -1,0 +1,46 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: files and the session list (calmxz/Crux#752).
+  Three structurally different app shells around the session screen settled in #751, switchable with ?variant=A|B|C,
+  walked through 29 scenes (?scene=...), at phone or desktop width (?device=phone|desktop).
+  A: sidebar. B: home page. C: title switcher. The session screen itself (objectives panel, Crux's own lines in the thread,
+  pinned lines above the chat box) is #751's and the same in all three; only the shell and the file screens differ.
+  Wording is the spec's where it has one; text marked [no spec wording] is a placeholder.
+  No persistence, no backend. Rules live in docs/spec/; this file decides layout and flow only.
+
+  Chosen by the owner on 2026-11-09 (the ticket's resolution comment holds the full answer):
+  - Shell: variant A (sidebar on desktop, drawer on a phone; the app opens to the last session that isn't sealed).
+  - Record: one list across sessions with a By date / By session switch, By date first (scenes 6, 6b);
+    "Mastered in this session" in the objectives panel (scene 18).
+  - Session list lines: with the progress bar (scene 2b). Rename and delete: on each line and next to the title
+    (scenes 3, 3b, 4, 4b); click the title to rename on desktop only. Delete warning: type "delete" only when
+    something leaves the Record (scenes 5 to 5e).
+  - New session: variant B's start box. File states: in the panel (A). File viewer: A. Removing: C's dialog.
+    Allowance: A's dialog. Wrong type: A's pinned line. Held session: B's pinned line. Sealed: A, with the name
+    shown only if it has one (scene 16d). Jump points: B's jump menu in the top bar.
+  Serve this folder (the "prototypes" launch config, port 8765) and open the file: split js files do not load from file://.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE 752 - files and the session list</title>
+<link rel="stylesheet" href="752-files-sessions.css">
+</head>
+<body>
+<div class="proto-note" id="note"></div>
+<div class="stage"><div id="device" class="device phone"></div></div>
+<div class="proto-bar">
+  <button id="prev" title="Previous variant (Left arrow)">&#9664;</button>
+  <span class="lab" id="vlab"></span>
+  <button id="next" title="Next variant (Right arrow)">&#9654;</button>
+  <select id="scene"></select>
+  <button id="dev"></button>
+</div>
+<script src="752-data.js"></script>
+<script src="752-pieces.js"></script>
+<script src="752-scenes.js"></script>
+<script src="752-shells.js"></script>
+<script src="752-switcher.js"></script>
+</body>
+</html>
