@@ -36,8 +36,9 @@ The tutor judges this per topic. It never labels a whole file as a lesson, a syl
 ### When a file and the tutor disagree
 
 - Conventions and simplifications follow the files. The other version is mentioned once ([#667]).
-- An error is called out softly, and the correct form is taught: "Slide 30 looks like it has a typo ... worth checking with your teacher" ([#667]).
-- Crux keeps each flag until the learner has checked it with their teacher ([#669], [#671]). How flags and file errors affect the check is in [`mastery-check.md`](mastery-check.md).
+- A file mistake is called out softly, as "may have a mistake", never as an error or a typo. The tutor shows what the file says, the possible correction, and that the correction could be wrong too, then teaches the correction: "Slide 30 may have a mistake: it shows 5(3x² + 1)⁴. A possible correction is 5(3x² + 1)⁴ · 6x, but it could be wrong too, so it's worth checking with your teacher." ([#667], [#751])
+- The tutor reports a file mistake to Crux by a tool call (see [`ai-layer.md`](ai-layer.md)). On maths, SymPy checks it first. The tool call carries the file's step in LaTeX: what the file starts from, what it does to it, and what it gets. SymPy does the step itself and compares. A match means the file is right: there is no flag, and the tutor teaches from the file. No match means the flag goes ahead. "Can't tell" leaves it to the tutor's own judgement, as on files that are not maths ([#751]).
+- Crux keeps each flag until the learner reports what their teacher said, which the tutor records by a tool call, or taps "No one to ask, go with the correction" on its mistake mark. Until then, marking follows the correction ([#669], [#671], [#751]). How flags and file mistakes affect the check is in [`mastery-check.md`](mastery-check.md), and the mark is in [`learning-screen.md`](learning-screen.md).
 
 ### Files of questions
 
@@ -136,13 +137,13 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - **Whether the 20 GB store holds with trial links uploading:** open on [#675]. Every new link can hold 200 MB, and a lost link stays until the trial ends. At 100 full links, uploads stop for everyone ([#722]).
 - **Whether the Cloud Run credit holds with file work in the trial:** open on [#675] ([#722]).
-- **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged errors, and added pages. Open on [#678] ([#679]).
+- **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]).
 - **Whether Gemini can read a topic's pages straight from the bucket**, instead of Crux sending them: a build check, open on [#678] ([#716]).
 - **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: uploading and removing files, the removal notice, the "as on slide 30" pointers, "Reading…" and the "Couldn't read this file" line with its dismissal, the harmful-file message, the allowance message, the `.ppt` and `.doc` message, the files' "paused" message, and the upload line for guest mode, with its Request access button ([#667], [#671], [#678], [#716], [#722], [#732]).
+The files and their mistake marks show in the objectives panel (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: uploading and removing files, the removal notice, the "as on slide 30" pointers, "Reading…" and the "Couldn't read this file" line with its dismissal, the harmful-file message, the allowance message, the `.ppt` and `.doc` message, the files' "paused" message, and the upload line for guest mode, with its Request access button ([#667], [#671], [#678], [#716], [#722], [#732]).
 
 [#667]: https://github.com/calmxz/Crux/issues/667
 [#669]: https://github.com/calmxz/Crux/issues/669
@@ -161,3 +162,4 @@ Layout is not decided (see the main file's Gaps). These rules need: uploading an
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#751]: https://github.com/calmxz/Crux/issues/751

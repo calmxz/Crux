@@ -106,7 +106,7 @@ Only learners whose marks change are told ([#678]).
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the owner page's switches and re-mark progress, each part's "paused" line, the tap on a waiting message, the dispute's wait line, and the re-mark notices ([#678], [#736]).
+The session screen is in [`learning-screen.md`](learning-screen.md): each part's "paused" line, the tap on a waiting message and the re-mark notices in the thread, and the dispute's wait line in the problem sheet ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's switches and re-mark progress ([#678], [#736]).
 
 [#669]: https://github.com/calmxz/Crux/issues/669
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -115,3 +115,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the owner pa
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

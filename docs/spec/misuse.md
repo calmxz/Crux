@@ -95,7 +95,7 @@ A seal from Google's block stands apart from any open flag. A flag already waiti
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the locked account, the message on a sealed session, the message when Google blocks a reply, and the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
+The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the locked account, the message on a sealed session, and the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
 
 ## Gaps
 
@@ -113,3 +113,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the locked a
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

@@ -59,6 +59,14 @@ _Avoid_: query, prompt
 A PDF, image, PowerPoint, or Word document that the learner gives the tutor, with their request or later in a session. Examples are course material, a problem sheet, a past exam paper, and a syllabus. The session keeps the file, within the learner's storage allowance, and the tutor teaches from it. A photo of the learner's handwritten working (the steps to their answer), given as an answer in a mastery check, is not a file.
 _Avoid_: lesson file, document, attachment, upload
 
+**File mistake**:
+Something in a learner's file that the tutor, or SymPy on maths, finds wrong, such as a slide that drops a step. Unlike a slip, it is in the file, not in the learner's work.
+_Avoid_: error, typo, file error
+
+**Mistake mark**:
+The note an unchecked file mistake leaves on its file, until the learner reports what their teacher said, or says there is no one to ask.
+_Avoid_: error flag
+
 **Session**:
 The learning that starts from one request. It holds the request's topic, any prerequisite topics, and the related topics that follow. A learner can have several sessions and go back to any of them. The tutor names each session, and the learner can rename or delete it.
 

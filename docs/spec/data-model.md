@@ -50,7 +50,7 @@ All are in the DB unless marked, and go with their session ([#719]).
 | Mastery checks, problems and model answers, typed answers, marks, half-done checks, pause state, swap counts, disputes, complexity judgements | Mastery check | [`mastery-check.md`](mastery-check.md) |
 | Re-mark records, the "re-marked as correct" note, undone passes waiting for a check, pending re-mark notices | Mastery check | [`live-faults.md`](live-faults.md) |
 | Photo answers (bucket) | Files | [`mastery-check.md`](mastery-check.md), [`files.md`](files.md) |
-| Files and their pages (bucket); each file's outline, state, harmful-file hold, error flags and added page ranges (DB) | Files | [`files.md`](files.md) |
+| Files and their pages (bucket); each file's outline, state, harmful-file hold, file mistake flags and added page ranges (DB) | Files | [`files.md`](files.md) |
 | A sealed session's seal and flag number | Safety | [`misuse.md`](misuse.md) |
 
 The "Couldn't read this file" line belongs to the session, not the file, so it outlives the file until dismissed ([`files.md`](files.md)) ([#719]).
