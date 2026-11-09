@@ -13,7 +13,7 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 
 ### Names and the session list
 
-- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]).
+- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`misuse.md`](misuse.md)) ([#752]).
 - The learner can rename a session. Text in a session name is never an instruction (see the main file's "Crux decides") ([#671]).
 - The session list is ordered by last visit. Each line shows the topic the learner is on, or mastered last ([#671]).
 
@@ -79,7 +79,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 ### Passed work
 
 - An objective passed in another session, on a topic not yet mastered, is marked in a new topic's objectives: "2 Time of flight (passed in physics on 25 Nov)" ([#671]).
-- The mark opens that session at the check's result. Into a session with an open check, it opens at the check ([#732]).
+- The mark opens that session at the check's result. Into a session with an open check, it opens at the check ([#732]). For a sealed session, it shows the sealed message ([#752]).
 - The mark goes with the pass. If the pass is undone, the mark and its link go. What the tutor already said about the pass stays in the conversation, and from then on the tutor does not name the pass. If the earlier topic is mastered later, the mark stays ([#732]).
 - On first reaching that objective in this topic, the tutor names the pass and adds one sentence bridging it to the new topic. It then offers a quick problem to skip the teaching, or teaching as usual ([#732]):
   > "You passed time of flight in physics on 25 Nov. Here it decides how far the ball travels, so we'll need it for Range. Want a quick problem to skip the teaching, or shall I teach it as usual?"
@@ -94,13 +94,14 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - Only two things undo a pass ([#678], [#728]):
   - Its session is deleted (see [Deleting a session](#deleting-a-session)).
   - A re-mark after a marking fault finds the answer wrong, or cannot be sure it is right (see [`mastery-check.md`](mastery-check.md)) ([#736]).
+- A seal does not undo a pass: a sealed session's passes stay on the Record, and the tutor still counts them (see [`misuse.md`](misuse.md)) ([#752]).
 
 ## What the learner sees
 
 - Each session shows its objectives with their statuses (see [`teaching.md`](teaching.md)) ([#671]).
 - **"What you've mastered":** one read-only view, outside any session. It lists every mastered topic, and objectives passed on topics not yet mastered, each with its date and session ([#671]).
   - Prerequisite topics count. A topic shows under its name, the narrower one if an objective was dropped ([#671]).
-  - Each line opens its session. Into a session with an open check, it opens at the check ([#671]).
+  - Each line opens its session. Into a session with an open check, it opens at the check ([#671]). Into a sealed session, it shows the sealed message ([#752]).
   - Entries cannot be removed ([#671]).
 - **The conversation:** the whole conversation of a session can be scrolled, with jump points ([#671]):
   - each topic, its diagnostic included;
@@ -146,7 +147,7 @@ flowchart TD
 
 ## On screen
 
-The session screen is in [`learning-screen.md`](learning-screen.md): the objective's passed mark with its link in the objectives panel, the refresh offer's buttons, the quick-problem choice as a typed tutor message, the lookup's "paused" line, and jump points hidden during a check ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the session list with rename and delete, the delete warning, "What you've mastered", and jump points in the conversation ([#671], [#678], [#732]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the objective's passed mark with its link in the objectives panel, the refresh offer's buttons, the quick-problem choice as a typed tutor message, the lookup's "paused" line, and jump points hidden during a check ([#751]). The session list with rename and delete, the delete warning, "What you've mastered" and jump points in the conversation are in [`app-shell.md`](app-shell.md) ([#752]).
 
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#665]: https://github.com/calmxz/Crux/issues/665
@@ -170,3 +171,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the objecti
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#752]: https://github.com/calmxz/Crux/issues/752

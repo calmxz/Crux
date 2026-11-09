@@ -23,7 +23,7 @@ stateDiagram-v2
 
 ## The objectives panel
 
-- On desktop, a rail on the right of the conversation, always visible.
+- On desktop, a rail on the right of the conversation, always visible, except while the file viewer takes its place (see [`app-shell.md`](app-shell.md)) ([#752]).
 - On a phone, a strip under the top bar: one coloured segment per objective, then the count of objectives shown or passed ("2 of 5 ▾"). A tap drops down the full panel. The count keeps the strip readable without colour.
 - The panel holds:
   - the topic's name and the files it came from;
@@ -32,7 +32,8 @@ stateDiagram-v2
   - dropped objectives, struck through;
   - a paused topic;
   - the learner's preferences, each with a way to remove it;
-  - the session's files, each with any mistake mark (see [Mistake marks](#mistake-marks)). Uploading and removing files belong to the files and session list screens, still to be decided (see the main file's Gaps).
+  - "Mastered in this session", under the objectives: each topic mastered in the session, with its date and a link that opens its check's result. During a check its topics stay and its links hide, like jump points. A topic mastered twice shows both dates ([#752]);
+  - the session's files, each with its state, any mistake mark (see [Mistake marks](#mistake-marks)), and × to remove it. Adding, reading and removing files are in [`app-shell.md`](app-shell.md) ([#752]).
 
 ## The mastery check
 
@@ -62,8 +63,9 @@ stateDiagram-v2
   - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
   - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back".
 - A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`spending.md`](spending.md) and [`live-faults.md`](live-faults.md)).
-- The age question is a card in the thread of whichever session is open, with Yes and No.
+- The age question is a card in the thread of whichever session is open, with Yes and No. When no conversation is open, it shows in the main area (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the after-first-mastery notice are pinned lines above the chat box. Each shows once, as its own file says, and stays until dismissed or until the learner leaves. Neither shows inside a check; one due during a check waits until the result (see [`spending.md`](spending.md) and [`feedback.md`](feedback.md)).
+- A held session's pinned line cannot be dismissed, and goes when its file is removed. Pinned lines stack with that line first, then in the order they came (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the care line at a limit have no wording yet. The build ticket drafts both for the owner.
 
 ## Pictures
@@ -88,6 +90,7 @@ stateDiagram-v2
 | Result | The result card and the problem sheet with Dispute |
 | Pictures | Drawing Mermaid diagrams and graphs |
 
-The other screens add their own modules.
+The app shell, the session list, the Record, files and the file viewer are in [`app-shell.md`](app-shell.md) ([#752]). The other screens add their own modules.
 
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#752]: https://github.com/calmxz/Crux/issues/752

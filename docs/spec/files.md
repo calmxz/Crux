@@ -55,7 +55,7 @@ The tutor judges this per topic. It never labels a whole file as a lesson, a syl
 - Unreadable (blurry, password-protected, empty, broken): the tutor says what went wrong, and offers another file or typing the topic ([#667]). A file Crux processed but cannot follow, such as a blurry photo, stays until the learner removes it, unused, like a file with nothing learnable ([#732]).
 - Harmful: declined like a harmful typed request (see [`misuse.md`](misuse.md)) ([#667], [#677]). The decline counts once toward the misuse flag, and removing the file does not undo it ([#677], [#732]).
   - The tutor reports the file through a tool call, when the read finds the harm or whenever it spots it later. From then on, Crux sends none of its pages or outline to the tutor, including when the tutor writes check problems ([#679], [#732]).
-  - The tutor says: "I can't help with this file. This session can't continue until you remove it." The session waits until the file is removed or the session is deleted. Progress is kept, and the learner's other sessions stay open ([#732]).
+  - The tutor says: "I can't help with this file. This session can't continue until you remove it." The session waits until the file is removed or the session is deleted. Progress is kept, and the learner's other sessions stay open ([#732]). The learner cannot open the file either ([#752]).
   - During the wait, the age question, the tutor's care for a learner in distress, and disputes on a finished check still work (see [`age.md`](age.md), [`misuse.md`](misuse.md) and [`mastery-check.md`](mastery-check.md)). The conversation can still be read. The after-mastery menu waits, and the tutor answers anything else by repeating the message ([#675], [#677], [#681], [#732]).
   - If this happens while a check is open, the check finishes first. The message and the wait come after the result ([#675], [#732]).
 
@@ -119,6 +119,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - **Allowance:** 200 MB per account and per trial link, the owner's account included. It counts the learner's files only. The pages Crux makes from a file and shrunk photo answers do not count ([#716], [#722], [#732]).
 - Past the allowance, a new file is refused with a message showing what is using the space. The learner removes a file to add one ([#671]).
+- A sealed session's files (see [`misuse.md`](misuse.md)) do not count toward the allowance while it is sealed. They still count toward the store total. If the seal is lifted they count again; if that puts the learner over, nothing is removed, and they cannot add a file until they are under ([#752]).
 - **Store total:** 20 GB across files, pages and photo answers, for everyone, trial links included. When it is reached, uploads stop for everyone, learning continues, and the owner gets a push (see [`operations.md`](operations.md)) ([#671], [#716], [#717], [#722]).
 - The total is checked when a file is uploaded. A file already accepted is read in full, even if its pages go past the total ([#732]).
 - In v1, photo answers stop with uploads. A learner in a check types their answer instead (see [`mastery-check.md`](mastery-check.md)) ([#732]).
@@ -143,7 +144,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 ## On screen
 
-The files and their mistake marks show in the objectives panel (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: uploading and removing files, the removal notice, the "as on slide 30" pointers, "Reading…" and the "Couldn't read this file" line with its dismissal, the harmful-file message, the allowance message, the `.ppt` and `.doc` message, the files' "paused" message, and the upload line for guest mode, with its Request access button ([#667], [#671], [#678], [#716], [#722], [#732]).
+The files and their mistake marks show in the objectives panel (see [`learning-screen.md`](learning-screen.md)) ([#751]). Adding, reading and removing files, their states, the pointers, the allowance dialog, the wrong-type messages and the held session's line are in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the upload line for guest mode, with its Request access button ([#722]).
 
 [#667]: https://github.com/calmxz/Crux/issues/667
 [#669]: https://github.com/calmxz/Crux/issues/669
@@ -163,3 +164,4 @@ The files and their mistake marks show in the objectives panel (see [`learning-s
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#752]: https://github.com/calmxz/Crux/issues/752

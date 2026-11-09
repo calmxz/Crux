@@ -83,6 +83,8 @@ Whichever way it was sealed, nothing reaches a sealed session: no lookup, no sha
 
 A seal from Google's block stands apart from any open flag. A flag already waiting keeps its choices, and its sessions can still be read, apart from the sealed one. The message on a sealed session carries a flag number, so a reply can be matched, including from a trial link ([#735]).
 
+A sealed session's mastered topics and passed objectives stay on the Record, and the tutor still counts them. Every way into it shows the sealed message, and a message naming it leaves out "open … to pick it up". Its files leave the learner's allowance while it is sealed (see [`files.md`](files.md#the-allowance-and-the-store)). What the learner sees, and where, is in [`app-shell.md`](app-shell.md) ([#752]).
+
 **A misuse closure**
 
 - The account locks for 7 days. Nothing is erased yet ([#733]).
@@ -95,7 +97,7 @@ A seal from Google's block stands apart from any open flag. A flag already waiti
 
 ## On screen
 
-The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the locked account, the message on a sealed session, and the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
+The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). These rules need: the locked account, and the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
 
 ## Gaps
 
@@ -114,3 +116,4 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#752]: https://github.com/calmxz/Crux/issues/752
