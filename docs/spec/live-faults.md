@@ -106,7 +106,7 @@ Only learners whose marks change are told ([#678]).
 
 ## On screen
 
-The session screen is in [`learning-screen.md`](learning-screen.md): each part's "paused" line, the tap on a waiting message and the re-mark notices in the thread, and the dispute's wait line in the problem sheet ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's switches and re-mark progress ([#678], [#736]).
+The session screen is in [`learning-screen.md`](learning-screen.md): each part's "paused" line, the tap on a waiting message and the re-mark notices in the thread, and the dispute's wait line in the problem sheet ([#751]). The greyed file button and its pinned line while files are switched off are in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's switches and re-mark progress ([#678], [#736]).
 
 [#669]: https://github.com/calmxz/Crux/issues/669
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -116,3 +116,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): each part's
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#752]: https://github.com/calmxz/Crux/issues/752
