@@ -1,0 +1,41 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: the learning screen and the mastery check (calmxz/Crux#751).
+  Three structurally different layouts of the learning screen, switchable with ?variant=A|B|C,
+  walked through eleven scenes (?scene=...), at phone or desktop width (?device=phone|desktop).
+  Wording is the spec's where it has one; text marked [no spec wording] is a placeholder.
+  No persistence, no backend. Rules live in docs/spec/; this file decides layout and flow only.
+
+  Chosen by the owner on 2026-11-09 (the ticket's resolution comment holds the full answer):
+  - Objectives: variant A's rail on desktop; on a phone, A's strip showing C's coloured segments plus the count.
+  - The check: variant A, in the same conversation, thread cleared to the check, dark check bar.
+  - Crux's own lines: variant B, in the thread, with the near-limit pop-up and feedback notice pinned above the chat box.
+  - The result: a card in the thread; tapping a problem opens a sheet with the learner's answer, the model answer and Dispute (not drawn here).
+  - Pictures: Mermaid diagrams and SymPy-plotted graphs, drawn whenever they help; graphs only in check problems.
+  - Unchecked file mistakes: scene 12, option A, a mark on the file.
+  Open locally: double-click, or serve this folder and open the file.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE 751 - learning screen and mastery check</title>
+<link rel="stylesheet" href="751-learning-screen.css">
+
+</head>
+<body>
+<div class="proto-note" id="note"></div>
+<div class="stage"><div id="device" class="device phone"></div></div>
+<div class="proto-bar">
+  <button id="prev" title="Previous variant (Left arrow)">&#9664;</button>
+  <span class="lab" id="vlab"></span>
+  <button id="next" title="Next variant (Right arrow)">&#9654;</button>
+  <select id="scene"></select>
+  <button id="dev"></button>
+</div>
+<script src="751-scenes.js"></script>
+<script src="751-pieces.js"></script>
+<script src="751-layouts.js"></script>
+<script src="751-switcher.js"></script>
+</body>
+</html>
