@@ -167,7 +167,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the feedback page and its link, its ticks and the share choices and warning, the after-first-mastery notice, "Your feedback" in Settings, the too-many-sends message, and the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
+The after-first-mastery notice is a pinned line above the chat box (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the feedback page and its link, its ticks and the share choices and warning, "Your feedback" in Settings, the too-many-sends message, and the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -184,3 +184,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the feedback
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

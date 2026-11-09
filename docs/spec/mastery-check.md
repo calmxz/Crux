@@ -23,6 +23,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 - A check covers every objective not dropped, as they stand when it is offered, including any the diagnostic skipped, and any passed in another session (see [`sessions.md`](sessions.md)). Dropped objectives are not on it. After a fail, see [After a fail](#after-a-fail) ([#669], [#732]).
 - Written problems, answered with working, shown one at a time as "Problem k of N". No multiple choice ([#669]).
+- A problem may show a graph whose points SymPy works out ("From the graph, estimate the slope at x = 1"). Diagrams are not used in the check, and model answers and the result stay text. The marker gets the graph's function and range as text ([#751]).
 - Each problem tests its objective as written. A "why" objective needs an explanation ([#669]).
 - Problems are fresh: never seen before in the topic, and never copied from the files. Where there are files, they follow the files' style, leaving out any file the tutor declined (see [`files.md`](files.md)) ([#667], [#669], [#732]).
 - A method objective gets problems that need and name the method ("Using the chain rule, ..."). An answer by another method gets "This one asks for the chain rule. Can you do it that way?" at once, right or wrong ([#669]).
@@ -61,9 +62,9 @@ This file covers the mastery check, from the offer to the result and what follow
 - The end step comes after the last problem, before the result ([#669]):
   - A slip gets one fix: "Problem 2 has a slip in the last line. Can you fix it?" Fixed is right; not fixed is wrong.
   - Unsure (an unexpected valid method, unknown notation, an ambiguous step) gets a neutral "Walk me through this step". Still unclear is wrong.
-- Course notation and standard notation are both accepted. Where a file has an error, the answer is marked by the correct version, or by what the teacher said if the learner reported it back ([#669]).
-- There is no reminder of file errors before the check. The result names a wrong answer that follows one: "this follows slide 12's error, which we flagged earlier" ([#669]).
-- An unchecked file-error flag is reminded outside the check, never during it. Where it shows is a screens question ([#669]).
+- Course notation and standard notation are both accepted. Where a file has a mistake, the answer is marked by the correction, or by what the teacher said if the learner reported it back ([#669], [#751]).
+- There is no reminder of file mistakes before the check. The result names a wrong answer that follows one: "this follows slide 12's mistake, which we flagged earlier" ([#669], [#751]).
+- An unchecked file mistake is reminded outside the check, never during it, by a mistake mark on its file (see [`learning-screen.md`](learning-screen.md)) ([#669], [#751]).
 - While marking, "Marking…" may show for up to about 20 seconds ([#716]). Which model and settings each check job uses is in [`ai-layer.md`](ai-layer.md) ([#679]).
 
 ## The result
@@ -125,7 +126,7 @@ This file covers the mastery check, from the offer to the result and what follow
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the offer with its split, "Problem k of N", photo answers, "Marking…", the result with model answers behind a tap, Dispute, the passed status, open file-error flags, hidden files, the "paused" messages, and the re-mark message ([#669], [#678], [#716]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the offer and its buttons, the check in the conversation with its check bar, photo answers and "Marking…", the result card and its problem sheet with Dispute, the passed status, hidden files, mistake marks, and the "paused" and re-mark lines ([#751]).
 
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#667]: https://github.com/calmxz/Crux/issues/667
@@ -145,3 +146,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the offer wi
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#751]: https://github.com/calmxz/Crux/issues/751

@@ -164,7 +164,7 @@ flowchart TD
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the objectives message with each objective's status, the topic options, the after-mastery menu with its dropped line, and the welcome back ([#666], [#668], [#670]).
+The session screen is in [`learning-screen.md`](learning-screen.md): each objective's status in the objectives panel, and the topic options, the after-mastery menu with its dropped and "Back to" lines, and the welcome back as messages in the thread ([#751]).
 
 [#662]: https://github.com/calmxz/Crux/issues/662
 [#664]: https://github.com/calmxz/Crux/issues/664
@@ -184,3 +184,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the objectiv
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

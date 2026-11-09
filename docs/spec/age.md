@@ -67,7 +67,7 @@ Guests and trial-link holders get the same question, buttons and rules above ([#
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the landing page's 18+ line, the age question's Yes and No buttons, "please tap Yes or No", the closure message, the trial link's access-ended message, and the owner page's dated under-18 count ([#679], [#681], [#728]).
+The age question is a card in the thread with Yes and No, and "please tap Yes or No" a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the landing page's 18+ line, the closure message, the trial link's access-ended message, and the owner page's dated under-18 count ([#679], [#681], [#728]).
 
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -80,3 +80,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#751]: https://github.com/calmxz/Crux/issues/751

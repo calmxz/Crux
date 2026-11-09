@@ -9,6 +9,7 @@ This file covers what runs where, the database, backups, environments and releas
 | Part | Where | Notes |
 |---|---|---|
 | Frontend | Cloudflare, static files, free | A React single-page app with TanStack Router and TanStack Query. It is served apart from the backend, so the landing page shows while the backend wakes |
+| Diagrams | Mermaid, drawn by the frontend | See [`learning-screen.md`](learning-screen.md) |
 | The Worker | Cloudflare | Passes `/api` calls to Cloud Run, so the site and API share one address |
 | Backend | Google Cloud Run, Crux project, Singapore (`asia-southeast1`), request-based billing | Python with FastAPI |
 | Tasks service | A second Cloud Run service from the same image | IAM-only. Only Cloud Tasks and Cloud Scheduler call it |
@@ -204,3 +205,4 @@ Layout is not decided (see the main file's Gaps). These rules need: what the sta
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#750]: https://github.com/calmxz/Crux/issues/750
+[#751]: https://github.com/calmxz/Crux/issues/751

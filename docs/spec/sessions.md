@@ -28,7 +28,7 @@ This is what the rules need kept. Where each item lives and what it belongs to i
 - A topic replaced mid-way, with what was shown, so the diagnostic can skip it when it starts again ([#665], [#670], [#671]).
 - Paused topics and unfinished prerequisite topics, resumable where they stopped. A mastered topic reopened for a dropped objective keeps its smaller mastery meanwhile ([#668], [#671]).
 - A half-done check, which never expires: answered problems, saved model answers and marks, the split, the open problem, pending slip fixes and walk-throughs, and when the learner left ([#669], [#671]).
-- Disputes used and still open, and open file-error flags ([#669], [#671]).
+- Disputes used and still open, and open file mistakes ([#669], [#671]).
 - Mastered topics, the dropped objectives listed on them, and whether each has had its one offer (used up as [`learning-loop.md`](learning-loop.md) says) ([#670], [#671], [#728]).
 - The menu's sources: the request, queued topics including one replaced mid-way, and files. Also whether "that covers everything you came for" has been said ([#670], [#671]).
 
@@ -146,7 +146,7 @@ flowchart TD
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the session list with rename and delete, the delete warning, "What you've mastered", jump points in the conversation, the refresh offer, the objective's passed mark with its link, the quick-problem choice, and the lookup's "paused" message ([#671], [#678], [#732]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the objective's passed mark with its link in the objectives panel, the refresh offer's buttons, the quick-problem choice as a typed tutor message, the lookup's "paused" line, and jump points hidden during a check ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the session list with rename and delete, the delete warning, "What you've mastered", and jump points in the conversation ([#671], [#678], [#732]).
 
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#665]: https://github.com/calmxz/Crux/issues/665
@@ -169,3 +169,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the session 
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

@@ -69,7 +69,9 @@ The tutor reports to Crux only through tool calls, never by Crux reading the cha
 - a page request;
 - a lookup;
 - related topics, each tagged with where it came from, for Crux to sort (see [`learning-loop.md`](learning-loop.md));
-- a decline, naming its kind from the harm list, with a mark for the two cases that flag at once (see [`misuse.md`](misuse.md)) ([#733]).
+- a decline, naming its kind from the harm list, with a mark for the two cases that flag at once (see [`misuse.md`](misuse.md)) ([#733]);
+- a diagram, as Mermaid text, and a graph, as a function in LaTeX with its range and the points or tangent to mark (see [`teaching.md`](teaching.md)) ([#751]);
+- a file mistake, with the file's maths step in LaTeX where there is one, and what the teacher said about one (see [`files.md`](files.md)) ([#751]).
 
 Each turn carries an idempotency key, so a tool result is recorded once ([#716]).
 
@@ -114,7 +116,8 @@ A blocked call has no tool call, so Crux reads Google's block result itself ([#7
 The library is SymPy. Where it runs in a check is in [`mastery-check.md`](mastery-check.md).
 
 - **What it reads:** only LaTeX, with the Lark backend. `parse_expr` and `sympify` never run on outside text ([#716]).
-- **What goes to it:** only expression and number answers. Equations, sets, intervals and worded answers go to the AI's independent working ([#716]).
+- **What goes to it:** expression and number answers, quantities with units, a file's maths step, and a graph's function. Equations, sets, intervals and worded answers go to the AI's independent working ([#716], [#751]).
+- **Units:** SymPy's own units module checks quantities with units ("15 m/s") wherever the library reads: model answers, learners' final answers, file mistakes and graphs' axes ([#751]).
 - **How it compares:** by simplifying and a numeric spot-check. Each comparison runs in a separate process, killed after a few seconds ([#716]).
 
 | Result | When |
@@ -126,6 +129,8 @@ The library is SymPy. Where it runs in a check is in [`mastery-check.md`](master
 - **Model answers:** a match is saved. No match throws the problem away unseen, and a new one is written and checked. "Can't tell" goes to the AI's independent working ([#679]).
 - **Final answers:** it also compares the learner's final answer with the model answer. A disagreement with the marker brings a fresh re-mark, told whether the final values match, before the learner sees a result ([#679]).
 - The library never marks alone, and the working is still judged ([#679]).
+- **Pictures:** a diagram's Mermaid text must parse before it is drawn. A graph's function is read like an answer, and the library works out the points and any tangent's slope. If either fails, nothing is drawn, and the tutor explains in words. Crux stores the description, not an image ([#751]).
+- **File mistakes:** the library does the file's step itself and compares it with the file's result. Match: no flag. No match: the flag goes ahead. Can't tell: the tutor judges alone (see [`files.md`](files.md)) ([#751]).
 
 ## The distress check's call
 
@@ -146,7 +151,7 @@ When a limit or a switch stops a message, Crux asks the model whether the person
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: "The tutor is busy right now", the two lines when Google blocks a reply, and the message when a problem is swapped ([#679], [#733], [#735]).
+The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor is busy right now", the two lines when Google blocks a reply, and the message when a problem is swapped are lines in the thread, and diagrams and graphs show inside the tutor's message ([#751]).
 
 [#669]: https://github.com/calmxz/Crux/issues/669
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -159,3 +164,4 @@ Layout is not decided (see the main file's Gaps). These rules need: "The tutor i
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#751]: https://github.com/calmxz/Crux/issues/751

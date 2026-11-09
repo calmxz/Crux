@@ -83,13 +83,15 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 - A preference is stated by the learner, or noticed by the tutor and confirmed ("use real-world examples"). It carries across sessions. The learner can see and remove it ([#668]). How it is kept is in [`sessions.md`](sessions.md) ([#671]).
 - Nothing the tutor infers about the learner, such as recurring mistakes or strengths, is stored ([#668]).
 
-## Gaps
+## Pictures
 
-- How the tutor shows a picture in the chat is not decided. It belongs to screens and layout, on the map's Not yet specified list.
+- The tutor draws a diagram or a graph whenever it helps, and whenever the learner asks, including "a picture" on the never-ready menu. It does not draw on every turn ([#751]).
+- A diagram is Mermaid text. A graph is a function the tutor names, with a range and the points or tangent to mark. How Crux checks them is in [`ai-layer.md`](ai-layer.md), and where they show is in [`learning-screen.md`](learning-screen.md) ([#751]).
+- Diagrams stay in teaching. In the mastery check, only a graph may appear, in a problem (see [`mastery-check.md`](mastery-check.md)) ([#751]).
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: each objective's status, paused topics, the never-ready menu, and the learner's preferences with a way to remove each ([#668]).
+The session screen is in [`learning-screen.md`](learning-screen.md): each objective's status and the trouble mark, the paused topic, and the preferences with a way to remove each, in the objectives panel; the never-ready menu as a typed tutor message ([#751]).
 
 [#663]: https://github.com/calmxz/Crux/issues/663
 [#664]: https://github.com/calmxz/Crux/issues/664
@@ -101,3 +103,4 @@ Layout is not decided (see the main file's Gaps). These rules need: each objecti
 [#671]: https://github.com/calmxz/Crux/issues/671
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751

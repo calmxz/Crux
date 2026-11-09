@@ -160,7 +160,7 @@ How long per-account spend and the "email me" addresses are kept is in [`privacy
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the tutoring bar on the settings page, the near-limit pop-up, the day, week, ceiling and month messages with their tick-box, the fixed lines after a filling reply and after a file, the waiting mark on a kept message, the care and crisis lines, and the owner page's settings, cap line, counts, and share with its raise ([#675], [#679], [#734]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the near-limit pop-up as a pinned line, and the day, week, ceiling and month messages with their tick-box, the fixed lines after a filling reply and after a file, the waiting mark on a kept message, and the care and crisis lines in the thread ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the tutoring bar on the settings page, and the owner page's settings, cap line, counts, and share with its raise ([#675], [#679], [#734]).
 
 [#667]: https://github.com/calmxz/Crux/issues/667
 [#671]: https://github.com/calmxz/Crux/issues/671
@@ -180,3 +180,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the tutoring
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#751]: https://github.com/calmxz/Crux/issues/751
