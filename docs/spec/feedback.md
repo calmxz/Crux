@@ -167,7 +167,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## On screen
 
-The after-first-mastery notice is a pinned line above the chat box (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the feedback page and its link, its ticks and the share choices and warning, "Your feedback" in Settings, the too-many-sends message, and the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
+The after-first-mastery notice is a pinned line above the chat box (see [`learning-screen.md`](learning-screen.md)) ([#751]). The feedback page and its link, its ticks, the share choices and warning, "Your feedback" in Settings and the too-many-sends message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -185,3 +185,4 @@ The after-first-mastery notice is a pinned line above the chat box (see [`learni
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#753]: https://github.com/calmxz/Crux/issues/753

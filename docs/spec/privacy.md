@@ -47,7 +47,7 @@ Repairs from a backup are done by script, and the owner sees counts, not content
 
 ### Closing an account
 
-- Closing is one click in Settings, after a confirm screen. The screen names what is erased ("your 4 sessions, your files, and your record of 3 mastered topics") and the date the 7 days end, with a "Send me a copy first" button ([#677], [#733]).
+- Closing starts in Settings, in a confirm dialog where the learner types "delete" before Close account works ([#753]). The dialog names what is erased ("your 4 sessions, your files, and your record of 3 mastered topics") and the date the 7 days end, with a "Send me a copy first" button ([#677], [#733]).
 - An email follows: "Your Crux account closes on 3 Nov. Sign in to keep it." ([#677])
 - During the 7 days, the next time they open Crux, on any browser, they see "Keep my account / Sign out", with the same button. There is no tutoring until they pick. A habitual visit does not cancel by accident ([#677], [#733]).
 - Keeping leaves the account as it was. Sign out lets the closing go on ([#677]).
@@ -156,7 +156,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: Close account with its confirm screen and "Send me a copy first", "Keep my account / Sign out", the terms-changed step, the share tick with its two choices, "Who runs Crux" with the officer's contact, and the owner page's shared sessions and copy requests ([#677], [#733]).
+Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). These rules need: "Who runs Crux" with the officer's contact, and the owner page's shared sessions and copy requests ([#677], [#733]).
 
 
 [#668]: https://github.com/calmxz/Crux/issues/668
@@ -176,3 +176,4 @@ Layout is not decided (see the main file's Gaps). These rules need: Close accoun
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#743]: https://github.com/calmxz/Crux/issues/743
+[#753]: https://github.com/calmxz/Crux/issues/753

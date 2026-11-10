@@ -100,6 +100,7 @@ One email through Resend, about 8 am Philippine time, on days with something in 
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)) ([#733]);
+- the day before a misuse closure is erased: "1 closed account is erased tomorrow. Check the Crux inbox for a contest." ([#753]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
@@ -162,7 +163,7 @@ Some things happen by the date alone, with no job: a re-run's budget returning o
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the daily email, and the copy's email with its link ([#717], [#735]).
+Layout is not decided (see the main file's Gaps). The copy's email with its link is in [`account-screens.md`](account-screens.md) ([#753]). These rules need: the daily email ([#717], [#735]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -178,3 +179,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the daily em
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#753]: https://github.com/calmxz/Crux/issues/753

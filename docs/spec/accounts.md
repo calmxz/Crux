@@ -101,6 +101,7 @@ What else an account keeps is in [`sessions.md`](sessions.md), and the marks in 
 ## Staying signed in
 
 - A learner stays signed in on that browser until they sign out, or until 30 days pass without a visit: any signed-in request, opening the app included. There is a Sign out button ([#674], [#719]).
+- Closing the account signs the learner out on that browser. Other browsers stay signed in, and show "Keep my account" on opening ([#753]).
 - This uses a sign-in cookie that the backend checks on each call. It is never used for counting ([#674], [#717]).
 
 ## Steps on opening Crux
@@ -114,7 +115,7 @@ If several apply, the order is: a lock, the age question (see [`age.md`](age.md)
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the landing page's pre-written example, the sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box, the misuse block's message, and the owner page's let-in list with its expiry, keep option and blocked-email note, "25 + N let in", and refused-codes count ([#674], [#675], [#677], [#679], [#717], [#733]).
+The sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box and the misuse block's message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the landing page's pre-written example, and the owner page's let-in list with its expiry, keep option and blocked-email note, "25 + N let in", and refused-codes count ([#674], [#675], [#677], [#679], [#717], [#733]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -129,3 +130,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the landing 
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#753]: https://github.com/calmxz/Crux/issues/753
