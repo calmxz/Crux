@@ -1,0 +1,61 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: sign-up, settings, feedback and closing an account (calmxz/Crux#753).
+  Three variants (?variant=A|B|C) of the screens around an account, walked through 40 scenes (?scene=...),
+  at desktop or phone width (?device=desktop|phone). The app shell from #752 (sidebar on desktop, drawer on a phone)
+  is the same in all three; the variants differ in how sign-in, the steps on opening, the lock, settings, feedback
+  and closing are built. A: pages. B: dialogs and panels over the app. C: a separate settings area.
+  Wording is the spec's where it has one; text marked [no spec wording] is a placeholder.
+  No persistence, no backend. Rules live in docs/spec/; this file decides layout and flow only.
+  Keys: Left/Right change variant, Up/Down change scene.
+
+  Ticket items and the scenes that show them:
+  - 674: sign-up page 1; One more thing with two ticks 12-13; in-app note 6; sender-out 7 (day), 8 (month);
+         too-many-requests 10; Sign out 28.
+  - 681: the sign-up tick 12-13; the closure message 22.
+  - 675: the tutoring bar 23; Crux is full for now 14.
+  - 676: the feedback page 29-35 and its link (sidebar footer in A, top bar in B, Account menu in C).
+  - 677: Close account and its confirm 36-37; Keep my account / Sign out 16; Your feedback in Settings 25;
+         the feedback page's ticks 29-32; the terms-changed step 17.
+  - 717: network refused 10 (the 20-an-hour code limit; the trial's wrong-link refusal belongs to #754);
+         Too many codes today 9; the human check 2.
+  - 733: the locked account 18-21, 27; Send me a copy first 16, 36-37; the share tick, two choices, warning 30.
+  - 734: too many sends 34; the session named on the share tick 30.
+  - 735: the copy's email with its link 40.
+  - Also: wrong and expired codes 4-5; region 11; misuse block 15; closing email 39; just after closing 38;
+          feedback with no sessions 31 and from a trial link 32; the 200 MB allowance question 24.
+  Chosen by the owner on 2026-11-10 (the ticket's resolution comment holds the full answer):
+  - Variant A throughout: sign-in as one card on its own page; the lock, Keep and terms steps as cards on their own
+    page (the age question stays in the thread or main area); the lock page first, then read-only with the lock bar;
+    Feedback and Settings at the sidebar's foot; Settings and Feedback as pages in the main area.
+  - Close account: a dialog over the Settings page with "delete" typed before Close account works (variant B's
+    dialog form plus typing). Right after closing: the sign-in page with a note (scene 38, A).
+  - Settings shows the 200 MB allowance with "See your files"; Sign out is last on the page.
+  - "Sign out" on the Keep card keeps its name, with "It still closes on 10 Nov. You can come back and keep it until
+    then." under it. A locked learner cannot delete sessions or remove files.
+  Serve this folder (the "prototypes" launch config, port 8765) and open the file over http.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE 753 - sign-up, settings, feedback and closing</title>
+<link rel="stylesheet" href="753-base.css">
+<link rel="stylesheet" href="753-extra.css">
+</head>
+<body>
+<div class="proto-note" id="note"></div>
+<div class="stage"><div id="device" class="device desktop"></div></div>
+<div class="proto-bar">
+  <button id="prev" title="Previous variant (Left arrow)">&#9664;</button>
+  <span class="lab" id="vlab"></span>
+  <button id="next" title="Next variant (Right arrow)">&#9654;</button>
+  <select id="scene"></select>
+  <button id="dev"></button>
+</div>
+<script src="753-shell.js"></script>
+<script src="753-gates.js"></script>
+<script src="753-pages.js"></script>
+<script src="753-scenes.js"></script>
+</body>
+</html>
