@@ -6,8 +6,8 @@ This file covers the app around the session screen: where the app opens, the ses
 
 ## The shell
 
-- **Sidebar:** on desktop, the session list beside the session screen, always in view. On a phone, the same list is a drawer opened from "☰" in the top bar. It holds "+ New session" at the top, the session list, and "What you've mastered" at the bottom.
-- **Main area:** the part of the app beside the sidebar. It shows a session, "What you've mastered", or a sealed session's message.
+- **Sidebar:** on desktop, the session list beside the session screen, always in view. On a phone, the same list is a drawer opened from "☰" in the top bar. It holds "+ New session" at the top, the session list, and "What you've mastered" at the bottom, with Feedback and Settings under it (see [`account-screens.md`](account-screens.md)) ([#753]).
+- **Main area:** the part of the app beside the sidebar. It shows a session, "What you've mastered", a sealed session's message, the Settings page or the feedback page ([#753]).
 - Where the app opens:
 
 ```mermaid
@@ -21,7 +21,7 @@ flowchart TD
 ```
 
 - When the age question is due and no conversation is open (the start box, "What you've mastered", or a sealed message), its card shows in the main area until answered (see [`age.md`](age.md)).
-- When a seal also locks the account, the locked account's screen comes first. That screen is left to [#753].
+- When a seal also locks the account, the locked account's screen comes first (see [`account-screens.md`](account-screens.md)) ([#753]).
 
 ## The session list
 
@@ -80,6 +80,7 @@ flowchart TD
 - A file past the allowance opens the **allowance dialog**: '"Lecture 9.pdf" wasn't added: your files are using 192 of 200 MB. Remove a file to make room.' Then every file across the learner's sessions, largest first, each with its session, size and Remove, and Close.
 - Remove opens the removal dialog. A file in a session with an open check shows "in a check" in place of Remove. A sealed session's files are not listed (see [`files.md`](files.md#the-allowance-and-the-store)).
 - The learner adds the file again once there is room.
+- "See your files" in Settings opens the same dialog, starting "Your files are using 186 of 200 MB." in place of the "wasn't added" line ([#753]).
 
 ## A held session
 

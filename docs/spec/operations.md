@@ -162,7 +162,7 @@ Some things happen by the date alone, with no job: a re-run's budget returning o
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: the daily email, and the copy's email with its link ([#717], [#735]).
+Layout is not decided (see the main file's Gaps). The copy's email with its link is in [`account-screens.md`](account-screens.md) ([#753]). These rules need: the daily email ([#717], [#735]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -178,3 +178,4 @@ Layout is not decided (see the main file's Gaps). These rules need: the daily em
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
+[#753]: https://github.com/calmxz/Crux/issues/753
