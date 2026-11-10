@@ -92,16 +92,16 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`teaching.md`](teaching.md) | How the tutor teaches; objective statuses and readiness; the help ladder; the diagnostic; detours and prerequisite topics; the never-ready menu; preferences | 663, 668 (+667, 670, 671) | 750 |
 | [`mastery-check.md`](mastery-check.md) | The offer, problems and model answers, marking and the pass rule, disputes, fails, half-done checks, photo answers | 663, 669 (+667, 671, 677, 678, 679, 716, 722) | 1,050 |
 | [`learning-screen.md`](learning-screen.md) | The session screen: the objectives panel, the check and its result on screen, menus and buttons, Crux's own lines, pictures, mistake marks, frontend modules | 751 | 1,200 |
-| [`app-shell.md`](app-shell.md) | The app around the session screen: where it opens, the session list, rename and delete, "What you've mastered", files on screen, held and sealed sessions on screen | 752 | 1,850 |
+| [`app-shell.md`](app-shell.md) | The app around the session screen: where it opens, the session list, rename and delete, "What you've mastered", files on screen, held and sealed sessions on screen | 752 (+753) | 1,850 |
 | [`account-screens.md`](account-screens.md) | Sign-in, the steps on opening, a locked account, the Settings page, the feedback page and closing an account on screen | 753 | 1,850 |
 | [`files.md`](files.md) | Files: types and limits, how files shape objectives, file mistakes, storage and conversion, pages sent to the tutor, the allowance | 667 (+669, 670, 671, 675, 677, 679, 681, 716, 717, 722) | 1,300 |
 | [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731) | 800 |
-| [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717) | 1,250 |
+| [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717, 753) | 1,250 |
 | [`age.md`](age.md) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722) | 600 |
 | [`spending.md`](spending.md) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+667, 671, 674, 676, 677, 678, 679, 716, 717, 722, 728, 731, 733, 734) | 1,100 |
 | [`trial.md`](trial.md) | Guest mode, Request access and trial links, the advisory opinion, ending the trial | 677, 722 (+717) | 1,750 |
-| [`privacy.md`](privacy.md) | Terms of Use, Privacy Policy and processors, when the owner reads sessions, deleting and retention | 677 (+679, 681, 716, 717, 722) | 1,800 |
-| [`misuse.md`](misuse.md) | The harm line, the misuse flag, the owner's decision, sealed flags, misuse closures | 677 (+665, 667, 732, 733) | 700 |
+| [`privacy.md`](privacy.md) | Terms of Use, Privacy Policy and processors, when the owner reads sessions, deleting and retention | 677 (+679, 681, 716, 717, 722, 753) | 1,800 |
+| [`misuse.md`](misuse.md) | The harm line, the misuse flag, the owner's decision, sealed flags, misuse closures | 677 (+665, 667, 732, 733, 753) | 700 |
 | [`feedback.md`](feedback.md) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722, 728, 733, 734) | 1,200 |
 | [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed and blocked calls, the maths library, the distress check's call | 679, 684 (+678, 716, 728, 733, 734, 735) | 1,300 |
 | [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735, 750) | 1,800 |

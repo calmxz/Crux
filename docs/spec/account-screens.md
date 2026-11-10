@@ -53,7 +53,7 @@ flowchart TD
 
 - The card reads "Your account closes on 10 Nov." and "Everything in it is erased that day, unless you keep it."
 - Then "Keep my account", "Sign out" with "It still closes on 10 Nov. You can come back and keep it until then." under it, and "Send me a copy first".
-- A "Your feedback" link opens the learner's feedback list alone on the plain page, with Back, so a quote or a share can be unticked during the 7 days (see [`feedback.md`](feedback.md)). The app stays closed.
+- A "Your feedback" link opens the learner's feedback list alone on the plain page, with Back. It lets the learner untick a quote or a share during the 7 days (see [`feedback.md`](feedback.md)). The app stays closed.
 - "Keep my account" goes to the next step due, or the app.
 
 ### The terms step
