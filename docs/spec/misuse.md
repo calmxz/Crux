@@ -89,7 +89,7 @@ A sealed session's mastered topics and passed objectives stay on the Record, and
 
 - The account locks for 7 days. Nothing is erased yet ([#733]).
 - If the owner upholds a contest, the account is restored as it was, and no block is set ([#677], [#733]).
-- A contest that arrives in the 7 days is entered on the owner page, which holds the erasure until the owner decides. A contest after that is settled by the let-in list (see [`accounts.md`](accounts.md)) ([#733]).
+- A contest that arrives in the 7 days is entered on the owner page, which holds the erasure until the owner decides. The owner's daily email gives a reminder the day before the erasure (see [`operations.md`](operations.md)) ([#753]). A contest after that is settled by the let-in list (see [`accounts.md`](accounts.md)) ([#733]).
 - Otherwise it is erased on day 8, in the daily housekeeping job ([#733]). The 7 days start when the closure email is sent, and a contest entered before then still counts (see [`operations.md`](operations.md)) ([#735]).
 - A lock is read-only: the learner can read, tap the age question, and untick a quote or a share, but not be tutored, start a session, rename one, or close the account ([#733], [#734], [#753]).
 - A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased (see [`privacy.md`](privacy.md)). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).

@@ -105,7 +105,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`feedback.md`](feedback.md) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722, 728, 733, 734) | 1,200 |
 | [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed and blocked calls, the maths library, the distress check's call | 679, 684 (+678, 716, 728, 733, 734, 735) | 1,300 |
 | [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735, 750) | 1,800 |
-| [`operations.md`](operations.md) | Email sending, errors, uptime, how the owner is told, the bill, the daily job | 717 (+675, 676, 677, 679, 716, 728, 733, 734, 735) | 1,500 |
+| [`operations.md`](operations.md) | Email sending, errors, uptime, how the owner is told, the bill, the daily job | 717 (+675, 676, 677, 679, 716, 728, 733, 734, 735, 753) | 1,500 |
 | [`quality-bar.md`](quality-bar.md) | What "solid" means; ordinary tests, real-phone tests, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743, 750) | 1,650 |
 | [`ai-tests.md`](ai-tests.md) | AI tests: risk tiers, runs, the grader and the owner's spot-reads, the release gate, what stops a round | 678 (+667, 669, 679, 680, 716, 728, 732, 733, 734, 735, 736) | 1,400 |
 | [`live-faults.md`](live-faults.md) | A fail on the live version: the owner's switches and what each does, re-marks after a marking fault | 678 (+669, 679, 728, 734, 735, 736) | 1,600 |

@@ -100,6 +100,7 @@ One email through Resend, about 8 am Philippine time, on days with something in 
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)) ([#733]);
+- the day before a misuse closure is erased: "1 closed account is erased tomorrow. Check the Crux inbox for a contest." ([#753]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
