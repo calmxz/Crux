@@ -115,7 +115,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - misuse-block entries;
 - trial links switched off;
 - age-question answers;
-- each home erasure, with its moves and writes and any copy's object ID and expiry, and re-marks that change a mark ([#719]).
+- each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
@@ -178,6 +178,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 ## Secrets
 
 - Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
+- Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`operations.md`](operations.md)) ([#762]).
 - Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]).
 - How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
@@ -207,3 +208,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762

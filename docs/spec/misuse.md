@@ -102,7 +102,7 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 
 ## Gaps
 
-- **Child-protection law:** the owner chose not to seek advice before the trial. Whether RA 9775 and RA 11930 apply to Crux, and what they require, stays unconfirmed ([#743]).
+- **Child-protection law:** the owner chose not to seek advice before the trial. Whether RA 11930 applies to Crux, and what it requires, stays unconfirmed. It repealed RA 9775 in 2022 ([#743], [#762]).
 
 [#665]: https://github.com/calmxz/Crux/issues/665
 [#667]: https://github.com/calmxz/Crux/issues/667
@@ -120,3 +120,4 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762

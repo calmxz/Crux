@@ -112,7 +112,7 @@ These never link to a home with delete with parent. The erasure writes or moves 
 | A dead link's feedback answers and quote permissions, when it died other than by a Yes | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
-| A copy (copies bucket), its address, and the email that sends its link | Homes | Until its link expires ([`privacy.md`](privacy.md)) |
+| A copy (copies bucket), its address, its link's scrambled code, and the email that sends its link | Homes | Until its link expires ([`privacy.md`](privacy.md)) ([#762]) |
 | The scrambled misuse email | Safety | 12 months ([`misuse.md`](misuse.md)) |
 | The list of a home's bucket objects to erase | Files | Until each is erased; the daily job retries ([#719]) |
 
@@ -168,7 +168,7 @@ flowchart TD
 - A cost that arrives later for an erased home is added to the nameless month and day totals ([#719]).
 - The move to the reported hold changes the owner of every row under the session, so delete with parent does not reach them. Until erasure the learner sees no change ([#719]).
 - An under-18 closure erases an outstanding copy and its link. Crux then keeps nothing about the person, apart from a Reported session, its flag's record and its email ([`age.md`](age.md)) ([#719]).
-- The restore log records each home erasure, with any copy's object ID and expiry. A restore re-applies it by calling the routine, so the moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing. A replayed age answer calls the routine only, so the dated count gains 1 once (see [`hosting.md`](hosting.md)) ([#719]).
+- The restore log records each home erasure, with any copy's object ID, expiry and scrambled code ([#762]). A restore re-applies it by calling the routine, so the moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing. A replayed age answer calls the routine only, so the dated count gains 1 once (see [`hosting.md`](hosting.md)) ([#719]).
 - Tests: every table holding a learner's data, apart from those in [Outliving a home](#outliving-a-home), links to a home with delete with parent; each item that outlives a home has its own erasure test; and erasing a home holding a Reported session, by each path and after a restore, keeps that session, its files, its flag's record and, for an account, its email ([#719]).
 
 ## Modules
@@ -195,3 +195,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#719]: https://github.com/calmxz/Crux/issues/719
+[#762]: https://github.com/calmxz/Crux/issues/762

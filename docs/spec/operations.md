@@ -8,7 +8,7 @@ This file covers email, knowing when something is wrong, how the owner is told, 
 
 - Resend Free sends Crux's email from the domain: 100 a day and 3,000 a month, from Tokyo's sending region. The account has two-step sign-in ([#717]).
 - It carries trial invites and declines, sign-in codes, the account emails, and the owner's daily email ([#717]).
-- Sent emails stay in Resend's log for up to 30 days (see [`privacy.md`](privacy.md)) ([#717]).
+- Sent emails stay in Resend's log for 30 days, and in its backups for up to 7 days after (see [`privacy.md`](privacy.md)) ([#717], [#762]).
 - What a learner sees when codes cannot be sent is in [`accounts.md`](accounts.md) ([#674]).
 
 ### Who gets the day's emails
@@ -40,16 +40,19 @@ What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
 - **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and runs the script ([#735]).
-- The link is signed when the email goes out, so a delayed email cannot use it up. Google's signed links last at most 7 days, so that is how long it works ([#735]).
+- The email links to the copy page, with a long random code. Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
+- The backend signs as a separate service account that can read only the copies bucket, so a copy link can never open anything else. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
+- The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour ([#762]).
+- Once the link has expired, the page refuses the code. An unknown code gets the same page (see [`account-screens.md`](account-screens.md)) ([#762]).
 - The email says when the link expires, and to keep it private ([#735]).
-- Crux erases the copy and the address when the link expires ([#735]).
+- Once the link has expired, the daily job erases the copy, its address and its code ([#735], [#762]).
 
 ### The Crux email
 
 The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 
 - **In the trial:** Cloudflare Email Routing forwards it to a dedicated Crux Gmail, and replies come from that Gmail. It has no processor agreement, which the owner accepted for the trial.
-- **From opening:** Zoho Mail's free plan if Zoho's processor agreement covers it, otherwise Google Workspace Business Starter, about USD 84 a year. Trial mail in the Gmail is moved or deleted at the switch.
+- **From opening:** Zoho Mail's free plan if Zoho offers it to Crux (it is available only in some data centers) and Zoho's processor agreement covers it, otherwise Google Workspace Business Starter, about USD 84 a year ([#762]). Trial mail in the Gmail is moved or deleted at the switch.
 
 ## Errors
 
@@ -58,7 +61,7 @@ The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 - Each release keeps private source maps, and a local command turns a minified browser trace into file and line ([#717]).
 - New kinds of error push to the Google Cloud app, at most 20 an hour per project, then quiet for 6 hours. The uptime check is separate ([#717]).
 - Errors carry no learner text: the type, the place in the code and the request number. Any message that could hold learner text is replaced, for example "[answer, 58 characters]" ([#717]).
-- **At opening:** if only browser errors were hard to fix in the trial, Sentry is added for the browser. If Error Reporting failed more broadly, Sentry replaces it for both, with Error Reporting's notifications off. Either way Sentry collects no network addresses: its browser setting off, "Prevent Storing of IP Addresses" on, and a rule removing the location it derives ([#717]).
+- **At opening:** if only browser errors were hard to fix in the trial, Sentry is added for the browser. If Error Reporting failed more broadly, Sentry replaces it for both, with Error Reporting's notifications off. Either way Sentry collects no network addresses: its browser setting off, "Prevent Storing of IP Addresses" on, and a rule removing the location it derives ([#717]). Addresses can still reach Sentry through request headers such as `X-Forwarded-For`, cookies and query parameters, so the SDK's deny lists cover all three, and the backend SDK's user info is off ([#762]).
 
 ## The outside check
 
@@ -120,7 +123,7 @@ Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Zoho o
 
 All scheduled work runs in one job: Cloud Scheduler calling the tasks service. Cloud Scheduler is free for up to 3 jobs per billing account, and 2 go to the peak schedule if the fallback in [`hosting.md`](hosting.md) is ever used ([#716], [#728] Answer 7).
 
-The job acts on every date that has passed, so a missed run catches up on the next one. Dates that give someone a chance to act (the undo, the contest period, notice periods, the trial's notice) first gain the days Crux was down, worked out from the gap between runs ([#735]). It does:
+The job acts on every date that has passed, so a missed run catches up on the next one. Dates that give someone a chance to act (the undo, the contest period, notice periods, the trial's notice, a copy link's 7 days) first gain the days Crux was down, worked out from the gap between runs ([#735], [#762]). It does:
 
 **Backups and reports**
 
@@ -158,8 +161,8 @@ Some things happen by the date alone, with no job: a re-run's budget returning o
 
 ## Gaps
 
-- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Research on [#726] reads it as about USD 0.35 a month per log-based rule, so about USD 0.70 a month for the two rules ([#717]).
-- **Zoho's processor agreement:** whether it covers the free plan. Open on [#726] ([#717]).
+- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month, so about USD 0.70 a month for the two rules ([#717], [#762]).
+- **Zoho's free plan:** whether Zoho offers it to Crux, and whether its processor agreement covers it. Open on [#726] ([#717], [#762]).
 
 ## On screen
 
@@ -180,3 +183,4 @@ Layout is not decided (see the main file's Gaps). The copy's email with its link
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#762]: https://github.com/calmxz/Crux/issues/762

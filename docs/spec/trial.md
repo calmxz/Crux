@@ -117,10 +117,10 @@ A holder who does not visit cannot be reached ([#733]).
 
 **The Trial Terms** carry the upload lines decided for accounts (see [`privacy.md`](privacy.md)) ([#722]). They also say a quote tick can't be undone once the link has ended ([#734]).
 
-**The Trial Privacy Notice** says ([#677], [#717], [#722], [#728], [#733]):
+**The Trial Privacy Notice** says ([#677], [#717], [#722], [#728], [#733], [#762]):
 
 - A request's email is kept at most 30 days.
-- "Your invite is kept in our email provider's log for up to 30 days."
+- "Your invite stays in our email provider's log for 30 days, and in its backups for up to 7 days after."
 - Files and photo answers are kept with the link's sessions. They are erased at once when removed or when their session is deleted, and erased with the link when it dies, apart from those in a sealed session reported to the authorities ([#719]).
 - Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`privacy.md`](privacy.md)).
 - Error reports carry no learner text.
@@ -148,7 +148,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 ## The advisory opinion
 
 - If the trial shows a public opening is worth it, the owner first sends the National Privacy Commission a Request for Advisory Opinion, at least a month before opening ([#677]). It goes after the trial, not before ([#717], [#722]).
-- It follows NPC Circular 18-01: a letter to the Privacy Commissioner and Chairman, by email or in person, with the facts, the questions and a certification that the matter is not pending. An answer comes within 20 working days. It is non-binding, and a fee may apply ([#677]).
+- It follows NPC Circular 18-01: a letter to the Privacy Commissioner and Chairman, by email or in person, with the facts, the questions and a certification that the matter is not pending. An answer comes within 20 working days. It is non-binding, and costs PHP 7,500 plus PHP 75, paid in advance (NPC Circular 2023-01). The NPC turns away "anticipatory and speculative" requests ([#677], [#762]).
 - It asks ([#677]):
   - Is Crux "automated decision-making or profiling" that must be registered under NPC Circular 2022-04, Section 5?
   - If not, is the sworn declaration still needed?
@@ -157,7 +157,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 ## Opening
 
 - The before-opening checklist is in [`quality-bar.md`](quality-bar.md), and it is done before anyone but the owner signs up, even privately to one friend ([#677], [#680]).
-- Within 20 days of the first account holder who is not the owner, the owner registers Crux on the Commission's registration system (NPCRS), unless the Commission's answer says it is not needed. It costs about PHP 500, then PHP 350 a year, as summarised in 2023. A private share counts the same as a public one ([#677], [#722]).
+- Within 20 days of the first account holder who is not the owner, the owner registers Crux on the Commission's registration system (NPCRS), unless the Commission's answer says it is not needed. NPC Circular 2022-04 counts the 20 days from "the commencement of such system", and the application is notarized. The fee depends on the tier: PHP 500 to 2,500, then PHP 350 to 1,000 a year (Circular 2023-01). On 2026-11-11 the NPCRS was "currently unavailable to the public until further notice". A private share counts the same as a public one ([#677], [#722], [#762]).
 - Trial-link users are not counted toward the 20 days ([#722]).
 
 ## On screen
@@ -178,3 +178,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762
