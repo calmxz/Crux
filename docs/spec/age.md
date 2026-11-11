@@ -67,7 +67,7 @@ Guests and trial-link holders get the same question, buttons and rules above ([#
 
 ## On screen
 
-The age question is a card in the thread with Yes and No, and "please tap Yes or No" a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The closure message is in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the landing page's 18+ line, the trial link's access-ended message, and the owner page's dated under-18 count ([#679], [#681], [#728]).
+The age question is a card in the thread with Yes and No, and "please tap Yes or No" a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The closure message is in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). The landing page's 18+ line and the trial link's access-ended message are in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's dated under-18 count ([#679], [#681], [#728]).
 
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -82,3 +82,4 @@ The age question is a card in the thread with Yes and No, and "please tap Yes or
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#754]: https://github.com/calmxz/Crux/issues/754

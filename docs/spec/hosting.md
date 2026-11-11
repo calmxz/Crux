@@ -189,7 +189,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). These rules need: what the static page shows when the backend cannot be reached ([#716]).
+What the landing page shows while the backend wakes, or when it cannot be reached, is in [`landing-screens.md`](landing-screens.md) ([#716], [#754]).
 
 [#675]: https://github.com/calmxz/Crux/issues/675
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -206,3 +206,4 @@ Layout is not decided (see the main file's Gaps). These rules need: what the sta
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#754]: https://github.com/calmxz/Crux/issues/754

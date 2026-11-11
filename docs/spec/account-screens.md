@@ -6,7 +6,7 @@ This file covers the screens around an account: the sign-in page, the steps show
 
 ## Signing in
 
-- **Sign-in page:** its own page, one centred card, with no app or landing page around it. The landing page's "Sign in" leads to it. Each step replaces the last inside the card.
+- **Sign-in page:** its own page, one centred card, with no app or landing page around it. From opening, the landing page's "Sign in or sign up" leads to it. During the trial the owner opens it by its address, and anyone else is refused (see [`landing-screens.md`](landing-screens.md)) ([#754]). Each step replaces the last inside the card.
 - The card is headed "Sign in or sign up". It starts with "Continue with Google", then "or", the email field and "Email me a code". The human check, when it shows, sits under the email field.
 - The code step reads "Check your email" and "We sent a 6-digit code to ana@example.com. It works for 10 minutes.", then the code boxes, Continue, and "Send a new code" · "Use another email".
 - After the code or Google, a new email gets "One more thing" in the same card (see [`accounts.md`](accounts.md)). Start stays greyed until both ticks are ticked.
@@ -119,3 +119,4 @@ One page in the main area, with four parts in this order:
 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#754]: https://github.com/calmxz/Crux/issues/754

@@ -98,7 +98,7 @@ A sealed session's mastered topics and passed objectives stay on the Record, and
 
 ## On screen
 
-The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account is in [`account-screens.md`](account-screens.md) ([#753]). These rules need: the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
+The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account is in [`account-screens.md`](account-screens.md) ([#753]). A guest's block message and a trial link's lock, notices and ended pages are in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
 
 ## Gaps
 
@@ -119,3 +119,4 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#754]: https://github.com/calmxz/Crux/issues/754
