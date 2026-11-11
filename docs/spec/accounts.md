@@ -29,7 +29,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 ### Email me a code
 
 - The code is 6 random digits, stored scrambled. It is typed into the same page, lasts 10 minutes, and dies after 5 wrong tries ([#674], [#717]).
-- A human check runs first, Cloudflare Turnstile. It is usually invisible, and shows at most a "Verify you are human" checkbox ([#674], [#717]).
+- A human check runs first, Cloudflare Turnstile in Managed mode with the `interaction-only` appearance. Most visitors see nothing; a box to tick appears only when Cloudflare is unsure ([#674], [#717], [#762]).
 - Codes are limited to 3 an hour and 10 a day per email address, and 20 an hour per network address ([#674], [#717]). What these records keep is in [`privacy.md`](privacy.md).
 - Throwaway email services are not blocked, and new accounts have no daily cap ([#674]).
 
@@ -133,3 +133,4 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762

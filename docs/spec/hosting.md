@@ -115,7 +115,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - misuse-block entries;
 - trial links switched off;
 - age-question answers;
-- each home erasure, with its moves and writes and any copy's object ID and expiry, and re-marks that change a mark ([#719]).
+- each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
@@ -207,3 +207,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762

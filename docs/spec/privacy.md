@@ -52,7 +52,7 @@ Repairs from a backup are done by script, and the owner sees counts, not content
 - During the 7 days, the next time they open Crux, on any browser, they see "Keep my account / Sign out", with the same button. There is no tutoring until they pick. A habitual visit does not cancel by accident ([#677], [#733]).
 - Keeping leaves the account as it was. Sign out lets the closing go on ([#677]).
 - Otherwise the account and its data are erased on day 8, in the daily housekeeping job ([#677], [#728] Answer 7).
-- **If they asked for a copy:** on day 8, Crux makes the copy itself, erases the account and everything else, and emails a private link that works for 7 days from when it is sent (see [`operations.md`](operations.md)). It keeps only the copy and the address until the link expires, and a missed link cannot be made again. Keeping the account cancels the copy ([#733], [#735]).
+- **If they asked for a copy:** on day 8, Crux makes the copy itself, erases the account and everything else, and emails a private link to the copy page that works for 7 days from when it is sent (see [`operations.md`](operations.md)). It keeps only the copy, the address and the link's scrambled code until the link expires, and a missed link cannot be made again. Keeping the account cancels the copy ([#733], [#735], [#762]).
 - A request that arrives by email during a closing, including a misuse closure, is entered on the owner page, or Crux cannot know about it ([#733]).
 - On day 8, the feedback words leave the owner page. Anonymous counts and yes/no answers stay as tallies. The account's quote permissions are withdrawn too (see [`feedback.md`](feedback.md)) ([#677]).
 - The owner chose the undo for the meantime. Erasing at once is the fallback if the undo causes problems ([#677]).
@@ -96,7 +96,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Code limits | Email addresses for a day, network addresses for an hour ([#674], [#717]) |
 | Wrong-link counts | Network addresses for an hour ([#717]) |
 | A trial request's email | At most 30 days ([#717]) |
-| Sent emails, in Resend's log | Up to 30 days ([#717]) |
+| Sent emails, at Resend | 30 days in its log, and up to 7 days after in its backups ([#717], [#762]) |
 | Closed-for-misuse email, scrambled | 12 months ([#677]) |
 | Backups | Deleted data may remain in a backup for up to 8 days. A restore re-applies every deletion and listed safety or privacy action made since its dump, from a log that keeps only IDs, times and actions for about 8 days (see [`hosting.md`](hosting.md)) ([#716], [#735]) |
 | Google's copy | Only prompts its filters flag, up to 90 days, with no opt-out. Google staff may read flagged content, and it is never used for training. A short-term cache of at most 24 hours. Deleting in Crux cannot reach these ([#677], [#679], [#717]) |
@@ -152,7 +152,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 | Google Cloud | Cloud Run, Cloud Storage, Agent Platform, Error Reporting, Monitoring, BigQuery | Google Cloud's data processing addendum. Data "may be processed in any country", and Crux's data is stored in Singapore ([#679], [#717]) |
 | Cloudflare | Static files, the Worker, DNS, the registrar, Email Routing, Turnstile | Its self-serve agreement. It sees network addresses at its edge. Turnstile reads the network address, browser details and connection fingerprint, and Cloudflare uses those signals partly for its own purposes, outside the agreement ([#716], [#717]) |
 | Supabase | The database | Part of its Terms on every plan, with Supabase Pte. Ltd (Singapore). Data stored in Singapore ([#717]) |
-| Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log up to 30 days ([#717]) |
+| Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log 30 days and in its backups up to 7 days after ([#717], [#762]) |
 | The Crux Gmail, in the trial | The Crux email | No agreement, an exception the owner accepted. Zoho or Workspace from opening ([#717]) |
 
 ## On screen
@@ -179,3 +179,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762

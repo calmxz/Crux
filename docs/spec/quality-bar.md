@@ -87,7 +87,7 @@ These are the tests the closed tickets sent here, by area.
 
 **Closing and retention** ([#677], [#733], [#735])
 
-- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 8. A day-8 copy, with a 7-day link signed when the email goes.
+- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 8. A day-8 copy through the copy page: each opening gets a link that works its full 15 minutes, and the page refuses the code after 7 days plus any days down ([#762]).
 - The idle warnings.
 - The terms and "Keep my account" steps on a live sign-in.
 - A notice clock starts at Resend's acceptance. Dates gain the days lost in a pause.
@@ -203,8 +203,8 @@ These settle how Google's services behave, while that part is built:
 | The fidelity test on real decks: Word equations, SmartArt, speaker notes ([#716], [#722]) | check |
 | The build checks, and the smoke test with the Express keys deleted ([#716], [#732], [#735]) | check |
 | A deliberate error reaches the owner's phone within minutes, which also proves the request-log filter keeps Crux's own logs ([#717]) | owner |
-| An uptime alert and a new-request push reach the phone. The Google Cloud app receives a push ([#717], [#735]) | owner |
-| The breach plan ([#678]) | owner |
+| An uptime alert and a new-request push reach the phone, and so do two requests 2 minutes apart. The Google Cloud app receives a push ([#717], [#735], [#762]) | owner |
+| The breach plan, with how the NPC takes breach notices confirmed ([#678], [#762]) | owner |
 | A test restore of a dump that replays the log ([#716], [#735]) | check |
 | The Trial Terms and Trial Privacy Notice published ([#677], [#717]) | owner |
 | The spend caps set: the Crux and Crux tests projects, and Cloud Run on live and staging ([#679], [#716]) | owner |
@@ -264,3 +264,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#750]: https://github.com/calmxz/Crux/issues/750
+[#762]: https://github.com/calmxz/Crux/issues/762

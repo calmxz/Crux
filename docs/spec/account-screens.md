@@ -106,6 +106,7 @@ One page in the main area, with four parts in this order:
 ### The emails
 
 - **Closing:** subject "Your Crux account closes on 10 Nov", the line in [`privacy.md`](privacy.md), and a "Sign in to Crux" button.
+- **The copy page, once its link has expired or for an unknown code:** "This link has expired. Copies are kept for 7 days after they're sent." ([#762]).
 - **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 17 Nov. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
 ## Frontend modules
@@ -120,3 +121,4 @@ One page in the main area, with four parts in this order:
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#762]: https://github.com/calmxz/Crux/issues/762
