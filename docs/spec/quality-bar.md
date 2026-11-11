@@ -87,7 +87,7 @@ These are the tests the closed tickets sent here, by area.
 
 **Closing and retention** ([#677], [#733], [#735])
 
-- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 8. A day-8 copy through the copy page: each opening gets a link that works its full 15 minutes, and the page refuses the code after 7 days plus any days down ([#762]).
+- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 8. A day-8 copy through the copy page: each opening gets a link that works its full 15 minutes and opens nothing outside the copies bucket, and the page refuses the code after 7 days plus any days down ([#762]).
 - The idle warnings.
 - The terms and "Keep my account" steps on a live sign-in.
 - A notice clock starts at Resend's acceptance. Dates gain the days lost in a pause.
