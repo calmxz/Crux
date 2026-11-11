@@ -41,7 +41,7 @@ What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 - **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and runs the script ([#735]).
 - The email links to the copy page, with a long random code. Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
-- The backend signs with its service account, which may sign only for the copies bucket. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
+- The backend signs with its own service account, as it does for upload links. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
 - The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour ([#762]).
 - Once the link has expired, the page refuses the code. An unknown code gets the same page (see [`account-screens.md`](account-screens.md)) ([#762]).
 - The email says when the link expires, and to keep it private ([#735]).
