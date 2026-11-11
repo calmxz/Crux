@@ -17,7 +17,7 @@ Two pointers in the fact list are loose. #677 did not choose a 30-day restore. I
 | 2a | Agent Platform keeps stored interactions 7 days | confirmed | Agent Platform docs: Interactions API overview and developer guide |
 | 2b | Gemini Developer API keeps stored interactions 55 days | confirmed (Paid Tier; 1 day on Free Tier) | Gemini API docs, "Interactions API" |
 | 2c | Gemini Developer API keeps every prompt 55 days for abuse checks (#679 Q9) | confirmed | Gemini API docs, "Abuse monitoring" |
-| 3 | Resend keeps sent emails 30 days, not 1 day on Free | partly | Resend pricing page. Resend Data Processing Addendum |
+| 3 | Resend keeps sent emails 30 days, not 1 day on Free | partly (30 days confirmed; backups add up to 7 days) | Resend GDPR page. Resend pricing page. Resend Data Processing Addendum |
 | 4 | Zoho's DPA covers free-plan customers | unverified | Zoho privacy policy, Zoho Accounts help, Zoho GDPR page |
 
 ## 1. Delete and restore windows at other apps
