@@ -1,0 +1,53 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: the landing page, guest mode and trial links (calmxz/Crux#754).
+  Three variants (?variant=A|B|C) of what a visitor sees before having an account, walked through 47 scenes
+  (?scene=...), at desktop or phone width (?device=desktop|phone).
+  A: pages (a long landing page; ticks, Request access and ended links as one-card pages).
+  B: start box first (a one-screen landing led by the start box; Request access further down; banners).
+  C: straight into the app (the public link opens the guest app shell; dialogs over it).
+  Held fixed in all three: the session screen (#751), the app shell (#752), the sign-in card and opening-page
+  pattern (#753), the refused-upload pinned line, the age card and the re-mark notices in the thread, and a trial
+  link's Settings without an Account part.
+  Wording is the spec's where it has one; text marked [no spec wording] is a placeholder. No persistence, no backend.
+  Rules live in docs/spec/; this file decides layout and flow only.
+  Keys: Left/Right change variant, Up/Down change scene.
+  Chosen by the owner on 2026-11-11 (the ticket's resolution comment holds the full answer):
+  - Landing page: B (one screen led by the start box, sample chips, video beside it). The entry ticks sit inside the
+    start box from the outset; Start and the chips work once both are ticked. For a trial link, the ticks and the link
+    notice sit in the app's start box, or in the chat box's place.
+  - Request access, Who runs Crux, ended links: A (a plain page with one card). Notices: ending, breach and dismissal
+    as pages with Continue; the device note as a banner.
+  - Guest sidebar as drawn (no Record, Feedback or Settings); the reply count always shown on the own topic.
+  - No "Sign in" on the landing page during the trial; a non-owner gets a refusal on the sign-in card.
+  - The month's stop reads "Guest mode is full for this month. Back on 1 Dec."; a sample ends with Crux's fixed line;
+    a blocked guest session ends in place; the video stays beside the example from opening; during the trial,
+    Who runs Crux names the owner as the builder, with privacy@ and LinkedIn only.
+  Serve this folder (the "prototypes" launch config, port 8765) and open the file over http.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE 754 - the landing page, guest mode and trial links</title>
+<link rel="stylesheet" href="754-base.css">
+<link rel="stylesheet" href="754-extra.css">
+<link rel="stylesheet" href="754-own.css">
+</head>
+<body>
+<div class="proto-note" id="note"></div>
+<div class="stage"><div id="device" class="device desktop"></div></div>
+<div class="proto-bar">
+  <button id="prev" title="Previous variant (Left arrow)">&#9664;</button>
+  <span class="lab" id="vlab"></span>
+  <button id="next" title="Next variant (Right arrow)">&#9654;</button>
+  <select id="scene"></select>
+  <button id="dev"></button>
+</div>
+<script src="754-shell.js"></script>
+<script src="754-landing.js"></script>
+<script src="754-guest.js"></script>
+<script src="754-trial.js"></script>
+<script src="754-scenes.js"></script>
+</body>
+</html>
