@@ -73,7 +73,7 @@ The spec treats this as a test to run, not as a known fact.
 - `operations.md:52`: "Zoho Mail's free plan if Zoho offers it to Crux's account and Zoho's processor agreement covers it, otherwise Google Workspace Business Starter".
 - `operations.md:162`: add "and whether the free plan is offered in the data centre a Philippine sign-up lands in".
 - `quality-bar.md:235`: "Zoho if its free plan is offered to Crux and its agreement covers it, otherwise Workspace".
-- Decisions touched: #717 (the Crux email at opening) and #726 (the open Zoho check). Part 2 of this research checks the Zoho agreement itself.
+- Decisions touched: #717 (the Crux email at opening) and #726 (the open Zoho check). [Privacy promises: Resend and Zoho](privacy-resend-zoho.md) checks the Zoho agreement itself.
 
 ## 11. Google Workspace Business Starter: price in the Philippines
 

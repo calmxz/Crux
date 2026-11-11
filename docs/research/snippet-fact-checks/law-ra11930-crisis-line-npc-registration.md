@@ -16,8 +16,8 @@ Two ticket numbers in the fact list point at pull requests, not decisions. #708 
 | 5 | The route to an NPC advisory opinion | partly | NPC Circular 18-01. NPC Circular 2023-01. NPC fees advisory of 2024-03-15 |
 | 6a | Agent Platform terms bar under-18 services | confirmed | Google Cloud Service Specific Terms §20(d) |
 | 6b | OpenAI API allows minors with safeguards | confirmed | OpenAI "Under-18 guidance" |
-| 6c | LinkedIn minimum age 16 | confirmed | LinkedIn User Agreement |
-| 6d | Facebook minimum age 13 | confirmed (new terms on 2027-01-20) | Meta Terms of Service |
+| 6c | LinkedIn minimum age 16 | no claim (the page gives 16) | LinkedIn User Agreement |
+| 6d | Facebook minimum age 13 | no claim (the page gives 13; new terms on 2027-01-20) | Meta Terms of Service |
 
 ## 1. RA 11930: duties of internet intermediaries
 

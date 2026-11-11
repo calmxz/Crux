@@ -4,7 +4,7 @@ Checked on 2026-11-11 for [#762](https://github.com/calmxz/Crux/issues/762). Abo
 
 Verdicts:
 
-- **confirmed:** the page says what the spec says.
+- **confirmed:** the page says what the spec, or the decision that used the fact, says.
 - **partly:** some parts match and some do not.
 - **changed:** the page was updated, and the spec or a decision reflects an older version.
 - **unverified:** the owning page could not be opened, or no first-party page states the fact. No fact was settled from a snippet or from memory.
@@ -14,11 +14,11 @@ Verdicts:
 
 | Part | Rows | Confirmed | Partly | Changed | Unverified | No claim |
 |---|---|---|---|---|---|---|
-| 1. Law and safety | 9 | 5 | 3 | 0 | 1 | 0 |
+| 1. Law and safety | 9 | 3 | 3 | 0 | 1 | 2 |
 | 2. Privacy promises | 10 | 8 | 1 | 0 | 1 | 0 |
 | 3. Sign-in, email and operations tools | 20 | 6 | 2 | 1 | 2 | 9 |
-| 4. Spending and hosting | 15 | 10 | 3 | 1 | 1 | 0 |
-| **Total** | **54** | **29** | **9** | **2** | **5** | **9** |
+| 4. Spending and hosting | 15 | 9 | 3 | 1 | 1 | 1 |
+| **Total** | **54** | **26** | **9** | **2** | **5** | **12** |
 
 No fact is wrong outright. Nine are only partly right, and most of those need a spec fix.
 
@@ -34,14 +34,20 @@ Each fix is a proposal for the owner. None is applied here.
 | 4 | Resend: the 30 days is a search and log window, not a stated erasure date; the DPA deletes customer data within 90 days of account termination. Reword, or ask Resend to confirm erasure in writing | `operations.md:11`, `privacy.md:99`, `privacy.md:155`, `trial.md:123` | #717 |
 | 5 | Sentry: addresses still arrive through headers such as `X-Forwarded-For`; add the SDK deny lists for headers, cookies and query parameters | `operations.md:61` | #717 |
 | 6 | Zoho Mail Free is "available only in select data centers"; make the fallback conditional on Zoho offering it to Crux | `operations.md:52`, `operations.md:162`, `quality-bar.md:235` | #717, #726 |
-| 7 | GCS signed URLs: a link signed with a system-managed key lasts at most 12 hours, so the 7-day copy-of-data link fails under the no-stored-keys rule. Options: a link to Crux that hands out fresh short links, one stored signing key, or a 12-hour link | `operations.md:43`, `privacy.md:55`, `privacy.md:85`, `privacy.md:86`, `privacy.md:122`, `privacy.md:135`, `account-screens.md:103`, `quality-bar.md:90` | #735, #716 |
-| 8 | Turnstile: "usually invisible" and "at most a checkbox" describe two different widget modes; pick one. Invisible mode requires a reference to Cloudflare's Turnstile Privacy Addendum | `accounts.md:32`, `privacy.md:153` | #674 to #676 |
+| 7 | GCS signed URLs: 7 days is the V4 maximum, but the 7-day copy-of-data link may not last that long under the no-stored-keys rule (`hosting.md:180`). Google's `gcloud storage sign-url` caps a link signed with a system-managed key at 12 hours, because that key "may not remain valid after 12 hours". No page states the limit for the keyless route the backend would use (the Service Account Credentials API), so that route stays unverified until tested. Options: a link to Crux that hands out fresh short links, one stored signing key, or a 12-hour link | `operations.md:43`, `privacy.md:55`, `privacy.md:85`, `privacy.md:86`, `privacy.md:122`, `privacy.md:135`, `account-screens.md:103`, `quality-bar.md:90` | #735, #716 |
+| 8 | Turnstile: "usually invisible" and "at most a checkbox" describe two different widget modes; pick one. Invisible mode requires a reference to Cloudflare's Turnstile Privacy Addendum in Crux's privacy policy | `accounts.md:32`, `account-screens.md:10`, `privacy.md:153` | #674, #717 |
 | 9 | Cloud Monitoring: the pricing page's Example 7 settles that a log-based rule is billed as a metric reference; drop "reads it as" | `operations.md:161` | #726 |
 
 ## Open questions for the owner
 
 - **RA 11930 duties (#743).** If Crux counts as an internet intermediary under Sec. 3(p), Sec. 9(a) requires a takedown within 24 hours of notice, a report to the DOJ within 3 days, and keeping data for 6 months (content data for 1 year). The spec makes reporting the owner's choice (`misuse.md:70`) and erases a sealed session with its account (`misuse.md:69`). Fix 1 only renames the law; this question stays open for the lawyer before the trial.
-- **NPC systems down.** The NPCRS and the breach notification system are both unavailable. The NPC homepage gives an email route for breach notices. This bears on `privacy.md:126` and `quality-bar.md:156`.
+- **RA 11930, other sections.** Sec. 9(a)(1) requires terms of service that prohibit OSAEC and CSAEM; the harm list at `misuse.md:14` names "explicit sexual content" but not child sexual abuse material. Sec. 7 protects a takedown from liability only if it is reported within 24 hours. Both matter only if Crux is an internet intermediary.
+- **NPC systems down.** The NPCRS notice reads "currently unavailable to the public until further notice", and filings by email, in person or by mail are not accepted. The breach notification system is also unavailable; the NPC homepage gives an email route for breach notices. This bears on `trial.md:160`, `privacy.md:126` and `quality-bar.md:156`.
+
+## Follow-ups that are not spec fixes yet
+
+- **Push alerts 5 minutes apart.** Cloud Monitoring sends at most 20 notifications a day per log-based rule, at least 5 minutes apart for an open alert. Its footnote suggests a second push inside 5 minutes may never be sent, and the "everything else" rule carries eight kinds of push. A phone test in `quality-bar.md` would settle it.
+- **Resend's daily quota resets at midnight UTC**, which is 8 am Philippine time, the hour of the owner's daily email (`operations.md:92`). Crux's sender shares should count on the UTC day.
 
 ## Still unverified
 
@@ -56,9 +62,9 @@ Each fix is a proposal for the owner. None is applied here.
 ## Records out of date, with no spec change
 
 - #717 lists only Gemini 4 Argon Cyber Permissive in the Frontier abuse-monitoring category; the page now also lists Gemini 4 Carbon and Gemini 4 Carbon for cyber.
-- #679 rejected the Interactions API partly as a preview; Google now calls it generally available as of June 2026.
+- #679 rejected the Interactions API partly because it was "Preview on Agent Platform". The Gemini Developer API docs now call it generally available as of June 2026. The Agent Platform pages show no preview notice, but its launch stage there is not established.
 - #679 called the Developer API's prepaid credit "the only hard money stop"; the Gemini API now also has experimental project spend caps. The rejection rests on the 55-day retention, so it stands.
-- #738: Playwright 1.65.0 (2026-11-05) bundles Chromium 158.0.8127.18, so the upgrade path is open. Three of its four CVEs, not one, describe code running outside the sandbox.
+- #738: Playwright 1.65.0 (2026-11-05) bundles Chromium 158.0.8127.18, so the upgrade path is open. Three of the four CVEs in #738, not one, describe code running outside the sandbox.
 - The fact list behind this ticket cited #708, #712 and #718, which are glossary PRs. The decisions that used the facts are #681, #677, #722 and #679.
 
 ## The checks

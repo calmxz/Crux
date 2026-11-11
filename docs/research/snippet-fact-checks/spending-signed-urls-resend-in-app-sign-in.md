@@ -53,7 +53,7 @@ Files to fix under any option: `operations.md:43`, and the 7-day promises at `pr
 - Attachments: "Emails can be no larger than 40MB (including attachments after Base64 encoding)."
 - Send Email: "Filename and content of attachments (max 40MB per email, after Base64 encoding of the attachments)."
 
-**Verdict: confirmed.** Base64 grows a file by about a third, so the largest file is about 30 MB. The 200 MB copy in #735's example would not fit either way.
+**Verdict: no claim.** The page gives 40 MB, but the spec never sends a copy as an attachment. Base64 grows a file by about a third, so the largest file is about 30 MB. The 200 MB copy in #735's example would not fit either way.
 
 **Also on the limits page, and bearing on `operations.md`:**
 

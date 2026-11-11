@@ -105,7 +105,7 @@ The spec does not cite any vendor's age terms. The reason for 18+ is in #681, wh
 
 **Page says:** "“Minimum Age” means 16 years old." The same clause raises it where the law requires an older age.
 
-**Verdict: confirmed.**
+**Verdict: no claim.** The page gives 16, as the fact list says, but neither the spec nor #681 states LinkedIn's age.
 
 ### 6d. Facebook
 
@@ -116,6 +116,6 @@ The spec does not cite any vendor's age terms. The reason for 18+ is in #681, wh
 - Current terms, section 3.1: "you cannot use Facebook if: You are under 13 years old."
 - Terms from 2027-01-20: "You are under 13 years old or under the minimum legal age in your country to use Facebook."
 
-**Verdict: confirmed.** Note that from 2027-01-20 the floor stays 13, and the new terms add any higher national minimum.
+**Verdict: no claim.** The page gives 13, as the fact list says, but neither the spec nor #681 states Facebook's age. From 2027-01-20 the floor stays 13, and the new terms add any higher national minimum.
 
 **Fix for fact 6:** none to `docs/spec/`. The 18+ rule rests on §20(d), which still holds. LinkedIn's 16 and Facebook's 13 mean the share posts can reach people under 18. #681 kept age wording off the posts and put it on the landing page and the ticks, so nothing changes.

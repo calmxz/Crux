@@ -29,7 +29,7 @@ Two pointers in the fact list are loose. #677 did not choose a 30-day restore. I
 - `privacy.md:54`: "Otherwise the account and its data are erased on day 8, in the daily housekeeping job ([#677], [#728] Answer 7)."
 - `privacy.md:58`: "The owner chose the undo for the meantime. Erasing at once is the fallback if the undo causes problems ([#677])."
 
-#677, Rejected: "**Erasing an account at once, or holding everything 30 days** (Q1): the owner chose a week to change one's mind, as in comparable learning apps (Khan Academy 48 hours, Duolingo 7 days); 30 days would reverse "deleting is irreversible"." The decision behind #677 also gave ChatGPT, Claude and Quizlet as apps with no undo. ChatGPT's data was "erased within 30 days". For Claude, it said "A deleted chat leaves its back-end systems within 30 days". It found Duolingo's figure only in third-party guides.
+#677, Rejected: "**Erasing an account at once, or holding everything 30 days** (Q1): the owner chose a week to change one's mind, as in comparable learning apps (Khan Academy 48 hours, Duolingo 7 days); 30 days would reverse "deleting is irreversible"." The searches behind #677 also named ChatGPT, Claude and Quizlet as apps with no undo. ChatGPT's data was "erased within 30 days". For Claude, it said "A deleted chat leaves its back-end systems within 30 days". It found Duolingo's figure only in third-party guides.
 
 ### 1a. Khan Academy
 
@@ -63,7 +63,7 @@ A second page, "Khan Academy’s automatic account deletion policies and procedu
 - "If you delete your account, we will delete your data within 30 days, except we may retain a limited set of data for longer where required or permitted by law."
 - "No. Deleted accounts cannot be reactivated, but you can create a new account with the same email address after 30 days."
 
-**Verdict: confirmed.** The decision behind #677 quoted "permanent and cannot be undone". I did not find that phrase on the current page. The substance is the same.
+**Verdict: confirmed.** A search summary behind #677 gave "permanent and cannot be undone". I did not find that phrase on the current page. The substance is the same.
 
 ### 1d. Claude
 

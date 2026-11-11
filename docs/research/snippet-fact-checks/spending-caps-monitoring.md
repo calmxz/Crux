@@ -27,7 +27,7 @@ Three notes on where the facts come from:
 | 2a | Cloud Monitoring charges for alerting from no sooner than 1 September 2027, USD 0.35 a month per log-based rule | confirmed | Google Cloud Observability pricing, and its pricing examples |
 | 2b | A log-based rule sends at most 20 notifications a day, and at least 5 minutes apart for an open alert | confirmed | Cloud Monitoring "Quotas and limits" |
 | 3 | A GCS V4 signed URL lasts 7 days at most | partly | Cloud Storage "Signed URLs". `gcloud storage sign-url` reference |
-| 4 | Resend allows 40 MB per email | confirmed | Resend "Attachments" and "Send Email" API reference |
+| 4 | Resend allows 40 MB per email | no claim (the page gives 40 MB) | Resend "Attachments" and "Send Email" API reference |
 | 5 | Google sign-in is blocked in the LinkedIn and Facebook in-app browsers (`disallowed_useragent`) | partly | Google OAuth 2.0 "Web Server Applications" and "Policies" |
 | 6 | An `intent://` link opens the system browser | unverified | Chrome "Android Intents with Chrome". Android "Build web apps in WebView" |
 | 7a | Turnstile free plan | confirmed | Cloudflare Turnstile "Plans" |
