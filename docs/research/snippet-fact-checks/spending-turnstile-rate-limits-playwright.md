@@ -38,12 +38,11 @@ The spec states no Turnstile plan and no rule limits. "The burst guard" comes fr
 - Invisible mode section: "Invisible mode is similar to Non-Interactive mode where visitors will never interact with the Turnstile widget. Visitors will also not see a widget or any indication that an invisible browser challenge is in progress."
 - Invisible mode section: "As a condition of enabling invisible mode, you must reference Cloudflare's Turnstile Privacy Addendum in your own privacy policy."
 
-**Verdict: partly.** "Shows at most a checkbox" fits Managed mode, and the checkbox is real. "Usually invisible" fits only Invisible mode, which never shows a checkbox. The Managed mode section does not say whether its non-interactive challenge shows a widget. The table describes the non-interactive challenge as a "visible widget with loading spinner", so Managed mode is probably visible too. The page does not print the label "Verify you are human".
+- Widget configurations, "Appearance modes" (`https://developers.cloudflare.com/turnstile/get-started/client-side-rendering/widget-configurations/`): "`interaction-only`: The widget becomes visible only when visitor interaction is required and provides the cleanest visitor experience. Most visitors will never see the widget, but suspected bots will encounter the interactive challenge." Also: "Appearance modes only affect visible widget types (Managed and Non-Interactive)."
 
-**Fix:** pick the mode, then make `accounts.md:32` match it.
+**Verdict: confirmed.** Managed mode with the `interaction-only` appearance does what the spec says: usually nothing shows, and a box to tick appears only when Cloudflare is unsure. The spec does not name the mode or the setting. The page does not print the label "Verify you are human". The Privacy Addendum duty applies to Invisible mode only.
 
-- Managed mode: "A human check runs first, Cloudflare Turnstile in Managed mode. It may show a small widget, and asks for a tick only when Cloudflare is unsure ([#674], [#717])."
-- Invisible mode: "A human check runs first, Cloudflare Turnstile in Invisible mode. The learner never sees it ([#674], [#717])." `account-screens.md:10` then drops the human check from the card. Also, the Privacy Policy must reference Cloudflare's Turnstile Privacy Addendum. `privacy.md:153` names Turnstile but not the addendum.
+**Fix:** name the setting in `accounts.md:32`: Managed mode with the `interaction-only` appearance. Chosen by the owner on 2026-11-11 over always-visible Managed mode and Invisible mode. `account-screens.md:10` and `privacy.md:153` stay as they are.
 
 Decisions this touches: #674 and #717 (the human check), only in wording.
 

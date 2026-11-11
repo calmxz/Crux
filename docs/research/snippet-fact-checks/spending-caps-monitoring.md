@@ -31,7 +31,7 @@ Three notes on where the facts come from:
 | 5 | Google sign-in is blocked in the LinkedIn and Facebook in-app browsers (`disallowed_useragent`) | partly | Google OAuth 2.0 "Web Server Applications" and "Policies" |
 | 6 | An `intent://` link opens the system browser | unverified | Chrome "Android Intents with Chrome". Android "Build web apps in WebView" |
 | 7a | Turnstile free plan | confirmed | Cloudflare Turnstile "Plans" |
-| 7a2 | `accounts.md:32`: Turnstile "is usually invisible, and shows at most a "Verify you are human" checkbox" | partly | Cloudflare Turnstile "Widget modes" |
+| 7a2 | `accounts.md:32`: Turnstile "is usually invisible, and shows at most a "Verify you are human" checkbox" | confirmed (Managed mode, `interaction-only`) | Cloudflare Turnstile "Widget modes" |
 | 7b | Cloudflare's free rate-limiting rule | confirmed | Cloudflare WAF "Rate limiting rules" |
 | 8a | #738: the four Chrome CVE numbers | confirmed | NVD and CVE.org records. Chrome Releases, 2026-10-27 |
 | 8b | #738: Playwright 1.64.1, the latest stable release, still bundles Chromium 156.0.8078.4 | changed | Playwright `browsers.json` at v1.64.0, v1.64.1 and v1.65.0. GitHub releases |

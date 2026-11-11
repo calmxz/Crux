@@ -17,10 +17,10 @@ Verdicts:
 | 1. Law and safety | 9 | 3 | 3 | 0 | 1 | 2 |
 | 2. Privacy promises | 10 | 8 | 1 | 0 | 1 | 0 |
 | 3. Sign-in, email and operations tools | 20 | 6 | 2 | 1 | 2 | 9 |
-| 4. Spending and hosting | 15 | 9 | 3 | 1 | 1 | 1 |
-| **Total** | **54** | **26** | **9** | **2** | **5** | **12** |
+| 4. Spending and hosting | 15 | 10 | 2 | 1 | 1 | 1 |
+| **Total** | **54** | **27** | **8** | **2** | **5** | **12** |
 
-No fact is wrong outright. Nine are only partly right, and most of those need a spec fix.
+No fact is wrong outright. Eight are only partly right, and seven of those need a spec fix.
 
 ## Proposed spec fixes
 
@@ -34,8 +34,8 @@ Each fix is a proposal for the owner. None is applied here.
 | 4 | Resend: the 30 days is a search and log window, not a stated erasure date; the DPA deletes customer data within 90 days of account termination. Reword, or ask Resend to confirm erasure in writing | `operations.md:11`, `privacy.md:99`, `privacy.md:155`, `trial.md:123` | #717 |
 | 5 | Sentry: addresses still arrive through headers such as `X-Forwarded-For`; add the SDK deny lists for headers, cookies and query parameters | `operations.md:61` | #717 |
 | 6 | Zoho Mail Free is "available only in select data centers"; make the fallback conditional on Zoho offering it to Crux | `operations.md:52`, `operations.md:162`, `quality-bar.md:235` | #717, #726 |
-| 7 | GCS signed URLs: 7 days is the V4 maximum, but the 7-day copy-of-data link may not last that long under the no-stored-keys rule (`hosting.md:180`). Google's `gcloud storage sign-url` caps a link signed with a system-managed key at 12 hours, because that key "may not remain valid after 12 hours". No page states the limit for the keyless route the backend would use (the Service Account Credentials API), so that route stays unverified until tested. Options: a link to Crux that hands out fresh short links, one stored signing key, or a 12-hour link | `operations.md:43`, `privacy.md:55`, `privacy.md:85`, `privacy.md:86`, `privacy.md:122`, `privacy.md:135`, `account-screens.md:103`, `quality-bar.md:90` | #735, #716 |
-| 8 | Turnstile: "usually invisible" and "at most a checkbox" describe two different widget modes; pick one. Invisible mode requires a reference to Cloudflare's Turnstile Privacy Addendum in Crux's privacy policy | `accounts.md:32`, `account-screens.md:10`, `privacy.md:153` | #674, #717 |
+| 7 | GCS signed URLs: 7 days is the V4 maximum, but the 7-day copy-of-data link may not last that long under the no-stored-keys rule (`hosting.md:180`). Google's `gcloud storage sign-url` caps a link signed with a system-managed key at 12 hours, because that key "may not remain valid after 12 hours". No page states the limit for the keyless route the backend would use (the Service Account Credentials API), so that route stays unverified until tested. Chosen by the owner on 2026-11-11: the email links to Crux, which hands out a fresh short-lived download link while the copy is under 7 days old. Rejected: one stored signing key, or a 12-hour link | `operations.md:43`, `privacy.md:55`, `privacy.md:85`, `privacy.md:86`, `privacy.md:122`, `privacy.md:135`, `account-screens.md:103`, `quality-bar.md:90` | #735, #716 |
+| 8 | Turnstile: the spec's "usually invisible, and shows at most a checkbox" is Managed mode with the `interaction-only` appearance; name that setting. Chosen by the owner on 2026-11-11 over always-visible Managed mode and Invisible mode | `accounts.md:32` | #674, #717 |
 | 9 | Cloud Monitoring: the pricing page's Example 7 settles that a log-based rule is billed as a metric reference; drop "reads it as" | `operations.md:161` | #726 |
 
 ## Open questions for the owner
