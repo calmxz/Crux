@@ -105,13 +105,14 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 
 ### Who runs Crux
 
-- Crux is run by the owner, named, in the Philippines ([#677]).
+- Crux is run by the owner, named, in the Philippines ([#677]). Until opening, "Who runs Crux" says the owner built it (see [Contacts](#contacts)) ([#754]).
 - Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent ([#677]).
 - Crux follows the same standards wherever its learners are ([#677]).
 
 ### Contacts
 
-- The owner is the data protection officer. The site and the Privacy Policy publish "Data Protection Officer, Crux", the owner's home postal address, a dedicated phone number (a prepaid SIM used only for Crux), and the role email ([#677]).
+- The owner is the data protection officer. From opening, the site and the Privacy Policy publish "Data Protection Officer, Crux", the owner's home postal address, a dedicated phone number (a prepaid SIM used only for Crux), and the role email ([#677]).
+- Until opening, the site and the Trial Privacy Notice give only privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux. The officer's title, postal address and phone are published with the before-opening checklist (see [`quality-bar.md`](quality-bar.md)). The owner accepts that this gives less than the Commission's advisory expects during the trial ([#754]).
 - The owner's actual name and details are filled in when the policy is written ([#677]).
 - Data requests (a copy, deletion) go to the Crux email, privacy@ the domain ([#677], [#717]). The owner's LinkedIn or other profiles are a general contact ([#677]).
 - Where that inbox sits, in the trial and from opening, is in [`operations.md`](operations.md) ([#717]).
@@ -156,7 +157,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). These rules need: "Who runs Crux" with the officer's contact, and the owner page's shared sessions and copy requests ([#677], [#733]).
+Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). "Who runs Crux" is in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's shared sessions and copy requests ([#677], [#733]).
 
 
 [#668]: https://github.com/calmxz/Crux/issues/668
@@ -177,3 +178,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#754]: https://github.com/calmxz/Crux/issues/754

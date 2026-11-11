@@ -8,6 +8,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 - Sign-up is off during the trial. Sign-in by Google or code works only for the owner's own email addresses ([#677], [#717], [#728] Answer 5). A test address goes on the same list (see [`feedback.md`](feedback.md)) ([#734]).
 - No learner signs in during the trial. Trial-link users return through the link only (see [`trial.md`](trial.md)) ([#717], [#728] Answer 5).
+- During the trial the landing page has no "Sign in", and the owner opens the sign-in page by its address. An email not on the list, by code or by Google, is refused before any code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link." From the EU or the UK, it gets the region message instead (see [`landing-screens.md`](landing-screens.md)) ([#754]).
 - The rest of this file holds from opening.
 
 ## Ways in
@@ -18,7 +19,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 - The same email by code and by Google is one account, matched on the email ([#674]).
 - Crux's own backend runs both ways in. There is no sign-in service, and Supabase never sees the browser ([#717]).
 - Nothing is typed to the tutor without an account, and there is no guest mode ([#674], [#677]).
-- The landing page shows a pre-written example: a request, the tutor's narrowing questions and the learning objectives it proposes, written once, with no AI call ([#674], [#677]).
+- The landing page shows a pre-written example: a request, the tutor's narrowing questions and the learning objectives it proposes, written once, with no AI call ([#674], [#677]). The demo video stays beside it ([#754]).
 
 ### Continue with Google
 
@@ -115,7 +116,7 @@ If several apply, the order is: a lock, the age question (see [`age.md`](age.md)
 
 ## On screen
 
-The sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box and the misuse block's message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the landing page's pre-written example, and the owner page's let-in list with its expiry, keep option and blocked-email note, "25 + N let in", and refused-codes count ([#674], [#675], [#677], [#679], [#717], [#733]).
+The sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box and the misuse block's message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). The landing page's pre-written example and the trial's sign-in refusal are in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's let-in list with its expiry, keep option and blocked-email note, "25 + N let in", and refused-codes count ([#674], [#675], [#677], [#679], [#717], [#733]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -131,3 +132,4 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#754]: https://github.com/calmxz/Crux/issues/754
