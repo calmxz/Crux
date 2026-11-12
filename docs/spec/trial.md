@@ -54,7 +54,7 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 
 > Thanks for asking about Crux. The trial is limited for now. If Crux opens to everyone, you'll be able to sign up then. Follow [the owner's LinkedIn] to hear when it does.
 
-If the day's emails have run out, an invite or decline waits for the next day. A request is never kept past its 30 days, so one still unsent then is erased without an email ([#717]).
+If the day's emails have run out, an invite or decline waits for Resend's next day, from 8 am Philippine time ([#763]). A request is never kept past its 30 days, so one still unsent then is erased without an email ([#717]).
 
 ## Trial links
 
@@ -195,3 +195,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#763]: https://github.com/calmxz/Crux/issues/763

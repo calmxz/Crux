@@ -142,7 +142,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | The restore log | Its own Cloud Storage bucket, soft delete off. The app can only add entries, and only the release script reads them | A lifecycle rule deletes each entry after 8 days ([#719]) |
 | Request logs, error reports, lookup and push log lines | Google's logs | 30 days ([`hosting.md`](hosting.md)) |
 | Billing export | BigQuery | [`operations.md`](operations.md) |
-| Background answers and short-lived expiry jobs | Cloud Tasks | Until they run ([`hosting.md`](hosting.md)) |
+| Background answers, short-lived expiry jobs and email retries (a queue ID only) | Cloud Tasks | Until they run ([`hosting.md`](hosting.md), [`operations.md`](operations.md)) ([#763]) |
 | Private source maps, each AI test's last passing round | Build and test records; the build ticket picks the place | [#719] |
 
 Not stored: the note, which Crux builds on each reply from its records ([`sessions.md`](sessions.md)) ([#719]).
@@ -197,3 +197,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#763]: https://github.com/calmxz/Crux/issues/763

@@ -63,7 +63,7 @@ The Trial area leaves the menu when the trial ends.
   - "Delete a session or file during a closing", with the name typed from the learner's email, "No session or file by that name", a pick by date when two match, the waiting erasure's date and Cancel, and "Kept until the closure is decided" for a held session;
   - "Delete the account".
 - **The reported hold** lists the date, the kind and, for an account, its email, with Erase.
-- **"Tell learners about a breach"** takes the text and shows a preview, then confirms with the counts and when the sending finishes. In the trial: "Send this to 3 emails and 14 live trial links?". From opening: "Send this to 25 accounts and 6 other emails? All are sent by 13 Mar."
+- **"Tell learners about a breach"** takes the text and shows a preview, then confirms with the counts and when the sending finishes. In the trial: "Send this to 3 emails and 14 live trial links?". From opening, with the date, the time and the hours from now: "Send this to 150 accounts and 40 other emails? The last go at about 8 am on 14 Mar, 33 hours from now.", or "Send this to 25 accounts and 6 other emails? All are sent now." when all fit in today's room. The estimate counts the day's room, the month's, and email already waiting ahead of the notice. When the month's room runs out first: "…The last go after Resend's month restarts, on a date Resend doesn't give." ([#763])
 
 ## Money and switches
 
@@ -92,3 +92,4 @@ The Trial area leaves the menu when the trial ends.
 
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#763]: https://github.com/calmxz/Crux/issues/763

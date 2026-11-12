@@ -18,7 +18,7 @@ Each message shows in the card under the button or field it is about:
 
 | When | Under | Message |
 |---|---|---|
-| The sender is out for the day or the month | Email me a code | The sender-out message in [`accounts.md`](accounts.md) |
+| The sender is out for the day or the month, or Resend is down | Email me a code | The sender-out message in [`accounts.md`](accounts.md) |
 | 10 codes today for one email | Email me a code | "Too many codes today. Use Continue with Google, or try again tomorrow." |
 | 3 codes this hour for one email, or 20 from one network | Email me a code | "Too many code requests. Try again in an hour, or use Continue with Google." |
 | From the EU or the UK | The button tapped | "Crux isn't available in your region yet." |
