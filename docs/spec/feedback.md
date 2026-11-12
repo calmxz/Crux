@@ -59,6 +59,7 @@ A trial link keeps "Your feedback" and the once-only notice while it is alive, a
 - **An account closes:** after the 7-day undo, the feedback words leave the owner page, apart from a published quote still to be removed. Anonymous counts and yes/no answers stay as tallies, so a verdict does not change because someone left. Its quotes are withdrawn ([#677]).
 - **An under-18 closure** first takes its counts off (see [Taking counts back](#taking-counts-back)) ([#681]). Its words go at once. As for a link, only a published quote's note and remove-by date stay ([#734]).
 - **A trial link dies after a tap on Yes to the age question:** the link's feedback words and quote permissions are removed at once. For a published quote, only the note of where it was published and the remove-by date stay, until the owner marks it done ([#734]).
+- **A trial link its holder erases:** as after a tap on Yes ([#755]).
 - **A trial link dies in any other way:** its anonymous feedback answers and quote permissions stay, outside the link's home, until 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer, permission and note stay until the owner marks the quote removed ([#719]). The holder can untick until the link dies, and the trial's end notice reminds them. The Trial Terms say a tick can't be undone once the link has ended ([#677], [#734]).
 
 ## What the owner counts
@@ -167,7 +168,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## On screen
 
-The after-first-mastery notice is a pinned line above the chat box (see [`learning-screen.md`](learning-screen.md)) ([#751]). The feedback page and its link, its ticks, the share choices and warning, "Your feedback" in Settings and the too-many-sends message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source ([#676], [#677], [#717], [#733], [#734]).
+The after-first-mastery notice is a pinned line above the chat box (see [`learning-screen.md`](learning-screen.md)) ([#751]). The feedback page and its link, its ticks, the share choices and warning, "Your feedback" in Settings and the too-many-sends message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). The owner page's path, bar progress, feedback list with unread marks, limit-hit line and arrivals by source are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -186,3 +187,4 @@ The after-first-mastery notice is a pinned line above the chat box (see [`learni
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#755]: https://github.com/calmxz/Crux/issues/755

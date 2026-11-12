@@ -67,7 +67,7 @@ flowchart TD
 ## Who runs Crux
 
 - A page of its own, holding one card, the same from every link: the landing page's footer, the guest sidebar, and a trial link's Settings among the trial's terms links.
-- During the trial, it reads "Crux is built by [the owner's name], in the Philippines.", then privacy@ for questions about your data or having it deleted, and the owner's LinkedIn for anything else. From opening, it carries the officer's details (see [`privacy.md`](privacy.md)).
+- During the trial, it reads "Crux is built by [the owner's name], in the Philippines.", then privacy@ for questions about your data, "On a trial link, Erase this trial link in Settings erases your sessions, files and feedback.", and the owner's LinkedIn for anything else ([#755]). From opening, it carries the officer's details (see [`privacy.md`](privacy.md)).
 
 ## Signing in during the trial
 
@@ -80,7 +80,7 @@ flowchart TD
 - **First open on a browser:** the app opens as [`app-shell.md`](app-shell.md) says. The entry ticks sit inside the start box, under "Welcome to your trial." and the trial link notice. When the app opens on a session, because the link already has sessions, they take the chat box's place. Start or Send works once both are ticked.
 - **The Trial Terms change:** the ticks show again in the same place, under "The Trial Terms changed on 2 Dec. What changed".
 - **The one-time device note** is a banner across the top of the app, with Dismiss.
-- **The sidebar's foot** reads "Trial link" where an account shows its email. Settings has no Account part (see [`account-screens.md`](account-screens.md)).
+- **The sidebar's foot** reads "Trial link" where an account shows its email. Settings has no Account part. It shows "Trial link K7Q-4MP" and "Erase this trial link" (see [`account-screens.md`](account-screens.md)) ([#755]).
 - **On opening, in this order:** a lock, the age question, any notice pages, then the ticks if due. This mirrors an account's order, where the age card comes before the Keep and terms pages.
 - **A locked link:** the lock page from [`account-screens.md`](account-screens.md), headed "Your trial link is locked", with "Read my sessions" and no Sign out.
 
@@ -91,6 +91,7 @@ Each is an opening page with Continue. Several show one after another, before th
 - **The trial is ending:** "The trial ends on 15 Jan", then "After that, this link stops working and everything in it is erased. Until then, you can untick a quote or a share in Settings, under Your feedback."
 - **A data breach:** "A data breach", then what happened, written at the time.
 - **A misuse flag dismissed:** "Crux's owner read some of your sessions", then the dismissal's wording from [`misuse.md`](misuse.md).
+- **The trial's end moved or taken back:** "The trial now ends on 14 Dec." or "The trial is no longer ending." ([#755])
 - A re-mark's notice stays a line in the thread (see [`learning-screen.md`](learning-screen.md)).
 
 ### Ended pages
@@ -103,6 +104,7 @@ A link that no longer works opens an opening page in place of the app, saying wh
 | Switched off for misuse | "This trial link was switched off", then "The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. The owner switched this link off, and its sessions have been erased.", with Request access |
 | Just after Yes to the age question | "Your trial has ended", then "Crux is for people 18 and over, so this trial link has been switched off and its sessions have been erased.", with OK, which goes to the landing page |
 | Back later on a link ended by a Yes | "This trial link has ended", then "It no longer works.", with OK |
+| Erased by its holder ([#755]) | "You erased this trial link", then "Its sessions, files and feedback are gone." |
 | A link Crux doesn't know | "This link doesn't work", then "Open the whole link from your invite email. If it still doesn't work, you can request access again.", with Request access |
 | 10 wrong links from one network in an hour | "Too many wrong links", then "Your network tried too many links that don't work. Try again in an hour." |
 | The trial is over | "The trial has ended", then "Thanks for trying Crux. You can still try it as a guest.", with "Try it as a guest". From opening: "Thanks for trying Crux.", with "Sign in or sign up" |
@@ -122,3 +124,4 @@ Request access shows on these pages only while the trial runs.
 The app shell gains the guest sidebar. The session screen gains the reply count and the mini check's bar.
 
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#755]: https://github.com/calmxz/Crux/issues/755

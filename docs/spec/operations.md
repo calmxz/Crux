@@ -19,16 +19,17 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 |---|---|---|---|
 | Bulk | "It's back" and "spots open" | 40 | 1,200 |
 | Codes | Sign-in codes | 80 | 2,400 |
-| Required | Closure and misuse emails, re-mark emails, idle warnings, terms changes, copies of data, trial invites and declines, and the owner's daily email | 100 | 3,000 |
+| Required | Closure and misuse emails, contest decisions, erasure warnings, breach notices, re-mark emails, idle warnings, terms changes, copies of data, trial invites and declines, and the owner's daily email | 100 | 3,000 |
 
 - An email over its share waits for the next day, oldest first. A sign-in code is refused instead, as [`accounts.md`](accounts.md) says ([#674], [#735]).
 - A change to the shares is a recorded change ([#735]).
+- To meet the 72 hours, a breach notice may use the whole day's room, up to 100, so sign-in codes are refused once the day's total reaches 80 while it sends. Anything past the day's room goes the next day. Its addresses: every account, then waiting requests, invites and declines waiting to send, the let-in list, the "email me" ticks and copies still waiting, each once. The reported hold's email is left out ([#755]).
 - A trial request is never kept past its 30 days. One still unsent then is erased without an email (see [`trial.md`](trial.md)) ([#717]).
 - **"It's back" emails** go when Crux reopens, as [`spending.md`](spending.md) says. After Google's cap, they wait until a model call succeeds, since Google's month may reset later than Crux's. The daily job tries one small call on the 1st, spent from the owner's share, then hourly until one succeeds ([#675], [#734], [#735]).
 
 ### When a required email is late
 
-- A notice period starts when Resend accepts the email, not on its planned date. This covers the idle warnings' 30 and 7 days, the 7 days to contest a misuse closure, and the terms' 14 days ([#735]).
+- A notice period starts when Resend accepts the email, not on its planned date. This covers the idle warnings' 30 and 7 days, the 7 days to contest a misuse closure, the terms' 14 days, and the 2 days after an erasure warning ([#735], [#755]).
 - Erasure waits for its notice, for at most 30 days. After that it goes ahead, and the owner is told. The daily email lists any required email still unsent ([#735]).
 - A trial request's 30 days do not wait, as above ([#717]).
 - Accepted does not mean read. A learner who has lost the inbox cannot act on the email, and the data goes at the deadline (see [`privacy.md`](privacy.md)) ([#677]).
@@ -39,7 +40,7 @@ What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
 - **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
-- **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and runs the script ([#735]).
+- **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and makes it with the owner page's button ([#735], [#755]).
 - The email links to the copy page, with a long random code. Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
 - The backend signs as a separate service account that can read only the copies bucket, so a copy link can never open anything else. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
 - The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour ([#762]).
@@ -53,6 +54,7 @@ The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 
 - **In the trial:** Cloudflare Email Routing forwards it to a dedicated Crux Gmail, and replies come from that Gmail. It has no processor agreement, which the owner accepted for the trial.
 - **From opening:** Zoho Mail's free plan if Zoho offers it to Crux (it is available only in some data centers) and Zoho's processor agreement covers it, otherwise Google Workspace Business Starter, about USD 84 a year ([#762]). Trial mail in the Gmail is moved or deleted at the switch.
+- Crux's emails that ask for a reply carry privacy@ as their reply address: the warning, dismissal and closure emails, the contest decisions, the erasure warning and the closing email. Invites, copy links and sign-in codes carry none, so a reply can't bring a link into the inbox ([#755]).
 
 ## Errors
 
@@ -105,6 +107,7 @@ One email through Resend, about 8 am Philippine time, on days with something in 
 - misuse flags (see [`misuse.md`](misuse.md)) ([#733]);
 - the day before a misuse closure is erased: "1 closed account is erased tomorrow. Check the Crux inbox for a contest." ([#753]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
+- an erasure waiting for its date: "1 erasure on 15 Mar: check the inbox for a reply." ([#755]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
 
@@ -166,7 +169,7 @@ Some things happen by the date alone, with no job: a re-run's budget returning o
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). The copy's email with its link is in [`account-screens.md`](account-screens.md) ([#753]). These rules need: the daily email ([#717], [#735]).
+The copy's email with its link is in [`account-screens.md`](account-screens.md) ([#753]). The daily email's layout and the owner page are in [`owner-screens.md`](owner-screens.md) ([#755]). The rest of the layout is not decided (see the main file's Gaps).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -184,3 +187,4 @@ Layout is not decided (see the main file's Gaps). The copy's email with its link
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

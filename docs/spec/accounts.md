@@ -116,7 +116,7 @@ If several apply, the order is: a lock, the age question (see [`age.md`](age.md)
 
 ## On screen
 
-The sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box and the misuse block's message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). The landing page's pre-written example and the trial's sign-in refusal are in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's let-in list with its expiry, keep option and blocked-email note, "25 + N let in", and refused-codes count ([#674], [#675], [#677], [#679], [#717], [#733]).
+The sign-in page, "One more thing" with its two ticks, the in-app-browser note, the sender-out and too-many-requests messages, "Too many codes today", the region message, the Sign out button, "Crux is full for now" with its tick-box and the misuse block's message are in [`account-screens.md`](account-screens.md) ([#753]). The rest of the layout is not decided (see the main file's Gaps). The landing page's pre-written example and the trial's sign-in refusal are in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's let-in list, "25 + N let in" and refused-codes count are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
@@ -134,3 +134,4 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

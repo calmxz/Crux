@@ -7,6 +7,7 @@ This file covers the app around the session screen: where the app opens, the ses
 ## The shell
 
 - **Sidebar:** on desktop, the session list beside the session screen, always in view. On a phone, the same list is a drawer opened from "☰" in the top bar. It holds "+ New session" at the top, the session list, and "What you've mastered" at the bottom, with Feedback and Settings under it (see [`account-screens.md`](account-screens.md)) ([#753]).
+- **The owner's sidebar** also holds "Owner" above Feedback and Settings, shown only to the owner's main address (see [`owner-screens.md`](owner-screens.md)) ([#755]).
 - **A guest's sidebar** holds the guest's own parts, and a trial link's foot reads "Trial link" in place of the email (see [`landing-screens.md`](landing-screens.md)) ([#754]).
 - **Main area:** the part of the app beside the sidebar. It shows a session, "What you've mastered", a sealed session's message, the Settings page or the feedback page ([#753]).
 - Where the app opens:
@@ -116,3 +117,4 @@ The session screen's modules (see [`learning-screen.md`](learning-screen.md#fron
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#755]: https://github.com/calmxz/Crux/issues/755

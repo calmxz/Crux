@@ -58,6 +58,7 @@ The learner hears only after the owner decides. Each message gives the reason, u
 - **Warned:** an email: "This breaks Crux's terms. Another time closes your account."
 - **Dismissed:** an email: "The tutor declined 3 of your requests (making drugs or other illegal goods, methods of self-harm), so the owner read those sessions on Saturday. No action was taken."
 - **Closed:** an email with the reason, the date, and that replying before then contests it.
+- Each of these emails ends with "If you reply, quote flag 4821.", so a reply can be matched to its flag. The owner page shows an account's flag with no email ([#755]).
 
 **Sealed flags**
 
@@ -88,17 +89,18 @@ A sealed session's mastered topics and passed objectives stay on the Record, and
 **A misuse closure**
 
 - The account locks for 7 days. Nothing is erased yet ([#733]).
-- If the owner upholds a contest, the account is restored as it was, and no block is set ([#677], [#733]).
+- If the owner upholds a contest, the account is restored as it was, and no block is set ([#677], [#733]). Crux emails "Crux's owner read your reply about flag 4790 and restored your account. You can use Crux again." ([#755])
+- If the owner keeps the closure, the account is erased on the date the closure email gave, or at the next daily job if that date has passed. Crux emails the decision with the date: "Crux's owner read your reply about flag 4790 and kept the closure. Your account will be erased on 18 Mar." ([#755])
 - A contest that arrives in the 7 days is entered on the owner page, which holds the erasure until the owner decides. The owner's daily email gives a reminder the day before the erasure (see [`operations.md`](operations.md)) ([#753]). A contest after that is settled by the let-in list (see [`accounts.md`](accounts.md)) ([#733]).
 - Otherwise it is erased on day 8, in the daily housekeeping job ([#733]). The 7 days start when the closure email is sent, and a contest entered before then still counts (see [`operations.md`](operations.md)) ([#735]).
 - A lock is read-only: the learner can read, tap the age question, and untick a quote or a share, but not be tutored, start a session, rename one, or close the account ([#733], [#734], [#753]).
-- A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased (see [`privacy.md`](privacy.md)). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).
+- A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased, by its exact name, and Crux erases it 2 days after warning the account's address (see [`privacy.md`](privacy.md)) ([#755]). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).
 - Erasing wins over a flag. A flag waiting when an account is erased goes with it, with no block. A tap on Yes erases at once, with no block. A learner who closes and signs up again starts with no warning on record ([#681], [#733]).
 - The email is then kept scrambled for 12 months, to block rejoining. How the block works at sign-up is in [`accounts.md`](accounts.md) ([#677], [#733]).
 
 ## On screen
 
-The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account is in [`account-screens.md`](account-screens.md) ([#753]). A guest's block message and a trial link's lock, notices and ended pages are in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's flagged sessions, with warn, dismiss, close, restore, lift and "Reported" ([#677], [#733]).
+The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account is in [`account-screens.md`](account-screens.md) ([#753]). A guest's block message and a trial link's lock, notices and ended pages are in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's flags, closures and reported hold are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 ## Gaps
 
@@ -121,3 +123,4 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

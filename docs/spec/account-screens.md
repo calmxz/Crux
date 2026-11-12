@@ -88,6 +88,7 @@ One page in the main area, with four parts in this order:
 - **Files:** "Your files: 186 of 200 MB" with a bar, and "See your files". It opens the allowance dialog in [`app-shell.md`](app-shell.md), starting "Your files are using 186 of 200 MB." in place of the "wasn't added" line.
 - **Your feedback:** "Untick to withdraw a quote or end a share." Then each answer sent, newest first: "8 Nov · Helped: yes · Would pay: maybe", its text, the quote tick, the share tick ("Share: Personal essay (the owner can read it up to 8 Nov)"), and "You said Crux may email you about this." when that tick was given. An answer with neither tick reads "Not quoted, not shared."
 - **Account:** the email, Close account, the Terms, Privacy Policy and "Who runs Crux" links, then Sign out, last on the page.
+- **On a trial link,** in place of Account: "Trial link K7Q-4MP", then "Erase this trial link", which opens a dialog where the holder types "delete", as for Close account. While a sealed flag locks the link, it says "A locked trial link can't be erased." (see [`trial.md`](trial.md)) ([#755]).
 
 ### The feedback page
 
@@ -122,3 +123,4 @@ One page in the main area, with four parts in this order:
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

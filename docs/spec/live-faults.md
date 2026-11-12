@@ -19,6 +19,7 @@ The owner switches off the part its test covers, until a fix passes ([#678], [#7
 | Age, the harm line and the twin rule | The whole tutor |
 
 - The owner page has a switch for each, plus guest mode, for a fault only guests reach. The switches apply to the owner's account on live too. Dev, the AI tests and staging have their own settings ([#678], [#679], [#736]).
+- Switching a part off asks first, naming what learners will see. Switching one on needs "A fix passed the test" ticked ([#755]).
 - A fault only in a decline's kind, with the decline still made, switches nothing. It is handled like any other strict fail, below ([#736]).
 - A failing distress check has no switch. It keeps running until a fix passes, and it blocks releases like any strict fail ([#736]).
 - A fault no fix can solve leaves its part off, with no time limit. If Flash-Lite cannot pass the job, the fallback in [`ai-layer.md`](ai-layer.md) applies, as a recorded change ([#679], [#736]).
@@ -106,7 +107,7 @@ Only learners whose marks change are told ([#678]).
 
 ## On screen
 
-Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754]). The session screen is in [`learning-screen.md`](learning-screen.md): each part's "paused" line, the tap on a waiting message and the re-mark notices in the thread, and the dispute's wait line in the problem sheet ([#751]). The greyed file button and its pinned line while files are switched off are in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's switches and re-mark progress ([#678], [#736]).
+Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754]). The session screen is in [`learning-screen.md`](learning-screen.md): each part's "paused" line, the tap on a waiting message and the re-mark notices in the thread, and the dispute's wait line in the problem sheet ([#751]). The greyed file button and its pinned line while files are switched off are in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). The owner page's switches and re-mark progress are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 [#669]: https://github.com/calmxz/Crux/issues/669
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -118,3 +119,4 @@ Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#755]: https://github.com/calmxz/Crux/issues/755
