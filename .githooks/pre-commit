@@ -7,7 +7,7 @@
 
 MAX_TOKENS=5000
 MAX_BYTES=$((MAX_TOKENS * 4))
-LOCAL_PATH='([a-z]:|/[a-z])[\\/]+users[\\/]|appdata[\\/]|(^|[^a-z0-9_.~-])/(users|home)/[a-z0-9._-]+/|(^|[^a-z0-9_.~-])/root/'
+LOCAL_PATH='([a-z]:|/[a-z])[\\/]+users[\\/]|appdata[\\/]|(^|[^a-z0-9_.~-])/(users|home)/[a-z0-9._-]+/|(^|[^a-z0-9_.~-])/roo[t]/' # [t] keeps this line from matching itself
 
 # Files nobody writes by hand: lockfiles, codegen output, tool output,
 # vendored code, license text. They skip the size check only: a lockfile
