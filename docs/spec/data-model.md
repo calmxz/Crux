@@ -10,7 +10,7 @@ This file covers what Crux stores, what each item belongs to, where it lives, wh
 - What only an account has (its email, sign-in codes, the 7-day undo, copies) sits on the account. What only a trial link has (its scrambled key, browsers, switched-off state) sits on the link ([#719]).
 - A file belongs to its session. The storage allowance is still counted per home (see [`files.md`](files.md)) ([#719]).
 - Guests have no home, and Crux stores nothing for them (see [Guests](#guests)) ([#719]).
-- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind and email, and the dead-link list. Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`hosting.md`](hosting.md)) ([#719]).
+- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`hosting.md`](hosting.md)) ([#719]).
 
 ## What belongs to what
 
@@ -84,7 +84,7 @@ A decline in a sealed flag stays with its sealed session and goes with it, not w
 
 | Items | Module | Lifetime |
 |---|---|---|
-| The link and its scrambled key, browser IDs, unseen notices, the device note shown | Homes | [`trial.md`](trial.md) |
+| The link and its scrambled key, link code and date made, browser IDs, unseen notices, the device note shown | Homes | [`trial.md`](trial.md) |
 | Wrong-link counts per network address | Sign-in | [`trial.md`](trial.md) |
 
 Sign-in sessions belong to the Sign-in module, for accounts and links, behind the sign-in cookie ([`accounts.md`](accounts.md)).
@@ -108,8 +108,8 @@ These never link to a home with delete with parent. The erasure writes or moves 
 | Item | Module | Lifetime |
 |---|---|---|
 | The reported hold: a sealed session marked "Reported", with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind and the email | Safety | Until the owner erases it ([`misuse.md`](misuse.md)) |
-| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason. A link that died by a Yes keeps only "ended" | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
-| A dead link's feedback answers and quote permissions, when it died other than by a Yes | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
+| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
+| A dead link's feedback answers and quote permissions, when it died other than by a Yes or its holder's erasing | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
 | A copy (copies bucket), its address, its link's scrambled code, and the email that sends its link | Homes | Until its link expires ([`privacy.md`](privacy.md)) ([#762]) |
@@ -161,7 +161,7 @@ flowchart TD
   T -. logged .-> L[Restore log]
 ```
 
-- One erasure routine erases a home, and every path calls it: closing after the undo, an under-18 Yes, the idle rule, a misuse closure, a link dying, Crux closing, a paid launch's non-answer, and a deletion request by email. The Homes module runs it, and each item's own module makes its move or write ([#719]).
+- One erasure routine erases a home, and every path calls it: closing after the undo, an under-18 Yes, the idle rule, a misuse closure, a link dying, Crux closing, a paid launch's non-answer, and a holder erasing a trial link. A deletion request by email starts the closing ([#755]). The Homes module runs it, and each item's own module makes its move or write ([#719]).
 - Before the transaction, the routine makes any copy asked for and records it, or reuses one already recorded ([#719]).
 - In one transaction: for an under-18 closure, take its counts and feedback tallies back and add 1 to the dated under-18 count; make every move and write in [Outliving a home](#outliving-a-home); add the home's stop records and today's spend to the nameless totals; list the home's bucket objects to erase, after the moves, by what each belongs to, never by folder; and delete the home. If any step fails, nothing changes ([#719]).
 - After it commits, the listed bucket objects are erased. The daily job retries any still listed, and erases any copy object with no record ([#719]).
@@ -196,3 +196,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

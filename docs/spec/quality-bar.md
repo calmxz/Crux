@@ -21,7 +21,7 @@ These are the tests the closed tickets sent here, by area.
 **Isolation and the owner page** ([#676], [#678], [#734])
 
 - On every page and request, another learner's, guest's or trial link's session, file or Record gives "not found".
-- The owner page turns away every other account, test addresses included, and anyone signed out, including at its direct address.
+- The owner page turns away every other account, test addresses included, and anyone signed out, including at its direct address, with "Page not found" ([#755]).
 - Feedback text shows there as plain text.
 
 **Sign-up and sign-in** ([#674], [#678], [#717], [#733])
@@ -92,7 +92,7 @@ These are the tests the closed tickets sent here, by area.
 - The terms and "Keep my account" steps on a live sign-in.
 - A notice clock starts at Resend's acceptance. Dates gain the days lost in a pause.
 - Spend lines past the week are reduced to nameless totals. "Email me" lists are erased.
-- The export script's zip, with a declined file packed unread. A quote untick reaches the daily email.
+- The copy's zip, with a declined file packed unread. A quote untick reaches the daily email.
 - The share tick's two choices, and its untick.
 
 **Misuse** ([#677], [#733], [#735], [#743])
@@ -265,3 +265,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

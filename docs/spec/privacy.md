@@ -35,7 +35,7 @@ The owner reads a conversation only in two cases ([#677]):
 - **Shared:** on the feedback page, the learner ticks to share, and picks a named session or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal". The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see [`feedback.md`](feedback.md)) ([#677], [#733]).
 - **Flagged:** a flag opens only the sessions where the tutor declined something, chat text only. The owner reads each one from its start up to the flag, plus any new declines while the flag waits. Access ends when the owner acts on the flag or, after a closure, when the lock ends ([#677], [#733]).
 
-No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread by a script, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
+No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread when the copy is made, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
 
 Repairs from a backup are done by script, and the owner sees counts, not content ([#716]). The owner page's feedback rules, including who sent an answer, are in [`feedback.md`](feedback.md) ([#677]).
 
@@ -85,7 +85,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A copy asked for while closing | Until its 7-day link expires ([#733], [#735]) |
 | A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
 | A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
-| A dead trial link's feedback answers and quote permissions | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
+| A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first ([#719]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
@@ -114,16 +114,20 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 - The owner is the data protection officer. From opening, the site and the Privacy Policy publish "Data Protection Officer, Crux", the owner's home postal address, a dedicated phone number (a prepaid SIM used only for Crux), and the role email ([#677]).
 - Until opening, the site and the Trial Privacy Notice give only privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux. The officer's title, postal address and phone are published with the before-opening checklist (see [`quality-bar.md`](quality-bar.md)). The owner accepts that this gives less than the Commission's advisory expects during the trial ([#754]).
 - The owner's actual name and details are filled in when the policy is written ([#677]).
-- Data requests (a copy, deletion) go to the Crux email, privacy@ the domain ([#677], [#717]). The owner's LinkedIn or other profiles are a general contact ([#677]).
+- Data requests (a copy, deletion) go to the Crux email, privacy@ the domain ([#677], [#717]). A trial link has no email: its holder erases it in Settings, and nothing is erased on an emailed request (see [`trial.md`](trial.md)) ([#755]). The owner's LinkedIn or other profiles are a general contact ([#677]).
 - Where that inbox sits, in the trial and from opening, is in [`operations.md`](operations.md) ([#717]).
 
 ### Copies and requests
 
-- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. A script the owner runs makes it, without the owner reading through it ([#677]). It reaches the learner as a private 7-day link (see [`operations.md`](operations.md)) ([#735]).
+- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. The owner checks the request came from the account's own address. A button on the owner page then makes it, as the copy at closing is made, without the owner reading through it ([#677], [#755]). It reaches the learner as a private 7-day link (see [`operations.md`](operations.md)) ([#735]).
+
+- A request by email is entered on the owner page by pasting the sender's address, used only to find the account and never stored ([#755]).
+- **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag ([#755]).
+- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) on 15 Mar. Didn't ask? Reply to stop it.", and erases it 2 days later unless the owner cancels. A session held for the owner's decision waits for the decision. Restoring the account doesn't stop a waiting erasure: it runs on the date the email gave ([#755]).
 
 ### Breaches
 
-If sensitive or sign-in data reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677]).
+If sensitive or sign-in data reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677]). The learners' notice goes from the owner page: an email to every account, locked and closing ones included, and to every other address Crux holds, and a notice page on every live trial link (see [`operations.md`](operations.md)) ([#755]).
 
 ### What it covers
 
@@ -157,7 +161,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 
 ## On screen
 
-Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). "Who runs Crux" is in [`landing-screens.md`](landing-screens.md) ([#754]). These rules need: the owner page's shared sessions and copy requests ([#677], [#733]).
+Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). "Who runs Crux" is in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's shared sessions, entered requests and breach form are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 
 [#668]: https://github.com/calmxz/Crux/issues/668
@@ -180,3 +184,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

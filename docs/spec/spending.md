@@ -109,7 +109,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 ## The owner's share
 
 - At the share, Crux stops only the owner's account, re-marks and the distress check. The owner sees "You've used your owner share this month" ([#679], [#734]).
-- The owner raises it on the owner page, which reminds them to raise Google's cap first ([#679]).
+- The owner raises it on the owner page, which asks them to raise Google's cap first and tick "I raised Google's cap" ([#679], [#755]).
 - Re-marks and the distress check's pot spend from the share ([#728] Answer 1, [#734]). At the share, re-marks pause. They resume when the share refills on the 1st, or sooner if the owner raises it. A pass stands until it is re-marked. The owner's own check pauses as half-done at the share, and resumes the same way ([#734]).
 - Google's cap covers the share too, so when it trips the owner is stopped as well ([#679]).
 
@@ -119,7 +119,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 - The Crux project's cap is about USD 11.50: the learners' USD 8, the owner's USD 3 and a margin of about USD 0.50 ([#679]).
 - The cap is not instant, and an overage is billed to the card ([#679]).
 - When Google refuses calls, learners see the month's message, and a check it stops is kept as half-done ([#675], [#679]).
-- Before any raise in the money (the budget, a re-run's budget, the owner's share), the owner page reminds the owner to raise Google's cap first ([#679]).
+- Before any raise in the money (the budget, a re-run's budget, the owner's share), the owner page names the cap to set, and the raise waits for the tick "I raised Google's cap" ([#679], [#755]).
 - Once a day, Crux compares its own total with Google's billing report. A gap over 10% goes in the owner's daily email, with where it is ([#679], [#717]).
 - Tests' cap is in the main file's "Money". The Cloud Run cap is in [`hosting.md`](hosting.md) ([#678], [#716]).
 
@@ -160,7 +160,7 @@ How long per-account spend and the "email me" addresses are kept is in [`privacy
 
 ## On screen
 
-The session screen is in [`learning-screen.md`](learning-screen.md): the near-limit pop-up as a pinned line, and the day, week, ceiling and month messages with their tick-box, the fixed lines after a filling reply and after a file, the waiting mark on a kept message, and the care and crisis lines in the thread ([#751]). The waiting badge on a session in the list is in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). The tutoring bar on the Settings page is in [`account-screens.md`](account-screens.md) ([#753]). These rules need: the owner page's settings, cap line, counts, and share with its raise ([#675], [#679], [#734]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the near-limit pop-up as a pinned line, and the day, week, ceiling and month messages with their tick-box, the fixed lines after a filling reply and after a file, the waiting mark on a kept message, and the care and crisis lines in the thread ([#751]). The waiting badge on a session in the list is in [`app-shell.md`](app-shell.md) ([#752]). The rest of the layout is not decided (see the main file's Gaps). The tutoring bar on the Settings page is in [`account-screens.md`](account-screens.md) ([#753]). The owner page's settings, cap line, counts, and share with its raise are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 [#667]: https://github.com/calmxz/Crux/issues/667
 [#671]: https://github.com/calmxz/Crux/issues/671
@@ -183,3 +183,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the near-li
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#755]: https://github.com/calmxz/Crux/issues/755

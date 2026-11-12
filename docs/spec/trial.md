@@ -9,7 +9,7 @@ This file covers the first two of the main file's "Stages": the trial without ac
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
 - From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
-- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]).
+- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](#the-link-code)) ([#755]).
 - If the trial does not show that opening is worth it, Crux stays a portfolio project, and guest mode stays ([#677], [#733]).
 
 ## Entry
@@ -68,6 +68,18 @@ If the day's emails have run out, an invite or decline waits for the next day. A
 - A person who loses the email asks again and, if approved, gets a new, empty trial space ([#717]).
 - The key is stored scrambled. A network that tries 10 wrong links in an hour is refused for the rest of the hour. Its address is kept only that hour ([#717]).
 
+### The link code
+
+- At approval, each link gets a random 6-character code from 31 characters that can't be confused (no 0, O, 1, I or L), made separately from its key and unique among live links and stubs. The owner page names the link by it, with the date it was made, and the holder's trial Settings page shows "Trial link K7Q-4MP" (see [`owner-screens.md`](owner-screens.md)) ([#755]).
+- A quoted code tells the owner which link an email is about, for looking things up and answering. It is not proof of holding the link, since a screenshot of Settings shows it, so nothing is switched off or erased on an emailed request ([#755]).
+- An email to the Crux inbox quoting a code is deleted once answered, with the reply in Sent and the copy in Trash, and at the trial's end at the latest ([#755]).
+
+### Erasing a link
+
+- The holder erases their link with "Erase this trial link" on their trial Settings page, after typing "delete". It erases at once what a tap on Yes erases: sessions, files, pages, photo answers, preferences, feedback words and quote permissions. A published quote keeps only where it was published and the remove-by date, until the owner marks it removed (see [`feedback.md`](feedback.md)) ([#755]).
+- A link locked by a sealed flag can't be erased this way until the owner decides ([#755]).
+- They may request access again ([#755]).
+
 ### What a link carries
 
 The main file's "Stages" sets the rule. In detail:
@@ -78,7 +90,7 @@ The main file's "Stages" sets the rule. In detail:
 - Sessions stay under the link until it dies (below). Removing a file or deleting a session erases at once, apart from a sealed session (see [`misuse.md`](misuse.md)) ([#717], [#722], [#733]).
 - Anonymous feedback, which is kept. A tap on Yes to the age question removes its words and quote permissions (see [`feedback.md`](feedback.md)) ([#677], [#717], [#734]).
 
-Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You can email me about this", the copy of data by email, Close account, and the let-in list ([#722]).
+Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You can email me about this", the copy of data by email, Close account (a link has "Erase this trial link" instead, above), and the let-in list ([#722], [#755]).
 
 ### Browsers, switching off and misuse
 
@@ -92,9 +104,9 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 
 ### When a link dies
 
-A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719]).
+A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), its holder erases it ([#755]), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719]).
 
-A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason, so a holder returning by key or by cookie sees it. A link that died by a Yes keeps only "ended". The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
+A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason, so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
 
 ### Telling a link holder
 
@@ -126,11 +138,13 @@ A holder who does not visit cannot be reached ([#733]).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
-- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]).
+- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first, unless the holder erases the link ([#755]). Those of a published quote stay until the owner removes it ([#719]).
 - A sealed session is kept longer only if reported to the authorities ([#719]).
 - Deleting a session erases it, but another session may still mention something from it.
 - The owner may read flagged or shared sessions (see [`privacy.md`](privacy.md)).
 - A holder who does not visit cannot be reached with a notice.
+- An email quoting a link code is kept until answered, then deleted ([#755]).
+- "Erase this trial link" in Settings erases the link's sessions, files and feedback ([#755]).
 - Until opening, its contacts are privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux (see [`privacy.md`](privacy.md)) ([#754]).
 
 ## Known gap
@@ -140,6 +154,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 ## Ending the trial
 
 - The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and the daily housekeeping job ends the trial on that date ([#733]).
+- Once set, the date can move later or be taken back, never earlier. A date set after a take-back is never earlier than the one taken back. Link holders see a fresh notice at their next visit ([#755]).
 - Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" stays ([#719]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
 - Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
@@ -162,7 +177,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 
 ## On screen
 
-The landing page, guest mode, the entry ticks and the trial link notice, the Request access page, the one-time device note, the network-refused message, what a dead or switched-off link shows, the guest's upload line and the link holder's notices are in [`landing-screens.md`](landing-screens.md) ([#754]). The rest of the layout is not decided (see the main file's Gaps). These rules need: the owner page's requests list (approve, decline, days left), trial-link list with browser counts and switch-off, guest cap setting, and the button that ends the trial ([#677], [#717], [#722], [#733]).
+The landing page, guest mode, the entry ticks and the trial link notice, the Request access page, the one-time device note, the network-refused message, what a dead or switched-off link shows, the guest's upload line and the link holder's notices are in [`landing-screens.md`](landing-screens.md) ([#754]). The rest of the layout is not decided (see the main file's Gaps). The owner page's requests list, trial-link list, dead links, guest cap setting and the end of the trial are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 [#675]: https://github.com/calmxz/Crux/issues/675
 [#677]: https://github.com/calmxz/Crux/issues/677
@@ -179,3 +194,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

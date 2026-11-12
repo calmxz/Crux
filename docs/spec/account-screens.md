@@ -73,6 +73,7 @@ flowchart TD
 - When a seal locks the account while the learner is in the app, the lock's page shows at once. Behind "Read my sessions", the sealed session shows its sealed message (see [`app-shell.md`](app-shell.md)).
 - "Read my sessions" opens the app read-only. Each session shows the **lock bar**, "Your account is locked. Why?", and the chat box's place reads "Your account is locked, so the tutor can't reply." "Why?" brings the lock's card back.
 - What a lock allows is in [`misuse.md`](misuse.md). On screen, "+ New session", Rename, Close account and the feedback page's Send are greyed. In a misuse closure, Delete, the file × and the held session's Remove are greyed too.
+- In a misuse closure, Delete and the file × say instead: "Your account is locked, so you can't delete this here. To have it erased, email Crux and give its name exactly as shown: Thesis statements." The lock's card adds: "To have a session or file erased, email Crux with its name exactly as shown. Sessions kept for the owner's decision stay until then." ([#755])
 - Greyed items say "Your account is locked, so this can't be changed."; Close account says "A locked account can't be closed."; the feedback page says "Your account is locked, so you can't send feedback. You can still untick a quote or a share in Settings, under Your feedback."
 
 ## Settings, Feedback and Sign out
@@ -88,6 +89,7 @@ One page in the main area, with four parts in this order:
 - **Files:** "Your files: 186 of 200 MB" with a bar, and "See your files". It opens the allowance dialog in [`app-shell.md`](app-shell.md), starting "Your files are using 186 of 200 MB." in place of the "wasn't added" line.
 - **Your feedback:** "Untick to withdraw a quote or end a share." Then each answer sent, newest first: "8 Nov · Helped: yes · Would pay: maybe", its text, the quote tick, the share tick ("Share: Personal essay (the owner can read it up to 8 Nov)"), and "You said Crux may email you about this." when that tick was given. An answer with neither tick reads "Not quoted, not shared."
 - **Account:** the email, Close account, the Terms, Privacy Policy and "Who runs Crux" links, then Sign out, last on the page.
+- **On a trial link,** in place of Account: "Trial link K7Q-4MP", then "Erase this trial link", which opens a dialog where the holder types "delete", as for Close account. While a sealed flag locks the link, it says "A locked trial link can't be erased." (see [`trial.md`](trial.md)) ([#755]).
 
 ### The feedback page
 
@@ -115,10 +117,11 @@ One page in the main area, with four parts in this order:
 |---|---|
 | Sign-in | The sign-in page: the two ways in, the human check, the code step, its messages, "One more thing", the full and blocked cards, and the note after closing |
 | Opening steps | The opening pages and their order: the lock, "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
-| Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, and the close-account dialog with its typed "delete" |
+| Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#755]: https://github.com/calmxz/Crux/issues/755

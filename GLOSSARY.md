@@ -17,8 +17,12 @@ Someone who uses Crux on the public link without an account, before Crux opens, 
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
-The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, or the holder taps Yes to Crux's age question.
+The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, the holder taps Yes to Crux's age question, or the holder erases the link.
 _Avoid_: invite, code, password
+
+**Link code**:
+A short random code that names a trial link, such as K7Q-4MP, shown to the owner and on the holder's Settings page. It names the link so the holder can say which link is theirs; it never opens the link and does not prove they hold it.
+_Avoid_: link number, link ID, key
 
 **Copy page**:
 The Crux page that the email with a learner's copy of their data links to. Each time it is opened while the link is live, it starts a fresh download. After 7 days it says the link has expired.
@@ -39,6 +43,10 @@ _Avoid_: agent, bot, assistant
 **Owner**:
 The person who runs Crux, shares it, and decides whether a paid launch comes next. Only the owner sees how many learners reached each step and what learners said in feedback.
 _Avoid_: admin
+
+**Owner page**:
+The owner's own app, at its own address, where the owner approves requests, judges misuse flags, reads feedback and counts, and changes limits and switches. Only the owner's main address can open it.
+_Avoid_: admin panel, dashboard
 
 **Budget**:
 The most money Crux can spend on tutoring in a month, including tutoring for guests and for trial links. Each day also has its own cap, a set part of the budget. The owner's own tutoring is not part of the budget. When the budget or the daily cap runs out, no learner is tutored until it resets. The one exception: a learner can finish a mastery check that has already started.
