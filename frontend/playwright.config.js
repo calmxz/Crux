@@ -12,6 +12,17 @@ import { defineConfig, devices } from '@playwright/test'
 // against (#518), the stubbed backend -- runs Playwright, and stops it all.
 // Its header lists the ports it needs free.
 
+// #738: local runs use the installed Chrome, which updates itself, with the
+// sandbox on; Playwright adds --no-sandbox unless chromiumSandbox is true. CI
+// keeps the bundled Chromium: the sandbox may not start on GitHub's Ubuntu
+// runners.
+const chromiumUse = { ...devices['Desktop Chrome'] }
+
+if (!process.env.CI) {
+  chromiumUse.channel = 'chrome'
+  chromiumUse.launchOptions = { chromiumSandbox: true }
+}
+
 export default defineConfig({
   testDir: './e2e',
   timeout: 30_000,
@@ -35,14 +46,7 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      // #738: local runs use the installed Chrome, which updates itself, with
-      // the sandbox on; Playwright adds --no-sandbox unless chromiumSandbox is
-      // true. CI keeps the bundled Chromium: the sandbox may not start on
-      // GitHub's Ubuntu runners.
-      use: {
-        ...devices['Desktop Chrome'],
-        ...(process.env.CI ? {} : { channel: 'chrome', launchOptions: { chromiumSandbox: true } }),
-      },
+      use: chromiumUse,
     },
   ],
 })
