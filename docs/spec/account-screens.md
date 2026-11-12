@@ -18,7 +18,7 @@ Each message shows in the card under the button or field it is about:
 
 | When | Under | Message |
 |---|---|---|
-| The sender is out for the day or the month | Email me a code | The sender-out message in [`accounts.md`](accounts.md) |
+| The sender is out for the day or the month, Resend is down, or a breach notice is still sending ([#763]) | Email me a code | The sender-out message in [`accounts.md`](accounts.md) |
 | 10 codes today for one email | Email me a code | "Too many codes today. Use Continue with Google, or try again tomorrow." |
 | 3 codes this hour for one email, or 20 from one network | Email me a code | "Too many code requests. Try again in an hour, or use Continue with Google." |
 | From the EU or the UK | The button tapped | "Crux isn't available in your region yet." |
@@ -125,3 +125,4 @@ One page in the main area, with four parts in this order:
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#763]: https://github.com/calmxz/Crux/issues/763

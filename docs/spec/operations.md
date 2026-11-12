@@ -15,15 +15,20 @@ This file covers email, knowing when something is wrong, how the owner is told, 
 
 Crux keeps shares of Resend's limits, counted on all email sent that day or month, so a flood of one kind cannot take away another ([#735]).
 
+- **The day** is Resend's: a UTC calendar day, 8 am to 8 am Philippine time, as Resend Free counts its 100. Other limits keep the owner's days (see the main file's "Money") ([#763]).
+- **The totals** are Resend's own used figures for the day and the month, carried on its replies (`x-resend-daily-quota`, `x-resend-monthly-quota`), plus Crux's sends since that reply. The day restarts at 8 am. The month restarts when Resend's figure drops, since Resend states no Free month start ([#763]).
+- A full month, by Crux's count or a refusal, counts as something for the daily email. The 8:05 am run sends it to Resend even though it does not fit, and the answer shows whether Resend's month has restarted. That refusal is expected, so it is not logged as an error ([#763]).
+- Resend counts received email and each To, CC and BCC address. So Crux never turns on Resend's receiving, and each email has one address ([#763]).
+
 | Kind | What it covers | Stops when the day's total reaches | Stops when the month's total reaches |
 |---|---|---|---|
 | Bulk | "It's back" and "spots open" | 40 | 1,200 |
 | Codes | Sign-in codes | 80 | 2,400 |
 | Required | Closure and misuse emails, contest decisions, erasure warnings, breach notices, re-mark emails, idle warnings, terms changes, copies of data, trial invites and declines, and the owner's daily email | 100 | 3,000 |
 
-- An email over its share waits for the next day, oldest first. A sign-in code is refused instead, as [`accounts.md`](accounts.md) says ([#674], [#735]).
+- An email over its share waits for the next day, oldest first. A sign-in code is refused instead, as [`accounts.md`](accounts.md) says ([#674], [#735]). Email waiting for room goes, when room comes back, with the daily email first in a new day, then oldest by when it was first due ([#763]).
 - A change to the shares is a recorded change ([#735]).
-- To meet the 72 hours, a breach notice may use the whole day's room, up to 100, so sign-in codes are refused once the day's total reaches 80 while it sends. Anything past the day's room goes the next day. Its addresses: every account, then waiting requests, invites and declines waiting to send, the let-in list, the "email me" ticks and copies still waiting, each once. The reported hold's email is left out ([#755]).
+- To meet the 72 hours, a breach notice may use the whole day's room, up to 100, so sign-in codes are refused once the day's total reaches 80 while it sends. Anything past the day's room goes the next day. On that day it gets at most 99, after the daily email, since email sent before 8:05 am, email waiting from before the notice, and codes until the day reaches 80 take room too ([#763]). Its addresses: every account, then waiting requests, invites and declines waiting to send, the let-in list, the "email me" ticks and copies still waiting, each once. The reported hold's email is left out ([#755]).
 - A trial request is never kept past its 30 days. One still unsent then is erased without an email (see [`trial.md`](trial.md)) ([#717]).
 - **"It's back" emails** go when Crux reopens, as [`spending.md`](spending.md) says. After Google's cap, they wait until a model call succeeds, since Google's month may reset later than Crux's. The daily job tries one small call on the 1st, spent from the owner's share, then hourly until one succeeds ([#675], [#734], [#735]).
 
@@ -32,6 +37,16 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 - A notice period starts when Resend accepts the email, not on its planned date. This covers the idle warnings' 30 and 7 days, the 7 days to contest a misuse closure, the terms' 14 days, and the 2 days after an erasure warning ([#735], [#755]).
 - Erasure waits for its notice, for at most 30 days. After that it goes ahead, and the owner is told. The daily email lists any required email still unsent ([#735]).
 - A trial request's 30 days do not wait, as above ([#717]).
+
+### When Resend refuses or is down
+
+Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
+
+- A sign-in code is refused with the sender-out message in [`accounts.md`](accounts.md). Over Resend's 10 requests a second, Crux waits the seconds Resend names and sends the code.
+- Any other email is retried by reason. Resend down: hourly. Over 10 requests a second: after the seconds Resend names. A quota refusal (`daily_quota_exceeded` or `monthly_quota_exceeded`): the day or the month is marked full, and the email waits for the next room. A code refused on quota marks it full too, and is refused, as above.
+- A quota refusal Crux did not expect means its count was wrong, so it is also logged as an error.
+- A retry never outlasts how long the spec keeps the email's address, such as a trial request's 30 days. A deadline to send, such as a breach notice's 72 hours, does not end it.
+- Retries are Cloud Tasks set for their time (see "The daily job"). A retry task holds only the email's queue ID.
 - Accepted does not mean read. A learner who has lost the inbox cannot act on the email, and the data goes at the deadline (see [`privacy.md`](privacy.md)) ([#677]).
 
 ### Sending a copy of a learner's data
@@ -86,7 +101,8 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 - when the owner's share reaches 100%;
 - for each new access request;
 - for a misuse flag raised at once ([#733]);
-- when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]).
+- when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]);
+- when Resend is down, or the email day or month is full, at most once a day each: "Resend is down: 12 emails waiting". The daily email may not get through then ([#763]).
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
 
@@ -94,7 +110,7 @@ There are two alert rules: one for access requests, and one for everything else.
 
 ### The daily email
 
-One email through Resend, about 8 am Philippine time, on days with something in it ([#717]):
+One email through Resend, at 8:05 am Philippine time from the daily job, first in Resend's new day, on days with something in it ([#717], [#763]):
 
 - the budget at 50% and 80%;
 - the learner cap filled;
@@ -109,6 +125,7 @@ One email through Resend, about 8 am Philippine time, on days with something in 
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
 - an erasure waiting for its date: "1 erasure on 15 Mar: check the inbox for a reply." ([#755]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
+- Resend's month full, by Crux's count or a refusal ([#763]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
 
 ### The services' own emails
@@ -124,7 +141,7 @@ Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Zoho o
 
 ## The daily job
 
-All scheduled work runs in one job: Cloud Scheduler calling the tasks service. Cloud Scheduler is free for up to 3 jobs per billing account, and 2 go to the peak schedule if the fallback in [`hosting.md`](hosting.md) is ever used ([#716], [#728] Answer 7).
+All scheduled work runs in one job: Cloud Scheduler calling the tasks service, at 8:05 am Philippine time, 5 minutes after Resend's day restarts ([#763]). Cloud Scheduler is free for up to 3 jobs per billing account, and 2 go to the peak schedule if the fallback in [`hosting.md`](hosting.md) is ever used ([#716], [#728] Answer 7).
 
 The job acts on every date that has passed, so a missed run catches up on the next one. Dates that give someone a chance to act (the undo, the contest period, notice periods, the trial's notice, a copy link's 7 days) first gain the days Crux was down, worked out from the gap between runs ([#735], [#762]). It does:
 
@@ -158,7 +175,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - let-in entries older than 7 days, not used or kept. Sign-up also ignores an expired entry ([#679], [#728] Answer 7);
 - the trial, on its date ([#733]).
 
-**The one exception:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits and wrong-link counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]).
+**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits and wrong-link counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
 
 Some things happen by the date alone, with no job: a re-run's budget returning on the 1st, and the go-public bar judged at the end of its last day ([#676], [#734], [#735]).
 
@@ -166,6 +183,8 @@ Some things happen by the date alone, with no job: a re-run's budget returning o
 
 - **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month, so about USD 0.70 a month for the two rules ([#717], [#762]).
 - **Zoho's free plan:** whether Zoho offers it to Crux, and whether its processor agreement covers it. Open on [#726] ([#717], [#762]).
+- **Resend's figures on every reply:** Resend's page says only that "the API returns headers that track your email sending quotas". Checked at the build's first real send, a refusal included. If they are missing, how Crux counts comes back as a recorded change ([#763]).
+- **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; stale dates in a retried email; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
 
 ## On screen
 
@@ -187,4 +206,5 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#763]: https://github.com/calmxz/Crux/issues/763
 [#755]: https://github.com/calmxz/Crux/issues/755
