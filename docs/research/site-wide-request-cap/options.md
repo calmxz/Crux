@@ -24,11 +24,11 @@ A cap set below a shared network's normal use turns away real learners. A cap se
 - Money: none.
 - Rules: the Free plan's only rate limiting rule.
 - Complexity: a zone setting, made in the dashboard or by API. No Crux code apart from the app's 429 message.
-- Blocked calls do not run the Worker, so they don't use its 100,000-a-day allowance [L].
+- Blocked calls never reach Cloud Run. The Workers metrics page leaves them out of the Worker's request total, but whether they count toward the 100,000-a-day allowance is unstated [L].
 
 **Domain and `workers.dev`.** It covers the live site from the trial on, because the trial runs on the domain. It cannot cover a Worker on `workers.dev`, such as staging if staging stays there [L]. So it cannot be tested on staging unless staging uses a host on the domain.
 
-**Limits.** It stops floods, not a steady bot. A bot sending about 1.2 calls a second stays far under any useful N. That rate still spends the Worker's daily allowance and, by the illustration in [L], can spend Cloud Run's free credit over a month.
+**Limits.** It stops floods, not a steady bot. A bot sending about 1.2 calls a second stays far under any useful N. That rate still spends the Worker's daily allowance and, by the illustration in [L], can spend Cloud Run's free credit over a month. An `/api/`-only rule also misses unknown paths outside `/api`. Unless the Worker lists its paths in `run_worker_first`, a bot that omits the navigation header runs the Worker on those paths, and spends its allowance [L].
 
 ## Option 2: a per-network limit in the Worker (the Rate Limiting binding)
 
@@ -75,7 +75,7 @@ A cap set below a shared network's normal use turns away real learners. A cap se
 These are recorded changes to the main file's free-hosting rule.
 
 - **Cloudflare Pro**, "$20 /mo billed annually, or $25/mo billed monthly" (https://www.cloudflare.com/plans/). It allows 2 rules, periods up to 1 minute, blocks up to 1 hour and a custom response [L]. It is still a per-minute count.
-- **Workers Paid**, "a minimum charge of $5 USD per month for an account", with 10 million requests a month included [L]. It removes the 100,000-a-day ceiling, which is the thing that takes the API down for everyone. It also removes the ceiling that bounds Cloud Run's exposure, so a per-network cap matters more on it.
+- **Workers Paid**, "a minimum charge of $5 USD per month for an account", with "10 million included per month" (https://developers.cloudflare.com/workers/platform/pricing/). It removes the 100,000-a-day ceiling, which is the thing that takes the API down for everyone. It also removes the ceiling that bounds Cloud Run's exposure, so a per-network cap matters more on it.
 
 ## Summary
 
@@ -84,7 +84,7 @@ These are recorded changes to the main file's free-hosting rule.
 | Window | 10 s, block 10 s | 10 or 60 s | Any (hour, day) |
 | Stops a slow bot | No | No | Yes, per network |
 | Blocked response | Cloudflare's 429 page | Crux's own 429 | Crux's own 429 |
-| Uses Worker allowance when blocked | No | Yes | Yes, plus a Durable Object request |
+| Uses Worker allowance when blocked | Not in the Worker's request total; daily count unstated | Yes | Yes, plus a Durable Object request |
 | Covers `workers.dev` and staging | No | Yes | Yes |
 | Money | 0 | 0 (plan unstated) | 0 within Free allowances |
 | Effort | Zone setting | Small Worker change | Durable Object, tests, privacy change |
