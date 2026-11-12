@@ -1,16 +1,17 @@
 #!/bin/sh
 # Blocks commits that stage a file over 5,000 tokens (tokens = bytes / 4),
-# or a file holding a local machine path (a drive's Users folder, AppData),
-# which names the account it was written on. The repo is public.
-# Measures the staged blob, so unstaged edits do not count.
+# or a file holding a local machine path (a Windows, macOS or Linux home
+# folder, AppData), which names the account it was written on. The repo is
+# public. Measures the staged blob, so unstaged edits do not count.
 # Enable once per clone: git config core.hooksPath .githooks
 
 MAX_TOKENS=5000
 MAX_BYTES=$((MAX_TOKENS * 4))
-LOCAL_PATH='([a-z]:|/[a-z])[\\/]+users[\\/]|appdata[\\/]'
+LOCAL_PATH='([a-z]:|/[a-z])[\\/]+users[\\/]|appdata[\\/]|(^|[^a-z0-9_.~-])/(users|home)/[a-z0-9._-]+/|(^|[^a-z0-9_.~-])/root/'
 
 # Files nobody writes by hand: lockfiles, codegen output, tool output,
-# vendored code, license text. Binary files are skipped automatically.
+# vendored code, license text. They skip the size check only: a lockfile
+# can still record a local path. Binary files skip both checks.
 is_exempt() {
 	case "$1" in
 	backend/uv.lock) return 0 ;;
@@ -29,7 +30,7 @@ is_exempt() {
 # changed in <sha>...HEAD as committed, instead of the staged ones.
 if [ -n "$1" ]; then
 	if ! git rev-parse --verify --quiet "$1^{commit}" >/dev/null; then
-		echo "[ERROR] file-size check: base commit '$1' not found (shallow clone?)" >&2
+		echo "[ERROR] pre-commit check: base commit '$1' not found (shallow clone?)" >&2
 		exit 1
 	fi
 	blob="HEAD:" scope="changed"
@@ -45,15 +46,20 @@ tab=$(printf '\t')
 while IFS="$tab" read -r added _deleted path; do
 	[ -z "$path" ] && continue
 	[ "$added" = "-" ] && continue
+	# Each hit shows its line number and up to 40 characters either side.
+	hits=$(git cat-file -p "$blob$path" | grep -n -o -i -E ".{0,40}($LOCAL_PATH).{0,40}" | head -n 3)
+	if [ -n "$hits" ]; then
+		while IFS= read -r hit; do
+			paths="$paths  $path:$hit
+"
+		done <<HITS
+$hits
+HITS
+	fi
 	is_exempt "$path" && continue
 	bytes=$(git cat-file -s "$blob$path") || exit 1
 	if [ "$bytes" -gt "$MAX_BYTES" ]; then
 		over="$over  $path: $((bytes / 4)) tokens ($bytes bytes)
-"
-	fi
-	hits=$(git cat-file -p "$blob$path" | grep -n -i -E "$LOCAL_PATH" | head -n 3 | cut -c1-120)
-	if [ -n "$hits" ]; then
-		paths="$paths$(printf '%s\n' "$hits" | sed "s|^|  $path:|")
 "
 	fi
 done <<EOF
