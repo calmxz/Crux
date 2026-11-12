@@ -1,0 +1,50 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: the owner page (calmxz/Crux#755).
+  Three variants (?variant=A|B|C) of the owner page, walked through scenes (?scene=...), at desktop or phone
+  width (?device=desktop|phone).
+  A: one long page (inside the owner's own app: "Owner page" at the sidebar foot; "Needs you" first, then sections).
+  B: its own app (its own address and its own menu, one page per area, list beside detail).
+  C: inbox first (a queue of what needs a decision, with a status strip; Numbers and Settings as tabs).
+  Held fixed in all three: the app shell (#752), the Settings and feedback pages (#753), and the spec's wording.
+  Wording is the spec's where it has one; text marked [no spec wording] is a placeholder. No persistence, no backend.
+  Rules live in docs/spec/; this file decides layout and flow only. Sample emails are example.com placeholders.
+  Keys: Left/Right change variant, Up/Down change scene.
+  Chosen by the owner on 2026-11-12 (the ticket's resolution comment holds the full answer):
+  - The owner page is B (its own app at its own address, a menu of areas, lists beside the open item), reached by
+    a plain "Owner" link at the owner's sidebar foot. Anyone else at the address gets "Page not found".
+  - The daily email is C's layout ("Needs you" first, each line opening its item, then "For your information").
+  - A trial link is named by a random code ("Link K7Q-4MP"), shown to the holder too, for lookups only. Flags show
+    no email. Breach notices, copies asked for by email, and a locked learner's session erasure (by exact name) are
+    done from the owner page. Switches confirm both ways; a raise needs "I raised Google's cap" ticked.
+  Serve this folder (the "prototypes" launch config, port 8765) and open the file over http.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE 755 - the owner page</title>
+<link rel="stylesheet" href="755-base.css">
+<link rel="stylesheet" href="755-extra.css">
+<link rel="stylesheet" href="755-own.css">
+</head>
+<body>
+<div class="proto-note" id="note"></div>
+<div class="stage"><div id="device" class="device desktop"></div></div>
+<div class="proto-bar">
+  <button id="prev" title="Previous variant (Left arrow)">&#9664;</button>
+  <span class="lab" id="vlab"></span>
+  <button id="next" title="Next variant (Right arrow)">&#9654;</button>
+  <select id="scene"></select>
+  <button id="dev"></button>
+</div>
+<script src="755-data.js"></script>
+<script src="755-blocks.js"></script>
+<script src="755-blocks2.js"></script>
+<script src="755-varA.js"></script>
+<script src="755-varB.js"></script>
+<script src="755-varC.js"></script>
+<script src="755-mail.js"></script>
+<script src="755-scenes.js"></script>
+</body>
+</html>
