@@ -5,11 +5,12 @@ Part of [the old frontend comparison](../old-frontend-comparison.md) (#768). The
 ## Sign-in
 
 - **Old code:** `views/LoginView.vue` (email and password, "Forgot password?"), `RegisterView.vue` (email, password twice, one consent box), `ForgotPasswordView.vue`, `ResetPasswordView.vue`, `components/auth/AuthCover.vue`, `lib/authErrors.js`, and `stores/auth.js`, which calls Supabase Auth from the browser (`services/supabase.js`).
-- **Matches:** a page of its own with one centred card and no app around it, and each message under the field it is about ([`account-screens.md`](../../spec/account-screens.md), Signing in).
+- **Matches:** a page of its own with one centred card and no app around it ([`account-screens.md`](../../spec/account-screens.md), Signing in).
 - **Differs:**
   - Passwords, reset links and confirmation emails, against "There is no password, no emailed sign-in link and no other provider" ([`accounts.md`](../../spec/accounts.md), Ways in).
   - The browser talks to Supabase, against "Supabase never sees the browser" ([`hosting.md`](../../spec/hosting.md), The database).
   - Sign-in and sign-up are two pages, against one page that serves both.
+  - An error shows in one line under the form, against each message under the button or field it is about (Messages).
   - One box, "I agree to the Terms of Service and Privacy Policy", at sign-up, against "One more thing" with two required ticks after the code or Google ([`accounts.md`](../../spec/accounts.md), New learners).
 - **Missing:** "Continue with Google"; the code step with its boxes, "Send a new code" and "Use another email"; the human check; every message in the Messages table; "Crux is full for now"; the misuse block's card; the note after closing; the trial-time refusal ([`landing-screens.md`](../../spec/landing-screens.md), Signing in during the trial).
 - **Stack:** `@supabase/supabase-js` in the browser, and a bearer token on each call.

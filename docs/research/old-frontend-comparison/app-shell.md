@@ -21,7 +21,7 @@ Part of [the old frontend comparison](../old-frontend-comparison.md) (#768). The
 
 - **Old code:** the list sections in `Sidebar.vue`; `SidebarSessionRow.vue`; `SidebarRowMenu.vue` (Rename, Pin, End, Continue topic, Resume); `composables/useSessionActions.js`, `useSessionGroups.js` and `useVisibilityRelist.js`; a search box that asks the backend.
 - **Matches:**
-  - A "⋯" menu on each line, and on the session's own header, sharing one set of actions ([`app-shell.md`](../../spec/app-shell.md), Rename and delete).
+  - A menu on each line, and an action bar in the session's header (Rename, Pin, End, Resume), sharing one set of actions ([`app-shell.md`](../../spec/app-shell.md), Rename and delete).
   - Renaming in place: Enter saves, Esc cancels, and an empty name keeps the old one.
   - Lines ordered by last activity ([`sessions.md`](../../spec/sessions.md), Names and the session list).
 - **Differs:**

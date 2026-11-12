@@ -23,7 +23,7 @@ Part of [the old frontend comparison](../old-frontend-comparison.md) (#768). The
   - A status slot above the chat box that holds limit messages, close to the spec's pinned lines ([`learning-screen.md`](../../spec/learning-screen.md), Crux's own lines).
 - **Differs:**
   - Limit messages read "{used}/{cap} requests today" and "${used} of ${cap} spent today", against "A learner never sees money" ([`spending.md`](../../spec/spending.md), What is counted).
-  - Limit messages sit above the chat box and errors arrive as toasts, against Crux's own lines as centred lines in the thread, coloured by kind, that stay in the conversation (Crux's own lines).
+  - Limit messages and the send error (with Retry) sit above the chat box, and other errors arrive as toasts, against Crux's own lines as centred lines in the thread, coloured by kind, that stay in the conversation (Crux's own lines).
   - The topic card offers lettered choices that the learner taps. The spec's menus are tutor messages "answered by typing" (Menus and buttons).
   - Tool chips and page citations ("p.12") show under the tutor's reply. The spec has neither; a pointer such as "as on slide 30" is a link into the file viewer ([`app-shell.md`](../../spec/app-shell.md), Reading a file).
   - The level card asks the learner to rate their own level. The spec's diagnostic is the tutor's ([`teaching.md`](../../spec/teaching.md), The diagnostic).
