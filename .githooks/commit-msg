@@ -8,13 +8,22 @@
 branch=$(git symbolic-ref --quiet --short HEAD) || exit 0 # detached HEAD
 [ "$branch" = "main" ] || exit 0
 
-# A revert or merge carries the titles of commits already on main.
-head -n 1 "$1" | grep -q -E '^(Revert "|Merge )' && exit 0
+# Git's own revert, reapply and merge subjects carry titles already on main.
+head -n 1 "$1" | grep -q -E "^(Revert \"|Reapply \"|Merge (branch|remote-tracking branch|tag) '|Merge pull request #)" && exit 0
 
 # Read up to the scissors line above a `git commit -v` diff, and skip
 # git's comment lines ("# Please enter...", "#<tab>modified: ...").
-issue=$(sed '/^# -\{24\} >8 -\{24\}$/q' "$1" | grep -v -E '^#([[:space:]]|$)' |
-	grep -o -E '#[0-9]+' | head -n 1)
+# Compared as plain strings, so any core.commentChar works.
+c=$(git config core.commentChar) || c='#'
+[ "$c" = auto ] && c='#'
+issue=$(awk -v c="$c" '
+	$0 == c " ------------------------ >8 ------------------------" { exit }
+	substr($0, 1, length(c)) == c {
+		s = substr($0, length(c) + 1, 1)
+		if (s == "" || s == " " || s == "\t") next
+	}
+	{ print }
+' "$1" | grep -o -E '#[0-9]+' | head -n 1)
 [ -z "$issue" ] && exit 0
 n=${issue#\#}
 
