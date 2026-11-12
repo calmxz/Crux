@@ -35,7 +35,14 @@ export default defineConfig({
   projects: [
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      // #738: local runs use the installed Chrome, which updates itself, with
+      // the sandbox on; Playwright adds --no-sandbox unless chromiumSandbox is
+      // true. CI keeps the bundled Chromium: the sandbox may not start on
+      // GitHub's Ubuntu runners.
+      use: {
+        ...devices['Desktop Chrome'],
+        ...(process.env.CI ? {} : { channel: 'chrome', launchOptions: { chromiumSandbox: true } }),
+      },
     },
   ],
 })
