@@ -1,0 +1,40 @@
+#!/bin/sh
+# Blocks a commit on main whose message references an issue (#123).
+# Issue work lands on its own branch and reaches main through a PR.
+# Git runs this in the checkout that commits, so a worktree on its own
+# branch passes. Chores with no issue number are not checked.
+# Enable once per clone: git config core.hooksPath .githooks
+
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0 # detached HEAD
+[ "$branch" = "main" ] || exit 0
+
+# Git's own revert, reapply and merge subjects carry titles already on main.
+head -n 1 "$1" | grep -q -E "^(Revert \"|Reapply \"|Merge (branch|remote-tracking branch|tag) '|Merge pull request #)" && exit 0
+
+# Read up to the scissors line above a `git commit -v` diff, and skip
+# git's comment lines ("# Please enter...", "#<tab>modified: ...").
+# Compared as plain strings, so any core.commentChar works.
+c=$(git config core.commentChar) || c='#'
+[ "$c" = auto ] && c='#'
+issue=$(awk -v c="$c" '
+	$0 == c " ------------------------ >8 ------------------------" { exit }
+	substr($0, 1, length(c)) == c {
+		s = substr($0, length(c) + 1, 1)
+		if (s == "" || s == " " || s == "\t") next
+	}
+	{ print }
+' "$1" | grep -o -E '#[0-9]+' | head -n 1)
+[ -z "$issue" ] && exit 0
+n=${issue#\#}
+
+cat >&2 <<EOF
+[ERROR] branch check: this commit references issue #$n but HEAD is main.
+
+Issue work goes on a branch. Move the staged work there and commit again:
+
+  git switch -c fix/$n-<slug>
+  git commit
+
+Then open a PR into main.
+EOF
+exit 1
