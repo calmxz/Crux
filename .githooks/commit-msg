@@ -1,0 +1,26 @@
+#!/bin/sh
+# Blocks a commit on main whose message references an issue (#123).
+# Issue work lands on its own branch and reaches main through a PR.
+# Git runs this in the checkout that commits, so a worktree on its own
+# branch passes. Chores with no issue number are not checked.
+# Enable once per clone: git config core.hooksPath .githooks
+
+branch=$(git symbolic-ref --quiet --short HEAD) || exit 0 # detached HEAD
+[ "$branch" = "main" ] || exit 0
+
+# Skip git's comment lines ("# Please enter the commit message...").
+issue=$(grep -v -E '^#( |$)' "$1" | grep -o -E '#[0-9]+' | head -n 1)
+[ -z "$issue" ] && exit 0
+n=${issue#\#}
+
+cat >&2 <<EOF
+[ERROR] branch check: this commit references issue #$n but HEAD is main.
+
+Issue work goes on a branch. Move the staged work there and commit again:
+
+  git switch -c fix/$n-<slug>
+  git commit
+
+Then open a PR into main.
+EOF
+exit 1

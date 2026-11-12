@@ -147,8 +147,9 @@ jobs:
         with:
           fetch-depth: 0  # the diff needs the base commit
 
-      # The local pre-commit hook, run over every file this PR or push
-      # changed. CI is the enforcing copy: core.hooksPath is per-clone, so
+      # The local pre-commit hook (file size and local machine paths), run
+      # over every file this PR or push changed. The job name stays as is
+      # because main's branch protection requires it. CI is the enforcing copy: core.hooksPath is per-clone, so
       # fresh clones and cloud agents skip the hook, and --no-verify skips it.
       - name: Check changed files
         env:

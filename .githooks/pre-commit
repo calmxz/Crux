@@ -1,10 +1,13 @@
 #!/bin/sh
-# Blocks commits that stage a file over 5,000 tokens (tokens = bytes / 4).
+# Blocks commits that stage a file over 5,000 tokens (tokens = bytes / 4),
+# or a file holding a local machine path (a drive's Users folder, AppData),
+# which names the account it was written on. The repo is public.
 # Measures the staged blob, so unstaged edits do not count.
 # Enable once per clone: git config core.hooksPath .githooks
 
 MAX_TOKENS=5000
 MAX_BYTES=$((MAX_TOKENS * 4))
+LOCAL_PATH='([a-z]:|/[a-z])[\\/]+users[\\/]|appdata[\\/]'
 
 # Files nobody writes by hand: lockfiles, codegen output, tool output,
 # vendored code, license text. Binary files are skipped automatically.
@@ -37,6 +40,7 @@ else
 fi
 
 over=""
+paths=""
 tab=$(printf '\t')
 while IFS="$tab" read -r added _deleted path; do
 	[ -z "$path" ] && continue
@@ -47,11 +51,31 @@ while IFS="$tab" read -r added _deleted path; do
 		over="$over  $path: $((bytes / 4)) tokens ($bytes bytes)
 "
 	fi
+	hits=$(git cat-file -p "$blob$path" | grep -n -i -E "$LOCAL_PATH" | head -n 3 | cut -c1-120)
+	if [ -n "$hits" ]; then
+		paths="$paths$(printf '%s\n' "$hits" | sed "s|^|  $path:|")
+"
+	fi
 done <<EOF
 $list
 EOF
 
-[ -z "$over" ] && exit 0
+if [ -n "$paths" ]; then
+	cat >&2 <<EOF
+[ERROR] local-path check: $scope files hold a local machine path, which names
+the account it was written on:
+
+$paths
+Replace each path with a repo-relative one (docs/spec/files.md), or describe
+the location without it ("kept locally, not committed"), then commit again.
+
+EOF
+fi
+
+if [ -z "$over" ]; then
+	[ -z "$paths" ] && exit 0
+	exit 1
+fi
 
 cat >&2 <<EOF
 [ERROR] file-size check: $scope files over the $MAX_TOKENS-token limit (tokens = bytes / 4, max $MAX_BYTES bytes):
