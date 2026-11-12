@@ -123,7 +123,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 
 - A request by email is entered on the owner page by pasting the sender's address, used only to find the account and never stored ([#755]).
 - **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag ([#755]).
-- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) on 15 Mar. Didn't ask? Reply to stop it.", and erases it 2 days later unless the owner cancels. A session held for the owner's decision waits for the decision, and a restored account drops the request ([#755]).
+- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) on 15 Mar. Didn't ask? Reply to stop it.", and erases it 2 days later unless the owner cancels. A session held for the owner's decision waits for the decision. Restoring the account doesn't stop a waiting erasure: it runs on the date the email gave ([#755]).
 
 ### Breaches
 
