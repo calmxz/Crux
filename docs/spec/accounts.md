@@ -37,7 +37,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 Email sending, and how many of the day's emails can be codes, is in [`operations.md`](operations.md) ([#735]).
 
-- A code request the sender cannot serve shows: "We can't send codes right now. Use Continue with Google, or try again after 8:00 am." The time is the reset of Resend's day (see [`operations.md`](operations.md)) in the learner's own clock, "after 9:00 am" in Tokyo. When it falls on the learner's next date, the message adds "tomorrow": at 9 pm, "…try again after 8:00 am tomorrow". When the month ran out, the codes' month share included, when Resend is down, or while a breach notice is still sending, it says "try again later" instead ([#674], [#763]).
+- A code request the sender cannot serve shows: "We can't send codes right now. Use Continue with Google, or try again after 8:00 am." The time is the reset of Resend's day (see [`operations.md`](operations.md)) in the learner's own clock, "after 9:00 am" in Tokyo. When it falls on the learner's next date, the message adds "tomorrow": at 9 pm, "…try again after 8:00 am tomorrow". When the month ran out, when Resend is down, or while a breach notice is still sending, it says "try again later" instead ([#674], [#763]).
 - The owner page shows a dated count of code requests refused because the sender ran out for the day or the month, each email address once per day ([#674], [#728] Answer 6).
 
 ### Inside LinkedIn's or Facebook's built-in browser

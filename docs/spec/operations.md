@@ -43,7 +43,7 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
 
 - A sign-in code is refused with the sender-out message in [`accounts.md`](accounts.md). Over Resend's 10 requests a second, Crux waits the seconds Resend names and sends the code.
-- Any other email is retried by reason. Resend down: hourly. Over 10 requests a second: after the seconds Resend names. A quota refusal (`daily_quota_exceeded` or `monthly_quota_exceeded`), for a code too: the day or the month is marked full, and the email waits for the next room.
+- Any other email is retried by reason. Resend down: hourly. Over 10 requests a second: after the seconds Resend names. A quota refusal (`daily_quota_exceeded` or `monthly_quota_exceeded`): the day or the month is marked full, and the email waits for the next room. A code refused on quota marks it full too, and is refused, as above.
 - A quota refusal Crux did not expect means its count was wrong, so it is also logged as an error.
 - A retry never outlasts how long the spec keeps the email's address, such as a trial request's 30 days. A deadline to send, such as a breach notice's 72 hours, does not end it.
 - Retries are Cloud Tasks set for their time (see "The daily job"). A retry task holds only the email's queue ID.
@@ -175,7 +175,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - let-in entries older than 7 days, not used or kept. Sign-up also ignores an expired entry ([#679], [#728] Answer 7);
 - the trial, on its date ([#733]).
 
-**The one exception:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits and wrong-link counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
+**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits and wrong-link counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
 
 Some things happen by the date alone, with no job: a re-run's budget returning on the 1st, and the go-public bar judged at the end of its last day ([#676], [#734], [#735]).
 
