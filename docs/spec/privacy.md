@@ -35,7 +35,7 @@ The owner reads a conversation only in two cases ([#677]):
 - **Shared:** on the feedback page, the learner ticks to share, and picks a named session or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal". The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see [`feedback.md`](feedback.md)) ([#677], [#733]).
 - **Flagged:** a flag opens only the sessions where the tutor declined something, chat text only. The owner reads each one from its start up to the flag, plus any new declines while the flag waits. Access ends when the owner acts on the flag or, after a closure, when the lock ends ([#677], [#733]).
 
-No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread by a script, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
+No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread when the copy is made, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
 
 Repairs from a backup are done by script, and the owner sees counts, not content ([#716]). The owner page's feedback rules, including who sent an answer, are in [`feedback.md`](feedback.md) ([#677]).
 
@@ -85,7 +85,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A copy asked for while closing | Until its 7-day link expires ([#733], [#735]) |
 | A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
 | A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
-| A dead trial link's feedback answers and quote permissions | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
+| A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first ([#719]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |

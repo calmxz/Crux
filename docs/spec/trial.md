@@ -9,7 +9,7 @@ This file covers the first two of the main file's "Stages": the trial without ac
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
 - From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
-- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email she sends quoting her link code, deleted once answered (see [The link code](#the-link-code)) ([#755]).
+- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](#the-link-code)) ([#755]).
 - If the trial does not show that opening is worth it, Crux stays a portfolio project, and guest mode stays ([#677], [#733]).
 
 ## Entry
@@ -76,9 +76,9 @@ If the day's emails have run out, an invite or decline waits for the next day. A
 
 ### Erasing a link
 
-- The holder erases her link with "Erase this trial link" on her trial Settings page, after typing "delete". It erases at once what a tap on Yes erases: sessions, files, pages, photo answers, preferences, feedback words and quote permissions. A published quote keeps only where it was published and the remove-by date, until the owner marks it removed (see [`feedback.md`](feedback.md)) ([#755]).
+- The holder erases their link with "Erase this trial link" on their trial Settings page, after typing "delete". It erases at once what a tap on Yes erases: sessions, files, pages, photo answers, preferences, feedback words and quote permissions. A published quote keeps only where it was published and the remove-by date, until the owner marks it removed (see [`feedback.md`](feedback.md)) ([#755]).
 - A link locked by a sealed flag can't be erased this way until the owner decides ([#755]).
-- She may request access again ([#755]).
+- They may request access again ([#755]).
 
 ### What a link carries
 
@@ -138,7 +138,7 @@ A holder who does not visit cannot be reached ([#733]).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
-- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]).
+- Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first, unless the holder erases the link ([#755]). Those of a published quote stay until the owner removes it ([#719]).
 - A sealed session is kept longer only if reported to the authorities ([#719]).
 - Deleting a session erases it, but another session may still mention something from it.
 - The owner may read flagged or shared sessions (see [`privacy.md`](privacy.md)).

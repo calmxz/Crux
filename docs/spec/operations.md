@@ -149,7 +149,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - a decline's saved details once it drops out of the 7 days with no flag ([#733]);
 - a withdrawn quote's words at 14 days, if its account has gone ([#677], [#735]);
 - a dead trial link's stub, at the trial's end or 12 months after the link died, whichever comes first ([#719]);
-- a dead trial link's feedback answers and quote permissions, 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
+- a dead trial link's feedback answers and quote permissions (not after a Yes or its holder's erasing, which remove them at once), 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
 - any scrambled "told Crux is full" email or listed bucket object that its Cloud Tasks job or the erasure missed, and any copy object with no record ([#719]);
 - per-account spend, rolled into totals with no account ([#677]);
 

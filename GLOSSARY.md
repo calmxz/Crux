@@ -21,7 +21,7 @@ The private link that Crux emails to someone when the owner approves their reque
 _Avoid_: invite, code, password
 
 **Link code**:
-A short random code that names a trial link, such as K7Q-4MP, shown to the owner and on the holder's Settings page. It names the link so the holder can say which is hers; it never opens the link and does not prove she holds it.
+A short random code that names a trial link, such as K7Q-4MP, shown to the owner and on the holder's Settings page. It names the link so the holder can say which link is theirs; it never opens the link and does not prove they hold it.
 _Avoid_: link number, link ID, key
 
 **Copy page**:

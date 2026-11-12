@@ -119,7 +119,7 @@ Request access shows on these pages only while the trial runs.
 | Entry ticks | The two ticks and the trial link notice, in the start box or the chat box's place, held once per browser |
 | Guest mode | The guest sidebar, the reply count, the 10-reply line, the sample's end line, the guest stops and the block ending |
 | Request access | The Request access page and its received and region states |
-| Trial link | The device banner, the notice pages, the ended pages, the locked link's wording, and the opening order |
+| Trial link | The device banner, the notice pages (with the trial's moved or taken-back end), the ended pages (with the erased link's), the locked link's wording, and the opening order |
 
 The app shell gains the guest sidebar. The session screen gains the reply count and the mini check's bar.
 

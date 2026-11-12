@@ -37,9 +37,9 @@ flowchart TD
 | Today | What needs the owner, in the daily email's order, each line opening its item |
 | Trial (during the trial only) | Requests ("maria.reyes@example.com · Asked 2 Nov · 16 days left", with Approve and Decline), trial links, dead links, and the end of the trial |
 | Safety | Flags, misuse closures, entered requests, the reported hold, and "Tell learners about a breach" |
-| Feedback | Answers, with unread ones marked and which may be quoted, published quotes to remove, and shared sessions. An answer counts as read once opened |
-| Counts | The go-public bar with "Start the window", the path, arrivals by source, and the other counts |
-| Money and limits | The money, Crux's count beside Google's bill, the limits, the learner cap and the let-in list |
+| Feedback | Answers, with unread ones marked, which may be quoted and the email when its tick was given; "Mark published" with where; withdrawn published quotes with their remove-by date and "Mark removed"; and shared sessions. An answer counts as read once opened |
+| Counts | The go-public bar's progress ("14 / 20 mastered") with "Start the window" and its same-day undo, the path, "Limit hit on 9 of 56 days", arrivals by source, and the other counts: learners stopped by their own limit, "Told Crux is full: 30, 12 ticked email", refused sign-in codes and the dated under-18 count. In the trial, links turned away and guest-mode stops |
+| Money and limits | The budget used and left, today against the ceiling, the owner's share with its raise, the distress check's pot, Crux's count beside Google's bill; the limits (the ceiling, the tutoring limits, the learner cap, the daily and monthly guest caps, the owner's share and the pot); the cap line ("Learner cap full (25 of 25). Raise it before you re-share.", "25 + N let in"); and the let-in list with each entry's expiry, "keep until I remove it" and the blocked-email note |
 | Switches | A switch for each part and guest mode, and re-mark progress |
 
 The Trial area leaves the menu when the trial ends.

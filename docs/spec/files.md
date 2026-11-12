@@ -131,7 +131,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - Removing a file erases it, its pages and its outline at once ([#677], [#732]).
 - What the tutor already said about the file stays in the conversation until the session is deleted. Removing a file tells the learner so: "What the tutor already said about this file stays in the conversation. To erase that too, delete the session." ([#732])
 - Deleting a session removes its files, even during a check (see [`sessions.md`](sessions.md)) ([#671]).
-- A trial link's files, pages and photo answers are erased with its sessions when the link dies: the owner switches it off, the holder taps Yes to Crux's age question, or the trial ends ([#722], [#728]).
+- A trial link's files, pages and photo answers are erased with its sessions when the link dies: the owner switches it off, the holder taps Yes to Crux's age question, the holder erases it, or the trial ends ([#722], [#728], [#755]).
 - What closing an account erases, and what deleting cannot reach at once, is in [`privacy.md`](privacy.md) ([#677], [#716]). The upload lines in the terms are there and in [`trial.md`](trial.md) ([#677], [#722]).
 
 ## Gaps
@@ -165,3 +165,4 @@ The files and their mistake marks show in the objectives panel (see [`learning-s
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
+[#755]: https://github.com/calmxz/Crux/issues/755

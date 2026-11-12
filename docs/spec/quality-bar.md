@@ -92,7 +92,7 @@ These are the tests the closed tickets sent here, by area.
 - The terms and "Keep my account" steps on a live sign-in.
 - A notice clock starts at Resend's acceptance. Dates gain the days lost in a pause.
 - Spend lines past the week are reduced to nameless totals. "Email me" lists are erased.
-- The export script's zip, with a declined file packed unread. A quote untick reaches the daily email.
+- The copy's zip, with a declined file packed unread. A quote untick reaches the daily email.
 - The share tick's two choices, and its untick.
 
 **Misuse** ([#677], [#733], [#735], [#743])
