@@ -86,7 +86,8 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 ## Pictures
 
 - The tutor draws a diagram or a graph whenever it helps, and whenever the learner asks, including "a picture" on the never-ready menu. It does not draw on every turn ([#751]).
-- A diagram is Mermaid text. A graph is a function the tutor names, with a range and the points or tangent to mark. How Crux checks them is in [`ai-layer.md`](ai-layer.md), and where they show is in [`learning-screen.md`](learning-screen.md) ([#751]).
+- A diagram is Mermaid text, of three types only: `flowchart` (or `graph`), `stateDiagram` (or `stateDiagram-v2`) and `sequenceDiagram` ([#751], [#769]).
+- A graph is a function the tutor names, with a range and the points or tangent to mark. How Crux checks them is in [`ai-layer.md`](ai-layer.md), and where they show is in [`learning-screen.md`](learning-screen.md) ([#751]).
 - Diagrams stay in teaching. In the mastery check, only a graph may appear, in a problem (see [`mastery-check.md`](mastery-check.md)) ([#751]).
 
 ## On screen
@@ -104,3 +105,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): each object
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#769]: https://github.com/calmxz/Crux/issues/769

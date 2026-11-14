@@ -19,7 +19,7 @@ This file covers what happens when someone says they are under 18. The rule that
 - The tutor acts only on a clear statement about the learner's age now ("I'm only 15") ([#681]).
 - A remark about the past ("I first saw this when I was 15") does not raise it. "Grade 10" alone is not enough ([#681]).
 - The tutor spots the statement and calls Crux through a tool. It does not ask the question itself ([#679]).
-- Noticing a statement is tested as an AI test, in [`ai-tests.md`](ai-tests.md). What the tap does is an ordinary test, in [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
+- Noticing a statement is tested as an AI test, in [`ai-tests.md`](ai-tests.md). What the tap does is an ordinary test, in [`ordinary-tests.md`](ordinary-tests.md) ([#678], [#679]).
 
 ## The question
 

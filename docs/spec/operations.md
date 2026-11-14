@@ -74,11 +74,11 @@ The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 ## Errors
 
 - Google Cloud Error Reporting reads the backend's logs on Cloud Run ([#717]).
-- Browser errors are posted to `/api/client-error` and logged there. A tiny handler inside the page catches most load failures ([#717]).
+- Browser errors are posted to `/api/client-error` and logged there. A tiny handler catches most load failures ([#717]). It is its own file from Crux's address, loaded first ([#769]). The build ticket loads it as a plain blocking script before the module, not cached. A hash for an inline handler is the alternative ([#769]).
 - Each release keeps private source maps, and a local command turns a minified browser trace into file and line ([#717]).
 - New kinds of error push to the Google Cloud app, at most 20 an hour per project, then quiet for 6 hours. The uptime check is separate ([#717]).
 - Errors carry no learner text: the type, the place in the code and the request number. Any message that could hold learner text is replaced, for example "[answer, 58 characters]" ([#717]).
-- **At opening:** if only browser errors were hard to fix in the trial, Sentry is added for the browser. If Error Reporting failed more broadly, Sentry replaces it for both, with Error Reporting's notifications off. Either way Sentry collects no network addresses: its browser setting off, "Prevent Storing of IP Addresses" on, and a rule removing the location it derives ([#717]). Addresses can still reach Sentry through request headers such as `X-Forwarded-For`, cookies and query parameters, so the SDK's deny lists cover all three, and the backend SDK's user info is off ([#762]).
+- **At opening:** if only browser errors were hard to fix in the trial, Sentry is added for the browser. If Error Reporting failed more broadly, Sentry replaces it for both, with Error Reporting's notifications off. Either way Sentry collects no network addresses: its browser setting off, "Prevent Storing of IP Addresses" on, and a rule removing the location it derives ([#717]). Addresses can still reach Sentry through request headers such as `X-Forwarded-For`, cookies and query parameters, so the SDK's deny lists cover all three, and the backend SDK's user info is off ([#762]). The Worker's country and address headers join those deny lists. If added, Sentry is bundled and sends through Crux's own address (see [`security.md`](security.md)) ([#769]).
 
 ## The outside check
 
@@ -205,7 +205,8 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#753]: https://github.com/calmxz/Crux/issues/753
+[#755]: https://github.com/calmxz/Crux/issues/755
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
-[#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#769]: https://github.com/calmxz/Crux/issues/769

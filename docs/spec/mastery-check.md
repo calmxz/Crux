@@ -24,6 +24,7 @@ This file covers the mastery check, from the offer to the result and what follow
 - A check covers every objective not dropped, as they stand when it is offered, including any the diagnostic skipped, and any passed in another session (see [`sessions.md`](sessions.md)). Dropped objectives are not on it. After a fail, see [After a fail](#after-a-fail) ([#669], [#732]).
 - Written problems, answered with working, shown one at a time as "Problem k of N". No multiple choice ([#669]).
 - A problem may show a graph whose points SymPy works out ("From the graph, estimate the slope at x = 1"). Diagrams are not used in the check, and model answers and the result stay text. The marker gets the graph's function and range as text ([#751]).
+- A check's graph has a text alternative (see [`learning-screen.md`](learning-screen.md)): a short table of its points, with the values rounded to the graph's grid. A tangent is given as two points on it, never as its slope. A screen-reader user then does the same reading task as everyone else. The grid's step is left to the build ([#769]).
 - Each problem tests its objective as written. A "why" objective needs an explanation ([#669]).
 - Problems are fresh: never seen before in the topic, and never copied from the files. Where there are files, they follow the files' style, leaving out any file the tutor declined (see [`files.md`](files.md)) ([#667], [#669], [#732]).
 - A method objective gets problems that need and name the method ("Using the chain rule, ..."). An answer by another method gets "This one asks for the chain rule. Can you do it that way?" at once, right or wrong ([#669]).
@@ -141,9 +142,10 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the offer a
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#731]: https://github.com/calmxz/Crux/issues/731
-[#733]: https://github.com/calmxz/Crux/issues/733
 [#732]: https://github.com/calmxz/Crux/issues/732
-[#736]: https://github.com/calmxz/Crux/issues/736
+[#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#769]: https://github.com/calmxz/Crux/issues/769

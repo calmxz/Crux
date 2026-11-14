@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what a visitor sees before having an account: the landing page, guest mode, Request access, "Who runs Crux", and a trial link's entry, notices and endings. All of it comes from [#754] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`age.md`](age.md), [`accounts.md`](accounts.md), [`privacy.md`](privacy.md), [`spending.md`](spending.md), [`misuse.md`](misuse.md) and [`hosting.md`](hosting.md). The session screen, the app shell, the sign-in page and the opening page are in [`learning-screen.md`](learning-screen.md), [`app-shell.md`](app-shell.md) and [`account-screens.md`](account-screens.md). The prototype the owner chose from is on the throwaway branch `prototype/754-landing-guest-trial`: the landing page is variant B, and the other screens mix the variants as this file says.
+This file covers what a visitor sees before having an account: the landing page, guest mode, Request access, "Who runs Crux", the legal pages, the demo video, and a trial link's entry, notices and endings. All of it comes from [#754] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`age.md`](age.md), [`accounts.md`](accounts.md), [`privacy.md`](privacy.md), [`spending.md`](spending.md), [`misuse.md`](misuse.md), [`hosting.md`](hosting.md) and [`security.md`](security.md). The session screen, the app shell, the sign-in page and the opening page are in [`learning-screen.md`](learning-screen.md), [`app-shell.md`](app-shell.md) and [`account-screens.md`](account-screens.md). The prototype the owner chose from is on the throwaway branch `prototype/754-landing-guest-trial`: the landing page is variant B, and the other screens mix the variants as this file says.
 
 ```mermaid
 flowchart TD
@@ -113,6 +113,19 @@ A link that no longer works opens an opening page in place of the app, saying wh
 
 Request access shows on these pages only while the trial runs. A showing is the ended page served to a browser. Crux writes the misuse and sealed lines, the misuse one from the decline records in the harm list's words ([#764]).
 
+## The legal pages
+
+- The Trial Terms, the Trial Privacy Notice, the Terms and the Privacy Policy are pages, each with its "What changed" list ([#769]).
+- Their text lives in the repo and is built into the site's static files at each release, so they open at once whatever the backend's state ([#769]).
+- The same release loads each new version and its "What changed" list into Homes, which keeps every version and who agreed to which ([#769]).
+
+## The demo video
+
+- The demo video is a silent screen recording, with a written walk-through under it ([#769]).
+- It never plays with sound on its own, has controls and can be paused ([#769]).
+- It is a file Crux serves, under Workers' 25 MiB file limit ([#769]).
+- The build ticket drafts the walk-through for the owner ([#769]).
+
 ## Frontend modules
 
 | Module | What it holds |
@@ -122,9 +135,11 @@ Request access shows on these pages only while the trial runs. A showing is the 
 | Guest mode | The guest sidebar, the reply count, the 10-reply line, the sample's end line, the guest stops and the block ending |
 | Request access | The Request access page and its received and region states |
 | Trial link | The device banner, the notice pages (with the trial's moved or taken-back end), the ended pages (with the erased link's), the locked link's wording, and the opening order |
+| Legal pages | The Trial Terms, the Trial Privacy Notice, the Terms and the Privacy Policy, with their "What changed" lists ([#769]) |
 
 The app shell gains the guest sidebar. The session screen gains the reply count and the mini check's bar.
 
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#769]: https://github.com/calmxz/Crux/issues/769
