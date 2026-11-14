@@ -9,7 +9,7 @@ This file covers the visitor's country and address, the content security policy,
 - Cloudflare removes `CF-IPCountry` from a Worker's calls to an origin outside Cloudflare, such as Cloud Run (Cloudflare's HTTP headers page) ([#769]).
 - So the Worker reads the country from `request.cf.country` and the address from `CF-Connecting-IP`. It sends both to the backend in Crux's own headers, after deleting any incoming headers of those names ([#769]).
 - The backend reads only those headers, behind the secret-header check, and never `X-Forwarded-For` ([#769]). The address is what the code limits and wrong-link counts read ([#716], [#717]).
-- The country `XX` (no data) and `T1` (Tor) get the region message, like the EU and the UK ([#769]).
+- The country `XX` (no data), `T1` (Tor) and an empty country get the region message, like the EU and the UK ([#769]).
 - The Worker drops `Referer` on its calls to Cloud Run, so a page's path, a trial link's key included, never reaches the backend that way ([#769]).
 
 ## The content security policy

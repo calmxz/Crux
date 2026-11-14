@@ -121,6 +121,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
 **A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]). A logged home erasure is applied again by calling the erasure routine in [`data-model.md`](data-model.md), so its moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing ([#719]). A restore may lose a share tick given, which the learner gives again, and a "Start the window" press and let-in entries, which the owner redoes ([#719]).
+After a full restore, the release loads the current terms versions and their "What changed" lists into Homes again before Crux takes traffic, so Homes matches the legal pages. An agreement made after the dump is lost with it, so that person is asked again at their next opening ([#769]).
 
 **A repair** ([#716], [#735]):
 

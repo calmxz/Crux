@@ -134,7 +134,7 @@ These are the tests the closed tickets sent here, by area.
 
 - Component tests run in Vitest, with no coverage target ([#769]).
 - About five browser paths, in Chromium, block a merge: a guest's first reply, a trial link landing signed in, sign-in by code, a mastery check through to its Result, and the owner page turning another account away. The build ticket picks the exact paths ([#769]).
-- A sixth opens every route once, and each kind of opening and ended page once, and runs axe on each, leaving out Turnstile's own frame. It runs in both themes, and its stub reply holds a diagram, a graph and maths ([#769]).
+- A sixth opens every route once, and each kind of opening and ended page once, and runs axe on each, leaving out Turnstile's own frame. It runs in both themes, and its stub reply holds a diagram, a graph and maths. It blocks a merge, like the five ([#769]).
 - One browser path renders a reply with maths, a diagram and a graph under the real content security policy, with no policy errors. No browser path turns the policy off (see [`security.md`](security.md)) ([#769]).
 - The headers' browser path is in [`security.md`](security.md) ([#769]).
 
