@@ -25,6 +25,16 @@ These are process terms, so they stay out of the glossary.
 - The glossary stays at the repo root and holds no rules. The spec uses its terms.
 - The spec lives in this repo, in `docs/spec/`. If the map decides the new code lives in a new repo, the spec moves with it.
 
+## Linked rules
+
+Some kinds of rule need a matching edit in another file, in the same change ([#764]):
+
+- a new email: its share row in [`operations.md`](operations.md);
+- a new opening page: the order in [`accounts.md`](accounts.md);
+- a new stored item: its row under "Stored items" in [`data-model.md`](data-model.md), and in the retention table in [`privacy.md`](privacy.md);
+- a new safety or privacy action: the restore log in [`hosting.md`](hosting.md);
+- a new screen element: the Frontend modules table of its screen file.
+
 ## Until the lock
 
 - The main file says "Draft: not locked" until the map's destination is reached, then "Locked" with the date.
@@ -100,3 +110,4 @@ What each stage needs is listed in [`quality-bar.md`](quality-bar.md), without c
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#680]: https://github.com/calmxz/Crux/issues/680
 [#750]: https://github.com/calmxz/Crux/issues/750
+[#764]: https://github.com/calmxz/Crux/issues/764
