@@ -109,9 +109,10 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 
 - every deletion;
 - seals and locks, and the "Reported" mark;
-- warnings and flags;
+- warnings and flags, and a warning or dismissal with its waiting misuse card ([#764]);
+- a tap on Continue on a misuse card, and an ended page's first showing, so a restore neither brings the kinds back nor loses a card ([#764]);
 - ticks and quotes withdrawn;
-- closures asked for or kept, contests entered, and copies asked for;
+- closures asked for or kept, contests entered or upheld ([#764]), and copies asked for;
 - misuse-block entries;
 - trial links switched off;
 - age-question answers;
@@ -209,3 +210,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
+[#764]: https://github.com/calmxz/Crux/issues/764

@@ -99,14 +99,14 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 - Declines count toward a misuse flag per link, raised as for accounts (see [`misuse.md`](misuse.md)) ([#677], [#717], [#733]).
 - The owner reads the chat in the flagged sessions, then dismisses the flag or switches the link off. There is no warning, since there is no email ([#677], [#733]).
 - A sealed flag from the tutor's report locks the link, as for accounts. One from Google's block seals only that session, and a second locks the link ([#735]). The owner decides from the date and the kind, and either lifts the lock or seal, or switches the link off. What is sealed stays in place (see [`misuse.md`](misuse.md)) ([#733]).
-- After a dismissal, the holder sees the same notice as an account's email on their next visit. A link switched off for misuse shows the reason ([#733]).
+- After a dismissal, the holder sees the misuse card on their next visit (see [`misuse.md`](misuse.md)). A link switched off from its flag shows a reason Crux writes: the kinds in the harm list's words, from the decline records, or for a sealed flag the fixed reason line ([#733], [#764]).
 - A share on the feedback page ends when the link dies ([#733]).
 
 ### When a link dies
 
 A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), its holder erases it ([#755]), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719]).
 
-A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason, so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
+A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason (a misuse reason keeps its kinds only until first shown, see [`misuse.md`](misuse.md)) ([#764]), so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
 
 ### Telling a link holder
 
@@ -168,6 +168,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
   - Is Crux "automated decision-making or profiling" that must be registered under NPC Circular 2022-04, Section 5?
   - If not, is the sworn declaration still needed?
   - Is a learner's progress sensitive information about education?
+  - Are declined kinds, such as methods of self-harm or explicit sexual content, sensitive information about health or sexual life? ([#764])
 
 ## Opening
 
@@ -196,3 +197,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
+[#764]: https://github.com/calmxz/Crux/issues/764

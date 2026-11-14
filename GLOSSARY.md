@@ -36,6 +36,9 @@ _Avoid_: space, tenant, profile
 A mark that Crux puts on an account or a trial link after the tutor declines too many harmful requests, or one very serious one. The owner then decides what happens, usually after reading the chat in the sessions where the tutor declined something.
 _Avoid_: strike, report
 
+**Misuse card**:
+A page, with Continue, that tells a warned or dismissed learner why the owner read their sessions, naming the kinds of request the tutor declined. Each decision's card shows every time they open Crux, on any browser, until they tap Continue once. A trial link's notice for a dismissed flag is the same card.
+
 **Tutor**:
 The AI that teaches the learner and tracks which learning objectives the learner has shown. When the learner has shown every learning objective they have not dropped, the tutor offers a mastery check.
 _Avoid_: agent, bot, assistant

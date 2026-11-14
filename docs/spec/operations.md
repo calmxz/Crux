@@ -120,7 +120,7 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - code requests refused because the sender's share ran out ([#735]);
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
 - requests still waiting (see [`trial.md`](trial.md));
-- misuse flags (see [`misuse.md`](misuse.md)) ([#733]);
+- misuse flags (see [`misuse.md`](misuse.md)), each by its number, whose it is and the date: "Flag 4821 · An account · 10 Mar · Open ›", or "Flag 4812 on Link K7Q-4MP · 10 Mar · Open ›". No kind and no email. The kind, the record line, the sessions and the actions are in the owner page's Safety area ([#733], [#764]);
 - the day before a misuse closure is erased: "1 closed account is erased tomorrow. Check the Crux inbox for a contest." ([#753]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
 - an erasure waiting for its date: "1 erasure on 15 Mar: check the inbox for a reply." ([#755]);
@@ -163,7 +163,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - idle accounts at 12 months, once their warnings have run ([#677], [#735]);
 - a copy and its address when the link expires ([#735]);
 - "email me if spots open" addresses at 3 months, and the misuse block's scrambled email at 12 months ([#677]);
-- a decline's saved details once it drops out of the 7 days with no flag ([#733]);
+- a decline's saved details once it drops out of the 7 days with no flag, never kinds waiting for a misuse card (see [`misuse.md`](misuse.md)) ([#733], [#764]);
 - a withdrawn quote's words at 14 days, if its account has gone ([#677], [#735]);
 - a dead trial link's stub, at the trial's end or 12 months after the link died, whichever comes first ([#719]);
 - a dead trial link's feedback answers and quote permissions (not after a Yes or its holder's erasing, which remove them at once), 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
@@ -208,3 +208,4 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#764]: https://github.com/calmxz/Crux/issues/764

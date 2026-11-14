@@ -28,8 +28,8 @@ Each message shows in the card under the button or field it is about:
 
 ## Steps on opening
 
-- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The lock, "Keep my account", the terms-changed step and the under-18 closure each use one.
-- The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, "Keep my account", then the terms step.
+- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
+- The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, "Keep my account", then the terms step ([#764]).
 
 ```mermaid
 flowchart TD
@@ -42,12 +42,20 @@ flowchart TD
   steps -->|"1. a lock"| lock["Lock page"]
   lock -->|"Read my sessions"| ro["The app, read-only,<br/>with the lock bar"]
   steps -->|"2. the age question"| age["Age card in the thread,<br/>or in the main area"]
-  steps -->|"3. a closing's 7 days"| keep["Keep page"]
-  steps -->|"4. terms changed"| terms["Terms page"]
-  keep -->|"Keep my account"| next["The next step due,<br/>or the app"]
+  steps -->|"3. a warning or dismissal"| card["Misuse card,<br/>one per decision"]
+  steps -->|"4. a closing's 7 days"| keep["Keep page"]
+  steps -->|"5. terms changed"| terms["Terms page"]
+  card -->|Continue| next["The next step due,<br/>or the app"]
+  keep -->|"Keep my account"| next
   terms -->|Agree| next
   steps -->|none| app["The app, opening as<br/>app-shell.md says"]
 ```
+
+### The misuse card
+
+- After a dismissal, the card reads "Crux's owner read some of your sessions", then "The tutor declined 3 of your requests (methods of self-harm, explicit sexual content), and the owner read those sessions that were still there. On 4 Mar the owner took no action.", with Continue ([#764]).
+- After a warning, it adds "This breaks Crux's terms. Another time closes your account." ([#764])
+- When it shows, and how often, is in [`misuse.md`](misuse.md).
 
 ### Keep my account
 
@@ -68,8 +76,9 @@ flowchart TD
 ## A locked account
 
 - On opening, the lock's card comes first on its own page, headed "Your account is locked", with "Read my sessions" and Sign out.
-  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. Your account will be erased on 10 Nov. To contest this, reply to the email we sent you before then." and "You can still read your sessions and what you've mastered. The tutor can't reply."
-  - **A sealed flag:** "One of your sessions was sealed, and your account is locked while Crux's owner decides. Nobody can open the sealed session, including Crux's owner. To reply, email Crux at its address and quote flag 4821." and "You can still read your other sessions. The tutor can't reply."
+  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. Your account will be erased on 10 Nov. To contest this, reply to the email we sent you before then." and "You can still read your sessions and what you've mastered. The tutor can't reply." If a session was sealed while the flag waited, the card adds "Another session was sealed." and the fixed reason line in [`misuse.md`](misuse.md) after the kinds ([#764]).
+  - **A sealed flag:** "One of your sessions was sealed, and your account is locked while Crux's owner decides. Nobody can open the sealed session, including Crux's owner. To reply, email Crux at its address and quote flag 4821." and "You can still read your other sessions. The tutor can't reply." It adds the fixed reason line ([#764]).
+  - **A closure decided on a sealed flag:** "Crux's owner closed your account on 3 Nov, about your sealed session.", the fixed reason line, then "Your account will be erased on 10 Nov." and "To contest this, reply to the email we sent you before then, and quote flag 4821." ([#764])
 - When a seal locks the account while the learner is in the app, the lock's page shows at once. Behind "Read my sessions", the sealed session shows its sealed message (see [`app-shell.md`](app-shell.md)).
 - "Read my sessions" opens the app read-only. Each session shows the **lock bar**, "Your account is locked. Why?", and the chat box's place reads "Your account is locked, so the tutor can't reply." "Why?" brings the lock's card back.
 - What a lock allows is in [`misuse.md`](misuse.md). On screen, "+ New session", Rename, Close account and the feedback page's Send are greyed. In a misuse closure, Delete, the file × and the held session's Remove are greyed too.
@@ -116,7 +125,7 @@ One page in the main area, with four parts in this order:
 | Module | What it holds |
 |---|---|
 | Sign-in | The sign-in page: the two ways in, the human check, the code step, its messages, "One more thing", the full and blocked cards, and the note after closing |
-| Opening steps | The opening pages and their order: the lock, "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
+| Opening steps | The opening pages and their order: the lock, the misuse card ([#764]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
 | Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
 
@@ -126,3 +135,4 @@ One page in the main area, with four parts in this order:
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
+[#764]: https://github.com/calmxz/Crux/issues/764
