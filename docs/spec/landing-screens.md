@@ -90,7 +90,7 @@ Each is an opening page with Continue. Several show one after another, before th
 
 - **The trial is ending:** "The trial ends on 15 Jan", then "After that, this link stops working and everything in it is erased. Until then, you can untick a quote or a share in Settings, under Your feedback."
 - **A data breach:** "A data breach", then what happened, written at the time.
-- **A misuse flag dismissed:** "Crux's owner read some of your sessions", then the dismissal's wording from [`misuse.md`](misuse.md).
+- **A misuse flag dismissed:** the misuse card, in the dismissal's wording from [`account-screens.md`](account-screens.md). It shows until Continue is tapped, as [`misuse.md`](misuse.md) says ([#764]).
 - **The trial's end moved or taken back:** "The trial now ends on 14 Dec." or "The trial is no longer ending." ([#755])
 - A re-mark's notice stays a line in the thread (see [`learning-screen.md`](learning-screen.md)).
 
@@ -100,8 +100,10 @@ A link that no longer works opens an opening page in place of the app, saying wh
 
 | When | Card |
 |---|---|
-| Switched off by the owner | "This trial link was switched off", the owner's reason, and "Its sessions have been erased.", with Request access |
-| Switched off for misuse | "This trial link was switched off", then "The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. The owner switched this link off, and its sessions have been erased.", with Request access |
+| Switched off from the trial-link list ([#764]) | "This trial link was switched off", the owner's reason, and "Its sessions have been erased.", with Request access |
+| Switched off for misuse, from the link's flag: the first showing ([#764]) | "This trial link was switched off", then "The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions that were still there. The owner switched this link off, and its sessions have been erased.", with Request access |
+| Switched off for misuse: later showings, on any browser ([#764]) | The same, leaving out the brackets |
+| Switched off from a sealed flag ([#764]) | "This trial link was switched off", then the fixed reason line in [`misuse.md`](misuse.md) and "The owner switched this link off, and its sessions have been erased.", with Request access |
 | Just after Yes to the age question | "Your trial has ended", then "Crux is for people 18 and over, so this trial link has been switched off and its sessions have been erased.", with OK, which goes to the landing page |
 | Back later on a link ended by a Yes | "This trial link has ended", then "It no longer works.", with OK |
 | Erased by its holder ([#755]) | "You erased this trial link", then "Its sessions, files and feedback are gone." |
@@ -109,7 +111,7 @@ A link that no longer works opens an opening page in place of the app, saying wh
 | 10 wrong links from one network in an hour | "Too many wrong links", then "Your network tried too many links that don't work. Try again in an hour." |
 | The trial is over | "The trial has ended", then "Thanks for trying Crux. You can still try it as a guest.", with "Try it as a guest". From opening: "Thanks for trying Crux.", with "Sign in or sign up" |
 
-Request access shows on these pages only while the trial runs.
+Request access shows on these pages only while the trial runs. A showing is the ended page served to a browser. Crux writes the misuse and sealed lines, the misuse one from the decline records in the harm list's words ([#764]).
 
 ## Frontend modules
 
@@ -125,3 +127,4 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#764]: https://github.com/calmxz/Crux/issues/764

@@ -49,16 +49,36 @@ The owner reads the chat in the flagged sessions (see [`privacy.md`](privacy.md)
 
 - An account has one open flag at a time. A decline that flags at once, arriving while a flag waits, moves that flag to the last row ([#733]).
 - After a warning or a dismissal, the count returns to 0, including declines that arrived while the flag waited. A warning stays on record ([#733]).
-- What is saved with a decline is erased once the message naming it is sent or shown, or when the decline drops out of the 7 days with no flag ([#733]). A decline in a sealed flag stays with its sealed session and goes with it. Once the seal is lifted, this rule applies, with the lift's message as the message naming it ([#719]).
+- What is saved with a decline is erased when the decline drops out of the 7 days with no flag. Once the owner decides, it is kept as "How long the kinds are kept" below sets out ([#733], [#764]). A decline in a sealed flag stays with its sealed session until the seal is lifted, or goes with the session ([#719], [#764]).
 
 **What the learner is told**
 
-The learner hears only after the owner decides. Each message gives the reason, using the saved kinds, and says the owner read those sessions that were still there ([#677], [#733]).
+The learner hears only after the owner decides. No email names a declined kind. Each gives the count, says the owner read the flagged sessions that were still there, and sends the learner to sign in. The kinds are read in the app ([#677], [#733], [#764]).
 
-- **Warned:** an email: "This breaks Crux's terms. Another time closes your account."
-- **Dismissed:** an email: "The tutor declined 3 of your requests (making drugs or other illegal goods, methods of self-harm), so the owner read those sessions on Saturday. No action was taken."
-- **Closed:** an email with the reason, the date, and that replying before then contests it.
+- **Warned:** an email: "The tutor declined 3 of your requests, and Crux's owner read those sessions that were still there. This breaks Crux's terms. Another time closes your account. Sign in to read why." ([#764])
+- **Dismissed:** an email: "The tutor declined 3 of your requests, and Crux's owner read those sessions that were still there. On 4 Mar the owner took no action. Sign in to read why." ([#764])
+- **Closed:** an email: "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests, and the owner read those sessions that were still there. Sign in to read why. Your account will be erased on 10 Nov. To contest this, reply before then." ([#764])
+- The count includes declines that arrived while the flag waited. The date is the day of the owner's decision ([#764]).
 - Each of these emails ends with "If you reply, quote flag 4821.", so a reply can be matched to its flag. The owner page shows an account's flag with no email ([#755]).
+- The contest outcomes under "A misuse closure" name no kind. Nor do the owner's own replies from the Crux inbox ([#755], [#764]).
+
+**Where the kinds are read**
+
+- **Warned or dismissed:** the **misuse card**, an opening page with Continue that names the declined kinds. Its wording is in [`account-screens.md`](account-screens.md) ([#764]).
+- Each decision's card shows at every opening, on any browser, until Continue is tapped once. It first shows at the next opening, in the order [`accounts.md`](accounts.md) gives. A learner already in the app sees it only at the next opening, unlike a lock's page ([#764]).
+- Several waiting cards show one after another, oldest decision first ([#764]).
+- While the account is locked, the card waits, and shows once the lock ends. This includes a card from an earlier decision when a later closure's contest is upheld ([#764]).
+- **Closed:** the lock card names the kinds (see [`account-screens.md`](account-screens.md)) ([#764]).
+- Cards and lock cards name kinds in the harm list's words, or "blocked by Google". They never name the mark that flags at once ([#764]).
+- **A trial link:** a dismissal shows the misuse card on the next visit. A link switched off from its flag shows a line Crux writes (see [`trial.md`](trial.md) and [`landing-screens.md`](landing-screens.md)) ([#764]).
+
+**How long the kinds are kept**
+
+- **Warned or dismissed:** the count, the kinds and the decision's date are kept until Continue is tapped on that card, or until the account is erased, at the latest by the 12-month idle erasure. On a trial link, they are kept until Continue or until the link dies. Each decline's place in its session is erased at the owner's decision ([#764]).
+- **Closed:** they stay with the lock, until the account is erased or a contest is upheld. Each decline's place stays with the lock, for the owner's contest reading. Any older card still waiting is kept, and shows after the restore ([#764]).
+- **A trial link switched off for misuse:** the kinds stay in its stub until the ended page first shows them. The stub then keeps the count and the general line ([#764]).
+- Kinds waiting for a card no longer count toward a flag, and the 7-day rule does not erase them ([#764]).
+- The restore log keeps these steps through a database restore (see [`hosting.md`](hosting.md)) ([#764]).
 
 **Sealed flags**
 
@@ -86,21 +106,30 @@ A seal from Google's block stands apart from any open flag. A flag already waiti
 
 A sealed session's mastered topics and passed objectives stay on the Record, and the tutor still counts them. Every way into it shows the sealed message, and a message naming it leaves out "open … to pick it up". Its files leave the learner's allowance while it is sealed (see [`files.md`](files.md#the-allowance-and-the-store)). What the learner sees, and where, is in [`app-shell.md`](app-shell.md) ([#752]).
 
+**What a seal tells the learner**
+
+- A seal never names its kind, on email or screen. Every sealed message, the sealed session's and the lock card's, adds one fixed line, the **fixed reason line**: "Sessions are sealed when they may hold content that is never allowed, so nobody can read them." ([#764])
+- A closure decided on a sealed flag names no kind and does not say the owner read anything. Its email: "Crux's owner closed your account on 3 Nov, about your sealed session. Sign in to read why. Your account will be erased on 10 Nov. To contest this, reply before then." With two sealed sessions, it says "your sealed sessions". It quotes the sealed flag's number ([#764]).
+- A lift shows no card for the seal itself. The seal's kind stays with the sealed session, and is erased at the lift or with the session ([#719], [#764]).
+- **A seal on a waiting flag:** each part is told its own way. If the owner lifts the seal and takes no other action, the readable part gets a misuse card naming its kinds. If the owner closes, the lock card names the readable part's kinds, then adds "Another session was sealed." and the fixed reason line. The sealed session is never said to be read ([#764]).
+- A trial link switched off from a sealed flag gets Crux's sealed wording (see [`landing-screens.md`](landing-screens.md)) ([#764]).
+
 **A misuse closure**
 
 - The account locks for 7 days. Nothing is erased yet ([#733]).
 - If the owner upholds a contest, the account is restored as it was, and no block is set ([#677], [#733]). Crux emails "Crux's owner read your reply about flag 4790 and restored your account. You can use Crux again." ([#755])
+- An upheld contest on a sealed-flag closure also restores the account as it was. The seal stays until the owner lifts it ([#764]).
 - If the owner keeps the closure, the account is erased on the date the closure email gave, or at the next daily job if that date has passed. Crux emails the decision with the date: "Crux's owner read your reply about flag 4790 and kept the closure. Your account will be erased on 18 Mar." ([#755])
 - A contest that arrives in the 7 days is entered on the owner page, which holds the erasure until the owner decides. The owner's daily email gives a reminder the day before the erasure (see [`operations.md`](operations.md)) ([#753]). A contest after that is settled by the let-in list (see [`accounts.md`](accounts.md)) ([#733]).
 - Otherwise it is erased on day 8, in the daily housekeeping job ([#733]). The 7 days start when the closure email is sent, and a contest entered before then still counts (see [`operations.md`](operations.md)) ([#735]).
 - A lock is read-only: the learner can read, tap the age question, and untick a quote or a share, but not be tutored, start a session, rename one, or close the account ([#733], [#734], [#753]).
-- A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased, by its exact name, and Crux erases it 2 days after warning the account's address (see [`privacy.md`](privacy.md)) ([#755]). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).
+- A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased, by its exact name, and Crux erases it 2 days after warning the account's address (see [`privacy.md`](privacy.md)) ([#755]). The warning names the session, even when a session the tutor never named carries its request's first words, which can echo a declined request ([#764]). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).
 - Erasing wins over a flag. A flag waiting when an account is erased goes with it, with no block. A tap on Yes erases at once, with no block. A learner who closes and signs up again starts with no warning on record ([#681], [#733]).
 - The email is then kept scrambled for 12 months, to block rejoining. How the block works at sign-up is in [`accounts.md`](accounts.md) ([#677], [#733]).
 
 ## On screen
 
-The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account is in [`account-screens.md`](account-screens.md) ([#753]). A guest's block message and a trial link's lock, notices and ended pages are in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's flags, closures and reported hold are in [`owner-screens.md`](owner-screens.md) ([#755]).
+The message when Google blocks a reply is a line in the thread (see [`learning-screen.md`](learning-screen.md)) ([#751]). The rest of the layout is not decided (see the main file's Gaps). The message on a sealed session is in [`app-shell.md`](app-shell.md) ([#752]). The locked account and the misuse card are in [`account-screens.md`](account-screens.md) ([#753], [#764]). A guest's block message and a trial link's lock, notices and ended pages are in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's flags, closures and reported hold are in [`owner-screens.md`](owner-screens.md) ([#755]).
 
 ## Gaps
 
@@ -124,3 +153,4 @@ The message when Google blocks a reply is a line in the thread (see [`learning-s
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#764]: https://github.com/calmxz/Crux/issues/764

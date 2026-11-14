@@ -111,8 +111,9 @@ These come from [`privacy.md`](privacy.md). They show the next time a learner op
 
 - During a closing's 7 days: "Keep my account / Sign out".
 - After a change that matters: the "terms changed" step.
+- After a misuse warning or dismissal: the misuse card, which comes from [`misuse.md`](misuse.md) ([#764]).
 
-If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), "Keep my account", then the terms step ([#733]).
+If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), the misuse card, "Keep my account", then the terms step ([#733], [#764]).
 
 ## On screen
 
@@ -136,3 +137,4 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
+[#764]: https://github.com/calmxz/Crux/issues/764

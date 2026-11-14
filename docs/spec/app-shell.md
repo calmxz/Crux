@@ -92,7 +92,7 @@ flowchart TD
 
 ## A sealed session
 
-- Tapping its line shows the sealed message in the main area, in place of the session: "This session is sealed. Nobody can open it, including Crux's owner. Your other sessions keep working. Please don't upload that file again. To reply, email Crux at its address and quote flag 4821." "Your other sessions keep working" is left out when the account is also locked. The address works for trial links, which have no account email.
+- Tapping its line shows the sealed message in the main area, in place of the session: "This session is sealed. Nobody can open it, including Crux's owner. Your other sessions keep working. Please don't upload that file again. To reply, email Crux at its address and quote flag 4821." "Your other sessions keep working" is left out when the account is also locked. The address works for trial links, which have no account email. The message adds the fixed reason line in [`misuse.md`](misuse.md) ([#764]).
 - When a session is sealed while the learner is in it, the main area gives way to the sealed message at once. Later visits open as [The shell](#the-shell) says.
 - Its line shows its name if it has one. A session sealed on its first typed request never had a name, so it shows "Sealed session", never the first words of the blocked request.
 - Every way into it from "What you've mastered", or from a "passed in" mark, shows the sealed message. A message naming it elsewhere uses its line's name, and leaves out "open … to pick it up": "You mastered this in Reaction rates on 20 Oct." (see [`misuse.md`](misuse.md)).
@@ -118,3 +118,4 @@ The session screen's modules (see [`learning-screen.md`](learning-screen.md#fron
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#764]: https://github.com/calmxz/Crux/issues/764

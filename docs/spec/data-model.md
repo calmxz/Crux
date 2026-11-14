@@ -66,11 +66,11 @@ In the DB, and erased with the home ([#719]).
 | Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
-| Decline records, the open flag, a warning, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal | Safety | [`misuse.md`](misuse.md) |
+| Decline records, the open flag, a warning, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal | Safety | [`misuse.md`](misuse.md) ([#764]) |
 | Feedback answers, sends per day, quote and share ticks, the "email me" tick, the first-mastery notice shown, unread marks | Feedback | [`feedback.md`](feedback.md) |
 | Count marks: they go when the account is erased, not when it closes | Feedback | [`feedback.md`](feedback.md) |
 
-A decline in a sealed flag stays with its sealed session and goes with it, not when the message naming it is sent. Once the seal is lifted, [`misuse.md`](misuse.md)'s rule applies, with the lift's message as the message naming it ([#719]).
+A decline in a sealed flag stays with its sealed session, and is erased at the lift or with the session. A lift names no kind (see [`misuse.md`](misuse.md)) ([#719], [#764]).
 
 ### Account only
 
@@ -108,7 +108,7 @@ These never link to a home with delete with parent. The erasure writes or moves 
 | Item | Module | Lifetime |
 |---|---|---|
 | The reported hold: a sealed session marked "Reported", with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind and the email | Safety | Until the owner erases it ([`misuse.md`](misuse.md)) |
-| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
+| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A misuse reason keeps the kinds only until its first showing, then the count and the general line ([#764]). A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
 | A dead link's feedback answers and quote permissions, when it died other than by a Yes or its holder's erasing | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
@@ -198,3 +198,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
+[#764]: https://github.com/calmxz/Crux/issues/764

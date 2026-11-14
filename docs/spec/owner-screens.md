@@ -46,9 +46,9 @@ The Trial area leaves the menu when the trial ends.
 
 ## Trial
 
-- A trial link reads "Link K7Q-4MP · made 12 Nov · 4 browsers: more than 3", with Switch off. Switching off asks for the reason the holder's ended page shows.
+- A trial link reads "Link K7Q-4MP · made 12 Nov · 4 browsers: more than 3", with Switch off. Switching off here asks for the reason the holder's ended page shows. Switching off from the link's flag asks for none: Crux writes it (see [`trial.md`](trial.md)) ([#764]).
 - A flag on a link reads "Flag 4812 on Link K7Q-4MP".
-- A dead link reads "Link K7Q-4MP · Switched off:" and the reason. A link that died by a Yes, or that its holder erased, reads "A link · Ended" or "A link · Erased by its holder".
+- A dead link reads "Link K7Q-4MP · Switched off:" and the reason. One switched off from its flag reads "Link K7Q-4MP · Switched off for misuse", or "Link K7Q-4MP · Switched off: sealed" for a sealed flag ([#764]). A link that died by a Yes, or that its holder erased, reads "A link · Ended" or "A link · Erased by its holder".
 - **The end of the trial:** a date at least 7 days ahead. Once set, the owner can move it later or take it back (see [`trial.md`](trial.md)).
 
 ## Safety
@@ -75,7 +75,7 @@ The Trial area leaves the menu when the trial ends.
 ## The daily email
 
 - The subject is "Crux, 11 Mar: 4 things need you", or "Crux, 11 Mar" on a day with only "For your information" lines.
-- "Needs you" comes first, each line with "Open ›" landing on that item. Then "For your information", with no links. The lines are in [`operations.md`](operations.md).
+- "Needs you" comes first, each line with "Open ›" landing on that item. Then "For your information", with no links. The lines are in [`operations.md`](operations.md), including a flag's line, which names no kind ([#764]).
 
 ## Frontend modules
 
@@ -93,3 +93,4 @@ The Trial area leaves the menu when the trial ends.
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
+[#764]: https://github.com/calmxz/Crux/issues/764

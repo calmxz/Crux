@@ -86,7 +86,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
 | A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
 | A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
-| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first ([#719]) |
+| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing (see [`misuse.md`](misuse.md)) ([#719], [#764]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
 | Per-account spend | Current day and week only. Older days only as totals with no account ([#677]) |
@@ -185,3 +185,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#764]: https://github.com/calmxz/Crux/issues/764
