@@ -73,6 +73,11 @@ stateDiagram-v2
 
 - A diagram or graph shows inside the tutor's message, with a caption. When and how the tutor draws is in [`teaching.md`](teaching.md); how Crux checks a picture is in [`ai-layer.md`](ai-layer.md).
 - Diagrams are drawn from Mermaid text on the frontend. Graphs are drawn from the points SymPy works out; the drawing library is left to the build.
+- The frontend draws only what Mermaid parses as one of the three types in [`teaching.md`](teaching.md), with Mermaid's settings locked (see [`ai-layer.md`](ai-layer.md)) ([#769]).
+- Every picture has a text alternative built from its own data, with no AI call. The caption stays visible ([#769]):
+  - A flowchart or state diagram reads as a list of its boxes and arrows. A sequence diagram reads as its messages in order.
+  - In teaching, a graph reads as its range, its marked points or tangent, and a short table of its points (about nine). The formula is named only if the picture labels it.
+  - In a mastery check, a graph reads as [`mastery-check.md`](mastery-check.md) says.
 
 ## Mistake marks
 
@@ -89,10 +94,11 @@ stateDiagram-v2
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |
-| Pictures | Drawing Mermaid diagrams and graphs |
+| Pictures | Drawing Mermaid diagrams and graphs, and their text alternatives ([#769]) |
 
 The app shell, the session list, the Record, files and the file viewer are in [`app-shell.md`](app-shell.md) ([#752]). The other screens add their own modules.
 
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#754]: https://github.com/calmxz/Crux/issues/754
+[#769]: https://github.com/calmxz/Crux/issues/769

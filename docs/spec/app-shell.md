@@ -114,8 +114,14 @@ flowchart TD
 
 The session screen's modules (see [`learning-screen.md`](learning-screen.md#frontend-modules)) gain the session menu and the jump menu in the top bar, "Mastered in this session", and the file rows' states and ×.
 
+## Gaps
+
+- **The all-sessions page with its search:** in v1. How it looks and behaves, and which screen files and module rows hold it, are specified on [#780] ([#769]).
+
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#769]: https://github.com/calmxz/Crux/issues/769
+[#780]: https://github.com/calmxz/Crux/issues/780

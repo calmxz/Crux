@@ -117,6 +117,7 @@ One page in the main area, with four parts in this order:
 ### The emails
 
 - **Closing:** subject "Your Crux account closes on 10 Nov", the line in [`privacy.md`](privacy.md), and a "Sign in to Crux" button.
+- **The copy page** is the page the day-8 email links to. It shows a loading line while the backend wakes, and the landing page's unreachable line when the backend cannot be reached (see [`landing-screens.md`](landing-screens.md)) ([#769]).
 - **The copy page, once its link has expired or for an unknown code:** "This link has expired. Copies are kept for 7 days after they're sent." ([#762]).
 - **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 17 Nov. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
@@ -128,11 +129,18 @@ One page in the main area, with four parts in this order:
 | Opening steps | The opening pages and their order: the lock, the misuse card ([#764]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
 | Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
+| Copy page | The page the day-8 email links to: its loading and unreachable lines, and its expired page ([#769]) |
+
+## Gaps
+
+- **Themes:** in v1. How they look and behave, and which screen files and module rows hold them, are specified on [#779] ([#769]).
 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#769]: https://github.com/calmxz/Crux/issues/769
+[#779]: https://github.com/calmxz/Crux/issues/779

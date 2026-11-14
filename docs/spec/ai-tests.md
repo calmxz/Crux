@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the tests that run against the real model, how they are judged, and when they run. What a fail on the live version does, the owner's switches and re-marks are in [`live-faults.md`](live-faults.md). Tests that need no AI judgement are in [`quality-bar.md`](quality-bar.md). The models and their settings are in [`ai-layer.md`](ai-layer.md). Test money is in the main file's "Money".
+This file covers the tests that run against the real model, how they are judged, and when they run. What a fail on the live version does, the owner's switches and re-marks are in [`live-faults.md`](live-faults.md). Tests that need no AI judgement are in [`ordinary-tests.md`](ordinary-tests.md). The models and their settings are in [`ai-layer.md`](ai-layer.md). Test money is in the main file's "Money".
 
 ## Terms
 
@@ -16,7 +16,7 @@ These are test and build terms, so they stay out of the glossary ([#678]).
 
 - Every test the closed tickets sent here is on the bar, as an AI test or an ordinary one. Marking, related and unrelated, and mastered-elsewhere each include at least one non-maths subject ([#678]).
 - The boundaries are enforced in server code wherever code can. Where the boundary is the model's own judgement, such as marking, the harm line, or noticing an age statement, the AI test is the only check ([#678]).
-- Rules Crux enforces itself are ordinary tests (see [`quality-bar.md`](quality-bar.md)). Examples are when the lookup runs during a check, none of the teaching reachable while a problem is open, the menu order, a file reordering the menu, the age question's tap, and the maths library's checks ([#678], [#679], [#732]).
+- Rules Crux enforces itself are ordinary tests (see [`ordinary-tests.md`](ordinary-tests.md)). Examples are when the lookup runs during a check, none of the teaching reachable while a problem is open, the menu order, a file reordering the menu, the age question's tap, and the maths library's checks ([#678], [#679], [#732]).
 - Mermaid text that does not parse, and a graph function SymPy cannot read, draw nothing and fall back to words. These are ordinary tests ([#751]).
 - AI tests run in the Crux tests project, on the live models and instructions, with scripted situations only. They never touch live Crux or a learner's data ([#679], [#716]).
 

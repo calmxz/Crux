@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what runs where, the database, backups, environments and releases, the backend's tools, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
+This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
 ## What runs where
 
@@ -71,9 +71,9 @@ What a background answer is, and when it runs, is in [`spending.md`](spending.md
 - A new message in a session with waiting messages is answered together with them. If one of them is already being answered, the new message follows it, as with any reply under way ([#734], [#735]).
 - A call that fails on overload leaves the message waiting, for the next opening or the next block to clear ([#735]).
 
-## The Worker and the country check
+## The Worker
 
-- Cloudflare adds the visitor's country to each request (`CF-IPCountry`), and the visitor's network address, which the code limits and wrong-link counts read ([#716], [#717]).
+- The Worker passes the visitor's country and network address to the backend in Crux's own headers, as [`security.md`](security.md) says ([#769]).
 - Cloud Run accepts only calls from the Worker. The Worker adds a secret header, and middleware checks it first with `hmac.compare_digest`. A failure returns a plain 404 ([#716]).
 - The secret is at least 32 random bytes, rotatable through a current and next pair, rotated at each release or on any sign of a leak, and never logged ([#716]).
 - **Nothing blocks the whole site.** Crux checks the country only where someone new comes in: sign-up, a code for an email with no account, guest mode and Request access (see the main file's "Who Crux is for"). Accounts and trial links work from anywhere, and the outside check is not affected ([#733], [#735]).
@@ -146,10 +146,7 @@ All of this comes from [#716].
 - The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
 - CI starts the local stack, then runs `alembic upgrade head` ([#750]).
 
-### The backend's tools
-
-- Python 3.14, uv for dependencies and the lockfile, ruff for style, basedpyright for types ([#750]).
-- The API is contract-first. `docs/api/openapi.yaml` is written by hand, `gen_contracts.py` generates the request and response models from it, and CI fails on drift between them ([#750]).
+The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 
 ## Releases
 
@@ -207,7 +204,7 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#750]: https://github.com/calmxz/Crux/issues/750
-[#751]: https://github.com/calmxz/Crux/issues/751
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#769]: https://github.com/calmxz/Crux/issues/769

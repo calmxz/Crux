@@ -70,7 +70,7 @@ The tutor reports to Crux only through tool calls, never by Crux reading the cha
 - a lookup;
 - related topics, each tagged with where it came from, for Crux to sort (see [`learning-loop.md`](learning-loop.md));
 - a decline, naming its kind from the harm list, with a mark for the two cases that flag at once (see [`misuse.md`](misuse.md)) ([#733]);
-- a diagram, as Mermaid text, and a graph, as a function in LaTeX with its range and the points or tangent to mark (see [`teaching.md`](teaching.md)) ([#751]);
+- a diagram, as Mermaid text of one of the three types in [`teaching.md`](teaching.md) ([#769]), and a graph, as a function in LaTeX with its range and the points or tangent to mark (see [`teaching.md`](teaching.md)) ([#751]);
 - a file mistake, with the file's maths step in LaTeX where there is one, and what the teacher said about one (see [`files.md`](files.md)) ([#751]).
 
 Each turn carries an idempotency key, so a tool result is recorded once ([#716]).
@@ -130,6 +130,10 @@ The library is SymPy. Where it runs in a check is in [`mastery-check.md`](master
 - **Final answers:** it also compares the learner's final answer with the model answer. A disagreement with the marker brings a fresh re-mark, told whether the final values match, before the learner sees a result ([#679]).
 - The library never marks alone, and the working is still judged ([#679]).
 - **Pictures:** a diagram's Mermaid text must parse before it is drawn. A graph's function is read like an answer, and the library works out the points and any tangent's slope. If either fails, nothing is drawn, and the tutor explains in words. Crux stores the description, not an image ([#751]).
+- **Diagrams:** the parse check allows only the three type words in [`teaching.md`](teaching.md), so any other type fails like any picture. It refuses settings, styles, classes, colours, images and icons in the Mermaid text, so the contrast test holds and no diagram loads anything from outside ([#769]).
+- **Diagram build notes,** checked while deciding ([#769]):
+  - The refused grammar includes frontmatter `config:`, `%%{init}%%`, `style`, `classDef`, `class`, `:::`, `linkStyle`, sequence `rect` and `box` colours, and flowchart `img` and `icon` shapes.
+  - The frontend runs Mermaid with `securityLevel: 'strict'`, and with `theme`, `themeVariables`, `themeCSS` and `fontFamily` added to its `secure` list.
 - **File mistakes:** the library does the file's step itself and compares it with the file's result. Match: no flag. No match: the flag goes ahead. Can't tell: the tutor judges alone (see [`files.md`](files.md)) ([#751]).
 
 ## The distress check's call
@@ -165,3 +169,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#769]: https://github.com/calmxz/Crux/issues/769
