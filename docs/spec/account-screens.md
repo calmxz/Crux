@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md) and [`misuse.md`](misuse.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
+This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. Its dates follow [#772]. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md) and [`misuse.md`](misuse.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
 
 ## Signing in
 
@@ -28,7 +28,7 @@ Each message shows in the card under the button or field it is about:
 
 ## Steps on opening
 
-- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
+- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The card past a last day ([#772]), the lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
 - The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, "Keep my account", then the terms step ([#764]).
 
 ```mermaid
@@ -39,6 +39,7 @@ flowchart TD
   signin -->|"returning"| steps
   more -->|Start| steps
   signed -->|yes| steps{"Steps due,<br/>in this order"}
+  steps -->|"past a last day, alone"| past["Card past the last day,<br/>Sign out only"]
   steps -->|"1. a lock"| lock["Lock page"]
   lock -->|"Read my sessions"| ro["The app, read-only,<br/>with the lock bar"]
   steps -->|"2. the age question"| age["Age card in the thread,<br/>or in the main area"]
@@ -59,8 +60,8 @@ flowchart TD
 
 ### Keep my account
 
-- The card reads "Your account closes on 10 Nov." and "Everything in it is erased that day, unless you keep it."
-- Then "Keep my account", "Sign out" with "It still closes on 10 Nov. You can come back and keep it until then." under it, and "Send me a copy first".
+- The card reads "Your account closes at 11:59 pm on 10 Nov." and "After that, everything in it is erased, unless you keep it." ([#772])
+- Then "Keep my account", "Sign out" with "It still closes at 11:59 pm on 10 Nov. You can come back and keep it until then." under it, and "Send me a copy first".
 - A "Your feedback" link opens the learner's feedback list alone on the plain page, with Back. It lets the learner untick a quote or a share during the 7 days (see [`feedback.md`](feedback.md)). The app stays closed.
 - "Keep my account" goes to the next step due, or the app.
 
@@ -76,9 +77,11 @@ flowchart TD
 ## A locked account
 
 - On opening, the lock's card comes first on its own page, headed "Your account is locked", with "Read my sessions" and Sign out.
-  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. Your account will be erased on 10 Nov. To contest this, reply to the email we sent you before then." and "You can still read your sessions and what you've mastered. The tutor can't reply." If a session was sealed while the flag waited, the card adds "Another session was sealed." and the fixed reason line in [`misuse.md`](misuse.md) after the kinds ([#764]).
+  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. To contest this, email Crux at its address by 11:59 pm on 10 Nov. After that, your account is erased." and "You can still read your sessions and what you've mastered. The tutor can't reply." If a session was sealed while the flag waited, the card adds "Another session was sealed." and the fixed reason line in [`misuse.md`](misuse.md) after the kinds ([#764]).
   - **A sealed flag:** "One of your sessions was sealed, and your account is locked while Crux's owner decides. Nobody can open the sealed session, including Crux's owner. To reply, email Crux at its address and quote flag 4821." and "You can still read your other sessions. The tutor can't reply." It adds the fixed reason line ([#764]).
-  - **A closure decided on a sealed flag:** "Crux's owner closed your account on 3 Nov, about your sealed session.", the fixed reason line, then "Your account will be erased on 10 Nov." and "To contest this, reply to the email we sent you before then, and quote flag 4821." ([#764])
+  - **A closure decided on a sealed flag:** "Crux's owner closed your account on 3 Nov, about your sealed session.", the fixed reason line, then "To contest this, email Crux at its address by 11:59 pm on 10 Nov, and quote flag 4821. After that, your account is erased." ([#764], [#772])
+  - **Past a misuse closure's last day:** "Your time to contest ended at 11:59 pm on 10 Nov. Unless Crux's owner upholds a contest you sent in time, your account will be erased.", with Sign out only. While a contest is held: "Crux's owner has your reply and will decide. Until then, your account stays locked and nothing is erased." After "Keep the closure": "Crux's owner read your reply and kept the closure. Your account will be erased." ([#772])
+- **Past a closing's last day,** the account opens to a card with Sign out only: "Your account closed at 11:59 pm on 10 Nov. Everything in it will be erased.", with "We'll email you a copy once it's erased." if one was asked for. After 12 months without a visit: "Your account closed at 11:59 pm on 10 Nov, after 12 months without a visit. Everything in it will be erased." ([#772])
 - When a seal locks the account while the learner is in the app, the lock's page shows at once. Behind "Read my sessions", the sealed session shows its sealed message (see [`app-shell.md`](app-shell.md)).
 - "Read my sessions" opens the app read-only. Each session shows the **lock bar**, "Your account is locked. Why?", and the chat box's place reads "Your account is locked, so the tutor can't reply." "Why?" brings the lock's card back.
 - What a lock allows is in [`misuse.md`](misuse.md). On screen, "+ New session", Rename, Close account and the feedback page's Send are greyed. In a misuse closure, Delete, the file × and the held session's Remove are greyed too.
@@ -109,27 +112,27 @@ One page in the main area, with four parts in this order:
 
 ## Closing an account
 
-- Close account opens a dialog over the Settings page, like the other dialogs that erase something: "Close your account?", then "This erases your 4 sessions, your files, and your record of 3 mastered topics on 10 Nov. Until then, open Crux and choose Keep my account to stop it.", "Send me a copy first", "Type delete to confirm" with its box, Cancel and Close account.
+- Close account opens a dialog over the Settings page, like the other dialogs that erase something: "Close your account?", then "This erases your 4 sessions, your files, and your record of 3 mastered topics after 11:59 pm on 10 Nov. Until then, open Crux and choose Keep my account to stop it.", "Send me a copy first", "Type delete to confirm" with its box, Cancel and Close account.
 - Close account works only once "delete" is typed, in any case (see [`privacy.md`](privacy.md)).
-- "Send me a copy first", in this dialog or on the "Keep my account" card, turns into "We'll email ana@example.com a copy on 10 Nov, as a private link that works for 7 days."
-- Right after closing, the learner is signed out on that browser and sees the sign-in page, with a note above the card: "Your account closes on 10 Nov. We've emailed you. Sign in before then to keep it." (see [`accounts.md`](accounts.md)).
+- "Send me a copy first", in this dialog or on the "Keep my account" card, turns into "We'll email ana@example.com a copy once your account is erased, as a private link that works for 7 days." ([#772])
+- Right after closing, the learner is signed out on that browser and sees the sign-in page, with a note above the card: "Your account closes at 11:59 pm on 10 Nov. We've emailed you. Sign in before then to keep it." (see [`accounts.md`](accounts.md)).
 
 ### The emails
 
-- **Closing:** subject "Your Crux account closes on 10 Nov", the line in [`privacy.md`](privacy.md), and a "Sign in to Crux" button.
-- **The copy page** is the page the day-8 email links to. It shows a loading line while the backend wakes, and the landing page's unreachable line when the backend cannot be reached (see [`landing-screens.md`](landing-screens.md)) ([#769]).
-- **The copy page, once its link has expired or for an unknown code:** "This link has expired. Copies are kept for 7 days after they're sent." ([#762]).
-- **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 17 Nov. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
+- **Closing:** subject "Your Crux account closes at 11:59 pm on 10 Nov", the line in [`privacy.md`](privacy.md), and a "Sign in to Crux" button.
+- **The copy page** is the page the day-9 email links to. It shows a loading line while the backend wakes, and the landing page's unreachable line when the backend cannot be reached (see [`landing-screens.md`](landing-screens.md)) ([#769]).
+- **The copy page, once its link has expired or for an unknown code:** "This link has expired. A copy's link works for 7 days after it's sent." ([#762], [#772]).
+- **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 11:59 pm on 18 Nov, Philippine time. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
 ## Frontend modules
 
 | Module | What it holds |
 |---|---|
 | Sign-in | The sign-in page: the two ways in, the human check, the code step, its messages, "One more thing", the full and blocked cards, and the note after closing |
-| Opening steps | The opening pages and their order: the lock, the misuse card ([#764]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
+| Opening steps | The opening pages and their order: the card past a last day ([#772]), the lock, the misuse card ([#764]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
 | Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
-| Copy page | The page the day-8 email links to: its loading and unreachable lines, and its expired page ([#769]) |
+| Copy page | The page the day-9 email links to: its loading and unreachable lines, and its expired page ([#769]) |
 
 ## Gaps
 
@@ -144,3 +147,4 @@ One page in the main area, with four parts in this order:
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#772]: https://github.com/calmxz/Crux/issues/772

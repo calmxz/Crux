@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers email, knowing when something is wrong, how the owner is told, and the one daily job. What runs where is in [`hosting.md`](hosting.md).
+This file covers email, knowing when something is wrong, and how the owner is told. When dates take effect and the one daily job are in [`dates.md`](dates.md). What runs where is in [`hosting.md`](hosting.md).
 
 ## Email sending
 
@@ -34,8 +34,8 @@ Crux keeps shares of Resend's limits, counted on all email sent that day or mont
 
 ### When a required email is late
 
-- A notice period starts when Resend accepts the email, not on its planned date. This covers the idle warnings' 30 and 7 days, the 7 days to contest a misuse closure, the terms' 14 days, and the 2 days after an erasure warning ([#735], [#755]).
-- Erasure waits for its notice, for at most 30 days. After that it goes ahead, and the owner is told. The daily email lists any required email still unsent ([#735]).
+- A notice period starts when Resend accepts the email, not on its planned date. What a screen shows meanwhile, and what happens when it waits 30 days, are in [`dates.md`](dates.md) ([#735], [#755], [#772]).
+- The daily email lists any required email still unsent ([#735]).
 - A trial request's 30 days do not wait, as above ([#717]).
 
 ### When Resend refuses or is down
@@ -46,7 +46,7 @@ Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
 - Any other email is retried by reason. Resend down: hourly. Over 10 requests a second: after the seconds Resend names. A quota refusal (`daily_quota_exceeded` or `monthly_quota_exceeded`): the day or the month is marked full, and the email waits for the next room. A code refused on quota marks it full too, and is refused, as above.
 - A quota refusal Crux did not expect means its count was wrong, so it is also logged as an error.
 - A retry never outlasts how long the spec keeps the email's address, such as a trial request's 30 days. A deadline to send, such as a breach notice's 72 hours, does not end it.
-- Retries are Cloud Tasks set for their time (see "The daily job"). A retry task holds only the email's queue ID.
+- Retries are Cloud Tasks set for their time (see "The daily job" in [`dates.md`](dates.md)). A retry task holds only the email's queue ID.
 - Accepted does not mean read. A learner who has lost the inbox cannot act on the email, and the data goes at the deadline (see [`privacy.md`](privacy.md)) ([#677]).
 
 ### Sending a copy of a learner's data
@@ -54,14 +54,14 @@ Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
 What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
-- **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
+- **A copy asked for while closing:** the daily job makes it on day 9, and sends the link itself, as a required email ([#735], [#772]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and makes it with the owner page's button ([#735], [#755]).
-- The email links to the copy page, with a long random code after a `#` (see [`security.md`](security.md)) ([#770]). Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
+- The email links to the copy page, with a long random code after a `#` (see [`security.md`](security.md)) ([#770]). Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live until 11:59 pm on the 7th day after Resend accepts it, plus any outage days (see [`dates.md`](dates.md)) ([#735], [#762], [#772]).
 - The backend signs as a separate service account that can read only the copies bucket, so a copy link can never open anything else. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
 - The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour. Its address is kept only that hour ([#762], [#770]).
 - Once the link has expired, the page refuses the code. An unknown code gets the same page (see [`account-screens.md`](account-screens.md)) ([#762]).
 - The email says when the link expires, and to keep it private ([#735]).
-- Once the link has expired, the daily job erases the copy, its address and its code ([#735], [#762]).
+- Once the link has expired, the daily job erases the copy, its address and its code ([#735], [#762]). A copy whose email is still not accepted 30 days after it was made is erased too, and the owner is told ([#772]).
 
 ### The Crux email
 
@@ -82,8 +82,9 @@ The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 
 ## The outside check
 
-- Google Cloud Monitoring uptime checks open the public link and, through the Worker, an endpoint that runs one tiny database query and answers only "ok" ([#716], [#717]).
+- Google Cloud Monitoring uptime checks open the public link and, through the Worker, an endpoint that runs one tiny database query and answers "ok" ([#716], [#717]).
 - A third check calls an endpoint that fails if the daily job has not finished in 26 hours, so a missed run pushes at no cost ([#735]).
+- The database endpoint also stores when it last answered, which measures outages (see [`dates.md`](dates.md)) ([#772]).
 - They run every 5 minutes, from 3 or more checker places outside the EU and UK. Alerts push to the Google Cloud app ([#717]).
 - This also keeps the backend warm and Supabase from pausing ([#716]).
 - About 78,000 checks a month (3 checks x 3 places x 12 an hour x 24 x 30), of the 1 million free ([#717], [#735]).
@@ -102,6 +103,7 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 - for each new access request;
 - for a misuse flag raised at once ([#733]);
 - when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]);
+- when one of Crux's own notices has waited 30 days, or an emailed request needs confirming from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
 - when Resend is down, or the email day or month is full, at most once a day each: "Resend is down: 12 emails waiting". The daily email may not get through then ([#763]).
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
@@ -121,9 +123,11 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)), each by its number, whose it is and the date: "Flag 4821 · An account · 10 Mar · Open ›", or "Flag 4812 on Link K7Q-4MP · 10 Mar · Open ›". No kind and no email. The kind, the record line, the sessions and the actions are in the owner page's Safety area ([#733], [#764]);
-- the day before a misuse closure is erased: "1 closed account is erased tomorrow. Check the Crux inbox for a contest." ([#753]);
+- from the first run after a misuse closure's last day until it is erased, unless a contest is entered: "1 closed account's contest time has ended. It's erased on 12 Nov: check the Crux inbox for a contest.", its date updated if an outage delays the run, also kept in the owner page's Today area ([#753], [#772]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
-- an erasure waiting for its date: "1 erasure on 15 Mar: check the inbox for a reply." ([#755]);
+- an erasure warning waiting: "1 erasure warning ends on 15 Mar: check the Crux inbox for a reply.", then from the first run after that date, "1 erasure warning has ended. Its session is erased on 17 Mar: check the Crux inbox for a reply.", its date updated if an outage delays the run, also kept in the Today area ([#755], [#772]);
+- dates an outage moved: "Crux was down 40 minutes on 10 Nov: 3 dates moved by a day." ([#772]);
+- a request asked for by email whose email is still not accepted, and from 7 days after the owner entered it, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
 - Resend's month full, by Crux's count or a refusal ([#763]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
@@ -139,47 +143,6 @@ Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Zoho o
 - A gap over 10% goes in the daily email, for example "Google +35%: 3.5 Flash-Lite output tokens +USD 0.10" ([#717]).
 - This is free at this size. Crux's own count stays what enforces the limits ([#717]).
 
-## The daily job
-
-All scheduled work runs in one job: Cloud Scheduler calling the tasks service, at 8:05 am Philippine time, 5 minutes after Resend's day restarts ([#763]). Cloud Scheduler is free for up to 3 jobs per billing account, and 2 go to the peak schedule if the fallback in [`hosting.md`](hosting.md) is ever used ([#716], [#728] Answer 7).
-
-The job acts on every date that has passed, so a missed run catches up on the next one. Dates that give someone a chance to act (the undo, the contest period, notice periods, the trial's notice, a copy link's 7 days) first gain the days Crux was down, worked out from the gap between runs ([#735], [#762]). It does:
-
-**Backups and reports**
-
-- the daily database dump ([#716], [#728] Answer 7);
-- the bill comparison and the daily email ([#717]);
-
-**Email due**
-
-- "it's back" emails on the 1st, and any email waiting for its share ([#675], [#735]);
-- idle accounts' warnings at 30 and 7 days ([#677]);
-- the 30-day request declines ([#717], [#728] Answer 7);
-
-**Erasure**
-
-- accounts past their 7-day undo, making and sending any copy asked for first ([#677], [#728] Answer 7, [#733], [#735]);
-- misuse closures on day 8, unless a contest holds them ([#733]);
-- idle accounts at 12 months, once their warnings have run ([#677], [#735]);
-- a copy and its address when the link expires ([#735]);
-- "email me if spots open" addresses at 3 months, and the misuse block's scrambled email at 12 months ([#677]);
-- a decline's saved details once it drops out of the 7 days with no flag, never kinds waiting for a misuse card (see [`misuse.md`](misuse.md)) ([#733], [#764]);
-- a withdrawn quote's words at 14 days, if its account has gone ([#677], [#735]);
-- a dead trial link's stub, at the trial's end or 12 months after the link died, whichever comes first ([#719]);
-- a dead trial link's feedback answers and quote permissions (not after a Yes or its holder's erasing, which remove them at once), 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
-- any scrambled "told Crux is full" email or listed bucket object that its Cloud Tasks job or the erasure missed, and any copy object with no record ([#719]);
-- per-account spend, rolled into totals with no account ([#677]);
-
-**Ending things**
-
-- let-in entries older than 7 days, not used or kept. Sign-up also ignores an expired entry ([#679], [#728] Answer 7);
-- the trial, on its date ([#733]);
-- hand blocks at least 12 hours old (see [`security.md`](security.md)) ([#770]).
-
-**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits, the wrong-link counts and the copy page's wrong-code counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735], [#770]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
-
-Some things happen by the date alone, with no job: a re-run's budget returning on the 1st, and the go-public bar judged at the end of its last day ([#676], [#734], [#735]).
-
 ## Gaps
 
 - **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month. The two rules and the two metric alerts are about USD 1.40, plus about USD 0.10 for the points the alerts return, so about USD 1.50 a month ([#717], [#762], [#770]).
@@ -193,9 +156,7 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 
 [#674]: https://github.com/calmxz/Crux/issues/674
 [#675]: https://github.com/calmxz/Crux/issues/675
-[#676]: https://github.com/calmxz/Crux/issues/676
 [#677]: https://github.com/calmxz/Crux/issues/677
-[#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
@@ -212,3 +173,4 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#772]: https://github.com/calmxz/Crux/issues/772

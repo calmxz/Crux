@@ -48,31 +48,31 @@ Repairs from a backup are done by script, and the owner sees counts, not content
 ### Closing an account
 
 - Closing starts in Settings, in a confirm dialog where the learner types "delete" before Close account works ([#753]). The dialog names what is erased ("your 4 sessions, your files, and your record of 3 mastered topics") and the date the 7 days end, with a "Send me a copy first" button ([#677], [#733]).
-- An email follows: "Your Crux account closes on 3 Nov. Sign in to keep it." ([#677])
+- An email follows: "Your Crux account closes at 11:59 pm on 10 Nov, Philippine time. Sign in to keep it." ([#677], [#772])
 - During the 7 days, the next time they open Crux, on any browser, they see "Keep my account / Sign out", with the same button. There is no tutoring until they pick. A habitual visit does not cancel by accident ([#677], [#733]).
 - Keeping leaves the account as it was. Sign out lets the closing go on ([#677]).
-- Otherwise the account and its data are erased on day 8, in the daily housekeeping job ([#677], [#728] Answer 7).
-- **If they asked for a copy:** on day 8, Crux makes the copy itself, erases the account and everything else, and emails a private link to the copy page that works for 7 days from when it is sent (see [`operations.md`](operations.md)). It keeps only the copy, the address and the link's scrambled code until the link expires, and a missed link cannot be made again. Keeping the account cancels the copy ([#733], [#735], [#762]).
+- Otherwise the account and its data are erased on day 9, at the first daily run after the last day (see [`dates.md`](dates.md)). From 12:00 am after the last day, the account opens to a closed card only ([#677], [#728] Answer 7, [#772]).
+- **If they asked for a copy:** on day 9, Crux makes the copy itself, erases the account and everything else, and emails a private link to the copy page that works until 11:59 pm on the 7th day after it is sent (see [`operations.md`](operations.md)). It keeps only the copy, the address and the link's scrambled code until the link expires, or 30 days unsent, and a missed link cannot be made again. Keeping the account cancels the copy ([#733], [#735], [#762], [#772]).
 - A request that arrives by email during a closing, including a misuse closure, is entered on the owner page, or Crux cannot know about it ([#733]).
-- On day 8, the feedback words leave the owner page. Anonymous counts and yes/no answers stay as tallies. The account's quote permissions are withdrawn too (see [`feedback.md`](feedback.md)) ([#677]).
+- On day 9, the feedback words leave the owner page. Anonymous counts and yes/no answers stay as tallies. The account's quote permissions are withdrawn too (see [`feedback.md`](feedback.md)) ([#677], [#772]).
 - The owner chose the undo for the meantime. Erasing at once is the fallback if the undo causes problems ([#677]).
 - An under-18 closure skips the undo, and takes its counts off first (see [`age.md`](age.md)) ([#677], [#681]). A published quote's note stays until the owner removes it (see the table below) ([#734]). A misuse closure has its own 7 days (see [`misuse.md`](misuse.md)) ([#733]).
 - A closed account's spot under the cap stays used (see [`accounts.md`](accounts.md)) ([#675], [#677]).
 
 ### Idle accounts
 
-An account with no visit for 12 months is closed and erased, after emails 30 days and 7 days before. One visit keeps it: any signed-in request, opening the app included ([#719]). A learner who has lost the inbox cannot act on the emails, and the data goes at the deadline ([#677]). If a warning goes out late, the deadline moves, so the full notice is given (see [`operations.md`](operations.md)). The Privacy Policy says so ([#735]).
+An account with no visit for 12 months is closed and erased, after emails 30 days and 7 days before. One visit keeps it: any signed-in request, opening the app included ([#719]). A learner who has lost the inbox cannot act on the emails, and the data goes at the deadline ([#677]). If a warning goes out late, the deadline moves, so the full notice is given (see [`dates.md`](dates.md)). The Privacy Policy says so ([#735]). Past the deadline, the account opens to a closed card only, and is erased at the next daily run ([#772]).
 
 ### If Crux closes, or goes paid
 
-- **If Crux closes:** every learner is emailed at least 30 days ahead where possible: "Crux closes on 15 Feb. Want a copy of your data? Email us." Learning continues normally until then. Every account and its data is then erased, and the anonymous tallies stay ([#677]).
+- **If Crux closes:** every learner is emailed at least 30 days ahead where possible: "Crux closes at 11:59 pm on 15 Feb, Philippine time. Want a copy of your data? Email us before then." Learning continues normally until then. Every account and its data is then erased, once each copy asked for by then has been sent and its link has ended, and the anonymous tallies stay ([#677], [#772]).
 - The closing email goes on a day with few sign-ups, so it fits the sender's daily limit ([#677], [#728]).
 - **If the go-public bar is not met:** Crux is not shut down. It stays deployed as a portfolio project, under these same rules ([#676], [#677]).
 - **If a paid launch follows:** a v1 account moves only if the learner agrees to the new terms when they next open Crux. Anyone who does not answer is treated as a closing, with the 30 days' notice ([#677]).
 
 ## How long things stay
 
-| Data | How long |
+| Data | How long (job-enforced limits run longer only while the job is down) |
 |---|---|
 | Conversations, files, check answers and their marks | Until the session is deleted or the account is erased ([#671], [#677]) |
 | Account marks (dates of steps first reached, latest pay answer) | Until the account is erased. Deleting a session does not remove them ([#676]) |
@@ -82,8 +82,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A published quote, once withdrawn | Where it was published and the remove-by date, until the owner marks it removed. Its words too, for at most 14 days if its account has gone. After an under-18 ending, only where it was published and the date ([#677], [#734], [#735]) |
 | A decline's date and kind | As [`misuse.md`](misuse.md) sets out ([#733], [#719]) |
 | A misuse warning | As long as the account exists ([#733]) |
-| A copy asked for while closing | Until its 7-day link expires ([#733], [#735]) |
-| A copy asked for by email | Until its 7-day link expires, 7 days after sending ([#735], [#719]) |
+| A copy asked for while closing | Until its 7-day link expires, or 30 days if its email can't be sent ([#733], [#735], [#772]) |
+| A copy asked for by email | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772]) |
 | A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
 | A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing (see [`misuse.md`](misuse.md)) ([#719], [#764]) |
@@ -98,6 +98,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Copy page wrong-code counts | Network addresses for an hour ([#762], [#770]) |
 | Hand blocks, in Cloudflare's settings | Network addresses for 12 to 36 hours, longer only while the daily job is down or a lift fails (see [`security.md`](security.md)) ([#770]) |
 | A trial request's email | At most 30 days ([#717]) |
+| Uptime endpoint and outage times, not personal | Overwritten; an outage until no open date needs it ([#772]) |
+| Date moves, an inbox confirmation's code and mark | With the account, or as [`dates.md`](dates.md) says ([#772]) |
 | Sent emails, at Resend | 30 days in its log, and up to 7 days after in its backups ([#717], [#762]) |
 | Closed-for-misuse email, scrambled | 12 months ([#677]) |
 | Backups | Deleted data may remain in a backup for up to 8 days. A restore re-applies every deletion and listed safety or privacy action made since its dump, from a log that keeps only IDs, times and actions for about 8 days (see [`hosting.md`](hosting.md)) ([#716], [#735]) |
@@ -121,11 +123,11 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 
 ### Copies and requests
 
-- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. The owner checks the request came from the account's own address. A button on the owner page then makes it, as the copy at closing is made, without the owner reading through it ([#677], [#755]). It reaches the learner as a private 7-day link (see [`operations.md`](operations.md)) ([#735]).
+- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request, unless Crux's email can't go. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. The owner checks the request came from the account's own address. A button on the owner page then makes it, as the copy at closing is made, without the owner reading through it ([#677], [#755]). It reaches the learner as a private 7-day link (see [`operations.md`](operations.md)) ([#735]).
 
 - A request by email is entered on the owner page by pasting the sender's address, used only to find the account and never stored ([#755]).
-- **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag ([#755]).
-- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) on 15 Mar. Didn't ask? Reply to stop it.", and erases it 2 days later unless the owner cancels. A session held for the owner's decision waits for the decision. Restoring the account doesn't stop a waiting erasure: it runs on the date the email gave ([#755]).
+- **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag. Its timing, and what happens if its email can't go, is in [`dates.md`](dates.md) ([#755], [#772]).
+- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) after 11:59 pm on 15 Mar, Philippine time. Didn't ask? Reply before then to stop it.", its last day 2 days after Resend accepts it. Unless the owner cancels, it goes as [`dates.md`](dates.md) says, even if the account is restored. A session held for the owner's decision waits for the decision ([#755], [#772]).
 
 ### Breaches
 
@@ -138,7 +140,8 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - what is stored and for how long (see above);
 - "Deleting a session erases it. Another session may still mention something from it, until you delete that one too.";
 - a removed file's earlier replies stay in the conversation until the session is deleted;
-- "If you ask for a copy while closing, we keep it until its link expires, 7 days after it's sent, and no longer.";
+- "If you ask for a copy while closing, its link works until 11:59 pm Philippine time on the 7th day after it's sent, plus any days Crux was down. If we can't send it, we keep it at most 30 days. We erase the copy after that, and keep it no longer, except while our daily job is down.";
+- "Limits on how long we keep something end at our daily job's last run within them, and run longer only while that job is down.";
 - a date for erasing data moves if a notice goes out late, or if Crux is down, so nobody loses their chance to act ([#735]);
 - the processors below, and where they process data;
 - the dated anonymous counts, including the under-18 count, and the cookieless arrivals count;
@@ -190,3 +193,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#772]: https://github.com/calmxz/Crux/issues/772

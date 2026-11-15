@@ -28,7 +28,7 @@ flowchart TD
   H -. link dies .-> ST[Stub]
   FA -. link dies, not by Yes .-> FB[Kept 6 months after the trial, or 12 months after the link died]
   FA -. published quote withdrawn .-> QN[Quote note; words at most 14 days]
-  H -. at erasure .-> CP[Copy, its address and its email, until the link expires]
+  H -. at erasure .-> CP[Copy, its address and its email, until the link expires, or 30 days unsent]
 ```
 
 Solid lines are delete with parent: deleting the parent deletes the child in the same transaction. Dotted lines are items moved or written outside the home before it is erased ([#719]).
@@ -76,7 +76,7 @@ A decline in a sealed flag stays with its sealed session, and is erased at the l
 
 | Items | Module | Lifetime |
 |---|---|---|
-| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md) |
+| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state, date moves, an inbox confirmation's code and mark ([#772]) | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md) |
 | Sign-in codes; code limits per email and per network address | Sign-in | [`accounts.md`](accounts.md) |
 | "Email me when it's back" address | Spending | [`spending.md`](spending.md) |
 
@@ -113,7 +113,7 @@ These never link to a home with delete with parent. The erasure writes or moves 
 | A dead link's feedback answers and quote permissions, when it died other than by a Yes or its holder's erasing | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
-| A copy (copies bucket), its address, its link's scrambled code, and the email that sends its link | Homes | Until its link expires ([`privacy.md`](privacy.md)) ([#762]) |
+| A copy (copies bucket), its address, its link's scrambled code, and the email that sends its link | Homes | Until its link expires, or 30 days unsent ([`privacy.md`](privacy.md)) ([#762], [#772]) |
 | The scrambled misuse email | Safety | 12 months ([`misuse.md`](misuse.md)) |
 | The list of a home's bucket objects to erase | Files | Until each is erased; the daily job retries ([#719]) |
 
@@ -133,6 +133,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | The email queue with each kind, sender counts, required emails' acceptance times | Email | [`operations.md`](operations.md) |
 | Re-mark runs, the planted-file re-check list | Mastery check | [`live-faults.md`](live-faults.md) |
 | Data requests entered on the owner page, daily email items, the daily job's last run | Operations | [`operations.md`](operations.md) |
+| When the uptime checks' endpoint last answered, and each outage's start and end | Operations | [`dates.md`](dates.md) ([#772]) |
 | Terms versions and their "What changed" lists | Homes | For the life of Crux v1 ([#719]) |
 
 ### Outside the database
@@ -201,3 +202,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#772]: https://github.com/calmxz/Crux/issues/772

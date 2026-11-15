@@ -82,8 +82,8 @@ The cap itself is in the main file's "Money".
 - The owner adds an email on the owner page. That person signs up normally and gets past a full cap at "One more thing" ([#679]).
 - They are an ordinary learner, with tutoring limits, spend in the budget, and counted like anyone ([#679]).
 - The owner page shows "25 + N let in" ([#679]).
-- An entry is erased at sign-up, or after 7 days. For any entry, the owner can choose "keep until I remove it", which still ends at sign-up ([#679]).
-- Expiry runs in the daily housekeeping job, and sign-up also ignores an expired entry ([#728] Answer 7).
+- An entry is erased at sign-up, or at the last daily run within 7 days. For any entry, the owner can choose "keep until I remove it", which still ends at sign-up ([#679]).
+- Expiry runs in the daily job, and sign-up ignores an entry from 8:05 am on the day it is due to go, even if that run is missed ([#728] Answer 7, [#772]).
 - Open sign-up stays: the list only adds named people past a full cap ([#679]).
 - An entry also gets past the misuse block below, and the owner gets a note that this email was blocked. The person starts with a new, empty account ([#733]).
 
@@ -113,7 +113,7 @@ These come from [`privacy.md`](privacy.md). They show the next time a learner op
 - After a change that matters: the "terms changed" step.
 - After a misuse warning or dismissal: the misuse card, which comes from [`misuse.md`](misuse.md) ([#764]).
 
-If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), the misuse card, "Keep my account", then the terms step ([#733], [#764]).
+The card past a last day comes alone, before all of these (see [`dates.md`](dates.md)) ([#772]). If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), the misuse card, "Keep my account", then the terms step ([#733], [#764]).
 
 ## On screen
 
@@ -138,3 +138,4 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#772]: https://github.com/calmxz/Crux/issues/772
