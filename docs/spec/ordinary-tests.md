@@ -128,6 +128,9 @@ These are the tests the closed tickets sent here, by area.
 - An error carrying learner text is reported without it.
 - The restore log, one test per listed action. Sender shares. The 26-hour uptime check.
 - Push protection, Betterleaks and osv-scanner each fail on a planted case.
+- The copy page refuses a network after 10 wrong codes in an hour. A trial link's key and the copy page's code are read from after the `#` and sent in a request body ([#770]).
+- A Cloudflare refusal is retried once after 10 seconds, then shows "Crux can't be reached right now. Try again later." with the typed message kept. Crux's own errors are not retried. The Worker turns a Cloud Run answer not in Crux's error shape into its "can't be reached" code ([#770]).
+- A missing or lapsed sign-in cookie shows the signed-out view, and a blocked network the unreachable line; neither shows the other. Warm-on-open greys the landing page only after its second refused try, and the greying clears when a try succeeds ([#770]).
 - Before the trial, hadolint, the image scan and CodeQL each fail on a planted case: a Dockerfile running as root, an image with a known-vulnerable package, and a query built from strings. CodeQL also fails on a planted case on the frontend: a page that writes text from its address into the page as HTML ([#769]).
 
 ## Component tests and browser paths
@@ -171,3 +174,4 @@ These are the tests the closed tickets sent here, by area.
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770

@@ -62,7 +62,8 @@ stateDiagram-v2
   - the "paused" lines and the re-mark notices (see [`live-faults.md`](live-faults.md));
   - "The tutor is busy right now", the lines when Google blocks a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md));
   - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
-  - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back".
+  - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back";
+  - "Crux can't be reached right now. Try again later.", after a Cloudflare refusal and one try 10 seconds later, while the message shows as sending; a typed message stays in the box (see [`security.md`](security.md)) ([#770]).
 - A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`spending.md`](spending.md) and [`live-faults.md`](live-faults.md)).
 - The age question is a card in the thread of whichever session is open, with Yes and No. When no conversation is open, it shows in the main area (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the after-first-mastery notice are pinned lines above the chat box. Each shows once, as its own file says, and stays until dismissed or until the learner leaves. Neither shows inside a check; one due during a check waits until the result (see [`spending.md`](spending.md) and [`feedback.md`](feedback.md)).
@@ -90,7 +91,7 @@ stateDiagram-v2
 | Module | What it holds |
 |---|---|
 | Session screen | The top bar, the conversation, the chat box and the panel, laid out for phone and desktop, and the switch into and out of the check |
-| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, and the buttons and cards in the thread |
+| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]) |
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |
@@ -102,3 +103,4 @@ The app shell, the session list, the Record, files and the file viewer are in [`
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770

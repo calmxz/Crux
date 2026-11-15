@@ -112,6 +112,7 @@ These settle how Google's services behave, while that part is built:
 | The owner's keyboard and screen-reader pass over every screen, the owner pages included ([#769]) | owner |
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |
+| The request guards and open paths working on live; calls Cloudflare refuses not counting toward the Worker's 100,000; Security Analytics on Free showing the source address of busy traffic; a `#` trial link opening from the Gmail and Outlook apps (see [`security.md`](security.md)) ([#770]) | check |
 
 ### Before opening
 
@@ -133,6 +134,7 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 | The Sentry judgement, with its address settings if added ([#717]) | owner |
 | Google's sign-in screen moved to production, with the Privacy Policy on the domain ([#717]) | owner |
 | The crisis line's number and link verified again, and the directory's terms read ([#735]) | owner |
+| The burst guard's 300 and the two request pushes' numbers re-set from the trial's real counts (see [`security.md`](security.md)) ([#770]) | owner |
 
 ## Gaps
 
@@ -155,4 +157,5 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771

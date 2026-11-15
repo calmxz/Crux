@@ -56,9 +56,9 @@ What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
 - **A copy asked for while closing:** the daily job makes it on day 8, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and makes it with the owner page's button ([#735], [#755]).
-- The email links to the copy page, with a long random code. Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
+- The email links to the copy page, with a long random code after a `#` (see [`security.md`](security.md)) ([#770]). Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live for 7 days from sending, plus the days Crux was down ([#735], [#762]).
 - The backend signs as a separate service account that can read only the copies bucket, so a copy link can never open anything else. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
-- The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour ([#762]).
+- The code is stored scrambled. A network that tries 10 wrong codes in an hour is refused for the rest of the hour. Its address is kept only that hour ([#762], [#770]).
 - Once the link has expired, the page refuses the code. An unknown code gets the same page (see [`account-screens.md`](account-screens.md)) ([#762]).
 - The email says when the link expires, and to keep it private ([#735]).
 - Once the link has expired, the daily job erases the copy, its address and its code ([#735], [#762]).
@@ -106,7 +106,7 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
 
-There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]).
+There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]). Beside them, two metric alerts on Crux's logs push when `/api` calls run high. The owner is also told when a hand block's lift fails, a block outlives 36 hours, or the list holds anything but single addresses (see [`security.md`](security.md)) ([#770]).
 
 ### The daily email
 
@@ -173,15 +173,16 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 **Ending things**
 
 - let-in entries older than 7 days, not used or kept. Sign-up also ignores an expired entry ([#679], [#728] Answer 7);
-- the trial, on its date ([#733]).
+- the trial, on its date ([#733]);
+- hand blocks at least 12 hours old (see [`security.md`](security.md)) ([#770]).
 
-**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits and wrong-link counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
+**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits, the wrong-link counts and the copy page's wrong-code counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735], [#770]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down") ([#763]).
 
 Some things happen by the date alone, with no job: a re-run's budget returning on the 1st, and the go-public bar judged at the end of its last day ([#676], [#734], [#735]).
 
 ## Gaps
 
-- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month, so about USD 0.70 a month for the two rules ([#717], [#762]).
+- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month. The two rules and the two metric alerts are about USD 1.40, plus about USD 0.10 for the points the alerts return, so about USD 1.50 a month ([#717], [#762], [#770]).
 - **Zoho's free plan:** whether Zoho offers it to Crux, and whether its processor agreement covers it. Open on [#726] ([#717], [#762]).
 - **Resend's figures on every reply:** Resend's page says only that "the API returns headers that track your email sending quotas". Checked at the build's first real send, a refusal included. If they are missing, how Crux counts comes back as a recorded change ([#763]).
 - **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; stale dates in a retried email; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
@@ -210,3 +211,4 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770
