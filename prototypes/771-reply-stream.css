@@ -1,0 +1,56 @@
+:root { --ink:#1d2330; --mute:#6b7280; --line:#e3e6ec; --bg:#f6f7f9; --me:#2f5bea; --sys:#eef1f6; --warn:#fff4e0; --stop:#fde8e8; --ok:#1f8a4c; }
+* { box-sizing:border-box; }
+body { margin:0; font:15px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif; color:var(--ink); background:#d9dde4; }
+.stage { display:flex; justify-content:center; padding:16px 12px 150px; }
+.device { background:var(--bg); border:1px solid #b9bfca; border-radius:18px; overflow:hidden; display:flex; flex-direction:column; }
+.device.phone { width:390px; height:780px; } .device.small { width:320px; height:700px; }
+.device.desktop { width:1100px; height:740px; border-radius:8px; }
+.topbar { display:flex; align-items:center; gap:10px; padding:10px 14px; background:#fff; border-bottom:1px solid var(--line); min-height:50px; }
+.topbar .brand { font-weight:700; } .topbar .title { flex:1; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.strip { background:#fff; border-bottom:1px solid var(--line); padding:7px 14px; font-size:13px; display:flex; justify-content:space-between; }
+.body { flex:1; display:flex; min-height:0; }
+.thread { flex:1; overflow-y:auto; padding:14px; display:flex; flex-direction:column; gap:10px; min-width:0; }
+.rail { width:290px; border-left:1px solid var(--line); background:#fff; overflow-y:auto; padding:14px; font-size:14px; }
+.composer { border-top:1px solid var(--line); background:#fff; padding:10px; display:flex; gap:8px; }
+.composer input { flex:1; min-width:0; border:1px solid var(--line); border-radius:20px; padding:9px 14px; font:inherit; }
+.btn { border:1px solid #c9ced8; background:#fff; border-radius:8px; padding:7px 12px; font:inherit; font-size:14px; cursor:pointer; }
+.btn.primary { background:var(--me); color:#fff; border-color:var(--me); }
+.msg { max-width:88%; padding:9px 12px; border-radius:14px; min-width:0; }
+.msg.tutor { background:#fff; border:1px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px; }
+.msg.me { background:var(--me); color:#fff; align-self:flex-end; border-bottom-right-radius:4px; }
+.msg.me .wait { display:block; font-size:12px; opacity:.85; margin-top:4px; }
+.msg.faded { opacity:.55; }
+.msg p { margin:0 0 8px; } .msg p:last-child { margin-bottom:0; }
+.who { font-size:11px; color:var(--mute); margin-bottom:2px; text-transform:uppercase; letter-spacing:.5px; }
+.sysline { align-self:center; max-width:92%; text-align:center; font-size:13px; padding:6px 12px; border-radius:10px; background:var(--sys); color:#3b4252; }
+.sysline.warn { background:var(--warn); } .sysline.stop { background:var(--stop); }
+.label { font-size:11px; text-transform:uppercase; letter-spacing:.5px; color:var(--mute); margin:10px 0 0; border-top:1px dashed #c9ced8; padding-top:8px; align-self:stretch; }
+.nospec { color:#a1462d; font-style:italic; }
+.typing { color:var(--mute); font-size:14px; }
+.dots::after { content:"..."; animation:d 1.2s steps(4) infinite; display:inline-block; width:1.2em; overflow:hidden; vertical-align:bottom; }
+@keyframes d { from { width:0 } to { width:1.2em } }
+.caret { display:inline-block; width:.45em; height:1em; background:#9aa3b5; vertical-align:-2px; margin-left:2px; animation:blink 1s steps(2) infinite; }
+@keyframes blink { 50% { opacity:0 } }
+.rawtex { font-family:ui-monospace, Consolas, monospace; font-size:13px; background:#f3f0e6; color:#6b5a2b; padding:0 3px; border-radius:3px; word-break:break-all; }
+.picwait { border:1px dashed #c9ced8; border-radius:8px; padding:18px; text-align:center; color:var(--mute); font-size:13px; margin:6px 0; }
+figure { margin:6px 0 8px; } figcaption { font-size:12px; color:var(--mute); }
+.card { background:#fff; border:1px solid var(--line); border-radius:12px; padding:12px; min-width:0; }
+.checkbar { background:#1d2330; color:#fff; padding:7px 12px; font-size:13px; border-radius:10px; }
+.model { background:#f7f8fa; border-radius:8px; padding:6px 8px; font-size:14px; margin-top:4px; min-width:0; }
+.mark { background:var(--warn); border-radius:10px; padding:8px 10px; font-size:13px; }
+.uni { font-family:"Cambria Math", "STIX Two Math", Cambria, serif; }
+.uni.disp { display:block; text-align:center; margin:8px 0; font-size:1.08em; }
+/* option A: display maths scrolls sideways */
+.m-scroll .katex-display { overflow-x:auto; overflow-y:hidden; padding:2px 0 6px; }
+.m-scroll .katex-display:focus-visible { outline:2px solid var(--me); outline-offset:2px; }
+.m-scroll .scrollhint { font-size:11px; color:var(--mute); text-align:right; margin-top:-4px; }
+/* option B: display maths breaks after = and +, from KaTeX's own docs */
+.m-wrap .katex-display > .katex { white-space:normal; }
+.m-wrap .katex-display > .katex > .katex-html > .base { margin:.25em 0; }
+.m-wrap .katex-display { margin:.5em 0; overflow-x:auto; overflow-y:hidden; }
+.bar { position:fixed; left:50%; transform:translateX(-50%); bottom:10px; background:#1d2330; color:#fff; border-radius:12px; padding:8px 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; max-width:96vw; z-index:9; font-size:13px; }
+.bar select, .bar button { font:inherit; font-size:13px; border-radius:6px; border:1px solid #4b5568; background:#2a3242; color:#fff; padding:4px 8px; cursor:pointer; }
+.bar button.on { background:#fff; color:#1d2330; }
+.bar .grp { display:flex; gap:4px; align-items:center; }
+.note { max-width:1100px; margin:0 auto; padding:10px 14px 0; font-size:14px; }
+.note p { margin:4px 0; }
