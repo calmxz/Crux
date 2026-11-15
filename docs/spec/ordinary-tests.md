@@ -85,10 +85,11 @@ These are the tests the closed tickets sent here, by area.
 
 **Closing and retention** ([#677], [#733], [#735])
 
-- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 8. A day-8 copy through the copy page: each opening gets a link that works its full 15 minutes and opens nothing outside the copies bucket, and the page refuses the code after 7 days plus any days down ([#762]).
+- A closing waits 7 days, is cancelled by "Keep my account", and erases on day 9. A day-9 copy through the copy page: each opening gets a link that works its full 15 minutes and opens nothing outside the copies bucket, and the page refuses the code after 11:59 pm on its last day plus any outage days ([#762], [#772]).
 - The idle warnings.
 - The terms and "Keep my account" steps on a live sign-in.
-- A notice clock starts at Resend's acceptance. Dates gain the days lost in a pause.
+- A notice clock starts at Resend's acceptance, and a shown date only moves later. An emailed request waits for its email, or for the owner's confirmation with the right code ([#772]).
+- At 12:00 am after a last day, Keep, a trial link and a copy page stop, and the card past the last day shows. An outage of 15 minutes or more moves an open date by its total, before any run or refusal acts, and a restore keeps the move ([#772]).
 - Spend lines past the week are reduced to nameless totals. "Email me" lists are erased.
 - The copy's zip, with a declined file packed unread. A quote untick reaches the daily email.
 - The share tick's two choices, and its untick.
@@ -100,7 +101,7 @@ These are the tests the closed tickets sent here, by area.
 - The flag table: warn, dismiss and close, by whether a warning is on record. The count resets. One open flag.
 - A flag opens only sessions with a decline. No file shows on any flag. A flag dies with its account. A trial link's flag has no warning.
 - A sealed flag locks at once, and the owner sees only the date and the kind.
-- A lock is read-only. A contest holds the erasure. A misuse closure erases on day 8, and blocks the email for 12 months.
+- A lock is read-only. A contest holds the erasure. A misuse closure erases on day 10, one run after the owner's reminder, and blocks the email for 12 months ([#772]).
 - A blocked reply counts as a decline, tested with a made-up block result. A second prohibited-content block locks the account.
 - A sealed session marked "Reported" stays past its account's erasure, and an unmarked one goes. The erasure tests in [`data-model.md`](data-model.md) pass ([#719]).
 
@@ -177,3 +178,4 @@ These are the tests the closed tickets sent here, by area.
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#772]: https://github.com/calmxz/Crux/issues/772

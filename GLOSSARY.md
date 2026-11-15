@@ -25,8 +25,24 @@ A short random code that names a trial link, such as K7Q-4MP, shown to the owner
 _Avoid_: link number, link ID, key
 
 **Copy page**:
-The Crux page that the email with a learner's copy of their data links to. Each time it is opened while the link is live, it starts a fresh download. After 7 days it says the link has expired.
+The Crux page that the email with a learner's copy of their data links to. Each time it is opened while the link is live, it starts a fresh download. After the link's last day it says the link has expired.
 _Avoid_: download page, export
+
+**Last day**:
+The date by which someone can still act, such as keeping a closing account or contesting a closure. It lasts until 11:59 pm Philippine time on that date. Crux acts after it, never on it.
+_Avoid_: deadline day, expiry date
+
+**Chance to act**:
+A stretch of time in which a learner or the owner can still do something before Crux acts, such as the 7 days to keep a closing account. It ends on its last day, and lasts at least as long as it says.
+_Avoid_: grace period, window
+
+**Keep-limit**:
+The longest Crux keeps something that nobody acts on, such as a trial request's email. Crux erases it before the limit is up.
+_Avoid_: retention period, expiry
+
+**Outage**:
+A stretch of 15 minutes or more when Crux could not be reached. An outage moves every chance to act it overlaps later, so nobody loses time to it.
+_Avoid_: downtime
 
 **Home**:
 What a learner's sessions, files, record and preferences belong to: an account or a trial link. Erasing a home erases everything in it.

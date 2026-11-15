@@ -43,7 +43,7 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 
 - The form has the email, the human check, "I am 18 or over", and this line: "Trial places are limited. Request once; we'll email you a private link if you're approved. We keep your email only until we approve or decline your request, at most 30 days. [Privacy Notice]" ([#717]).
 - Each new request pushes to the owner's phone. The owner page lists waiting requests, and the owner approves or declines each one ([#717]).
-- A request not decided in 30 days, or still waiting when the trial ends, is declined ([#717]). The 30-day declines run in the daily housekeeping job ([#717], [#728] Answer 7).
+- A request not decided in 30 days, or still waiting when the trial ends, is declined, at the first run after its last day ([#717], [#772]). The 30-day declines run in the daily housekeeping job ([#717], [#728] Answer 7).
 - Every request is new. Crux keeps no record of past requests, and the owner is the duplicate check ([#717]).
 
 **On approval:** Crux makes a trial link with a random 128-bit key, emails it, and erases the email. The owner never sees the link. The invite says ([#717]):
@@ -113,7 +113,7 @@ A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its st
 Crux has no email for a link, so it uses an on-screen notice at the holder's next visit ([#733]):
 
 - **The Trial Terms change:** the entry ticks show again.
-- **The trial is ending:** a notice with the date, shown ahead of time. It reminds the holder that they can untick a quote or a share until then ([#734]).
+- **The trial is ending:** a notice with the date and time, shown ahead of time. It reminds the holder that they can untick a quote or a share until then ([#734]).
 - **A data breach:** a notice saying what happened.
 - **A re-mark** that changed a mark (see [`live-faults.md`](live-faults.md)) ([#736]).
 
@@ -154,7 +154,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 
 ## Ending the trial
 
-- The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and the daily housekeeping job ends the trial on that date ([#733]).
+- The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and links end at 12:00 am after it. Once passed, it can't be moved ([#733], [#772]).
 - Once set, the date can move later or be taken back, never earlier. A date set after a take-back is never earlier than the one taken back. Link holders see a fresh notice at their next visit ([#755]).
 - Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" stays ([#719]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
@@ -200,3 +200,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#772]: https://github.com/calmxz/Crux/issues/772

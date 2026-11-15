@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime, owner messages and the daily job are in [`operations.md`](operations.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
+This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime and owner messages are in [`operations.md`](operations.md), and the daily job in [`dates.md`](dates.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
 ## What runs where
 
@@ -117,11 +117,12 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - misuse-block entries;
 - trial links switched off;
 - age-question answers;
-- each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]).
+- each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]);
+- each outage, and each date an outage or a notice's acceptance moved, as the new last day per ID (see [`dates.md`](dates.md)) ([#772]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
-**A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]). A logged home erasure is applied again by calling the erasure routine in [`data-model.md`](data-model.md), so its moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing ([#719]). A restore may lose a share tick given, which the learner gives again, and a "Start the window" press and let-in entries, which the owner redoes ([#719]).
+**A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]). A logged home erasure is applied again by calling the erasure routine in [`data-model.md`](data-model.md), so its moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing ([#719]). Before Crux takes traffic, the release script sets the database endpoint's last-answer time to its last answer before the outage, read from the uptime check's history, which the script's account can read, so the restore counts only the real outage ([#772]). A restore may lose a share tick given, which the learner gives again, and a "Start the window" press and let-in entries, which the owner redoes ([#719]).
 After a full restore, the release loads the current terms versions and their "What changed" lists into Homes again before Crux takes traffic, so Homes matches the legal pages. An agreement made after the dump is lost with it, so that person is asked again at their next opening ([#769]).
 
 **A repair** ([#716], [#735]):
@@ -215,3 +216,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#772]: https://github.com/calmxz/Crux/issues/772
