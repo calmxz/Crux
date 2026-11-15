@@ -64,9 +64,9 @@ What a background answer is, and when it runs, is in [`spending.md`](spending.md
 
 - They run on the tasks service through Cloud Tasks, so they carry on if the learner leaves ([#735]).
 - Opening the app queues the learner's waiting messages and kept files' reads, oldest session first, with the open session ahead of them ([#734]).
-- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, and asks for finished answers while any are waiting ([#734], [#735]). It asks only while its tab is on screen, and less often the longer it waits ([#736]).
+- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, and asks for finished answers while any are waiting, or after a broken reply ([#734], [#735], [#771]). It asks only while its tab is on screen, and less often the longer it waits ([#736]).
 - Crux claims each waiting message in the database before answering it, so a second browser or a second opening does nothing. A claim expires, so a stopped instance cannot hold a message for good ([#734], [#735]).
-- One background answer runs at a time per learner, and Crux checks the limits before each one ([#735]).
+- One background answer runs at a time per learner, and Crux checks the limits before each one ([#735]). A broken reply's new answer does not stop at the learner's own tutoring limit (see [`ai-layer.md`](ai-layer.md)) ([#771]).
 - A new message goes through the backend as usual, and does not wait for this queue. If it runs beside a background answer, the limit can pass by at most that one reply ([#735]).
 - A new message in a session with waiting messages is answered together with them. If one of them is already being answered, the new message follows it, as with any reply under way ([#734], [#735]).
 - A call that fails on overload leaves the message waiting, for the next opening or the next block to clear ([#735]).
@@ -214,3 +214,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#771]: https://github.com/calmxz/Crux/issues/771

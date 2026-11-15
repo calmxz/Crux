@@ -40,7 +40,7 @@ The modules are the ones in [`data-model.md`](data-model.md) ([#719]).
 
 All of this comes from [#750].
 
-- **Tutor AI:** the whole `agent/` (tool loop, prompt, tools) is rebuilt. Two things in `services/llm.py` are borrowed as design: the test stub, and no retry once streaming starts ([#750]).
+- **Tutor AI:** the whole `agent/` (tool loop, prompt, tools) is rebuilt. Two things in `services/llm.py` are borrowed as design: the test stub, and no overload retry once streaming starts ([#750], [#771]).
 - **Spending:** the pricing piece is the rate table, the dated rate change and `usage_cost` in `services/cost_meter.py`. Its `gemini/...` model names become Agent Platform's, and its rates are re-checked against Agent Platform's price list. A dated rate change takes effect when Google's billing applies it; the build ticket checks Google's notice, and until then the copied date stays in UTC. The limits are written new ([#750]).
 - **Operations:** the three copied files change their imports and drop their Render comment. The rebuilt database setup keeps psycopg's `connect_timeout`, which the copied `/ready` probe relies on. Error handling, logging and the backup are written new ([#750]).
 
@@ -96,10 +96,10 @@ All of this comes from [#769].
 
 ## Copied frontend code
 
-- `markdownRenderer.js` is copied whatever [#771] decides, since every reply needs its Markdown and its DOMPurify cleaning. Its KaTeX part stays only if [#771] keeps LaTeX drawn with KaTeX. Vue's `ref` is replaced ([#769]).
-- If [#771] keeps word-by-word streaming, `markdownStreamBuffer.js` and `deltaBatcher.js` are copied too ([#769]).
+- `markdownRenderer.js` is copied, since every reply needs its Markdown and its DOMPurify cleaning. Its KaTeX part stays, since maths is drawn with KaTeX. Vue's `ref` is replaced ([#769], [#771]).
+- `markdownStreamBuffer.js` and `deltaBatcher.js` are copied too, since a reply shows word by word ([#769], [#771]).
 - Each is converted to TypeScript and comes with its tests: `markdownRenderer.test.js` (3 cases), `markdownIncremental.test.js` (14), `markdownStreamBuffer.test.js` (17) and `deltaBatcher.test.js` (4). The 6 cases in `markdownRendererLazy.test.js` mount the old Vue component, so they are rewritten against the React one ([#769]).
-- `sseParser.js` is left behind, since Hey API's client reads the event stream. If the fallback in [`tools.md`](tools.md) drops Hey API, `sseParser.js` and `sseParser.test.js` (7 cases) are copied, since something must read the backend's event stream whatever [#771] decides ([#769]).
+- `sseParser.js` is left behind, since Hey API's client reads the event stream. If the fallback in [`tools.md`](tools.md) drops Hey API, `sseParser.js` and `sseParser.test.js` (7 cases) are copied, since something must read the backend's event stream ([#769]).
 
 ## Frontend left behind
 
@@ -117,7 +117,6 @@ Learner statistics, keyboard shortcuts and pinning a session are lines on the ma
 
 ## Gaps
 
-- **Streaming and KaTeX:** whether they stay is open on [#771]. Its answer settles which frontend files are copied ([#769]).
 - **Where the new code lives, and when the old code goes:** open on [#781] ([#750], [#769]).
 - **Bringing the deployment back:** on the map's "Not yet specified" list. The new schema has no path from the old migrations ([#750]).
 

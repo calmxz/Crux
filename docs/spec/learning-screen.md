@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the session screen: where teaching, the mastery check, its result and Crux's own messages appear, and how pictures and mistake marks show. All of it comes from [#751] unless a line says otherwise. The rules these screens show are in the area files they link to. The prototype the owner chose from is on the throwaway branch `prototype/751-learning-screen`, variant A except where this file says otherwise.
+This file covers the session screen: where teaching, the mastery check, its result and Crux's own messages appear, how pictures and mistake marks show, how a reply arrives and breaks, how maths shows, and what a screen reader hears. All of it comes from [#751] unless a line says otherwise. The rules these screens show are in the area files they link to. The prototype the owner chose from is on the throwaway branch `prototype/751-learning-screen`, variant A except where this file says otherwise.
 
 ## One screen
 
@@ -64,11 +64,12 @@ stateDiagram-v2
   - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
   - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back";
   - "Crux can't be reached right now. Try again later.", after a Cloudflare refusal and one try 10 seconds later, while the message shows as sending; a typed message stays in the box (see [`security.md`](security.md)) ([#770]).
-- A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`spending.md`](spending.md) and [`live-faults.md`](live-faults.md)).
+- A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`spending.md`](spending.md) and [`live-faults.md`](live-faults.md)). After a broken reply, it is answered at the next opening or with the learner's next message ([#771]).
 - The age question is a card in the thread of whichever session is open, with Yes and No. When no conversation is open, it shows in the main area (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the after-first-mastery notice are pinned lines above the chat box. Each shows once, as its own file says, and stays until dismissed or until the learner leaves. Neither shows inside a check; one due during a check waits until the result (see [`spending.md`](spending.md) and [`feedback.md`](feedback.md)).
 - A held session's pinned line cannot be dismissed, and goes when its file is removed. Pinned lines stack with that line first, then in the order they came (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the care line at a limit have no wording yet. The build ticket drafts both for the owner.
+- The lines in [While a reply arrives](#while-a-reply-arrives), [When a reply breaks](#when-a-reply-breaks) and [Screen readers](#screen-readers) are drafts. The build ticket settles their wording with the owner ([#771]).
 
 ## Pictures
 
@@ -83,19 +84,52 @@ stateDiagram-v2
 ## Mistake marks
 
 - An unchecked file mistake (see [`files.md`](files.md)) shows as a mistake mark on its file in the objectives panel, until the learner reports back. It is hidden during a check, with the files.
-- The mark reads, for example: "**Slide 30 may have a mistake.** It shows 5(3x² + 1)⁴. A possible correction is 5(3x² + 1)⁴ · 6x, but it could be wrong too. Ask your teacher, then tell the tutor what they said."
+- The mark reads, for example: "**Slide 30 may have a mistake.** It shows 5(3x² + 1)⁴. A possible correction is 5(3x² + 1)⁴ · 6x, but it could be wrong too. Ask your teacher, then tell the tutor what they said." Its maths is drawn (see [Maths](#maths)) ([#771]).
 - It has two links. "Tell the tutor what they said" starts a chat reply ("About slide 30: my teacher said ..."). "No one to ask, go with the correction" clears the mark in one tap.
+
+## While a reply arrives
+
+- A tutor reply shows word by word as it arrives. Check problems, marks, model answers and the result show whole ([#771]).
+- Maths appears once the piece is complete, so no LaTeX shows while a reply arrives. A diagram or graph shows "Checking the picture..." until its check passes, even after the words end. If the check fails, the placeholder goes and the tutor explains in words (see [`ai-layer.md`](ai-layer.md)) ([#771]).
+- Before the first word, the screen shows "The tutor is writing...", except where the spec already names the wait: "Starting the tutor…", "Reading…", "Marking…", a problem being written, or the line of whatever stopped the message. The busy line at 5 seconds stands ([#771]).
+
+## When a reply breaks
+
+What a broken reply is, and how Crux answers it, is in [`ai-layer.md`](ai-layer.md). On screen, for learners and trial links, the learner taps nothing ([#771]):
+
+- **A lost connection:** the words so far stay, with "Connection lost. Reconnecting...". When the screen is back, the finished reply shows whole. A Cloudflare refusal while reconnecting shows nothing and backs off, and "Reconnecting..." stays (see [`security.md`](security.md)).
+- **A fault on Crux's side:** the words so far go, with "The reply broke off, so the tutor is starting again."
+- **A second fault:** the words go too, and the message waits with its waiting mark and "Your message is saved. The tutor will answer it when it can."
+- When something else stops the new answer, the message waits under that rule, and that rule's line follows the break line.
+
+A guest's broken reply is in [`landing-screens.md`](landing-screens.md).
+
+## Maths
+
+- The tutor writes maths as LaTeX, and the screen draws it with KaTeX wherever tutor-written text shows: messages, check problems, model answers, the result, mistake marks, objectives (in the panel, the Record, jump points and Crux's own lines) and sessions shown on the owner page ([#771]).
+- The learner's own messages and answers show as typed. A picture's text alternative is plain text ([#771]).
+- A display equation too wide for the screen breaks after a relation or an operator (=, +, −, ×) onto more lines. Aligned working, or an equation with no place to break, scrolls sideways in its own box, which takes keyboard focus ([#771]).
+- Maths KaTeX cannot draw shows as written: its LaTeX source in a plain code style, in the normal text colour. The learner can ask the tutor to write it again ([#771]).
+
+## Screen readers
+
+- While a reply arrives, the screen reader stays quiet. It hears the line shown before the first word, then the whole reply once it is done. Focus stays in the chat box ([#771]).
+- Crux's own lines, the break lines included, are announced as status messages ([#771]).
+- Each message can be reached in one jump with a screen reader, for example by a heading ([#771]).
+- Maths is read from KaTeX's MathML by the learner's own screen reader. Crux adds no spoken text of its own ([#771]).
+- If the before-trial check in [`quality-bar.md`](quality-bar.md) finds that announcements read maths flat on any screen reader, a reply holding maths is announced as "The tutor replied...", and the learner reads it in the message ([#771]).
 
 ## Frontend modules
 
 | Module | What it holds |
 |---|---|
 | Session screen | The top bar, the conversation, the chat box and the panel, laid out for phone and desktop, and the switch into and out of the check |
-| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]) |
+| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]); a reply as it arrives, the break lines, and what a screen reader hears ([#771]) |
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |
 | Pictures | Drawing Mermaid diagrams and graphs, and their text alternatives ([#769]) |
+| Maths | Drawing LaTeX with KaTeX, line breaks and the sideways box, and maths that cannot be drawn ([#771]) |
 
 The app shell, the session list, the Record, files and the file viewer are in [`app-shell.md`](app-shell.md) ([#752]). The other screens add their own modules.
 
@@ -104,3 +138,4 @@ The app shell, the session list, the Record, files and the file viewer are in [`
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#771]: https://github.com/calmxz/Crux/issues/771

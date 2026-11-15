@@ -69,6 +69,7 @@ These settle how Google's services behave, while that part is built:
 - that `OFF` holds on Agent Platform for the pinned models; how a block arrives mid-stream; whether a blocked attempt is charged ([#735]);
 - whether Gemini reads each listed image format ([#732]);
 - whether Gemini can read a topic's pages straight from the bucket on the global address ([#716]);
+- whether Google bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
 - the smoke test: the model-call-only role is enough for the service accounts, after which the Express API keys are deleted ([#716]).
 
 ## The repo
@@ -113,6 +114,7 @@ These settle how Google's services behave, while that part is built:
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |
 | The request guards and open paths working on live; calls Cloudflare refuses not counting toward the Worker's 100,000; Security Analytics on Free showing the source address of busy traffic; a `#` trial link opening from the Gmail and Outlook apps (see [`security.md`](security.md)) ([#770]) | check |
+| The screen-reader check: a reply holding maths, heard as the announcement and in the message, on NVDA (Windows) and TalkBack (the owner's Android phone). VoiceOver is untested, a known gap like the iPhone. Maths read flat in announcements on either switches maths replies to "The tutor replied..." (see [`learning-screen.md`](learning-screen.md)). Maths that either cannot read in the message returns to the owner as a recorded change: spoken text from a maths-speech library ([#771]) | owner |
 
 ### Before opening
 
@@ -139,7 +141,6 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 ## Gaps
 
 - **Whether warm-on-open meets the 5 seconds off-peak.** Example: Ana sends her first message 3 seconds after opening at 6 am, before the backend is up ([#716]).
-- **How a screen reader hears a reply while it streams, and how maths written in LaTeX is read out:** open on [#771] ([#769]).
 - **How the owner meets the 72-hour rule when nobody is watching.** The breach plan covers the writing. Example: the host emails on a Friday night that its database was exposed ([#677]).
 
 [#674]: https://github.com/calmxz/Crux/issues/674

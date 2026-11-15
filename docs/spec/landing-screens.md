@@ -48,6 +48,7 @@ flowchart TD
 - After a sample's result card, Crux's own fixed line, with no AI call: "That's the sample. Try another, try your own topic, or ask for a trial link.", with those three buttons. Once the own topic's 10 replies are used, the line and its buttons leave out the own topic: "That's the sample. Try another, or ask for a trial link." After the trial, they leave out the trial link. A sample has no after-mastery menu.
 - An upload gets the pinned line "Uploading your own files needs a trial link." with Request access, as [`app-shell.md`](app-shell.md) places refused uploads.
 - **When Google blocks a guest's message as prohibited content,** the session ends in place. The thread stays, with a red line, "The tutor can't help with this, so this guest session has ended.", and the chat box gives way to "This guest session has ended." with "Back to the start", which opens the landing page. The replies left stay with the browser.
+- **When a guest's reply breaks** (see [`ai-layer.md`](ai-layer.md)), Crux holds nothing to finish, so the guest's browser asks again by itself, once, when the connection is back, whatever the cause. The words so far are removed and the new reply replaces them. The guest sees one reply, and it counts once toward the 10. It stops like any guest reply. After a second break the guest sees "No reply." with Try again, and Try again counts as a new reply. The browser holds the count, so the guest caps are the real bound ([#771]).
 - **After Yes to the age question,** the tab goes back to the landing page, with no message, and the ticks show again in the start box.
 
 ### Guest stops
@@ -144,3 +145,4 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#771]: https://github.com/calmxz/Crux/issues/771
