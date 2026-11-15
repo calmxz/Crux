@@ -28,7 +28,7 @@ flowchart TD
   H -. link dies .-> ST[Stub]
   FA -. link dies, not by Yes .-> FB[Kept 6 months after the trial, or 12 months after the link died]
   FA -. published quote withdrawn .-> QN[Quote note; words at most 14 days]
-  H -. at erasure .-> CP[Copy, its address and its email, until the link expires]
+  H -. at erasure .-> CP[Copy, its address and its email, until the link expires, or 30 days unsent]
 ```
 
 Solid lines are delete with parent: deleting the parent deletes the child in the same transaction. Dotted lines are items moved or written outside the home before it is erased ([#719]).
@@ -133,7 +133,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | The email queue with each kind, sender counts, required emails' acceptance times | Email | [`operations.md`](operations.md) |
 | Re-mark runs, the planted-file re-check list | Mastery check | [`live-faults.md`](live-faults.md) |
 | Data requests entered on the owner page, daily email items, the daily job's last run | Operations | [`operations.md`](operations.md) |
-| When the uptime checks' endpoint last answered, each outage's start and end, and each date's move | Operations | [`dates.md`](dates.md) ([#772]) |
+| When the uptime checks' endpoint last answered, each outage's start and end, each date's move, and an inbox confirmation's code and mark | Operations | [`dates.md`](dates.md) ([#772]) |
 | Terms versions and their "What changed" lists | Homes | For the life of Crux v1 ([#719]) |
 
 ### Outside the database

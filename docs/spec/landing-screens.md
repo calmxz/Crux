@@ -89,7 +89,7 @@ flowchart TD
 
 Each is an opening page with Continue. Several show one after another, before the app. Each shows once per link.
 
-- **The trial is ending:** "The trial ends at 11:59 pm on 15 Jan", then "After that, this link stops working and everything in it is erased. Until then, you can untick a quote or a share in Settings, under Your feedback."
+- **The trial is ending:** "The trial ends at 11:59 pm on 15 Jan" ([#772]), then "After that, this link stops working and everything in it is erased. Until then, you can untick a quote or a share in Settings, under Your feedback."
 - **A data breach:** "A data breach", then what happened, written at the time.
 - **A misuse flag dismissed:** the misuse card, in the dismissal's wording from [`account-screens.md`](account-screens.md). It shows until Continue is tapped, as [`misuse.md`](misuse.md) says ([#764]).
 - **The trial's end moved or taken back:** "The trial now ends at 11:59 pm on 14 Dec." or "The trial is no longer ending.", also when an outage moves the end ([#755], [#772])

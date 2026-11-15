@@ -54,7 +54,7 @@ Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
 What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
 
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
-- **A copy asked for while closing:** the daily job makes it on day 9, and sends the link itself, as a required email ([#735]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
+- **A copy asked for while closing:** the daily job makes it on day 9, and sends the link itself, as a required email ([#735], [#772]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
 - **A copy asked for by email:** the daily email reminds the owner, who checks the request is really the learner's and makes it with the owner page's button ([#735], [#755]).
 - The email links to the copy page, with a long random code after a `#` (see [`security.md`](security.md)) ([#770]). Each opening while the link is live signs a download link that works for 15 minutes and sends the learner to it, so a delayed email cannot use it up. The link is live until 11:59 pm on the 7th day after Resend accepts it, plus any outage days (see [`dates.md`](dates.md)) ([#735], [#762], [#772]).
 - The backend signs as a separate service account that can read only the copies bucket, so a copy link can never open anything else. No Google key is stored (see [`hosting.md`](hosting.md)) ([#762]).
@@ -82,7 +82,7 @@ The address is privacy@ the domain (see [`privacy.md`](privacy.md)) ([#717]).
 
 ## The outside check
 
-- Google Cloud Monitoring uptime checks open the public link and, through the Worker, an endpoint that runs one tiny database query and answers only "ok" ([#716], [#717]).
+- Google Cloud Monitoring uptime checks open the public link and, through the Worker, an endpoint that runs one tiny database query and answers "ok" ([#716], [#717]).
 - A third check calls an endpoint that fails if the daily job has not finished in 26 hours, so a missed run pushes at no cost ([#735]).
 - The database endpoint also stores when it last answered, which measures outages (see [`dates.md`](dates.md)) ([#772]).
 - They run every 5 minutes, from 3 or more checker places outside the EU and UK. Alerts push to the Google Cloud app ([#717]).
@@ -103,6 +103,7 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 - for each new access request;
 - for a misuse flag raised at once ([#733]);
 - when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]);
+- when one of Crux's own notices has waited 30 days, or an emailed request needs confirming from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
 - when Resend is down, or the email day or month is full, at most once a day each: "Resend is down: 12 emails waiting". The daily email may not get through then ([#763]).
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
@@ -122,11 +123,11 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)), each by its number, whose it is and the date: "Flag 4821 · An account · 10 Mar · Open ›", or "Flag 4812 on Link K7Q-4MP · 10 Mar · Open ›". No kind and no email. The kind, the record line, the sessions and the actions are in the owner page's Safety area ([#733], [#764]);
-- from the first run after a misuse closure's last day until it is erased, unless a contest is entered: "1 closed account's contest time has ended. It's erased on 12 Nov: check the Crux inbox for a contest.", also kept in the owner page's Today area ([#753], [#772]);
+- from the first run after a misuse closure's last day until it is erased, unless a contest is entered: "1 closed account's contest time has ended. It's erased on 12 Nov: check the Crux inbox for a contest.", its date updated if an outage delays the run, also kept in the owner page's Today area ([#753], [#772]);
 - a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
-- an erasure warning waiting: "1 erasure warning ends on 15 Mar: check the Crux inbox for a reply.", then from the first run after that date, "1 erasure warning has ended. Its session is erased on 17 Mar: check the Crux inbox for a reply." ([#755], [#772]);
+- an erasure warning waiting: "1 erasure warning ends on 15 Mar: check the Crux inbox for a reply.", then from the first run after that date, "1 erasure warning has ended. Its session is erased on 17 Mar: check the Crux inbox for a reply.", its date updated if an outage delays the run, also kept in the Today area ([#755], [#772]);
 - dates an outage moved: "Crux was down 40 minutes on 10 Nov: 3 dates moved by a day." ([#772]);
-- a request asked for by email whose email is still not accepted, and from 7 days, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
+- a request asked for by email whose email is still not accepted, and from 7 days after the owner entered it, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
 - a required email still unsent, and a check paused by repeated blocks ([#735]);
 - Resend's month full, by Crux's count or a refusal ([#763]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).

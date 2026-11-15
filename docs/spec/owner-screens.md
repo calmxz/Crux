@@ -35,7 +35,7 @@ flowchart TD
 | Area | What it holds |
 |---|---|
 | Today | What needs the owner, in the daily email's order, each line opening its item |
-| Trial (during the trial only) | Requests ("maria.reyes@example.com · Asked 2 Nov · 16 days left", with Approve and Decline), trial links, dead links, and the end of the trial |
+| Trial (during the trial only) | Requests ("maria.reyes@example.com · Asked 2 Nov · 16 days left", counted to its 30-day erasure ([#772]), with Approve and Decline), trial links, dead links, and the end of the trial |
 | Safety | Flags, misuse closures, entered requests, the reported hold, and "Tell learners about a breach" |
 | Feedback | Answers, with unread ones marked, which may be quoted and the email when its tick was given; "Mark published" with where; withdrawn published quotes with their remove-by date and "Mark removed"; and shared sessions. An answer counts as read once opened |
 | Counts | The go-public bar's progress ("14 / 20 mastered") with "Start the window" and its same-day undo, the path, "Limit hit on 9 of 56 days", arrivals by source, and the other counts: learners stopped by their own limit, "Told Crux is full: 30, 12 ticked email", refused sign-in codes and the dated under-18 count. In the trial, links turned away and guest-mode stops |
@@ -60,8 +60,8 @@ The Trial area leaves the menu when the trial ends.
 - **"Enter a request"** takes the kind and "The learner's email", pasted from the inbox. It says "No account with that email" when none matches. The kinds are:
   - "A copy of their data", with "Make and send the copy";
   - "A contest of a misuse closure";
-  - "Delete a session or file during a closing", with the name typed from the learner's email, "No session or file by that name", a pick by date when two match, the warning's last day and Cancel, and "Kept until the closure is decided" for a held session;
-  - "Delete the account". From 7 days with its email unsent, "Confirm from the inbox" gives a one-time code to paste into an email from the Crux inbox, and marks it confirmed when the owner types back the code the learner's reply quotes (see [`dates.md`](dates.md)) ([#772]).
+  - "Delete a session or file during a closing", with the name typed from the learner's email, "No session or file by that name", a pick by date when two match, the warning's last day and Cancel, and "Kept until the closure is decided" for a held session, and "Confirm from the inbox" as below ([#772]);
+  - "Delete the account". From 7 days with its email unsent, "Confirm from the inbox" gives a one-time code to paste into a new email, never a reply, to the account's address from the Crux inbox, and marks it confirmed when the owner types back the code the learner's reply quotes (see [`dates.md`](dates.md)) ([#772]).
 - **The reported hold** lists the date, the kind and, for an account, its email, with Erase.
 - **"Tell learners about a breach"** takes the text and shows a preview, then confirms with the counts and when the sending finishes. In the trial: "Send this to 3 emails and 14 live trial links?". From opening, with the date, the time and the hours from now: "Send this to 150 accounts and 40 other emails? The last go at about 8 am on 14 Mar, 33 hours from now.", or "Send this to 25 accounts and 6 other emails? All are sent now." when all fit in today's room. The estimate counts the day's room, the month's, and email already waiting ahead of the notice. When the month's room runs out first: "…The last go after Resend's month restarts, on a date Resend doesn't give." ([#763])
 
@@ -84,7 +84,7 @@ The Trial area leaves the menu when the trial ends.
 | Owner shell | The address, top bar, menu and phone tab row with counts, the turned-away "Page not found", the sign-in hop for email links, and the Owner link at the sidebar foot |
 | Owner today | What needs the owner, each line opening its item |
 | Owner trial | Requests, trial links with codes and switch-off with its reason, dead links, and the end of the trial with its later or take-back |
-| Owner safety | Flags with the session reader beside the list, warn, dismiss, close, lift, Reported, misuse closures and contests, entered requests with the copy button, the name match and the waiting erasures, the reported hold, and the breach form |
+| Owner safety | Flags with the session reader beside the list, warn, dismiss, close, lift, Reported, misuse closures and contests, entered requests with the copy button, the name match and the waiting erasures, the reported hold, "Confirm from the inbox" with its code ([#772]), and the breach form |
 | Owner feedback | Answers with unread marks, published quotes and their remove-by dates, and shared sessions with the reader |
 | Owner counts | The bar, the window with Start and the same-day undo, the path, arrivals and the other counts |
 | Owner money | The money, Google's bill, the limits, the raise dialog with its tick, the learner cap and the let-in list |

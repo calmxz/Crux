@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md) and [`misuse.md`](misuse.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
+This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. Its dates follow [#772]. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md) and [`misuse.md`](misuse.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
 
 ## Signing in
 
@@ -28,7 +28,7 @@ Each message shows in the card under the button or field it is about:
 
 ## Steps on opening
 
-- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
+- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The card past a last day ([#772]), the lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
 - The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, "Keep my account", then the terms step ([#764]).
 
 ```mermaid
@@ -39,6 +39,7 @@ flowchart TD
   signin -->|"returning"| steps
   more -->|Start| steps
   signed -->|yes| steps{"Steps due,<br/>in this order"}
+  steps -->|"past a last day, alone"| past["Card past the last day,<br/>Sign out only"]
   steps -->|"1. a lock"| lock["Lock page"]
   lock -->|"Read my sessions"| ro["The app, read-only,<br/>with the lock bar"]
   steps -->|"2. the age question"| age["Age card in the thread,<br/>or in the main area"]

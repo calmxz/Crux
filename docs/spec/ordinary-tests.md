@@ -88,7 +88,7 @@ These are the tests the closed tickets sent here, by area.
 - A closing waits 7 days, is cancelled by "Keep my account", and erases on day 9. A day-9 copy through the copy page: each opening gets a link that works its full 15 minutes and opens nothing outside the copies bucket, and the page refuses the code after 11:59 pm on its last day plus any outage days ([#762], [#772]).
 - The idle warnings.
 - The terms and "Keep my account" steps on a live sign-in.
-- A notice clock starts at Resend's acceptance, and a shown date only moves later. An emailed request waits for its email, or for the owner's confirmation with the right code ([#772]).
+- A notice clock starts at Resend's acceptance, and a shown date only moves later. An emailed request waits for its email, or for the owner's confirmation with the right code; a reply with no code or a wrong one confirms nothing ([#772]).
 - At 12:00 am after a last day, Keep, a trial link and a copy page stop, and the card past the last day shows. An outage of 15 minutes or more moves an open date by its total, before any run or refusal acts, and a restore keeps the move ([#772]).
 - Spend lines past the week are reduced to nameless totals. "Email me" lists are erased.
 - The copy's zip, with a declined file packed unread. A quote untick reaches the daily email.
