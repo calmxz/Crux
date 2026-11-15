@@ -92,6 +92,10 @@ _Avoid_: chat, thread, conversation
 One period of learning without a break, during one visit, with no set length. A topic is small enough to finish in one or two study blocks.
 _Avoid_: sitting, lesson, visit
 
+**Broken reply**:
+A tutor reply whose stream ends before it is complete, for any reason except Google blocking it: the learner's connection is lost, or something fails on Crux's side. Crux answers it by itself, and the learner taps nothing.
+_Avoid_: break (a study block's break is a pause), dropped reply
+
 **Topic**:
 The specific thing a learner aims to master. It is small enough to split into learning objectives (usually 3 to 5) and to finish in one or two study blocks. The learner can show they know it in writing.
 

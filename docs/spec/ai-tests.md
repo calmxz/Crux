@@ -91,6 +91,7 @@ These are test and build terms, so they stay out of the glossary ([#678]).
 - The topic slice on real decks: notation, "as on slide 31", flagged mistakes, and pages the tutor adds on request ([#679], [#736]).
 - A file with nothing learnable: a receipt gets "I can't teach from this file" ([#736]).
 - Diagrams and graphs that match the tutor's explanation, drawn when they help and not on every turn ([#751]).
+- Every reply's maths draws in KaTeX. A script reads the replies the other tests produce, so this test makes no calls of its own ([#771]).
 - The outline read: the right topics on the right pages. This test sets the read's thinking level (see [`ai-layer.md`](ai-layer.md)) ([#736]).
 
 ### Runs
@@ -186,3 +187,4 @@ When the Crux tests project's cap is reached, rounds stop, and with them release
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
+[#771]: https://github.com/calmxz/Crux/issues/771

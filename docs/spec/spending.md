@@ -7,7 +7,7 @@ This file covers what Crux counts, the tutoring limits, what happens at a limit,
 ## What is counted
 
 - Every limit counts money: what each tutor reply, file read, lookup and mastery-check call actually costs. A check's calls are writing a problem, checking its model answer, marking, re-marking and the walk-through ([#675]).
-- Crux counts spend at list price from each reply's own token counts (input, cached, output, thinking), the moment the reply arrives, whether credits or the card pay ([#679]).
+- Crux counts spend at list price from each reply's own token counts (input, cached, output, thinking), the moment the reply arrives, whether credits or the card pay ([#679]). A broken attempt counts the same way, from what Crux sent and received (see [`ai-layer.md`](ai-layer.md)) ([#771]).
 - Crux's own count is what enforces the limits. Google's bill only checks it (see [Google's caps](#googles-caps)) ([#717]).
 - A learner never sees money. Their tutoring limit is shown as a bar ([#675]).
 
@@ -40,7 +40,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 
 ### The reply that fills the bar
 
-- Teaching stops at the reply that fills the learner's bar. No reply is cut off, except one Google blocks (see [`ai-layer.md`](ai-layer.md)) ([#675], [#678], [#735]).
+- Teaching stops at the reply that fills the learner's bar. No reply is cut off, except one Google blocks, or one that faults on Crux's side, which the tutor answers again (see [`ai-layer.md`](ai-layer.md)) ([#675], [#678], [#735], [#771]).
 - Crux knows the cost only when the reply arrives, so it adds its own fixed line after that reply: "That's today's tutoring. Answer whenever you like, and the tutor will pick up here tomorrow." It names the reset that applies, such as "on Monday". This costs no AI ([#734]).
 - When the ceiling or the month runs out between replies, the learner's next reply gets the "full" message ([#675]).
 
@@ -48,7 +48,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 
 - A learner is **turned away** when they send something and a limit stops Crux answering it ([#675]).
 - A message stopped by any limit is kept. It stays in the conversation, marked as waiting. After the reset, opening the app answers every kept message and starts every kept file's read, oldest session first, several in one session together. The cost comes off the new limit ([#675], [#734]).
-- If the limit fills while answering, the rest stay waiting. They also stay waiting on any visit when tutoring cannot run, such as a full limit, an open age question or a lock ([#734]).
+- If the limit fills while answering, the rest stay waiting. They also stay waiting on any visit when tutoring cannot run, such as a full limit, an open age question or a lock ([#734]). A message whose reply faulted twice waits too (see [`ai-layer.md`](ai-layer.md)) ([#771]).
 - An owner's raise counts as a reset. If a block clears while the app is open, the answers run then, without reopening, and only once across browsers. Blocks are a tap on the age question, "Keep my account", agreeing to terms, removing a held file, lifting a seal or a lock, a raise, or midnight passing ([#734], [#736]). A message the whole-tutor switch stopped is answered as [`live-faults.md`](live-faults.md) says ([#736]).
 - The session the learner is in goes first, so a new message there still starts within the main file's 5 seconds ([#734]).
 - A background answer never opens a check problem. After reteaching in a half-done check, the next problem waits until the learner opens that session ([#734]).
@@ -184,3 +184,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the near-li
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#771]: https://github.com/calmxz/Crux/issues/771

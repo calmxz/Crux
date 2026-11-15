@@ -47,6 +47,7 @@ All of these come from [#679], except the distress check ([#735]). Flash-Lite's 
 ## The prompt
 
 - **Order, for caching:** the instructions first, then the file outline and topic slice, then the conversation, with the learner's note and teaching state last. A change in an objective's status leaves the cached part intact ([#679]).
+- The tutor writes maths as LaTeX, using only what KaTeX draws, which the prompt names. It writes session and topic names without LaTeX ([#771]).
 - The tutor's instruction is in [`teaching.md`](teaching.md). The outline, the topic slice and the added pages are in [`files.md`](files.md). The note is in [`sessions.md`](sessions.md).
 
 ### Text that is never an instruction
@@ -77,11 +78,24 @@ Each turn carries an idempotency key, so a tool result is recorded once ([#716])
 
 ## When a call fails
 
-- **Overload:** only 429 and 503 are retried, twice, at about 0.5 s and 1.5 s with jitter. There is no retry once streaming has started ([#716]).
+- **Overload:** only 429 and 503 are retried, twice, at about 0.5 s and 1.5 s with jitter. Overload is never retried once streaming has started ([#716]). A broken reply is answered again once (see [A broken reply](#a-broken-reply)) ([#771]).
 - If no first word has arrived by about 5 seconds, the learner sees "The tutor is busy right now. Try again in a minute." The sitting is kept, and a mastery check under way pauses as half-done ([#679], [#716]).
 - Mastery-check calls use the same retries, but "Marking…" may wait up to about 20 seconds, since that is not a reply starting ([#716]). Writing a problem gets the same wait ([#735]).
 - Crux does not switch to another model on its own during an outage (see the map's Out of scope list) ([#679], [#716]).
 - When Google's spend cap stops Crux, [`spending.md`](spending.md) applies ([#679]).
+
+### A broken reply
+
+A broken reply is one whose stream ends before the reply is complete, for any reason except Google blocking it. Crux's server tells the two kinds apart, never the browser ([#771]):
+
+- **A lost connection:** the learner's connection drops or the phone sleeps, while Crux carries on. Crux finishes the reply by itself, and a learner who leaves finds it at the next opening. Whether Crux finishes the same reply within its request or answers again through Cloud Tasks is left to the build. No work runs outside a request either way (see [`hosting.md`](hosting.md)).
+- **A fault on Crux's side:** Crux's server, the Worker, a time limit, or an error from Google partway. The words so far are removed, none are saved, and the tutor answers again from the start.
+- Crux answers again once per message. A second fault leaves the message waiting, answered at the next opening or with the learner's next message in that session.
+- The new answer runs even if the broken words filled the learner's own tutoring limit, as the retry after a block does. Anything else that stops a reply leaves the message waiting under that rule.
+- During a mastery check, a reply that faults twice pauses the check as half-done. An answer that runs as a background answer never opens a check problem.
+- Tool results from words that are removed are dropped, as for a reply Google removes. The new answer reports afresh under the turn's idempotency key, so an age question or a decline is recorded once.
+- A broken attempt is counted like any reply (see [`spending.md`](spending.md)). Answering again after a broken reply and the retry after a block are separate, each once per message.
+- A guest's browser acts for the guest, since Crux holds nothing for them (see [`landing-screens.md`](landing-screens.md)).
 
 ## When Google blocks a call
 
@@ -95,7 +109,7 @@ A blocked call has no tool call, so Crux reads Google's block result itself ([#7
 
 **A failed call of this kind** gets one retry per message, with a hidden line: "Explain in your own words. Don't quote the text." The file's pages still go. The line is not saved or carried to later turns, and the retry runs even if the blocked attempt filled a limit ([#735]). If the retry is blocked too, the learner sees "The tutor couldn't answer that. Try asking another way." A background answer leaves that line in place of the reply ([#735]).
 
-**A reply blocked partway through:** the words shown so far are removed, and Crux saves none of them. A failed call of the kind above then gets its retry. After a harm result, the learner sees "The tutor can't continue that reply". This is the one exception to the main file's "a reply is never cut off midway" ([#735]).
+**A reply blocked partway through:** the words shown so far are removed, and Crux saves none of them. A failed call of the kind above then gets its retry. After a harm result, the learner sees "The tutor can't continue that reply". This and a fault on Crux's side (see [A broken reply](#a-broken-reply)) are the two exceptions to the main file's "a reply is never cut off midway" ([#735], [#771]).
 
 **A blocked message** stays in the conversation for the learner, and is left out of later prompts and the lookup. It counts once. Messages answered together count as one message. A tool result from a removed reply is dropped ([#735]).
 
@@ -155,7 +169,7 @@ When a limit or a switch stops a message, Crux asks the model whether the person
 
 ## On screen
 
-The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor is busy right now", the two lines when Google blocks a reply, and the message when a problem is swapped are lines in the thread, and diagrams and graphs show inside the tutor's message ([#751]).
+The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor is busy right now", the two lines when Google blocks a reply, and the message when a problem is swapped are lines in the thread, and diagrams and graphs show inside the tutor's message ([#751]). How a reply arrives and breaks, and how maths shows, are there too ([#771]).
 
 [#669]: https://github.com/calmxz/Crux/issues/669
 [#678]: https://github.com/calmxz/Crux/issues/678
@@ -170,3 +184,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor 
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#771]: https://github.com/calmxz/Crux/issues/771
