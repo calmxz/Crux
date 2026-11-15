@@ -148,7 +148,7 @@ Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Zoho o
 - **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month. The two rules and the two metric alerts are about USD 1.40, plus about USD 0.10 for the points the alerts return, so about USD 1.50 a month ([#717], [#762], [#770]).
 - **Zoho's free plan:** whether Zoho offers it to Crux, and whether its processor agreement covers it. Open on [#726] ([#717], [#762]).
 - **Resend's figures on every reply:** Resend's page says only that "the API returns headers that track your email sending quotas". Checked at the build's first real send, a refusal included. If they are missing, how Crux counts comes back as a recorded change ([#763]).
-- **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
+- **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; stale dates in a retried email; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
 
 ## On screen
 

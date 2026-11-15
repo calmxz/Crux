@@ -76,7 +76,7 @@ A decline in a sealed flag stays with its sealed session, and is erased at the l
 
 | Items | Module | Lifetime |
 |---|---|---|
-| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md) |
+| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state, date moves, an inbox confirmation's code and mark ([#772]) | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md) |
 | Sign-in codes; code limits per email and per network address | Sign-in | [`accounts.md`](accounts.md) |
 | "Email me when it's back" address | Spending | [`spending.md`](spending.md) |
 
@@ -133,7 +133,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | The email queue with each kind, sender counts, required emails' acceptance times | Email | [`operations.md`](operations.md) |
 | Re-mark runs, the planted-file re-check list | Mastery check | [`live-faults.md`](live-faults.md) |
 | Data requests entered on the owner page, daily email items, the daily job's last run | Operations | [`operations.md`](operations.md) |
-| When the uptime checks' endpoint last answered, each outage's start and end, each date's move, and an inbox confirmation's code and mark | Operations | [`dates.md`](dates.md) ([#772]) |
+| When the uptime checks' endpoint last answered, and each outage's start and end | Operations | [`dates.md`](dates.md) ([#772]) |
 | Terms versions and their "What changed" lists | Homes | For the life of Crux v1 ([#719]) |
 
 ### Outside the database
