@@ -114,7 +114,7 @@ These settle how Google's services behave, while that part is built:
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |
 | The request guards and open paths working on live; calls Cloudflare refuses not counting toward the Worker's 100,000; Security Analytics on Free showing the source address of busy traffic; a `#` trial link opening from the Gmail and Outlook apps (see [`security.md`](security.md)) ([#770]) | check |
-| The screen-reader check: a reply holding maths, heard as the announcement and in the message, on NVDA (Windows), TalkBack (the owner's Android phone) and VoiceOver (on an Apple device the owner arranges). Maths read flat in announcements on any of them switches maths replies to "The tutor replied..." (see [`learning-screen.md`](learning-screen.md)). Maths that any of them cannot read in the message returns to the owner as a recorded change: spoken text from a maths-speech library ([#771]) | owner |
+| The screen-reader check: a reply holding maths, heard as the announcement and in the message, on NVDA (Windows) and TalkBack (the owner's Android phone). VoiceOver is untested, a known gap like the iPhone. Maths read flat in announcements on either switches maths replies to "The tutor replied..." (see [`learning-screen.md`](learning-screen.md)). Maths that either cannot read in the message returns to the owner as a recorded change: spoken text from a maths-speech library ([#771]) | owner |
 
 ### Before opening
 
