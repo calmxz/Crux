@@ -95,6 +95,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Let-in list email | Up to 7 days, or until the owner removes it, and erased at sign-up ([#679]) |
 | Code limits | Email addresses for a day, network addresses for an hour ([#674], [#717]) |
 | Wrong-link counts | Network addresses for an hour ([#717]) |
+| Copy page wrong-code counts | Network addresses for an hour ([#762], [#770]) |
+| Hand blocks, in Cloudflare's settings | Network addresses for 12 to 36 hours, longer only while the daily job is down or a lift fails (see [`security.md`](security.md)) ([#770]) |
 | A trial request's email | At most 30 days ([#717]) |
 | Sent emails, at Resend | 30 days in its log, and up to 7 days after in its backups ([#717], [#762]) |
 | Closed-for-misuse email, scrambled | 12 months ([#677]) |
@@ -142,6 +144,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - the dated anonymous counts, including the under-18 count, and the cookieless arrivals count;
 - the sign-in cookie;
 - the human check, the email sender, the code limits and the region check;
+- the burst guard, the hand blocks and their keep time, and the owner's reading of Cloudflare's request analytics only to find a network to block ([#770]);
 - the misuse flag, sealed sessions, and the email of their account, being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
 - the guest and trial rules;
 - error reports with no learner text;
@@ -154,7 +157,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 | Processor | Used for | Agreement and place |
 |---|---|---|
 | Google Cloud | Cloud Run, Cloud Storage, Agent Platform, Error Reporting, Monitoring, BigQuery | Google Cloud's data processing addendum. Data "may be processed in any country", and Crux's data is stored in Singapore ([#679], [#717]) |
-| Cloudflare | Static files, the Worker, DNS, the registrar, Email Routing, Turnstile | Its self-serve agreement. It sees network addresses at its edge. Turnstile reads the network address, browser details and connection fingerprint, and Cloudflare uses those signals partly for its own purposes, outside the agreement ([#716], [#717]) |
+| Cloudflare | Static files, the Worker, DNS, the registrar, Email Routing, Turnstile | Its self-serve agreement. It sees network addresses at its edge, and its Security Analytics keeps sampled request details, with addresses and paths, for 31 days, which the owner reads only to find a network to block. The hand blocks sit in its settings ([#770]). Turnstile reads the network address, browser details and connection fingerprint, and Cloudflare uses those signals partly for its own purposes, outside the agreement ([#716], [#717]) |
 | Supabase | The database | Part of its Terms on every plan, with Supabase Pte. Ltd (Singapore). Data stored in Singapore ([#717]) |
 | Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log 30 days and in its backups up to 7 days after ([#717], [#762]) |
 | The Crux Gmail, in the trial | The Crux email | No agreement, an exception the owner accepted. Zoho or Workspace from opening ([#717]) |
@@ -186,3 +189,4 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#770]: https://github.com/calmxz/Crux/issues/770

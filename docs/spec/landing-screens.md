@@ -33,7 +33,7 @@ flowchart TD
 - Request access shows, on this page and in guest mode, only while the trial runs (see [`trial.md`](trial.md)).
 - **From the EU or the UK:** the video and the region message, "Crux isn't available in your region yet.", in place of the start box and the chips, with no Request access.
 - **Before typing, when guest mode is full or paused:** the stop line takes the start box's place. The video and Request access stay.
-- **While the backend wakes,** Start shows "Starting the tutor…" until the first reply. **When it can't be reached,** the start box and Request access are greyed, with "Crux can't be reached right now. Try again in a few minutes."
+- **While the backend wakes,** Start shows "Starting the tutor…" until the first reply. **When it can't be reached,** the start box and Request access are greyed, with "Crux can't be reached right now. Try again later." On a Cloudflare refusal, warm-on-open tries again after 10 seconds and greys them only if refused again. It keeps asking, less often each time, while the tab is on screen, and the greying clears when a try succeeds (see [`security.md`](security.md)) ([#770]).
 - **After the trial,** if Crux stays a portfolio project: the same page with no Request access.
 - **From opening:** the pre-written example in the start box's place, with "Sign in or sign up" in the top bar and under the example. The video stays beside it.
 - **An unknown address** shows "This page doesn't exist." with "Go to Crux".
@@ -143,3 +143,4 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770

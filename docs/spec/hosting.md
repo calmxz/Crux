@@ -76,6 +76,7 @@ What a background answer is, and when it runs, is in [`spending.md`](spending.md
 - The Worker passes the visitor's country and network address to the backend in Crux's own headers, as [`security.md`](security.md) says ([#769]).
 - Cloud Run accepts only calls from the Worker. The Worker adds a secret header, and middleware checks it first with `hmac.compare_digest`. A failure returns a plain 404 ([#716]).
 - The secret is at least 32 random bytes, rotatable through a current and next pair, rotated at each release or on any sign of a leak, and never logged ([#716]).
+- Only `/api/*` runs the Worker. It turns any answer from Cloud Run not in Crux's error shape into Crux's "can't be reached" code. The request guards in front of it are in [`security.md`](security.md) ([#770]).
 - **Nothing blocks the whole site.** Crux checks the country only where someone new comes in: sign-up, a code for an email with no account, guest mode and Request access (see the main file's "Who Crux is for"). Accounts and trial links work from anywhere, and the outside check is not affected ([#733], [#735]).
 
 ### The domain
@@ -146,12 +147,14 @@ All of this comes from [#716].
 - Staging sends no real email, and its daily job runs by hand, so it uses neither Resend's limit nor a Cloud Scheduler job ([#735]).
 - The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
 - CI starts the local stack, then runs `alembic upgrade head` ([#750]).
+- Staging's Worker runs on a subdomain of the domain, in the same Cloudflare account, behind its own copy of the request guards and a gate (see [`security.md`](security.md)). Its address is on Turnstile's hostname list ([#770]).
 
 The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 
 ## Releases
 
-- A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step ([#716]).
+- A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step, and re-applies the previous Cloudflare rules too ([#716], [#770]).
+- The open-path check runs on staging before live, and on live after each release (see [`security.md`](security.md)) ([#770]).
 - Migrations are backward-compatible: add first, remove in a later release. A one-step rollback still works ([#716]).
 - A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` ([#716], [#750]).
 
@@ -160,7 +163,7 @@ The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 - Cloud Run's automatic request logs are dropped for everyone by an exclusion filter. The Worker's call logs are off ([#716]).
 - Crux writes its own logs: status, path, timing and a request number. They never hold a network address or request headers ([#716]). The main file's "Where data lives" states the rule, and its one exception.
 - A logged path is the route's pattern, never the real address, so a trial link's key is never logged. Query strings are not logged, and addresses in browser error reports are stripped the same way. Logs stay 30 days, Google's default ([#735]).
-- Cloudflare sees network addresses at its edge, as a processor. Its automatic flood protection and the burst guard run there (see [`privacy.md`](privacy.md)) ([#716]).
+- Cloudflare sees network addresses at its edge, as a processor. Its automatic flood protection, the burst guard and the hand blocks run there (see [`security.md`](security.md) and [`privacy.md`](privacy.md)) ([#716], [#770]).
 - Logging addresses returns only as a recorded change, with a reason, a short keep time, shortened or scrambled addresses, and the terms-changed notice ([#716]).
 
 ## The converter
@@ -178,7 +181,8 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 - Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
 - Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`operations.md`](operations.md)) ([#762]).
-- Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]).
+- Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]). The deploy token can also edit the zone's firewall rules ([#770]).
+- Staging's gate secret is a GitHub secret, filled into Cloudflare's rule text when the rule is applied. The daily job's Cloudflare token is in Secret Manager, and can edit only Cloudflare's lists ([#770]).
 - How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
 ## Gaps
@@ -209,3 +213,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#770]: https://github.com/calmxz/Crux/issues/770

@@ -86,6 +86,7 @@ A decline in a sealed flag stays with its sealed session, and is erased at the l
 |---|---|---|
 | The link and its scrambled key, link code and date made, browser IDs, unseen notices, the device note shown | Homes | [`trial.md`](trial.md) |
 | Wrong-link counts per network address | Sign-in | [`trial.md`](trial.md) |
+| Copy page wrong-code counts per network address ([#770]) | Sign-in | [`operations.md`](operations.md) |
 
 Sign-in sessions belong to the Sign-in module, for accounts and links, behind the sign-in cookie ([`accounts.md`](accounts.md)).
 
@@ -199,3 +200,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
+[#770]: https://github.com/calmxz/Crux/issues/770
