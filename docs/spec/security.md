@@ -99,7 +99,7 @@ So an outside site never receives a page's path as the referrer, and a trial lin
 - Before the trial, one check on the live address finds the headers. It also finds that every script on the landing page and a legal page is one the build made ([#769]).
 - Turnstile's hostname check is proven on staging, with real keys, since Cloudflare's test keys always answer with `example.com` ([#769]).
 - Before the trial, checks on live find the request guards and the open paths working. They also find that calls Cloudflare refuses, by a custom rule or the burst guard, do not count toward the Worker's 100,000: Cloudflare's metrics page says requests blocked by WAF "will not count", and its limits page does not say. That check passes only if the Worker still gives Crux's own answer after more than 100,000 refused calls in one UTC day, run before any learner. A third finds that Security Analytics on Free shows the source address of busy traffic ([#770]).
-- If either of the last two fails, the part that rests on it comes back to the owner as a recorded change ([#770]).
+- A fourth finds that a `#` trial link opens from the Gmail and Outlook apps, in the existing check (see [`quality-bar.md`](quality-bar.md)). If any of the last three fails, the part that rests on it comes back to the owner as a recorded change ([#770]).
 
 ## Build notes
 

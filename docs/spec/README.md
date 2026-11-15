@@ -59,7 +59,7 @@ The rest of the money rules are in [`spending.md`](spending.md).
 
 - Crux's data is stored in Singapore ([#716](https://github.com/calmxz/Crux/issues/716)).
 - Real learner data never reaches the owner's computer. Development uses fake data, CI a throwaway database, and staging synthetic data only ([#678](https://github.com/calmxz/Crux/issues/678), [#716](https://github.com/calmxz/Crux/issues/716)).
-- No network address or request header is logged for anyone. The only address records are the sign-in code limits, the wrong-link counts and the copy page's wrong-code counts, each kept for an hour, and the owner's hand blocks, kept 12 to 36 hours (see [`security.md`](security.md)). The owner reads Cloudflare's 31-day request analytics only to find a network to block ([#716](https://github.com/calmxz/Crux/issues/716), [#717](https://github.com/calmxz/Crux/issues/717), [#762](https://github.com/calmxz/Crux/issues/762), [#770](https://github.com/calmxz/Crux/issues/770)).
+- No network address or request header is logged for anyone. The only address records are the sign-in code limits, the wrong-link counts and the copy page's wrong-code counts, each kept for an hour, and the owner's hand blocks, kept 12 to 36 hours, longer only while the daily job is down or a lift fails (see [`security.md`](security.md)). The owner reads Cloudflare's 31-day request analytics only to find a network to block ([#716](https://github.com/calmxz/Crux/issues/716), [#717](https://github.com/calmxz/Crux/issues/717), [#762](https://github.com/calmxz/Crux/issues/762), [#770](https://github.com/calmxz/Crux/issues/770)).
 
 ### Crux decides, the model does not
 

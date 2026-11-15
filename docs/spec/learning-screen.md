@@ -91,8 +91,7 @@ stateDiagram-v2
 | Module | What it holds |
 |---|---|
 | Session screen | The top bar, the conversation, the chat box and the panel, laid out for phone and desktop, and the switch into and out of the check |
-| Connection | Telling a Cloudflare refusal from Crux's own errors, the one retry after 10 seconds with its sending state, the unreachable line, and signed out against blocked ([#770]) |
-| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, and the buttons and cards in the thread |
+| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]) |
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |

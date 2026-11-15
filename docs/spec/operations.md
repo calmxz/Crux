@@ -103,11 +103,10 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 - for a misuse flag raised at once ([#733]);
 - when an AI test round fails (see [`ai-tests.md`](ai-tests.md)) ([#736]);
 - when Resend is down, or the email day or month is full, at most once a day each: "Resend is down: 12 emails waiting". The daily email may not get through then ([#763]).
-- when a hand block's lift fails, a block outlives 36 hours, or the list holds anything but single addresses (see [`security.md`](security.md)) ([#770]).
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
 
-There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]). Beside them, two metric alerts on Crux's logs push when `/api` calls run high (see [`security.md`](security.md)) ([#770]).
+There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]). Beside them, two metric alerts on Crux's logs push when `/api` calls run high. The owner is also told when a hand block's lift fails, a block outlives 36 hours, or the list holds anything but single addresses (see [`security.md`](security.md)) ([#770]).
 
 ### The daily email
 

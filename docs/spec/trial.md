@@ -137,7 +137,7 @@ A holder who does not visit cannot be reached ([#733]).
 - Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`privacy.md`](privacy.md)).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
-- Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
+- Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
 - Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first, unless the holder erases the link ([#755]). Those of a published quote stay until the owner removes it ([#719]).
 - A sealed session is kept longer only if reported to the authorities ([#719]).
