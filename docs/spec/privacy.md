@@ -83,8 +83,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A decline's date and kind | As [`misuse.md`](misuse.md) sets out ([#733], [#719]) |
 | A waiting erase card: the session's name, its mastered-topic count and the erase's date | Until Continue, or until the account or link is erased ([#777]) |
 | A misuse warning, with its date | As long as the account exists ([#733], [#776]) |
-| A copy asked for while closing | Until its 7-day link expires, or 30 days if its email can't be sent ([#733], [#735], [#772]) |
-| A copy asked for by email | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772]) |
+| A copy asked for while closing, with any declined kinds in it | Until its 7-day link expires, or 30 days if its email can't be sent ([#733], [#735], [#772], [#776]) |
+| A copy asked for by email, with any declined kinds in it | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772], [#776]) |
 | A sealed session marked "Reported", with its account's email | Until the owner lifts or erases it, once the authorities answer. With the answer recorded, it goes with its account or link ([#743], [#719], [#777]) |
 | A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing, or 30 days after the owner's decision, whichever comes first (see [`misuse.md`](misuse.md)) ([#719], [#764], [#776]) |

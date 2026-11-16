@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers email, knowing when something is wrong, and how the owner is told. When dates take effect and the one daily job are in [`dates.md`](dates.md). What runs where is in [`hosting.md`](hosting.md).
+This file covers copies and requests, email, knowing when something is wrong, and how the owner is told. When dates take effect and the one daily job are in [`dates.md`](dates.md). What runs where is in [`hosting.md`](hosting.md).
 
 ## Email sending
 
