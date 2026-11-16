@@ -28,7 +28,7 @@ Each message shows in the card under the button or field it is about:
 
 ## Steps on opening
 
-- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The card past a last day ([#772]), the lock, the misuse card ([#764]), "Keep my account", the terms-changed step and the under-18 closure each use one.
+- **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The card past a last day ([#772]), the lock, the misuse card ([#764]), the erase card ([#777]), "Keep my account", the terms-changed step and the under-18 closure each use one.
 - The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, "Keep my account", then the terms step ([#764]).
 
 ```mermaid
@@ -56,7 +56,13 @@ flowchart TD
 
 - After a dismissal, the card reads "Crux's owner read some of your sessions", then "The tutor declined 3 of your requests (methods of self-harm, explicit sexual content), and the owner read those sessions that were still there. On 4 Mar the owner took no action.", with Continue ([#764]).
 - After a warning, it adds "This breaks Crux's terms. Another time closes your account." ([#764])
+- Once its kinds are erased after 30 days, it leaves out the brackets: "The tutor declined 3 of your requests, and the owner read those sessions that were still there." ([#776])
 - When it shows, and how often, is in [`misuse.md`](misuse.md).
+
+### The erase card
+
+- After the owner erases a Reported sealed session (see [`misuse.md`](misuse.md)), the card reads "Crux's owner erased your sealed session "Reaction rates", with its 2 mastered topics.", then the fixed reason line, with Continue. With one topic it reads "with its 1 mastered topic", with none it leaves that part out, and a session that never had a name reads "your sealed session" ([#777]).
+- Each erased session gets its own card, oldest erase first. Each shows at every opening, on any browser, until Continue is tapped once. Under a lock it waits for the lock to end, and it waits until the account or link is erased ([#777]).
 
 ### Keep my account
 
@@ -129,7 +135,7 @@ One page in the main area, with four parts in this order:
 | Module | What it holds |
 |---|---|
 | Sign-in | The sign-in page: the two ways in, the human check, the code step, its messages, "One more thing", the full and blocked cards, and the note after closing |
-| Opening steps | The opening pages and their order: the card past a last day ([#772]), the lock, the misuse card ([#764]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
+| Opening steps | The opening pages and their order: the card past a last day ([#772]), the lock, the misuse card ([#764]), the erase card ([#777]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
 | Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
 | Copy page | The page the day-9 email links to: its loading and unreachable lines, and its expired page ([#769]) |
@@ -148,3 +154,5 @@ One page in the main area, with four parts in this order:
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#779]: https://github.com/calmxz/Crux/issues/779
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

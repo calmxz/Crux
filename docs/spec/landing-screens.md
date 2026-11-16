@@ -82,7 +82,7 @@ flowchart TD
 - **The Trial Terms change:** the ticks show again in the same place, under "The Trial Terms changed on 2 Dec. What changed".
 - **The one-time device note** is a banner across the top of the app, with Dismiss.
 - **The sidebar's foot** reads "Trial link" where an account shows its email. Settings has no Account part. It shows "Trial link K7Q-4MP" and "Erase this trial link" (see [`account-screens.md`](account-screens.md)) ([#755]).
-- **On opening, in this order:** a lock, the age question, any notice pages, then the ticks if due. This mirrors an account's order, where the age card comes before the Keep and terms pages.
+- **On opening, in this order:** a lock, the age question, any notice pages, then the ticks if due. This mirrors an account's order, where the age card comes before the Keep and terms pages. The erase card is a notice page, after the misuse card (see [`account-screens.md`](account-screens.md)) ([#777]).
 - **A locked link:** the lock page from [`account-screens.md`](account-screens.md), headed "Your trial link is locked", with "Read my sessions" and no Sign out.
 
 ### Notice pages
@@ -104,6 +104,7 @@ A link that no longer works opens an opening page in place of the app, saying wh
 | Switched off from the trial-link list ([#764]) | "This trial link was switched off", the owner's reason, and "Its sessions have been erased.", with Request access |
 | Switched off for misuse, from the link's flag: the first showing ([#764]) | "This trial link was switched off", then "The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions that were still there. The owner switched this link off, and its sessions have been erased.", with Request access |
 | Switched off for misuse: later showings, on any browser ([#764]) | The same, leaving out the brackets |
+| Switched off for misuse: a first showing 30 days or more after the owner's decision ([#776]) | The same, leaving out the brackets |
 | Switched off from a sealed flag ([#764]) | "This trial link was switched off", then the fixed reason line in [`misuse.md`](misuse.md) and "The owner switched this link off, and its sessions have been erased.", with Request access |
 | Just after Yes to the age question | "Your trial has ended", then "Crux is for people 18 and over, so this trial link has been switched off and its sessions have been erased.", with OK, which goes to the landing page |
 | Back later on a link ended by a Yes | "This trial link has ended", then "It no longer works.", with OK |
@@ -147,3 +148,5 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

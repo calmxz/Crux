@@ -75,7 +75,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - idle accounts at 12 months, once their warnings have run ([#677], [#735]);
 - a copy and its address after its link's last day, or 30 days after it was made if its email never went ([#735], [#772]);
 - "email me if spots open" addresses at 3 months, and the misuse block's scrambled email at 12 months ([#677]);
-- a decline's saved details once it drops out of the 7 days with no flag, never kinds waiting for a misuse card (see [`misuse.md`](misuse.md)) ([#733], [#764]);
+- a decline's saved details once it drops out of the 7 days with no flag; kinds waiting for a misuse card or a switched-off link's first showing, at the last run within 30 days of the owner's decision (see [`misuse.md`](misuse.md)) ([#733], [#764], [#776]);
 - a withdrawn quote's words at 14 days, if its account has gone ([#677], [#735]);
 - a dead trial link's stub, at the trial's end or 12 months after the link died, whichever comes first ([#719]);
 - a dead trial link's feedback answers and quote permissions (not after a Yes or its holder's erasing, which remove them at once), 6 months after the trial ends or 12 months after the link died, whichever comes first, unless published ([#719]);
@@ -114,3 +114,4 @@ The cards, emails and lines that print these dates are in [`account-screens.md`]
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
