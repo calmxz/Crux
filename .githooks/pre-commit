@@ -15,8 +15,8 @@ MAX_BYTES=$((MAX_TOKENS * 4))
 LOCAL_PATH='([A-Za-z]:|/[a-z])[\\/]+[Uu][Ss][Ee][Rr][Ss][\\/]|[Aa]pp[Dd]ata[\\/]|(^|[^A-Za-z0-9_.~-])/(Users|home)/[A-Za-z0-9._-]+'
 
 # Files nobody writes by hand: lockfiles, codegen output, tool output,
-# vendored code, license text. They skip the size check only: a lockfile
-# can still record a local path. Binary files skip both checks.
+# vendored code, license text. They skip the size and link checks: a
+# lockfile can still record a local path. Binary files skip every check.
 is_exempt() {
 	case "$1" in
 	backend/uv.lock) return 0 ;;
@@ -47,17 +47,33 @@ fi
 
 # Prints "  <path>: <problem>" for each [#123] short link with no
 # "[#123]: <url>" line (GitHub shows it as plain text), and each such line
-# no link uses. Inline [#123](<url>) links and fenced code are skipped.
+# no link uses. Skipped: inline [#123](<url>) links, escaped \[#123] and
+# image ![#123] brackets, code spans, one-line HTML comments, and fenced
+# code. A fence closes only on its own character, at least as long as the
+# one that opened it, as in CommonMark.
 link_check() {
 	awk -v f="  $1" '
-	/^[ \t]*(```|~~~)/ { fence = !fence; next }
-	fence { next }
-	/^\[#[0-9]+\]:/ { n = $0; sub(/^\[/, "", n); sub(/\].*/, "", n); def[n] = 1; next }
+	{ sub(/\r$/, "") }
+	fence != "" {
+		c = $0; sub(/^ +/, "", c); sub(/[ \t]+$/, "", c); run = c
+		gsub(substr(fence, 1, 1), "", run)
+		if (c != "" && run == "" && length(c) >= length(fence)) fence = ""
+		next
+	}
+	match($0, /^ ? ? ?(```+|~~~+)/) {
+		fence = substr($0, RSTART, RLENGTH); sub(/^ +/, "", fence); next
+	}
+	/^ ? ? ?(> ?)*\[#[0-9]+\]:/ {
+		n = $0; sub(/^[^[]*\[/, "", n); sub(/\].*/, "", n); def[n] = 1; next
+	}
 	{
 		line = $0
+		gsub(/<!--.*-->/, "", line)
+		gsub(/`[^`]*`/, "", line)
 		while (match(line, /\[#[0-9]+\]/)) {
 			n = substr(line, RSTART + 1, RLENGTH - 2)
-			if (substr(line, RSTART + RLENGTH, 1) != "(") use[n] = 1
+			before = RSTART > 1 ? substr(line, RSTART - 1, 1) : ""
+			if (substr(line, RSTART + RLENGTH, 1) != "(" && before != "\\" && before != "!") use[n] = 1
 			line = substr(line, RSTART + RLENGTH)
 		}
 	}
@@ -79,6 +95,7 @@ while IFS="$tab" read -r added _deleted path; do
 		grep -H --label="  $path" -n -o -E ".{0,40}($LOCAL_PATH).{0,40}" | head -n 3)
 	[ -n "$hits" ] && paths="$paths$hits
 "
+	is_exempt "$path" && continue
 	case "$path" in
 	*.md)
 		bad=$(git cat-file -p "$blob$path" | link_check "$path")
@@ -86,7 +103,6 @@ while IFS="$tab" read -r added _deleted path; do
 "
 		;;
 	esac
-	is_exempt "$path" && continue
 	bytes=$(git cat-file -s "$blob$path") || exit 1
 	if [ "$bytes" -gt "$MAX_BYTES" ]; then
 		over="$over  $path: $((bytes / 4)) tokens ($bytes bytes)
