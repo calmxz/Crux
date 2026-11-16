@@ -1,0 +1,38 @@
+<!doctype html>
+<!--
+  PROTOTYPE, throwaway. Ticket: Prototype: the all-sessions page and its search (calmxz/Crux#780).
+  The page inside the shell #752 chose (sidebar on desktop, drawer on a phone). One scene per question
+  (?scene=...), its options switched with ?opt=A|B|C, at ?device=phone|desktop. The search runs over sample data
+  as a word-prefix match, a stand-in for Postgres full-text search with the `simple` config (#716).
+  Wording is the spec's where it has one; red italic text is draft wording. No persistence, no backend.
+  Serve this folder over http (split js files do not load from file://).
+
+  Chosen by the owner on 2026-11-16 (the ticket's resolution comment holds the full answer):
+  - entry D (the owner's mix): the sidebar shows the 10 most recent sessions, then "All sessions (24)";
+    a search button at the right of the sidebar's top bar, in line with "Crux", opens the page.
+  - layout D: name and badges, last visit, progress bar; no "On:" / "Mastered last:" row on the page.
+  - scope C: names, topics, file names and conversations. typing A: as you type.
+  - hit A: one snippet, "You:" / "Tutor:", "(waiting)". check A: hidden earlier teaching not searched.
+  - sealed A: listed, found by name only. filter A: none. sort A: last visit only. menu A: "..." on each line.
+  - paging C (the owner's "A, maybe with lazy loading"): batches load as the learner scrolls.
+  - empty B: the no-match line names what the search looks through. Wording in the scenes is as chosen,
+    except "Try again" on the unreachable line, which the prototype does not draw.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PROTOTYPE #780: the all-sessions page and its search</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="780-all-sessions.css">
+</head>
+<body>
+<div class="note" id="note"></div>
+<div class="stage"><div id="device" class="device phone"></div></div>
+<div class="bar" id="bar"></div>
+<script src="780-data.js"></script>
+<script src="780-scenes.js"></script>
+<script src="780-search.js"></script>
+<script src="780-page.js"></script>
+</body>
+</html>
