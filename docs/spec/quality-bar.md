@@ -131,7 +131,7 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 | Sittings per mastery reviewed ([#678]) | owner |
 | The advisory letter sent, at least a month before opening ([#677]) | owner |
 | The Terms and Privacy Policy published, with the officer's contact ([#677]) | owner |
-| The reworded consent tick and the EU/UK check in sign-up ([#677]) | check |
+| The reworded consent tick, naming learning progress and the decline record, and the EU/UK check in sign-up ([#677], [#776]) | check |
 | The Crux email's switch: Zoho if its agreement covers the free plan, otherwise Workspace, with trial mail moved or deleted ([#717]) | owner |
 | The Sentry judgement, with its address settings if added ([#717]) | owner |
 | Google's sign-in screen moved to production, with the Privacy Policy on the domain ([#717]) | owner |
@@ -160,3 +160,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#776]: https://github.com/calmxz/Crux/issues/776

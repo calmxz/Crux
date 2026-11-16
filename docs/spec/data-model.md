@@ -10,7 +10,7 @@ This file covers what Crux stores, what each item belongs to, where it lives, wh
 - What only an account has (its email, sign-in codes, the 7-day undo, copies) sits on the account. What only a trial link has (its scrambled key, browsers, switched-off state) sits on the link ([#719]).
 - A file belongs to its session. The storage allowance is still counted per home (see [`files.md`](files.md)) ([#719]).
 - Guests have no home, and Crux stores nothing for them (see [Guests](#guests)) ([#719]).
-- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`hosting.md`](hosting.md)) ([#719]).
+- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind, flag number and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755], [#777]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`hosting.md`](hosting.md)) ([#719]).
 
 ## What belongs to what
 
@@ -24,7 +24,7 @@ flowchart TD
   S --> MSG[Messages and waiting messages]
   S --> C[Mastery check] --> MK[Marks and re-mark records]
   S --> PA[Photo answers]
-  S -. marked Reported, moved at erasure .-> RH[Reported hold]
+  S -. marked Reported, moved at erasure if not answered .-> RH[Reported hold]
   H -. link dies .-> ST[Stub]
   FA -. link dies, not by Yes .-> FB[Kept 6 months after the trial, or 12 months after the link died]
   FA -. published quote withdrawn .-> QN[Quote note; words at most 14 days]
@@ -66,7 +66,7 @@ In the DB, and erased with the home ([#719]).
 | Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
-| Decline records, the open flag, a warning, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal | Safety | [`misuse.md`](misuse.md) ([#764]) |
+| Decline records, the open flag, a warning with its date, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md) ([#764], [#776], [#777]) |
 | Feedback answers, sends per day, quote and share ticks, the "email me" tick, the first-mastery notice shown, unread marks | Feedback | [`feedback.md`](feedback.md) |
 | Count marks: they go when the account is erased, not when it closes | Feedback | [`feedback.md`](feedback.md) |
 
@@ -108,8 +108,8 @@ These never link to a home with delete with parent. The erasure writes or moves 
 
 | Item | Module | Lifetime |
 |---|---|---|
-| The reported hold: a sealed session marked "Reported", with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind and the email | Safety | Until the owner erases it ([`misuse.md`](misuse.md)) |
-| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A misuse reason keeps the kinds only until its first showing, then the count and the general line ([#764]). A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
+| The reported hold: a sealed session marked "Reported" whose home was erased before the authorities' answer was recorded, with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind, the number and the email | Safety | Until the owner erases it ([`misuse.md`](misuse.md)) ([#777]) |
+| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A misuse reason keeps the kinds only until its first showing, or the last run within 30 days of the owner's decision, whichever comes first, then the count and the general line ([#764], [#776]). A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
 | A dead link's feedback answers and quote permissions, when it died other than by a Yes or its holder's erasing | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
@@ -169,9 +169,9 @@ flowchart TD
 - After it commits, the listed bucket objects are erased. The daily job retries any still listed, and erases any copy object with no record ([#719]).
 - A cost that arrives later for an erased home is added to the nameless month and day totals ([#719]).
 - The move to the reported hold changes the owner of every row under the session, so delete with parent does not reach them. Until erasure the learner sees no change ([#719]).
-- An under-18 closure erases an outstanding copy and its link. Crux then keeps nothing about the person, apart from a Reported session, its flag's record and its email ([`age.md`](age.md)) ([#719]).
+- An under-18 closure erases an outstanding copy and its link. Crux then keeps nothing about the person, apart from a Reported session with no answer recorded, its flag's record and its email ([`age.md`](age.md)) ([#719]).
 - The restore log records each home erasure, with any copy's object ID, expiry and scrambled code ([#762]). A restore re-applies it by calling the routine, so the moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing. A replayed age answer calls the routine only, so the dated count gains 1 once (see [`hosting.md`](hosting.md)) ([#719]).
-- Tests: every table holding a learner's data, apart from those in [Outliving a home](#outliving-a-home), links to a home with delete with parent; each item that outlives a home has its own erasure test; and erasing a home holding a Reported session, by each path and after a restore, keeps that session, its files, its flag's record and, for an account, its email ([#719]).
+- Tests: every table holding a learner's data, apart from those in [Outliving a home](#outliving-a-home), links to a home with delete with parent; each item that outlives a home has its own erasure test; and erasing a home holding a Reported session with no answer recorded, by each path and after a restore, keeps that session, its files, its flag's record and, for an account, its email, while one with its answer recorded is erased with the home ([#719], [#777]).
 
 ## Modules
 
@@ -203,3 +203,5 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

@@ -45,7 +45,7 @@ In this order ([#677], [#681]):
 1. The learner sees a short message.
 2. The account's marks take 1 off each path and bar count that learner added, in the window each was counted in. A window already judged keeps its verdict. The budget counts are not changed (see [`feedback.md`](feedback.md)).
 3. The owner page's dated under-18 count adds 1, with nothing about who the person was.
-4. The account closes and its data is erased at once. The 7-day undo does not apply (see [`privacy.md`](privacy.md)). Only a published quote's note, with no words, stays until the owner removes it (see [`feedback.md`](feedback.md)) ([#734]). A sealed session marked "Reported" also stays, with the account's email, in the reported hold (see [`data-model.md`](data-model.md)). A copy not yet collected is erased with its link, and the account's feedback answers leave the tallies along with its counts ([#719]).
+4. The account closes and its data is erased at once. The 7-day undo does not apply (see [`privacy.md`](privacy.md)). Only a published quote's note, with no words, stays until the owner removes it (see [`feedback.md`](feedback.md)) ([#734]). A sealed session marked "Reported" with no answer recorded also stays, with the account's email, in the reported hold (see [`data-model.md`](data-model.md)) ([#777]). A copy not yet collected is erased with its link, and the account's feedback answers leave the tallies along with its counts ([#719]).
 
 The learner may sign up again like anyone new, ticking the box again. Crux keeps nothing about them to block it ([#681]).
 
@@ -84,3 +84,4 @@ The age question is a card in the thread with Yes and No, and "please tap Yes or
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#777]: https://github.com/calmxz/Crux/issues/777

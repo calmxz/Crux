@@ -98,7 +98,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`owner-screens.md`](owner-screens.md) | The owner page, its areas and dialogs, and the daily email on screen | 755 (+772) | 2,200 |
 | [`files.md`](files.md) | Files: types and limits, how files shape objectives, file mistakes, storage and conversion, pages sent to the tutor, the allowance | 667 (+669, 670, 671, 675, 677, 679, 681, 716, 717, 722) | 1,300 |
 | [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731) | 800 |
-| [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list | 674 (+675, 677, 679, 681, 717, 753, 754, 772) | 1,250 |
+| [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list, registering with the Commission | 674 (+675, 677, 679, 681, 717, 753, 754, 772) | 1,250 |
 | [`age.md`](age.md) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722, 754) | 600 |
 | [`spending.md`](spending.md) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+667, 671, 674, 676, 677, 678, 679, 716, 717, 722, 728, 731, 733, 734, 771) | 1,100 |
 | [`trial.md`](trial.md) | Guest mode, Request access and trial links, the advisory opinion, ending the trial | 677, 722 (+717, 754, 770, 772) | 1,750 |
@@ -109,7 +109,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the Worker, the database, backups, environments and staging, logs, the converter, secrets | 716 (+675, 678, 679, 717, 722, 726, 732, 733, 734, 735, 750, 754, 769, 770, 771, 772) | 1,800 |
 | [`security.md`](security.md) | The visitor's country and address, keys in addresses, the request guards, the content security policy, the other headers, where they are set, their checks, build notes | 769 (+716, 717, 770) | 2,500 |
 | [`tools.md`](tools.md) | The backend's and the frontend's tools: lint, the API made from the contract, the build checks, the fallback | 750, 769 | 550 |
-| [`operations.md`](operations.md) | Email sending, errors, uptime, how the owner is told, the bill | 717 (+675, 677, 716, 728, 733, 734, 735, 753, 769, 770, 772) | 1,300 |
+| [`operations.md`](operations.md) | Copies of data and emailed requests, email sending, errors, uptime, how the owner is told, the bill | 717 (+675, 677, 716, 728, 733, 734, 735, 753, 769, 770, 772) | 1,300 |
 | [`dates.md`](dates.md) | When a printed date takes effect, notices that wait for email, past the last day, when Crux acts, outages, the daily job | 772 (+675, 676, 677, 679, 716, 717, 719, 728, 733, 734, 735, 753, 755, 762, 763, 764, 770) | 1,700 |
 | [`quality-bar.md`](quality-bar.md) | What "solid" means; real-phone tests, security, accessibility, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743, 750, 769, 770, 771) | 1,750 |
 | [`ordinary-tests.md`](ordinary-tests.md) | Ordinary tests by area, component tests, browser paths and how they run | 678, 769 (+670, 671, 674, 675, 676, 677, 679, 680, 681, 716, 717, 719, 722, 728, 732, 733, 734, 735, 736, 743, 750, 755, 762, 770, 771, 772) | 1,950 |

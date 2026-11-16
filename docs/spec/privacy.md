@@ -81,12 +81,13 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Sign-up ticks, with date and terms version | As long as the account exists ([#677]) |
 | A published quote, once withdrawn | Where it was published and the remove-by date, until the owner marks it removed. Its words too, for at most 14 days if its account has gone. After an under-18 ending, only where it was published and the date ([#677], [#734], [#735]) |
 | A decline's date and kind | As [`misuse.md`](misuse.md) sets out ([#733], [#719]) |
-| A misuse warning | As long as the account exists ([#733]) |
-| A copy asked for while closing | Until its 7-day link expires, or 30 days if its email can't be sent ([#733], [#735], [#772]) |
-| A copy asked for by email | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772]) |
-| A sealed session marked "Reported", with its account's email | Until the owner erases it, once the authorities say what to do ([#743], [#719]) |
+| A waiting erase card: the session's name, its mastered-topic count and the erase's date | Until Continue, or until the account or link is erased ([#777]) |
+| A misuse warning, with its date | As long as the account exists ([#733], [#776]) |
+| A copy asked for while closing, with any declined kinds in it | Until its 7-day link expires, or 30 days if its email can't be sent ([#733], [#735], [#772], [#776]) |
+| A copy asked for by email, with any declined kinds in it | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772], [#776]) |
+| A sealed session marked "Reported", with its account's email | Until the owner lifts or erases it, once the authorities answer. With the answer recorded, it goes with its account or link ([#743], [#719], [#777]) |
 | A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
-| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing (see [`misuse.md`](misuse.md)) ([#719], [#764]) |
+| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing, or 30 days after the owner's decision, whichever comes first (see [`misuse.md`](misuse.md)) ([#719], [#764], [#776]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
 | Per-account spend | Current day and week only. Older days only as totals with no account ([#677]) |
@@ -110,7 +111,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 ### Who runs Crux
 
 - Crux is run by the owner, named, in the Philippines ([#677]). Until opening, "Who runs Crux" says the owner built it (see [Contacts](#contacts)) ([#754]).
-- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent ([#677]).
+- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, declined kinds, all kinds alike, as possibly sensitive information about health or sexual life, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent. If the Commission does not answer, or turns the request away, declined kinds stay handled as sensitive ([#677], [#776]).
 - Crux follows the same standards wherever its learners are ([#677]).
 
 ### Contacts
@@ -123,15 +124,11 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 
 ### Copies and requests
 
-- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request, unless Crux's email can't go. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. The owner checks the request came from the account's own address. A button on the owner page then makes it, as the copy at closing is made, without the owner reading through it ([#677], [#755]). It reaches the learner as a private 7-day link (see [`operations.md`](operations.md)) ([#735]).
-
-- A request by email is entered on the owner page by pasting the sender's address, used only to find the account and never stored ([#755]).
-- **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag. Its timing, and what happens if its email can't go, is in [`dates.md`](dates.md) ([#755], [#772]).
-- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) after 11:59 pm on 15 Mar, Philippine time. Didn't ask? Reply before then to stop it.", its last day 2 days after Resend accepts it. Unless the owner cancels, it goes as [`dates.md`](dates.md) says, even if the account is restored. A session held for the owner's decision waits for the decision ([#755], [#772]).
+Copies of a learner's data and requests by email are in [`operations.md`](operations.md#copies-and-requests).
 
 ### Breaches
 
-If sensitive or sign-in data reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677]). The learners' notice goes from the owner page: an email to every account, locked and closing ones included, and to every other address Crux holds, and a notice page on every live trial link (see [`operations.md`](operations.md)) ([#755]).
+If sensitive or sign-in data, decline records included, reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677], [#776]). The learners' notice goes from the owner page: an email to every account, locked and closing ones included, and to every other address Crux holds, and a notice page on every live trial link (see [`operations.md`](operations.md)) ([#755]). A switched-off link is not reached, though its stub may still hold kinds ([#776]).
 
 ### What it covers
 
@@ -165,6 +162,10 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 | Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log 30 days and in its backups up to 7 days after ([#717], [#762]) |
 | The Crux Gmail, in the trial | The Crux email | No agreement, an exception the owner accepted. Zoho or Workspace from opening ([#717]) |
 
+## Gaps
+
+- **Right of access:** whether a copy (see [`operations.md`](operations.md#copies-and-requests)) that leaves out declines still counting and an open flag meets the Data Privacy Act's right of access (section 16(c)) is unchecked ([#776]).
+
 ## On screen
 
 Layout is not decided (see the main file's Gaps). Close account with its dialog and "Send me a copy first", "Keep my account / Sign out", the terms-changed step and the share tick are in [`account-screens.md`](account-screens.md) ([#753]). "Who runs Crux" is in [`landing-screens.md`](landing-screens.md) ([#754]). The owner page's shared sessions, entered requests and breach form are in [`owner-screens.md`](owner-screens.md) ([#755]).
@@ -194,3 +195,5 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

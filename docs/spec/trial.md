@@ -104,9 +104,9 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 
 ### When a link dies
 
-A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), its holder erases it ([#755]), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719]).
+A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), its holder erases it ([#755]), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" with no answer recorded stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719], [#777]).
 
-A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason (a misuse reason keeps its kinds only until first shown, see [`misuse.md`](misuse.md)) ([#764]), so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
+A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason (a misuse reason keeps its kinds only until first shown, or 30 days after the owner's decision, see [`misuse.md`](misuse.md)) ([#764], [#776]), so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
 
 ### Telling a link holder
 
@@ -139,6 +139,7 @@ A holder who does not visit cannot be reached ([#733]).
 - The dated under-18 count exists.
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
+- "Crux handles the kinds of requests the tutor declines as possibly sensitive information." ([#776])
 - Feedback answers and quote permissions are kept 6 months after the trial ends, or 12 months after the link died, whichever comes first, unless the holder erases the link ([#755]). Those of a published quote stay until the owner removes it ([#719]).
 - A sealed session is kept longer only if reported to the authorities ([#719]).
 - Deleting a session erases it, but another session may still mention something from it.
@@ -148,15 +149,17 @@ A holder who does not visit cannot be reached ([#733]).
 - "Erase this trial link" in Settings erases the link's sessions, files and feedback ([#755]).
 - Until opening, its contacts are privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux (see [`privacy.md`](privacy.md)) ([#754]).
 
-## Known gap
+## Known gaps
 
-Files and photos can show a name, and the owner may see one when reading a session flagged for misuse. The trial accepts this, covered by the notice and by erasure ([#722]).
+- Files and photos can show a name, and the owner may see one when reading a session flagged for misuse. The trial accepts this, covered by the notice and by erasure ([#722]).
+- Whether the entry tick "I agree to the Trial Terms and Privacy Notice" counts as consent specific to the purpose (Data Privacy Act, section 13(a)) is unchecked. The owner chose the notice line over a link-only tick ([#776]).
+- Whether the trial treats learning progress as possibly sensitive is open ([#776]).
 
 ## Ending the trial
 
 - The owner ends the trial with a button on the owner page, whether or not Crux will open. It takes a date at least 7 days ahead, which link holders see, and links end at 12:00 am after it. Once passed, it can't be moved or taken back ([#733], [#772]).
 - Once set, the date can move later or be taken back, never earlier. A date set after a take-back is never earlier than the one taken back. Link holders see a fresh notice at their next visit ([#755]).
-- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" stays ([#719]).
+- Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" with no answer recorded stays ([#719], [#777]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
 - Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
 - Nothing from the trial is carried into an account ([#677]).
@@ -173,9 +176,7 @@ Files and photos can show a name, and the owner may see one when reading a sessi
 
 ## Opening
 
-- The before-opening checklist is in [`quality-bar.md`](quality-bar.md), and it is done before anyone but the owner signs up, even privately to one friend ([#677], [#680]).
-- Within 20 days of the first account holder who is not the owner, the owner registers Crux on the Commission's registration system (NPCRS), unless the Commission's answer says it is not needed. NPC Circular 2022-04 counts the 20 days from "the commencement of such system", and the application is notarized. The fee depends on the tier: PHP 500 to 2,500, then PHP 350 to 1,000 a year (Circular 2023-01). On 2026-11-11 the NPCRS was "currently unavailable to the public until further notice". A private share counts the same as a public one ([#677], [#722], [#762]).
-- Trial-link users are not counted toward the 20 days ([#722]).
+The before-opening checklist and registering with the Commission are in [`accounts.md`](accounts.md#opening).
 
 ## On screen
 
@@ -201,3 +202,5 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

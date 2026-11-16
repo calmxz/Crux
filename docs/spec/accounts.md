@@ -60,7 +60,7 @@ The rule is in the main file's "Who Crux is for".
 
 - After the code or Google, an email with no account gets one step, "One more thing", with two required ticks and a Start button that needs both ([#674]):
   - "I am 18 or over"
-  - "I agree to the Terms, and to Crux keeping my learning progress and what I share with the tutor, as the Privacy Policy explains" ([#677])
+  - "I agree to the Terms, and to Crux keeping my learning progress, what I share with the tutor, and a record of requests it declines, as the Privacy Policy explains" ([#677], [#776])
 - The Terms and the Privacy Policy are linked from the step ([#674]).
 - The account is made only on Start. A learner who leaves at the step has no account, and nothing is counted ([#674]).
 - Start adds 1 to "signed up" inside a window (see [`feedback.md`](feedback.md)) ([#674], [#676]).
@@ -112,8 +112,15 @@ These come from [`privacy.md`](privacy.md). They show the next time a learner op
 - During a closing's 7 days: "Keep my account / Sign out".
 - After a change that matters: the "terms changed" step.
 - After a misuse warning or dismissal: the misuse card, which comes from [`misuse.md`](misuse.md) ([#764]).
+- After the owner erases a sealed session: the erase card, from the same file ([#777]).
 
-The card past a last day comes alone, before all of these (see [`dates.md`](dates.md)) ([#772]). If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), the misuse card, "Keep my account", then the terms step ([#733], [#764]).
+The card past a last day comes alone, before all of these (see [`dates.md`](dates.md)) ([#772]). If several apply, the order is: a lock, the age question (see [`age.md`](age.md)), the misuse card, the erase card, "Keep my account", then the terms step ([#733], [#764], [#777]).
+
+## Opening
+
+- The before-opening checklist is in [`quality-bar.md`](quality-bar.md), and it is done before anyone but the owner signs up, even privately to one friend ([#677], [#680]).
+- Within 20 days of the first account holder who is not the owner, the owner registers Crux on the Commission's registration system (NPCRS), unless the Commission's answer says it is not needed. NPC Circular 2022-04 counts the 20 days from "the commencement of such system", and the application is notarized. The fee depends on the tier: PHP 500 to 2,500, then PHP 350 to 1,000 a year (Circular 2023-01). On 2026-11-11 the NPCRS was "currently unavailable to the public until further notice". A private share counts the same as a public one ([#677], [#722], [#762]).
+- Trial-link users are not counted toward the 20 days ([#722]).
 
 ## On screen
 
@@ -139,3 +146,7 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#680]: https://github.com/calmxz/Crux/issues/680
+[#722]: https://github.com/calmxz/Crux/issues/722
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

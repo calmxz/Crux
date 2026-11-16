@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers email, knowing when something is wrong, and how the owner is told. When dates take effect and the one daily job are in [`dates.md`](dates.md). What runs where is in [`hosting.md`](hosting.md).
+This file covers copies and requests, email, knowing when something is wrong, and how the owner is told. When dates take effect and the one daily job are in [`dates.md`](dates.md). What runs where is in [`hosting.md`](hosting.md).
 
 ## Email sending
 
@@ -49,9 +49,16 @@ Resend neither queues nor retries an email it refuses, so Crux does ([#763]):
 - Retries are Cloud Tasks set for their time (see "The daily job" in [`dates.md`](dates.md)). A retry task holds only the email's queue ID.
 - Accepted does not mean read. A learner who has lost the inbox cannot act on the email, and the data goes at the deadline (see [`privacy.md`](privacy.md)) ([#677]).
 
+### Copies and requests
+
+- A copy of a learner's data is sent on request to the Crux email, within a month, as for every data request, unless Crux's email can't go. It holds conversations, record, preferences, check answers and photos (data files plus readable text) and uploaded files, as a zip. Every copy, at closing or at Crux's closing too, also holds the decline records the learner is told about: kinds waiting for a misuse card with their count and decision date, or the count and date alone after the 30 days; a misuse closure's count, kinds and date; and a misuse warning, as "Warned on 4 Mar". It leaves out declines still counting toward a flag, an open flag and a sealed flag's kind, and never names the mark that flags at once. Kinds are named in the harm list's words, or "blocked by Google". A waiting erase card shows as its line and date: "2 May: Crux's owner erased your sealed session "Reaction rates", with its 2 mastered topics." ([#776], [#777]) The owner checks the request came from the account's own address. A button on the owner page then makes it, as the copy at closing is made, without the owner reading through it ([#677], [#755]). It reaches the learner as a private 7-day link (see [Sending a copy](#sending-a-copy-of-a-learners-data)) ([#735]).
+- A request by email is entered on the owner page by pasting the sender's address, used only to find the account and never stored ([#755]).
+- **Deleting an account by email** starts the same closing as Close account, with its email and 7-day undo. It is not offered for an account already closing or locked by a sealed flag. Its timing, and what happens if its email can't go, is in [`dates.md`](dates.md) ([#755], [#772]).
+- **A session or file during a closing** is found by the exact name in the learner's email, leaving out sealed sessions. Crux emails the account's address, "We'll erase 'Thesis statements' (made 2 Mar) after 11:59 pm on 15 Mar, Philippine time. Didn't ask? Reply before then to stop it.", its last day 2 days after Resend accepts it. Unless the owner cancels, it goes as [`dates.md`](dates.md) says, even if the account is restored. A session held for the owner's decision waits for the decision ([#755], [#772]).
+
 ### Sending a copy of a learner's data
 
-What a copy holds, and when one is made, is in [`privacy.md`](privacy.md).
+What a copy holds, and when one is made, is in [Copies and requests](#copies-and-requests).
 
 - The copy stays in a private Cloud Storage bucket, and never reaches the owner's computer ([#735]).
 - **A copy asked for while closing:** the daily job makes it on day 9, and sends the link itself, as a required email ([#735], [#772]). The copy, its address and this email are written outside the account before it is erased (see [`data-model.md`](data-model.md)) ([#719]).
@@ -124,7 +131,7 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - requests still waiting (see [`trial.md`](trial.md));
 - misuse flags (see [`misuse.md`](misuse.md)), each by its number, whose it is and the date: "Flag 4821 · An account · 10 Mar · Open ›", or "Flag 4812 on Link K7Q-4MP · 10 Mar · Open ›". No kind and no email. The kind, the record line, the sessions and the actions are in the owner page's Safety area ([#733], [#764]);
 - from the first run after a misuse closure's last day until it is erased, unless a contest is entered: "1 closed account's contest time has ended. It's erased on 12 Nov: check the Crux inbox for a contest.", its date updated if an outage delays the run, also kept in the owner page's Today area ([#753], [#772]);
-- a copy asked for by email, still to be sent (see [`privacy.md`](privacy.md)) ([#735]);
+- a copy asked for by email, still to be sent (see [Copies and requests](#copies-and-requests)) ([#735]);
 - an erasure warning waiting: "1 erasure warning ends on 15 Mar: check the Crux inbox for a reply.", then from the first run after that date, "1 erasure warning has ended. Its session is erased on 17 Mar: check the Crux inbox for a reply.", its date updated if an outage delays the run, also kept in the Today area ([#755], [#772]);
 - dates an outage moved: "Crux was down 40 minutes on 10 Nov: 3 dates moved by a day." ([#772]);
 - a request asked for by email whose email is still not accepted, and from 7 days after the owner entered it, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
@@ -174,3 +181,5 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777

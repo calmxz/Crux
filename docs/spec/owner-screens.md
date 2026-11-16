@@ -54,7 +54,7 @@ The Trial area leaves the menu when the trial ends.
 ## Safety
 
 - An account's flag reads "Flag 4821 · An account · 10 Mar", then the kind and the record line, with the actions [`misuse.md`](misuse.md) allows. "Read 2 sessions" opens them beside the list.
-- **Warn, dismiss and close** each open a dialog showing the email Crux will send.
+- **Warn, dismiss and close** each open a dialog showing the email Crux will send. So does a lift, of a lock or a seal, on a flag with readable declines, which sends the dismissed email ([#777]).
 - **"Mark 'Reported'"** opens a dialog saying it stays sealed until the authorities say what to do.
 - **A misuse closure** shows its last day, then from the run after it, its erasure date ("erased on 12 Nov") ([#772]). "Enter a contest" holds it. Then "Restore the account" or "Keep the closure".
 - **"Enter a request"** takes the kind and "The learner's email", pasted from the inbox. It says "No account with that email" when none matches. The kinds are:
@@ -62,7 +62,9 @@ The Trial area leaves the menu when the trial ends.
   - "A contest of a misuse closure";
   - "Delete a session or file during a closing", with the name typed from the learner's email, "No session or file by that name", a pick by date when two match, the warning's last day and Cancel, and "Kept until the closure is decided" for a held session, and "Confirm from the inbox" as below ([#772]);
   - "Delete the account". From 7 days with its email unsent, "Confirm from the inbox" gives a one-time code to paste into a new email, never a reply, to the account's address from the Crux inbox, and marks it confirmed when the owner types back the code from a reply that agrees (see [`dates.md`](dates.md)) ([#772]).
-- **The reported hold** lists the date, the kind and, for an account, its email, with Erase.
+- **The reported hold** lists every Reported session from its mark: the date, the kind, the flag number and, for an account, its email. One whose account or link lives reads "Account live" or "Link live", with "The authorities answered", then Lift and Erase. During a misuse closure's 7 days, Lift and Erase are greyed out, with "Wait for the closure to be decided". Once its account or link is erased, it has Erase only ([#777]).
+- **"The authorities answered"** opens a dialog: "Check the answer came through the channel you reported by, not only by email. A From line can be faked. Only tap this once the authorities no longer need the session. You can then lift the seal or erase it. If the account is erased first, the session goes with it." On a trial link the last sentence reads "If the trial link dies first, the session goes with it." Crux enforces nothing here; the first two sentences are a reminder ([#777]).
+- **Erase** on a live session whose own seal still locks the account or link opens a dialog with "Lift the lock", which lifts it in the same step. A Google seal with no lock has Erase only. Lift on a session whose own seal still locks the account or link lifts that lock ([#777]).
 - **"Tell learners about a breach"** takes the text and shows a preview, then confirms with the counts and when the sending finishes. In the trial: "Send this to 3 emails and 14 live trial links?". From opening, with the date, the time and the hours from now: "Send this to 150 accounts and 40 other emails? The last go at about 8 am on 14 Mar, 33 hours from now.", or "Send this to 25 accounts and 6 other emails? All are sent now." when all fit in today's room. The estimate counts the day's room, the month's, and email already waiting ahead of the notice. When the month's room runs out first: "…The last go after Resend's month restarts, on a date Resend doesn't give." ([#763])
 
 ## Money and switches
@@ -84,7 +86,7 @@ The Trial area leaves the menu when the trial ends.
 | Owner shell | The address, top bar, menu and phone tab row with counts, the turned-away "Page not found", the sign-in hop for email links, and the Owner link at the sidebar foot |
 | Owner today | What needs the owner, each line opening its item |
 | Owner trial | Requests, trial links with codes and switch-off with its reason, dead links, and the end of the trial with its later or take-back |
-| Owner safety | Flags with the session reader beside the list, warn, dismiss, close, lift, Reported, misuse closures and contests, entered requests with the copy button, the name match and the waiting erasures, the reported hold, "Confirm from the inbox" with its code ([#772]), and the breach form |
+| Owner safety | Flags with the session reader beside the list, warn, dismiss, close, lift, Reported, misuse closures and contests, entered requests with the copy button, the name match and the waiting erasures, the reported hold with "The authorities answered", Lift and Erase ([#777]), "Confirm from the inbox" with its code ([#772]), and the breach form |
 | Owner feedback | Answers with unread marks, published quotes and their remove-by dates, and shared sessions with the reader |
 | Owner counts | The bar, the window with Start and the same-day undo, the path, arrivals and the other counts |
 | Owner money | The money, Google's bill, the limits, the raise dialog with its tick, the learner cap and the let-in list |
@@ -95,3 +97,4 @@ The Trial area leaves the menu when the trial ends.
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#777]: https://github.com/calmxz/Crux/issues/777
