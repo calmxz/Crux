@@ -131,7 +131,7 @@ A guest's broken reply is in [`landing-screens.md`](landing-screens.md).
 | Pictures | Drawing Mermaid diagrams and graphs, and their text alternatives ([#769]) |
 | Maths | Drawing LaTeX with KaTeX, line breaks and the sideways box, and maths that cannot be drawn ([#771]) |
 
-The app shell, the session list, the Record, files and the file viewer are in [`app-shell.md`](app-shell.md) ([#752]). The other screens add their own modules.
+The app shell, the session list, the all-sessions page and its search, the Record, files and the file viewer are in [`app-shell.md`](app-shell.md) ([#752], [#780]). The other screens add their own modules.
 
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
@@ -139,3 +139,4 @@ The app shell, the session list, the Record, files and the file viewer are in [`
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#780]: https://github.com/calmxz/Crux/issues/780

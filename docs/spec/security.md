@@ -16,6 +16,7 @@ This file covers the visitor's country and address, keys in addresses, the reque
 
 - A trial link's key and the copy page's code sit after a `#` in the address, for example `/t/#AbC123…` (draft format). Browsers never send that part, so Cloudflare, its analytics and Crux's logs never see it ([#770]).
 - The app reads it, sends it in the body of its first `/api` call, and clears the address bar. The invite and copy emails carry the `#` form ([#770]).
+- The session search's term also travels in a request body, never in an address (see [`app-shell.md`](app-shell.md#the-all-sessions-page)) ([#780]).
 - Guessing is stopped as before: a long random key, 10 wrong links or codes an hour per network, and the request guards below ([#717], [#762], [#770]).
 
 ## Request guards
@@ -40,11 +41,13 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 - Both are metric alerts on Crux's own logs on live, which hold the route, never an address (see [`operations.md`](operations.md)) ([#770]).
 - **Example:** a script floods one route at 50 calls a second from 9 am. About 15 a second get through, so the push comes at about 9:03. If about 93,000 of the day's 100,000 are left (a guess), they last until about 10:43. A script at 2 calls a second never trips the first push; with about 6,700 normal calls in the past 24 hours (a guess), the backstop comes after about 3.2 hours ([#770]).
 - The 300 and both pushes' numbers are re-set before opening from the trial's real counts (see [`quality-bar.md`](quality-bar.md)) ([#770]).
+- The session search's pause and the all-sessions page's batch size are set so that a check passes: 25 learners opening Crux, then the page, and searching within the same 10 seconds stay under the burst guard's 300, counting the class's own opening of about 200 calls. As a guess, one page call and 3 search calls each add 100, which reaches 300 and fails, so the build needs a longer pause or a later first batch; scroll batches, retries and the re-check on Back count too. Ten searches each over 10 minutes add about 750 to a busy class's 1,000 to 1,500: 1,750 to 2,250, under the 3,000 push. About 50 search calls a learner a day, 1,250 for 25, added to about 6,700 other calls (a guess) make about 7,950, under the 30,000 backstop and the Worker's 100,000. The trial's real counts re-set the 300 and the pushes before opening, searches included ([#780]).
 
 ### What a learner sees
 
 - A **Cloudflare refusal** is a 403 or 429 that does not carry Crux's error shape: one shape, set in the API contract, that every error from the backend or the Worker carries, with a Crux error code. The Worker turns any answer from Cloud Run not in that shape into Crux's "can't be reached" code, so a Cloudflare refusal is always one made before the Worker ([#770]).
 - A tap, such as Send, shows as sending, and the app tries once more after 10 seconds. If that is refused too, the learner sees "Crux can't be reached right now. Try again later.", and a typed message stays in the box. The call never reached the Worker, so the retry cannot send a message twice. Every other error keeps its own handling ([#770]).
+- A session search fired by typing, or a batch of the all-sessions page fired by scrolling, counts as a tap: on a Cloudflare refusal it shows "Loading..." and tries once more after 10 seconds, and only a second refusal shows the unreachable line. Nothing is sent during the wait: when it ends, one search goes with whatever is typed then, and a refused batch is fetched again with it ([#780]).
 - A learner whose sign-in cookie is missing or lapsed sees what a signed-out visitor sees now. A learner on a blocked network sees "Crux can't be reached right now. Try again later." Neither ever sees the other's screen ([#770]).
 - On the landing page, warm-on-open tries again after 10 seconds before the page greys (see [`landing-screens.md`](landing-screens.md)). Asking for finished answers and `/api/client-error` show nothing on a refusal. They back off, and error reports are dropped rather than retried ([#770]).
 - A mastery check refused mid-way stays half-done, as [`ai-layer.md`](ai-layer.md) keeps it when the tutor is busy ([#770]).
@@ -127,3 +130,4 @@ These specifics are left to the build ticket. They were checked while deciding, 
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
+[#780]: https://github.com/calmxz/Crux/issues/780

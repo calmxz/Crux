@@ -2,14 +2,15 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the app around the session screen: where the app opens, the session list, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md) and [`misuse.md`](misuse.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
+This file covers the app around the session screen: where the app opens, the session list, the all-sessions page, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md) and [`misuse.md`](misuse.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
 
 ## The shell
 
-- **Sidebar:** on desktop, the session list beside the session screen, always in view. On a phone, the same list is a drawer opened from "☰" in the top bar. It holds "+ New session" at the top, the session list, and "What you've mastered" at the bottom, with Feedback and Settings under it (see [`account-screens.md`](account-screens.md)) ([#753]).
+- **Sidebar:** on desktop, the session list beside the session screen, always in view. On a phone, the same list is a drawer opened from "☰" in the top bar. It holds "+ New session" at the top, the session list, and "What you've mastered" at the bottom, with Feedback and Settings under it (see [`account-screens.md`](account-screens.md)) ([#753]). The session list shows the 10 most recent sessions, by last visit, then "All sessions (24)", which opens [the all-sessions page](#the-all-sessions-page). A learner with 3 sessions sees all 3, then "All sessions (3)" ([#780]).
+- **The search button** (🔍) sits at the right of the sidebar's top bar, in line with "Crux". Screen readers read it as "Search sessions". It opens the all-sessions page with the cursor in its search box. On a phone it is only in the drawer's top bar, so search takes two taps: ☰, then 🔍 ([#780]).
 - **The owner's sidebar** also holds "Owner" above Feedback and Settings, shown only to the owner's main address (see [`owner-screens.md`](owner-screens.md)) ([#755]).
-- **A guest's sidebar** holds the guest's own parts, and a trial link's foot reads "Trial link" in place of the email (see [`landing-screens.md`](landing-screens.md)) ([#754]).
-- **Main area:** the part of the app beside the sidebar. It shows a session, "What you've mastered", a sealed session's message, the Settings page or the feedback page ([#753]).
+- **A guest's sidebar** holds the guest's own parts, and a trial link's foot reads "Trial link" in place of the email (see [`landing-screens.md`](landing-screens.md)) ([#754]). A guest's sidebar has neither the search button nor the "All sessions" line. A trial link gets the sidebar and the all-sessions page exactly as an account does ([#780]).
+- **Main area:** the part of the app beside the sidebar. It shows a session, "What you've mastered", the all-sessions page, a sealed session's message, the Settings page or the feedback page ([#753], [#780]).
 - Where the app opens:
 
 ```mermaid
@@ -22,7 +23,7 @@ flowchart TD
   msg -->|"later visits"| open
 ```
 
-- When the age question is due and no conversation is open (the start box, "What you've mastered", or a sealed message), its card shows in the main area until answered (see [`age.md`](age.md)).
+- When the age question is due and no conversation is open (the start box, "What you've mastered", the all-sessions page, or a sealed message), its card shows in the main area until answered (see [`age.md`](age.md)) ([#780]).
 - When a seal also locks the account, the locked account's screen comes first (see [`account-screens.md`](account-screens.md)) ([#753]).
 
 ## The session list
@@ -35,11 +36,40 @@ flowchart TD
 
 ### Rename and delete
 
-- The session menu ("⋯") is on each sidebar line and next to the session's title. Both hold Rename and Delete.
+- The session menu ("⋯") is on each sidebar line, on each line of the all-sessions page, and next to the session's title. All hold Rename and Delete ([#780]).
 - Renaming edits the name in place, in the line or in the title. On desktop, clicking the title also starts renaming, with a pencil on hover. On a phone, renaming starts only from the menu. Enter saves, Esc cancels, an empty name keeps the old one, and a name is up to 80 characters.
 - Delete opens a warning dialog naming what goes (see [`sessions.md`](sessions.md#deleting-a-session)): 'Delete "Chain rule (MATH101 week 6)"? This deletes everything in it, including 2 mastered topics from your record. It can't be undone.' Other cases name the half-done check, the passed objectives and the files. Cancel and Delete session.
 - When deleting would take a mastered topic or a passed objective off the Record, or a half-done check would go, the learner types "delete", in any case, before the button works. Otherwise the two buttons are enough.
 - A sealed session's menu has no Rename, and Delete is greyed out, with "A sealed session can't be deleted." (see [`misuse.md`](misuse.md)).
+
+## The all-sessions page
+
+The page that lists every one of the learner's sessions and holds [the session search](sessions.md#the-session-search). It opens in the main area. All of it comes from [#780]. The prototype the owner chose from is on the throwaway branch `prototype/780-all-sessions`.
+
+- **Opening:** "All sessions (24)" and the search button always open it fresh: an empty search, every session newest first, at the top.
+- **The page:** titled "All sessions", with "24 sessions" under the title, or "3 of 24 sessions match" while a search is typed. The empty search box reads "Search your sessions".
+- **Lines:** each session is a line: its name and badges, then its last visit, then the progress bar while a topic is under way. The page leaves out the sidebar's "On:" and "Mastered last:" row; the sidebar keeps its full line. Each line has the session menu ("⋯") with Rename and Delete, working as in the sidebar: a sealed line has no Rename, and Delete is greyed out. The "⋯" next to an open session's title stays. Sealed sessions are listed with their "Sealed" badge, and tapping one shows the sealed message.
+- **Dates** use the learner's own clock and print no time, with "Today" and "Yesterday" as in the sidebar: a session last visited at 8:00 pm on 7 Nov in New York shows "7 Nov" from 9 Nov, although it was 8 Nov in Philippine time (see [`dates.md`](dates.md)).
+- **Order:** by last visit, newest first, with no filters and no other sort. With a search typed, matches keep that order; nothing ranks them by how well they match.
+- **Loading:** the first batch of lines loads with the page. When the learner scrolls near the end, the next batch loads by itself, with "Loading...". There is no button. The batch size is left to the build.
+- **Searching:** results follow the typing: the list narrows with each letter, after a short pause whose length is left to the build. The term travels in the request's body, never in an address (see [`security.md`](security.md#keys-in-addresses)), so it is in no history, shared link, log or Cloudflare sample. The page holds it in memory only: Back keeps it, and a reload clears it, including when the browser reloads a page it set aside. The search box asks the browser not to remember entries, so no past term is offered as a suggestion. Crux stores nothing new in the browser.
+- **Back:** going back from a session opened from the page (the Back button or gesture) returns the page as the learner left it: the same search still typed, the same lines in the same order, at the same place, with the batches already loaded. The opened session's new last visit shows the next time the page opens fresh.
+- Only the opened session's line is checked again on the way back: that one session is matched again against the search as it now stands. If it was deleted, its line is gone. With a search typed, a session sealed meanwhile keeps its line only if its name matches, with no snippet; one whose check started, or whose teaching is hidden again after reteaching, loses a snippet from hidden teaching, and keeps its line only if something it still shows matches; a renamed one, or one whose file was removed, keeps its line only if it still matches.
+- **A locked account** can still open the page and search, since a lock leaves reading open. Each line's menu greys what the lock greys (see [`account-screens.md`](account-screens.md)).
+- **One new backend call** returns the learner's sessions a batch at a time, newest visit first, with an optional search term in its body and each match's snippet.
+
+### What a match shows
+
+- A session matched in its conversation shows one snippet under its line, from the newest message that holds any typed word: up to two lines around the match, with "You:" or "Tutor:", "(waiting)" on a message still waiting, and "and 1 more in this conversation" when others match. The cut falls only between words outside maths, so a formula always shows whole and drawn as in the session; a word inside it is never highlighted. A diagram or graph shows as "(diagram)".
+- A line found only by a topic or a file name shows "Topic: Range" or "File: MATH101 week 5.pdf" under the name. A line found by its name shows no such line.
+- Tapping a snippet opens the session at that message, highlighted. A session that opens at something needing an answer opens there instead, with no highlight: an open check, at the check; mid-teaching on a topic last worked on 7 or more days ago, at "continue" and "refresh first"; a session held by a harmful file, at its restated hold; and a due age question, at its card. A due age question comes before an open check, since the check pauses until the tap (see [`age.md`](age.md)). The tutor's restatement of where it was, and the after-mastery welcome back, don't count: those sessions open at the message.
+- In a locked account nothing can be answered, so a snippet opens at its message, highlighted, with the lock bar as usual.
+
+### When nothing shows
+
+- No sessions: "No sessions yet." with "+ New session".
+- No match: 'No sessions match "zebra".', then "The search looks through session names, topics, file names and conversations.", and "Clear search".
+- When the page, a batch or a search can't load, "Crux can't be reached right now. Try again later." shows where the list, the batch or the results would be, with a "Try again" button that retries what failed. What has loaded stays, and scrolling or typing also tries again. A Cloudflare refusal first waits and tries once more (see [`security.md`](security.md#what-a-learner-sees)).
 
 ## What you've mastered
 
@@ -106,23 +136,19 @@ flowchart TD
 
 | Module | What it holds |
 |---|---|
-| App shell | The sidebar and drawer, where the app opens, and the main area's switch between a session, the Record and the sealed message |
+| App shell | The sidebar and drawer, with the search button, the 10 most recent sessions and "All sessions (24)", where the app opens, and the main area's switch between a session, the Record, the all-sessions page and the sealed message ([#780]) |
 | Session list | Lines, badges, progress bars, the session menu, renaming and the delete warning |
 | Record | "What you've mastered", with its By date and By session filter |
 | Files | The start box's chips, the file button and dropping, file states, the removal and allowance dialogs, and the pinned file lines |
 | File viewer | Pages, thumbnails, speaker notes and the highlighted page |
+| All-sessions page | The page, its search box, its lines and snippets, loading as the learner scrolls, and its empty and unreachable lines ([#780]) |
 
 The session screen's modules (see [`learning-screen.md`](learning-screen.md#frontend-modules)) gain the session menu and the jump menu in the top bar, "Mastered in this session", and the file rows' states and ×.
-
-## Gaps
-
-- **The all-sessions page with its search:** in v1. How it looks and behaves, and which screen files and module rows hold it, are specified on [#780] ([#769]).
 
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
-[#769]: https://github.com/calmxz/Crux/issues/769
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#780]: https://github.com/calmxz/Crux/issues/780

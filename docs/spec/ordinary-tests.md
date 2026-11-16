@@ -39,12 +39,13 @@ These are the tests the closed tickets sent here, by area.
 - An open question holds every session and browser. A tap on Yes clears the entry ticks on that browser.
 - A guest's Yes and a trial link's Yes do what [`age.md`](age.md) says, including a trial link's feedback words and quote permissions removed.
 
-**Sessions and the lookup** ([#671], [#678], [#732], [#735])
+**Sessions, the lookup and the session search** ([#671], [#678], [#732], [#735], [#780])
 
 - The refresh offer comes at 7 days.
 - No lookup runs while a check problem is open, and none of a session's teaching is reachable then. The lookup runs during reteaching after a refresh miss, even with checks switched off, and is off during the refresh, the end step and any paused check.
 - Deleting a session removes its entries from "What you've mastered".
 - A sealed session is unreachable by lookup, share, background answer or re-mark.
+- The session search finds only the learner's own sessions; finds a sealed session by its name only; skips a check's hidden teaching and files, finds them during reteaching, and skips them again before the next problem; skips messages Google blocked and Crux's own lines; and loses a deleted session at once.
 
 **Files** ([#670], [#677], [#716], [#722], [#732])
 
@@ -180,3 +181,4 @@ These are the tests the closed tickets sent here, by area.
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#780]: https://github.com/calmxz/Crux/issues/780

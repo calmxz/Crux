@@ -60,6 +60,7 @@ Learners see what is paused: "Checks are paused while we fix something; your pro
 **The lookup** ([#678])
 
 - The tutor says it cannot look things up right now.
+- The session search stays on: no AI test covers it (see [`sessions.md`](sessions.md#the-session-search)) ([#780]).
 
 ## Re-marks after a marking fault
 
@@ -120,3 +121,4 @@ Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#780]: https://github.com/calmxz/Crux/issues/780
