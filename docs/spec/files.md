@@ -132,7 +132,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - What the tutor already said about the file stays in the conversation until the session is deleted. Removing a file tells the learner so: "What the tutor already said about this file stays in the conversation. To erase that too, delete the session." ([#732])
 - Deleting a session removes its files, even during a check (see [`sessions.md`](sessions.md)) ([#671]).
 - A trial link's files, pages and photo answers are erased with its sessions when the link dies: the owner switches it off, the holder taps Yes to Crux's age question, the holder erases it, or the trial ends ([#722], [#728], [#755]).
-- What closing an account erases, and what deleting cannot reach at once, is in [`privacy.md`](privacy.md) ([#677], [#716]). The upload lines in the terms are there and in [`trial.md`](trial.md) ([#677], [#722]).
+- What closing an account erases, and what deleting cannot reach at once, is in [`privacy.md`](privacy.md) ([#677], [#716]). The upload lines in the terms are in [`terms-and-policy.md`](terms-and-policy.md) and [`trial.md`](trial.md) ([#677], [#722]).
 
 ## Gaps
 

@@ -22,7 +22,7 @@ A message or reply Google blocks as prohibited content is sealed the same way. T
 - The learner sees that the session is sealed, how to reply to the Crux email, and not to upload that file again.
 - The owner decides from the date, the kind and any reply, and either lifts the seal or closes the account. A Reported seal waits for the answer (below) ([#777]).
 - If nobody replies, the session stays sealed until it is erased with the account.
-- A guest has no flag (see above). They see the block message, and that guest session ends.
+- A guest has no flag (see [`misuse.md`](misuse.md)). They see the block message, and that guest session ends.
 
 Whichever way it was sealed, nothing reaches a sealed session: no lookup, no share, no background answer and no re-mark. Its waiting messages stay waiting until the seal is lifted, and a re-mark it missed runs then ([#735], [#736]).
 

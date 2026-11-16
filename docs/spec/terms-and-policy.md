@@ -25,7 +25,7 @@ The Terms state the harm line and what misuse leads to. Both are in [`misuse.md`
 
 - Changes that matter are emailed 14 days ahead. These are changes to what is stored, who sees or processes it, new uses of data, and new rules on what learners may do ([#677]).
 - The learner then agrees with a tick: "Crux's terms changed: [what changed]. [Agree] [Close my account]". It shows the next time they open Crux, on any browser, before any tutoring ([#677], [#733]).
-- A learner who never comes back sees nothing. The account waits, and the idle rule below applies ([#733]).
+- A learner who never comes back sees nothing. The account waits, and the idle rule in [`privacy.md`](privacy.md) applies ([#733]).
 - Other changes, such as a typo or a clearer sentence, are dated in a "What changed" list ([#677]).
 
 ## The Privacy Policy
@@ -56,7 +56,7 @@ If sensitive or sign-in data, decline records included, reaches the wrong hands 
 
 The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733]):
 
-- what is stored and for how long (see above);
+- what is stored and for how long (see [`privacy.md`](privacy.md));
 - "Deleting a session erases it. Another session may still mention something from it, until you delete that one too.";
 - a removed file's earlier replies stay in the conversation until the session is deleted;
 - "If you ask for a copy while closing, its link works until 11:59 pm Philippine time on the 7th day after it's sent, plus any days Crux was down. If we can't send it, we keep it at most 30 days. We erase the copy after that, and keep it no longer, except while our daily job is down.";

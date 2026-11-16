@@ -30,12 +30,12 @@ Crux counts declines, and the owner decides. A trial link follows [`trial-links.
 
 - The tutor reports each decline to Crux through a tool call, naming its kind from the harm list above, and marking the two cases that flag at once (see [`ai-layer.md`](ai-layer.md)) ([#677], [#733]). A harmful file's decline is in [`files.md`](files.md) ([#732]).
 - A decline here means a refusal under that list. Refusing a bare answer, turning a task toward its skill, and a file with nothing learnable are not declines. ([#733]).
-- A message or reply Google blocks for harm has no tool call, so Crux reads Google's block result itself. It counts as a decline, kind "blocked by Google". A block that is not about harm is not a decline. If Google's category is prohibited content, it is a sealed flag with no lock (see below) ([#733], [#735]). Which block results count is in [`ai-layer.md`](ai-layer.md).
+- A message or reply Google blocks for harm has no tool call, so Crux reads Google's block result itself. It counts as a decline, kind "blocked by Google". A block that is not about harm is not a decline. If Google's category is prohibited content, it is a sealed flag with no lock (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733], [#735]). Which block results count is in [`ai-layer.md`](ai-layer.md).
 - Crux saves each decline's date, kind and place in its session on the account, with no words from the chat or a file. Deleting a session does not undo a decline ([#733]). Crux handles the kinds as possibly sensitive (see [`terms-and-policy.md`](terms-and-policy.md)) ([#776]).
 - An account is flagged on 3 declines within 7 days ([#677]).
 - It is flagged at once on 1 decline for a threat against a real person, or for anything sexual involving minors ([#677], [#733]).
 - A flag shows on the owner page and in the owner's daily email. A flag raised at once also pushes to the owner's phone ([#733]).
-- A flag changes nothing for the learner, except under "Sealed flags" below. They keep learning, the tutor keeps declining, and nothing says they are flagged ([#733]).
+- A flag changes nothing for the learner, except under "Sealed flags" in [`sealed-sessions.md`](sealed-sessions.md). They keep learning, the tutor keeps declining, and nothing says they are flagged ([#733]).
 
 **The owner's decision**
 

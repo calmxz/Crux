@@ -6,7 +6,7 @@ This file covers the area files: what each one covers, its source tickets, and i
 
 The owner approves this list before any area file is written ([#680](https://github.com/calmxz/Crux/issues/680)). Each file has one subject and stays under the repo's file-size check of 5,000 tokens. That is 20,000 bytes, roughly 3,000 words with links.
 
-Sizes estimate the current rules, stated without reasons. Source tickets decided the subject; "+" marks later tickets that changed its rules. A file states its rules once and links the shared rules above.
+Sizes estimate the current rules, stated without reasons. Source tickets decided the subject; "+" marks later tickets that changed its rules. A file states its rules once and links the shared rules in [`README.md`](README.md).
 
 | File | Covers | Source tickets | Est. words |
 |---|---|---|---|
