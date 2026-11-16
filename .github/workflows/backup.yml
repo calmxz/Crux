@@ -12,7 +12,9 @@ permissions:
 
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    # #790: pinned because ubuntu-26.04, which ubuntu-latest became on
+    # 2026-11-16, has no apt-key, and the pgdg install step below uses it.
+    runs-on: ubuntu-24.04
     # G-10: a hung pg_dump or R2 upload would otherwise burn the 6h runner
     # limit and overlap the next night's run.
     timeout-minutes: 15
