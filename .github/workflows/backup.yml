@@ -12,9 +12,9 @@ permissions:
 
 jobs:
   backup:
-    # #790: pinned because ubuntu-26.04, which ubuntu-latest became on
-    # 2026-11-16, has no apt-key, and the pgdg install step below uses it.
-    runs-on: ubuntu-24.04
+    # #790: pinned, not ubuntu-latest, so a new default image cannot break
+    # the night's backup unseen (ubuntu-latest became 26.04 on 2026-11-16).
+    runs-on: ubuntu-26.04
     # G-10: a hung pg_dump or R2 upload would otherwise burn the 6h runner
     # limit and overlap the next night's run.
     timeout-minutes: 15
@@ -24,10 +24,12 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
+      # The pgdg repository's signed-by setup; 26.04 has no apt-key (#790).
       - name: Install postgresql-client-17
         run: |
-          sudo sh -c 'echo "deb https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
-          wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo apt-key add -
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl --fail -sSL -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list > /dev/null
           sudo apt-get update
           sudo apt-get install -y postgresql-client-17
 
@@ -52,9 +54,9 @@ jobs:
       - name: Dump database
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        # Absolute path: the runner preinstalls postgresql-client-16 and its
-        # /usr/bin/pg_dump wins the PATH race over the pgdg 17 client,
-        # aborting on "server version mismatch" against Postgres 17.
+        # Absolute path: the runner preinstalls PostgreSQL 18, and its
+        # /usr/bin/pg_dump wins the PATH race over the pgdg 17 client. The
+        # dump stays on client 17 so pg_restore 17 can read it.
         run: /usr/lib/postgresql/17/bin/pg_dump "$DATABASE_URL" -Fc -f dump.pgc
 
       - name: Upload and prune
