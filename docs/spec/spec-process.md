@@ -30,10 +30,12 @@ These are process terms, so they stay out of the glossary.
 Some kinds of rule need a matching edit in another file, in the same change ([#764]):
 
 - a new email: its share row in [`operations.md`](operations.md);
-- a new opening page: the order in [`accounts.md`](accounts.md);
-- a new stored item: its row under "Stored items" in [`data-model.md`](data-model.md), and in the retention table in [`privacy.md`](privacy.md);
+- a new opening page: the order in [`accounts.md`](accounts.md), and the order and its drawing under "Steps on opening" in [`account-screens.md`](account-screens.md);
+- a new trial notice page: the list under "Notice pages" in [`landing-screens.md`](landing-screens.md);
+- a new stored item, or a new limit on how long one is kept: its row under "Stored items" in [`data-model.md`](data-model.md), its row in the retention table in [`privacy.md`](privacy.md), and, for an item a trial link holds, its line in [`trial.md`](trial.md);
 - a new safety or privacy action: the restore log in [`hosting.md`](hosting.md);
-- a new screen element: the Frontend modules table of its screen file.
+- a new screen element: the Frontend modules table of its screen file;
+- a changed rule that a line in [`ordinary-tests.md`](ordinary-tests.md) tests: that line.
 
 ## Until the lock
 

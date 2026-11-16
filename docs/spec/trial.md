@@ -186,7 +186,6 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#679]: https://github.com/calmxz/Crux/issues/679
-[#680]: https://github.com/calmxz/Crux/issues/680
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
