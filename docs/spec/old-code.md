@@ -60,7 +60,7 @@ All of this comes from [#750].
 
 ## Frontend modules
 
-The modules are the ones in the screen files' Frontend modules tables. Themes and the all-sessions page get their rows on [#779] and [#780] ([#769]).
+The modules are the ones in the screen files' Frontend modules tables. Themes get their rows on [#779]. The all-sessions page has its row in [`app-shell.md`](app-shell.md#frontend-modules) ([#769], [#780]).
 
 | Module | Verdict | Old code as reference |
 |---|---|---|

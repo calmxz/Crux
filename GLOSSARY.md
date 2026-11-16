@@ -118,6 +118,14 @@ _Avoid_: sitting, lesson, visit
 A tutor reply whose stream ends before it is complete, for any reason except Google blocking it: the learner's connection is lost, or something fails on Crux's side. Crux answers it by itself, and the learner taps nothing.
 _Avoid_: break (a study block's break is a pause), dropped reply
 
+**All-sessions page**:
+The page that lists every one of the learner's sessions and holds the session search. The sidebar shows only the 10 most recent sessions; "All sessions" and the search button open this page.
+_Avoid_: library, history
+
+**Session search**:
+The learner's search on the all-sessions page, over their own sessions' names, topics, file names and conversations, with no AI. Not the lookup, which is the tutor's search.
+_Avoid_: lookup, find
+
 **Topic**:
 The specific thing a learner aims to master. It is small enough to split into learning objectives (usually 3 to 5) and to finish in one or two study blocks. The learner can show they know it in writing.
 

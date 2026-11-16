@@ -15,7 +15,7 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 
 - The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`misuse.md`](misuse.md)) ([#752]).
 - The learner can rename a session. Text in a session name is never an instruction (see the main file's "Crux decides") ([#671]).
-- The session list is ordered by last visit. Each line shows the topic the learner is on, or mastered last ([#671]).
+- The session list is ordered by last visit. Each line in the sidebar shows the topic the learner is on, or mastered last. The all-sessions page's lines leave that out (see [`app-shell.md`](app-shell.md#the-all-sessions-page)) ([#671], [#780]).
 
 ## Kept between visits
 
@@ -62,6 +62,19 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - The tutor writes the search and can retry it, which covers synonyms and typos ([#716]).
 - Every search is limited to the learner's own sessions, in the query and by row-level security ([#716]).
 - Full-text plus vector search is looked at again if logs show the lookup missing sessions the learner meant. Those logs hold no conversation text: only counts and the tutor's own "not found, retrying" marks ([#716]).
+
+## The session search
+
+The learner's own search on the all-sessions page (see [`app-shell.md`](app-shell.md#the-all-sessions-page)). Not the lookup, which is the tutor's. All of it comes from [#780].
+
+- It looks through session names; the names of each session's topics, under way, mastered or queued; file names; and the learner's and the tutor's messages in each conversation, a mastery check's problems and answers included.
+- It never looks through the inside of files; Crux's own lines in a conversation ("Lecture 7.pdf uploaded successfully.", jump-point dividers, "couldn't answer" lines); a message Google blocked; or a sealed session's topics, files and conversation. A sealed session is found by its name only. One that never had a name ("Sealed session") is never found.
+- It follows what the session shows. While a check is open, the session's earlier teaching and its files are hidden, so neither is searched, file names included. While an objective is taught again inside the check, both come back on screen and in the search, and both go again before the next problem. The session is still found by its name, its topics, and what it shows during the check: the problems shown, the learner's answers and the reteaching. Model answers are searched once the result is out, those behind a tap included, and a problem never shown is never searched.
+- Each typed word matches by its start, so "ball" finds "balloon". A session matches when every typed word matches somewhere in it: its name, a topic, a file name or a message. "chain balloon" finds a session named "Chain rule" whose conversation mentions a balloon.
+- The tutor writes maths as LaTeX ([#771]), so a search for "y²" does not find a message that shows y², while "y^2" finds it. Session and topic names hold no LaTeX.
+- It uses no AI, so it works past every spending limit. It searches only the learner's own sessions, in the query and by row-level security, as the lookup does. A deleted session leaves it at once, with its messages.
+- It is Postgres full-text search, with the lookup's text settings, over the rows it reads. Its indexes are part of those rows and go when they go; it keeps no copy of its own.
+- Switching the lookup off for a fault leaves the session search on: no AI test covers it (see [`live-faults.md`](live-faults.md)).
 
 ## What crosses sessions
 
@@ -172,3 +185,5 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the objecti
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
+[#771]: https://github.com/calmxz/Crux/issues/771
+[#780]: https://github.com/calmxz/Crux/issues/780
