@@ -59,7 +59,7 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 - The burst guard, both copies of the no-session rule and the hand-block rule live in the repo. The open paths come from the API contract's public routes ([#770]).
 - A release changes staging's copy when it reaches staging, and live's at the live step. The burst guard and the hand-block rule serve both hosts, so they never change when a release reaches staging. A release never changes the hand-block list's entries ([#770]).
 - **The open-path check** calls every open path with no sign-in cookie, expecting Crux's own answer, and one member route with no sign-in cookie, expecting Cloudflare's 403. Its bodies fail validation on every open path, so it adds no wrong-link or wrong-code count and sends no email, AI call or push. It runs on staging before live, and on live after each release. Staging's browser paths run locally, so this check is what catches a rule mistake before live ([#770]).
-- No release or rollback leaves the serving code with an open path refused, or a member route open with no sign-in cookie. A dropped open path stops the release on staging. A rollback re-applies the previous rules with the previous code, in its one step (see [`hosting.md`](hosting.md)) ([#716], [#770]).
+- No release or rollback leaves the serving code with an open path refused, or a member route open with no sign-in cookie. A dropped open path stops the release on staging. A rollback re-applies the previous rules with the previous code, in its one step (see [`backups-and-releases.md`](backups-and-releases.md)) ([#716], [#770]).
 
 ### Limits and cost
 

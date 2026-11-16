@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what the owner sees: the owner page, its areas and dialogs, and the daily email's layout. All of it comes from [#755] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`misuse.md`](misuse.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`live-faults.md`](live-faults.md) and [`operations.md`](operations.md). The owner page is not a module: its screens call the modules, and each setting belongs to its module ([#719]).
+This file covers what the owner sees: the owner page, its areas and dialogs, and the daily email's layout. All of it comes from [#755] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`trial-links.md`](trial-links.md), [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md), [`privacy.md`](privacy.md), [`terms-and-policy.md`](terms-and-policy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`live-faults.md`](live-faults.md), [`operations.md`](operations.md) and [`email.md`](email.md). The owner page is not a module: its screens call the modules, and each setting belongs to its module ([#719]).
 
 ```mermaid
 flowchart TD
@@ -46,7 +46,7 @@ The Trial area leaves the menu when the trial ends.
 
 ## Trial
 
-- A trial link reads "Link K7Q-4MP · made 12 Nov · 4 browsers: more than 3", with Switch off. Switching off here asks for the reason the holder's ended page shows. Switching off from the link's flag asks for none: Crux writes it (see [`trial.md`](trial.md)) ([#764]).
+- A trial link reads "Link K7Q-4MP · made 12 Nov · 4 browsers: more than 3", with Switch off. Switching off here asks for the reason the holder's ended page shows. Switching off from the link's flag asks for none: Crux writes it (see [`trial-links.md`](trial-links.md)) ([#764]).
 - A flag on a link reads "Flag 4812 on Link K7Q-4MP".
 - A dead link reads "Link K7Q-4MP · Switched off:" and the reason. One switched off from its flag reads "Link K7Q-4MP · Switched off for misuse", or "Link K7Q-4MP · Switched off: sealed" for a sealed flag ([#764]). A link that died by a Yes, or that its holder erased, reads "A link · Ended" or "A link · Erased by its holder".
 - **The end of the trial:** a date at least 7 days ahead. Once set, the owner can move it later or take it back until it has passed (see [`trial.md`](trial.md)) ([#772]).

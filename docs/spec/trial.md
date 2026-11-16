@@ -2,14 +2,14 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the first two of the main file's "Stages": the trial without accounts, and the advisory opinion before opening. Sign-up from opening is in [`accounts.md`](accounts.md).
+This file covers the first two of the main file's "Stages": the trial without accounts, and the advisory opinion before opening. Trial links are in [`trial-links.md`](trial-links.md). Sign-up from opening is in [`accounts.md`](accounts.md).
 
 ## During the trial
 
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
 - From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
-- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](#the-link-code)) ([#755]).
+- The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](trial-links.md#the-link-code)) ([#755]).
 - If the trial does not show that opening is worth it, Crux stays a portfolio project, and guest mode stays ([#677], [#733]).
 
 ## Entry
@@ -56,69 +56,6 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 
 If the day's emails have run out, an invite or decline waits for Resend's next day, from 8 am Philippine time ([#763]). A request is never kept past its 30 days, so one still unsent then is erased without an email ([#717]).
 
-## Trial links
-
-### Opening one
-
-- The first time this link opens on a browser, the entry ticks show if they have not been given there, with this notice ([#717], [#722], [#733]): "This link is for you only. Anyone with it sees your sessions and uses your limit. If it's used on more than 3 browsers, it may be switched off. Don't type or upload personal details, such as your name on a problem sheet."
-- The key sits after a `#` (see [`security.md`](security.md)) ([#770]). The link is then swapped for a sign-in cookie, and the key leaves the address bar. That browser stays signed in until 30 days without a visit ([#717]).
-- Another device opens the same link from the invite email and sees the same sessions. A one-time note after the first sign-in says: "To use Crux on another device, open your invite email there and tap the link." ([#717])
-- A link works from anywhere, including the EU and the UK, like an account (see [`hosting.md`](hosting.md)) ([#735]).
-- There is no device code and no "copy my link" ([#717]). A new link opened on a browser replaces the old sign-in there ([#733]).
-- A person who loses the email asks again and, if approved, gets a new, empty trial space ([#717]).
-- The key is stored scrambled. A network that tries 10 wrong links in an hour is refused for the rest of the hour. Its address is kept only that hour ([#717]).
-
-### The link code
-
-- At approval, each link gets a random 6-character code from 31 characters that can't be confused (no 0, O, 1, I or L), made separately from its key and unique among live links and stubs. The owner page names the link by it, with the date it was made, and the holder's trial Settings page shows "Trial link K7Q-4MP" (see [`owner-screens.md`](owner-screens.md)) ([#755]).
-- A quoted code tells the owner which link an email is about, for looking things up and answering. It is not proof of holding the link, since a screenshot of Settings shows it, so nothing is switched off or erased on an emailed request ([#755]).
-- An email to the Crux inbox quoting a code is deleted once answered, with the reply in Sent and the copy in Trash, and at the trial's end at the latest ([#755]).
-
-### Erasing a link
-
-- The holder erases their link with "Erase this trial link" on their trial Settings page, after typing "delete". It erases at once what a tap on Yes erases: sessions, files, pages, photo answers, preferences, feedback words and quote permissions. A published quote keeps only where it was published and the remove-by date, until the owner marks it removed (see [`feedback.md`](feedback.md)) ([#755]).
-- A link locked by a sealed flag can't be erased this way until the owner decides ([#755]).
-- They may request access again ([#755]).
-
-### What a link carries
-
-The main file's "Stages" sets the rule. In detail:
-
-- Every step of the learning loop, with files in a session and photo answers in a check, under the rules decided for accounts (see [`files.md`](files.md) and [`mastery-check.md`](mastery-check.md)) ([#722]).
-- The same tutoring limit as an account (see [`spending.md`](spending.md)) ([#677]).
-- An account's storage allowance, in the shared store (see [`files.md`](files.md)) ([#722]).
-- Sessions stay under the link until it dies (below). Removing a file or deleting a session erases at once, apart from a sealed session (see [`misuse.md`](misuse.md)) ([#717], [#722], [#733]).
-- Anonymous feedback, which is kept. A tap on Yes to the age question removes its words and quote permissions (see [`feedback.md`](feedback.md)) ([#677], [#717], [#734]).
-
-Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You can email me about this", the copy of data by email, Close account (a link has "Erase this trial link" instead, above), and the let-in list ([#722], [#755]).
-
-### Browsers, switching off and misuse
-
-- Browsers are counted per link by random IDs, with no network addresses. The owner page shows the count and flags more than 3 ([#677], [#717]).
-- The owner can switch a link off. The person may request again ([#717]).
-- Declines count toward a misuse flag per link, raised as for accounts (see [`misuse.md`](misuse.md)) ([#677], [#717], [#733]).
-- The owner reads the chat in the flagged sessions, then dismisses the flag or switches the link off. There is no warning, since there is no email ([#677], [#733]).
-- A sealed flag from the tutor's report locks the link, as for accounts. One from Google's block seals only that session, and a second locks the link ([#735]). The owner decides from the date and the kind, and either lifts the lock or seal, or switches the link off. What is sealed stays in place (see [`misuse.md`](misuse.md)) ([#733]).
-- After a dismissal, the holder sees the misuse card on their next visit (see [`misuse.md`](misuse.md)). A link switched off from its flag shows a reason Crux writes: the kinds in the harm list's words, from the decline records, or for a sealed flag the fixed reason line ([#733], [#764]).
-- A share on the feedback page ends when the link dies ([#733]).
-
-### When a link dies
-
-A link dies when the owner switches it off, its holder taps Yes to the age question (see [`age.md`](age.md)), its holder erases it ([#755]), or the trial ends. Its sessions, files, pages, photo answers and preferences are erased ([#717], [#722], [#728] Answer 2, [#733]). A sealed session marked "Reported" with no answer recorded stays in the reported hold (see [`data-model.md`](data-model.md)) ([#719], [#777]).
-
-A stub stays: the link's scrambled key, its scrambled sign-in cookie IDs, its state and, for a link switched off, the reason (a misuse reason keeps its kinds only until first shown, or 30 days after the owner's decision, see [`misuse.md`](misuse.md)) ([#764], [#776]), so a holder returning by key or by cookie sees it. A stub also keeps the link code, so the owner's dead-link list can name it. A link that died by a Yes, or that its holder erased, keeps only its state, with no code ([#755]). The stub goes when the trial ends, or 12 months after the link died, whichever comes first. The owner page lists dead links and why while their stubs last ([#719]).
-
-### Telling a link holder
-
-Crux has no email for a link, so it uses an on-screen notice at the holder's next visit ([#733]):
-
-- **The Trial Terms change:** the entry ticks show again.
-- **The trial is ending:** a notice with the date and time, shown ahead of time. It reminds the holder that they can untick a quote or a share until then ([#734], [#772]).
-- **A data breach:** a notice saying what happened.
-- **A re-mark** that changed a mark (see [`live-faults.md`](live-faults.md)) ([#736]).
-
-A holder who does not visit cannot be reached ([#733]).
-
 ## Money and counts
 
 - Guests and trial links spend from the learners' budget and the daily ceiling (see the main file's "Money") ([#677]).
@@ -127,14 +64,14 @@ A holder who does not visit cannot be reached ([#733]).
 
 ## The trial's notices
 
-**The Trial Terms** carry the upload lines decided for accounts (see [`privacy.md`](privacy.md)) ([#722]). They also say a quote tick can't be undone once the link has ended ([#734]).
+**The Trial Terms** carry the upload lines decided for accounts (see [`terms-and-policy.md`](terms-and-policy.md)) ([#722]). They also say a quote tick can't be undone once the link has ended ([#734]).
 
 **The Trial Privacy Notice** says ([#677], [#717], [#722], [#728], [#733], [#762]):
 
 - A request's email is kept at most 30 days.
 - "Your invite stays in our email provider's log for 30 days, and in its backups for up to 7 days after."
 - Files and photo answers are kept with the link's sessions. They are erased at once when removed or when their session is deleted, and erased with the link when it dies, apart from those in a sealed session reported to the authorities ([#719]).
-- Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`privacy.md`](privacy.md)).
+- Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`terms-and-policy.md`](terms-and-policy.md)).
 - Error reports carry no learner text.
 - The dated under-18 count exists.
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
@@ -147,11 +84,10 @@ A holder who does not visit cannot be reached ([#733]).
 - A holder who does not visit cannot be reached with a notice.
 - An email quoting a link code is kept until answered, then deleted ([#755]).
 - "Erase this trial link" in Settings erases the link's sessions, files and feedback ([#755]).
-- Until opening, its contacts are privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux (see [`privacy.md`](privacy.md)) ([#754]).
+- Until opening, its contacts are privacy@ and the owner's LinkedIn, naming the owner as the one who built Crux (see [`terms-and-policy.md`](terms-and-policy.md)) ([#754]).
 
 ## Known gaps
 
-- Files and photos can show a name, and the owner may see one when reading a session flagged for misuse. The trial accepts this, covered by the notice and by erasure ([#722]).
 - Whether the entry tick "I agree to the Trial Terms and Privacy Notice" counts as consent specific to the purpose (Data Privacy Act, section 13(a)) is unchecked. The owner chose the notice line over a link-only tick ([#776]).
 - Whether the trial treats learning progress as possibly sensitive is open ([#776]).
 
@@ -192,8 +128,6 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
-[#735]: https://github.com/calmxz/Crux/issues/735
-[#736]: https://github.com/calmxz/Crux/issues/736
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755

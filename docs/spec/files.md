@@ -119,7 +119,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - **Allowance:** 200 MB per account and per trial link, the owner's account included. It counts the learner's files only. The pages Crux makes from a file and shrunk photo answers do not count ([#716], [#722], [#732]).
 - Past the allowance, a new file is refused with a message showing what is using the space. The learner removes a file to add one ([#671]).
-- A sealed session's files (see [`misuse.md`](misuse.md)) do not count toward the allowance while it is sealed. They still count toward the store total. If the seal is lifted they count again; if that puts the learner over, nothing is removed, and they cannot add a file until they are under ([#752]).
+- A sealed session's files (see [`sealed-sessions.md`](sealed-sessions.md)) do not count toward the allowance while it is sealed. They still count toward the store total. If the seal is lifted they count again; if that puts the learner over, nothing is removed, and they cannot add a file until they are under ([#752]).
 - **Store total:** 20 GB across files, pages and photo answers, for everyone, trial links included. When it is reached, uploads stop for everyone, learning continues, and the owner gets a push (see [`operations.md`](operations.md)) ([#671], [#716], [#717], [#722]).
 - The total is checked when a file is uploaded. A file already accepted is read in full, even if its pages go past the total ([#732]).
 - In v1, photo answers stop with uploads. A learner in a check types their answer instead (see [`mastery-check.md`](mastery-check.md)) ([#732]).

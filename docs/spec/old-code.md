@@ -47,7 +47,7 @@ All of this comes from [#750].
 ## Copied tests and scripts
 
 - Copied code comes with its tests: `test_health.py`, `test_request_id.py`, `test_body_limit.py`, and the pricing cases taken out of `test_cost_meter_estimate.py` and `test_chat_rates.py` ([#750]).
-- Each moves onto the throwaway database where it touches one (see [`hosting.md`](hosting.md)) ([#750]).
+- Each moves onto the throwaway database where it touches one (see [`backups-and-releases.md`](backups-and-releases.md)) ([#750]).
 - `gen_contracts.py` is copied (see [`tools.md`](tools.md)) ([#750]).
 
 ## Left behind

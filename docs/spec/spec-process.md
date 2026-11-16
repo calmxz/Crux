@@ -9,7 +9,7 @@ This file covers how this spec is kept and changed, how build tickets use it, an
 These are process terms, so they stay out of the glossary.
 
 - **Spec:** the current v1 rules, in `docs/spec/`. The closed tickets keep the reasons.
-- **Main file:** `docs/spec/README.md`. It holds the shared rules and the index of area files.
+- **Main file:** `docs/spec/README.md`. It holds the shared rules and links the index of area files.
 - **Area file:** one spec file per subject.
 - **Copy error:** a spec file that disagrees with the ticket it cites.
 - **Spec-change issue:** an issue, labelled `spec-change`, that proposes a new or changed rule after the lock.
@@ -29,11 +29,11 @@ These are process terms, so they stay out of the glossary.
 
 Some kinds of rule need a matching edit in another file, in the same change ([#764]):
 
-- a new email: its share row in [`operations.md`](operations.md);
+- a new email: its share row in [`email.md`](email.md);
 - a new opening page: the order in [`accounts.md`](accounts.md), and the order and its drawing under "Steps on opening" in [`account-screens.md`](account-screens.md);
 - a new trial notice page: the list under "Notice pages" in [`landing-screens.md`](landing-screens.md);
-- a new stored item, or a new limit on how long one is kept: its row under "Stored items" in [`data-model.md`](data-model.md), its row in the retention table in [`privacy.md`](privacy.md), and, for an item a trial link holds, its line in [`trial.md`](trial.md);
-- a new safety or privacy action: the restore log in [`hosting.md`](hosting.md);
+- a new stored item, or a new limit on how long one is kept: its row under "Stored items" in [`data-model.md`](data-model.md), its row in the retention table in [`privacy.md`](privacy.md), and, for an item a trial link holds, its line in [`trial-links.md`](trial-links.md);
+- a new safety or privacy action: the restore log in [`backups-and-releases.md`](backups-and-releases.md);
 - a new screen element: the Frontend modules table of its screen file;
 - a changed rule that a line in [`ordinary-tests.md`](ordinary-tests.md) tests: that line.
 

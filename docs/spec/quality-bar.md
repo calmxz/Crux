@@ -47,7 +47,7 @@ The tools are in [`operations.md`](operations.md) ([#717]).
 
 - Phone notifications come within minutes: errors from Crux, and the outside check ([#678], [#717]). Error Reporting goes quiet for 6 hours after 20 notifications in an hour, and the uptime check is separate ([#717]).
 - The services' security emails go straight to the owner's own email ([#717]).
-- A one-page breach plan is written before the trial. It has the National Privacy Commission notice and the learner email already drafted, so the 72 hours from knowing are spent filling in and sending ([#678]). For link holders, it drafts the on-screen notice in [`trial.md`](trial.md) ([#733]).
+- A one-page breach plan is written before the trial. It has the National Privacy Commission notice and the learner email already drafted, so the 72 hours from knowing are spent filling in and sending ([#678]). For link holders, it drafts the on-screen notice in [`trial-links.md`](trial-links.md) ([#733]).
 
 ## Measured before it counts
 

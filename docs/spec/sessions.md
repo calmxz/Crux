@@ -9,11 +9,11 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 - A learner has several sessions and picks which to continue. Each resumes at the step left, including mid-diagnostic and mid-check ([#664]).
 - A trial link holds sessions as an account does ([#722]). Guest mode on the public link keeps nothing after the tab closes ([#677], [#722]).
 - Another learner's, guest's or trial link's session or Record gives "not found", on every page and request ([#678]).
-- Conversations and files are kept until the learner deletes the session ([#671]). Closing an account is in [`privacy.md`](privacy.md), and a trial link's end in [`trial.md`](trial.md) ([#677], [#722]).
+- Conversations and files are kept until the learner deletes the session ([#671]). Closing an account is in [`privacy.md`](privacy.md), and a trial link's end in [`trial.md`](trial.md) and [`trial-links.md`](trial-links.md) ([#677], [#722]).
 
 ### Names and the session list
 
-- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`misuse.md`](misuse.md)) ([#752]).
+- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`sealed-sessions.md`](sealed-sessions.md)) ([#752]).
 - The learner can rename a session. Text in a session name is never an instruction (see the main file's "Crux decides") ([#671]).
 - The session list is ordered by last visit. Each line in the sidebar shows the topic the learner is on, or mastered last. The all-sessions page's lines leave that out (see [`app-shell.md`](app-shell.md#the-all-sessions-page)) ([#671], [#780]).
 
@@ -107,7 +107,7 @@ The learner's own search on the all-sessions page (see [`app-shell.md`](app-shel
 - Only two things undo a pass ([#678], [#728]):
   - Its session is deleted (see [Deleting a session](#deleting-a-session)).
   - A re-mark after a marking fault finds the answer wrong, or cannot be sure it is right (see [`mastery-check.md`](mastery-check.md)) ([#736]).
-- A seal does not undo a pass: a sealed session's passes stay on the Record, and the tutor still counts them (see [`misuse.md`](misuse.md)) ([#752]).
+- A seal does not undo a pass: a sealed session's passes stay on the Record, and the tutor still counts them (see [`sealed-sessions.md`](sealed-sessions.md)) ([#752]).
 
 ## What the learner sees
 
@@ -152,7 +152,7 @@ flowchart TD
 
 ## Deleting a session
 
-- The learner can delete a session at any time, a half-done check included, which goes with it ([#671]). A sealed session cannot be deleted (see [`misuse.md`](misuse.md)) ([#733]).
+- The learner can delete a session at any time, a half-done check included, which goes with it ([#671]). A sealed session cannot be deleted (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733]).
 - A warning names what goes: "This deletes everything in it, including 5 mastered topics from your record" ([#671]).
 - Everything in the session goes, including its files, its mastered topics, and its passed objectives from "What you've mastered". It is erased at once and cannot be undone ([#671], [#677]). What deleting cannot reach at once is in [`privacy.md`](privacy.md) ([#677], [#716]).
 - Preferences stay ([#671]). So do the anonymous dated counts behind the go-public bar and the marks on the account, which are in no session (see [`feedback.md`](feedback.md)) ([#676]).

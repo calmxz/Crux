@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the app around the session screen: where the app opens, the session list, the all-sessions page, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md) and [`misuse.md`](misuse.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
+This file covers the app around the session screen: where the app opens, the session list, the all-sessions page, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md), [`misuse.md`](misuse.md) and [`sealed-sessions.md`](sealed-sessions.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
 
 ## The shell
 
@@ -40,7 +40,7 @@ flowchart TD
 - Renaming edits the name in place, in the line or in the title. On desktop, clicking the title also starts renaming, with a pencil on hover. On a phone, renaming starts only from the menu. Enter saves, Esc cancels, an empty name keeps the old one, and a name is up to 80 characters.
 - Delete opens a warning dialog naming what goes (see [`sessions.md`](sessions.md#deleting-a-session)): 'Delete "Chain rule (MATH101 week 6)"? This deletes everything in it, including 2 mastered topics from your record. It can't be undone.' Other cases name the half-done check, the passed objectives and the files. Cancel and Delete session.
 - When deleting would take a mastered topic or a passed objective off the Record, or a half-done check would go, the learner types "delete", in any case, before the button works. Otherwise the two buttons are enough.
-- A sealed session's menu has no Rename, and Delete is greyed out, with "A sealed session can't be deleted." (see [`misuse.md`](misuse.md)).
+- A sealed session's menu has no Rename, and Delete is greyed out, with "A sealed session can't be deleted." (see [`sealed-sessions.md`](sealed-sessions.md)).
 
 ## The all-sessions page
 
@@ -122,10 +122,10 @@ The page that lists every one of the learner's sessions and holds [the session s
 
 ## A sealed session
 
-- Tapping its line shows the sealed message in the main area, in place of the session: "This session is sealed. Nobody can open it, including Crux's owner. Your other sessions keep working. Please don't upload that file again. To reply, email Crux at its address and quote flag 4821." "Your other sessions keep working" is left out when the account is also locked. The address works for trial links, which have no account email. The message adds the fixed reason line in [`misuse.md`](misuse.md) ([#764]).
+- Tapping its line shows the sealed message in the main area, in place of the session: "This session is sealed. Nobody can open it, including Crux's owner. Your other sessions keep working. Please don't upload that file again. To reply, email Crux at its address and quote flag 4821." "Your other sessions keep working" is left out when the account is also locked. The address works for trial links, which have no account email. The message adds the fixed reason line in [`sealed-sessions.md`](sealed-sessions.md) ([#764]).
 - When a session is sealed while the learner is in it, the main area gives way to the sealed message at once. Later visits open as [The shell](#the-shell) says.
 - Its line shows its name if it has one. A session sealed on its first typed request never had a name, so it shows "Sealed session", never the first words of the blocked request.
-- Every way into it from "What you've mastered", or from a "passed in" mark, shows the sealed message. A message naming it elsewhere uses its line's name, and leaves out "open … to pick it up": "You mastered this in Reaction rates on 20 Oct." (see [`misuse.md`](misuse.md)).
+- Every way into it from "What you've mastered", or from a "passed in" mark, shows the sealed message. A message naming it elsewhere uses its line's name, and leaves out "open … to pick it up": "You mastered this in Reaction rates on 20 Oct." (see [`sealed-sessions.md`](sealed-sessions.md)).
 
 ## Jump points
 
