@@ -1,4 +1,4 @@
-# Backups, environments and releases
+# Backups, environments, and releases
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 

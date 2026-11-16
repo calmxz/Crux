@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers trial links: opening one, the link code, erasing a link, what a link carries, misuse, when a link dies, and telling a link holder. Guest mode, Request access and the rest of the trial are in [`trial.md`](trial.md).
+This file covers opening a trial link, the link code, erasing a link, what a link carries, misuse, when a link dies, and telling a link holder. Guest mode, Request access, and the rest of the trial are in [`trial.md`](trial.md).
 
 ## Trial links
 

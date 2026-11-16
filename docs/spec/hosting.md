@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what runs where, the database, logs, and secrets. Backups, environments and releases are in [`backups-and-releases.md`](backups-and-releases.md). Email, errors, uptime and owner messages are in [`operations.md`](operations.md) and [`email.md`](email.md), and the daily job in [`dates.md`](dates.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
+This file covers what runs where, the database, logs, and secrets. Backups, environments, and releases are in [`backups-and-releases.md`](backups-and-releases.md). Email, errors, uptime and owner messages are in [`operations.md`](operations.md) and [`email.md`](email.md), and the daily job in [`dates.md`](dates.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
 ## What runs where
 

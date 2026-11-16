@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what Crux promises: the Terms of Use, and the Privacy Policy with its contacts, breaches and processors. What the owner may read, deleting, and how long data stays are in [`privacy.md`](privacy.md).
+This file covers what Crux promises: the Terms of Use, and the Privacy Policy with its contacts, breaches, and processors. What the owner may read, deleting and closing, and how long data stays are in [`privacy.md`](privacy.md).
 
 ## The Terms of Use
 

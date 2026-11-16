@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the area files: what each one covers, its source tickets and its estimated size.
+This file covers the area files: what each one covers, its source tickets, and its estimated size.
 
 The owner approves this list before any area file is written ([#680](https://github.com/calmxz/Crux/issues/680)). Each file has one subject and stays under the repo's file-size check of 5,000 tokens. That is 20,000 bytes, roughly 3,000 words with links.
 
@@ -36,7 +36,7 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`security.md`](security.md) | The visitor's country and address, keys in addresses, the request guards, the content security policy, the other headers, where they are set, their checks, build notes | 769 (+716, 717, 770, 780) | 2,500 |
 | [`tools.md`](tools.md) | The backend's and the frontend's tools: lint, the API made from the contract, the build checks, the fallback | 750, 769 | 550 |
 | [`operations.md`](operations.md) | Errors, uptime, how the owner is told, the bill | 717 (+675, 716, 728, 733, 734, 735, 753, 769, 770, 772) | 1,450 |
-| [`email.md`](email.md) | Email sending, the day's shares, late and refused emails, copies of data and emailed requests, the Crux email | 717 (+675, 677, 734, 735, 753, 770, 772, 776, 777) | 1,950 |
+| [`email.md`](email.md) | Email sending, who gets the day's emails, late and refused emails, copies of data and emailed requests, the Crux email | 717 (+675, 677, 734, 735, 753, 770, 772, 776, 777) | 1,950 |
 | [`dates.md`](dates.md) | When a printed date takes effect, notices that wait for email, past the last day, when Crux acts, outages, the daily job | 772 (+675, 676, 677, 679, 716, 717, 719, 728, 733, 734, 735, 753, 755, 762, 763, 764, 770, 776) | 1,700 |
 | [`quality-bar.md`](quality-bar.md) | What "solid" means; real-phone tests, security, accessibility, what is measured before it counts, repo and CI; the stage checklists | 678 (+677, 680, 716, 717, 722, 728, 732, 733, 734, 735, 736, 743, 750, 769, 770, 771, 776) | 1,750 |
 | [`ordinary-tests.md`](ordinary-tests.md) | Ordinary tests by area, component tests, browser paths and how they run | 678, 769 (+670, 671, 674, 675, 676, 677, 679, 680, 681, 716, 717, 719, 722, 728, 732, 733, 734, 735, 736, 743, 750, 755, 762, 770, 771, 772, 777, 780) | 1,950 |

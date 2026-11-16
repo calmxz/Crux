@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers how Crux sends email: who gets the day's emails, late and refused emails, copies of data and emailed requests, and the Crux email. Errors, uptime and how the owner is told are in [`operations.md`](operations.md).
+This file covers how Crux sends email, late and refused emails, copies of data and emailed requests, and the Crux email. Errors, uptime, and how the owner is told are in [`operations.md`](operations.md).
 
 ## Email sending
 

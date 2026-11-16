@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers sealed flags, what a seal tells the learner, and a Reported session. The harm line, the misuse flag and misuse closures are in [`misuse.md`](misuse.md).
+This file covers sealed flags, what a seal tells the learner, and a Reported session. The harm line, the misuse flag, and misuse closures are in [`misuse.md`](misuse.md).
 
 **Sealed flags**
 
