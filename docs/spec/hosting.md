@@ -113,6 +113,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - warnings and flags, and a warning or dismissal with its waiting misuse card ([#764]);
 - a tap on Continue on a misuse card, and an ended page's first showing, so a restore neither brings the kinds back nor loses a card ([#764]);
 - the authorities' answer on a Reported session, a lock lift that decides a flag while a Reported seal stays, and an erase card waiting and a tap on its Continue ([#777]);
+- the 30-day erasure of kinds waiting for a misuse card or a first showing ([#776]);
 - ticks and quotes withdrawn;
 - closures asked for or kept, contests entered or upheld ([#764]), and copies asked for;
 - misuse-block entries;
@@ -220,3 +221,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#776]: https://github.com/calmxz/Crux/issues/776

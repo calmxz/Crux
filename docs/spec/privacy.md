@@ -87,7 +87,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A copy asked for by email | Until its 7-day link expires, or 30 days if its email can't be sent ([#735], [#719], [#772]) |
 | A sealed session marked "Reported", with its account's email | Until the owner lifts or erases it, once the authorities answer. With the answer recorded, it goes with its account or link ([#743], [#719], [#777]) |
 | A dead trial link's feedback answers and quote permissions, unless it died by a Yes or its holder erased it | 6 months after the trial ends, or 12 months after the link died, whichever comes first. Those of a published quote stay until the owner removes it ([#719]) |
-| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing (see [`misuse.md`](misuse.md)) ([#719], [#764]) |
+| A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing, or 30 days after the owner's decision, whichever comes first (see [`misuse.md`](misuse.md)) ([#719], [#764], [#776]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
 | Per-account spend | Current day and week only. Older days only as totals with no account ([#677]) |
@@ -111,7 +111,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 ### Who runs Crux
 
 - Crux is run by the owner, named, in the Philippines ([#677]). Until opening, "Who runs Crux" says the owner built it (see [Contacts](#contacts)) ([#754]).
-- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, declined kinds, all kinds alike, as possibly sensitive information about health or sexual life, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent ([#677], [#776]).
+- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, declined kinds, all kinds alike, as possibly sensitive information about health or sexual life, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent. If the Commission does not answer, or turns the request away, they stay handled this way ([#677], [#776]).
 - Crux follows the same standards wherever its learners are ([#677]).
 
 ### Contacts
@@ -128,7 +128,7 @@ Copies of a learner's data and requests by email are in [`operations.md`](operat
 
 ### Breaches
 
-If sensitive or sign-in data, decline records included, reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677], [#776]). The learners' notice goes from the owner page: an email to every account, locked and closing ones included, and to every other address Crux holds, and a notice page on every live trial link (see [`operations.md`](operations.md)) ([#755]).
+If sensitive or sign-in data, decline records included, reaches the wrong hands with a real risk of serious harm, the owner tells the National Privacy Commission and the affected learners within 72 hours. The owner sends the Commission a yearly summary of incidents ([#677], [#776]). The learners' notice goes from the owner page: an email to every account, locked and closing ones included, and to every other address Crux holds, and a notice page on every live trial link (see [`operations.md`](operations.md)) ([#755]). A switched-off link is not reached, though its stub may still hold kinds ([#776]).
 
 ### What it covers
 

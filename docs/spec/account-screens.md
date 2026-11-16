@@ -29,7 +29,7 @@ Each message shows in the card under the button or field it is about:
 ## Steps on opening
 
 - **Opening page:** a plain page like the sign-in page, holding one card, with nothing from the account behind it. The card past a last day ([#772]), the lock, the misuse card ([#764]), the erase card ([#777]), "Keep my account", the terms-changed step and the under-18 closure each use one.
-- The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, "Keep my account", then the terms step ([#764]).
+- The age question keeps its place: a card in the thread, or in the main area when no conversation is open (see [`learning-screen.md`](learning-screen.md) and [`app-shell.md`](app-shell.md)). The order stays as [`accounts.md`](accounts.md) gives it: a lock, the age question, the misuse card, the erase card, "Keep my account", then the terms step ([#764], [#777]).
 
 ```mermaid
 flowchart TD
@@ -44,9 +44,11 @@ flowchart TD
   lock -->|"Read my sessions"| ro["The app, read-only,<br/>with the lock bar"]
   steps -->|"2. the age question"| age["Age card in the thread,<br/>or in the main area"]
   steps -->|"3. a warning or dismissal"| card["Misuse card,<br/>one per decision"]
-  steps -->|"4. a closing's 7 days"| keep["Keep page"]
-  steps -->|"5. terms changed"| terms["Terms page"]
+  steps -->|"4. a sealed session erased"| erase["Erase card,<br/>one per session"]
+  steps -->|"5. a closing's 7 days"| keep["Keep page"]
+  steps -->|"6. terms changed"| terms["Terms page"]
   card -->|Continue| next["The next step due,<br/>or the app"]
+  erase -->|Continue| next
   keep -->|"Keep my account"| next
   terms -->|Agree| next
   steps -->|none| app["The app, opening as<br/>app-shell.md says"]
@@ -56,7 +58,7 @@ flowchart TD
 
 - After a dismissal, the card reads "Crux's owner read some of your sessions", then "The tutor declined 3 of your requests (methods of self-harm, explicit sexual content), and the owner read those sessions that were still there. On 4 Mar the owner took no action.", with Continue ([#764]).
 - After a warning, it adds "This breaks Crux's terms. Another time closes your account." ([#764])
-- Once its kinds are erased after 30 days, it leaves out the brackets: "The tutor declined 3 of your requests, and the owner read those sessions that were still there." ([#776])
+- Once its kinds are erased after 30 days, it leaves out the brackets: "The tutor declined 3 of your requests, and the owner read those sessions that were still there. On 4 Mar the owner took no action." ([#776])
 - When it shows, and how often, is in [`misuse.md`](misuse.md).
 
 ### The erase card
@@ -130,6 +132,17 @@ One page in the main area, with four parts in this order:
 - **The copy page, once its link has expired or for an unknown code:** "This link has expired. A copy's link works for 7 days after it's sent." ([#762], [#772]).
 - **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 11:59 pm on 18 Nov, Philippine time. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
+### Misuse emails
+
+The learner hears only after the owner decides. No email names a declined kind. Each gives the count, says the owner read the flagged sessions that were still there, and sends the learner to sign in. The kinds are read in the app ([#677], [#733], [#764]).
+
+- **Warned:** an email: "The tutor declined 3 of your requests, and Crux's owner read those sessions that were still there. This breaks Crux's terms. Another time closes your account. Sign in to read why." ([#764])
+- **Dismissed:** an email: "The tutor declined 3 of your requests, and Crux's owner read those sessions that were still there. On 4 Mar the owner took no action. Sign in to read why." ([#764])
+- **Closed:** an email: "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests, and the owner read those sessions that were still there. Sign in to read why. To contest this, reply by 11:59 pm on 10 Nov, Philippine time. After that, your account is erased." ([#764], [#772])
+- The count includes declines that arrived while the flag waited. The date is the day of the owner's decision ([#764]).
+- Each of these emails ends with "If you reply, quote flag 4821.", so a reply can be matched to its flag. The owner page shows an account's flag with no email ([#755]).
+- The contest outcomes under "A misuse closure" in [`misuse.md`](misuse.md) name no kind. Nor do the owner's own replies from the Crux inbox ([#755], [#764]).
+
 ## Frontend modules
 
 | Module | What it holds |
@@ -156,3 +169,5 @@ One page in the main area, with four parts in this order:
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#677]: https://github.com/calmxz/Crux/issues/677
+[#733]: https://github.com/calmxz/Crux/issues/733

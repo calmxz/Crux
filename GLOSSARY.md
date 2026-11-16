@@ -58,6 +58,9 @@ A page, with Continue, that tells a warned or dismissed learner why the owner re
 **Erase card**:
 A page, with Continue, that tells a learner the owner erased one of their sealed sessions after reporting it to the authorities. Like a misuse card, it shows every time they open Crux until they tap Continue once.
 
+**The authorities answered**:
+A step the owner records on a sealed session marked Reported, once the authorities no longer need it. Only then can the seal be lifted or the session erased while its account lives.
+
 **Tutor**:
 The AI that teaches the learner and tracks which learning objectives the learner has shown. When the learner has shown every learning objective they have not dropped, the tutor offers a mastery check.
 _Avoid_: agent, bot, assistant

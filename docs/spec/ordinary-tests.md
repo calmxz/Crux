@@ -103,7 +103,7 @@ These are the tests the closed tickets sent here, by area.
 - A sealed flag locks at once, and the owner sees only the date and the kind.
 - A lock is read-only. A contest holds the erasure. A misuse closure erases on day 10, one run after the owner's reminder, and blocks the email for 12 months ([#772]).
 - A blocked reply counts as a decline, tested with a made-up block result. A second prohibited-content block locks the account.
-- A sealed session marked "Reported" stays past its account's erasure, and an unmarked one goes. The erasure tests in [`data-model.md`](data-model.md) pass ([#719]).
+- A sealed session marked "Reported" with no answer recorded stays past its account's erasure, and an unmarked or answered one goes ([#777]). The erasure tests in [`data-model.md`](data-model.md) pass ([#719]).
 
 **The trial** ([#677], [#717], [#722], [#733])
 
@@ -179,3 +179,4 @@ These are the tests the closed tickets sent here, by area.
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#777]: https://github.com/calmxz/Crux/issues/777
