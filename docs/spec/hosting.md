@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what runs where, the database, backups, environments and releases, logs, and secrets. Email, errors, uptime and owner messages are in [`operations.md`](operations.md), and the daily job in [`dates.md`](dates.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
+This file covers what runs where, the database, logs, and secrets. Backups, environments, and releases are in [`backups-and-releases.md`](backups-and-releases.md). Email, errors, uptime and owner messages are in [`operations.md`](operations.md) and [`email.md`](email.md), and the daily job in [`dates.md`](dates.md). The visitor's country and address, and the security headers, are in [`security.md`](security.md). The tools are in [`tools.md`](tools.md). The free-hosting rule, the 5-second rule and where data lives are in the main file.
 
 ## What runs where
 
@@ -93,80 +93,12 @@ A domain is bought through Cloudflare's registrar before the trial, about USD 10
 - The backend reaches the database through SQLAlchemy 2 with psycopg ([#750]).
 - Alembic runs the migrations. Tables and columns come from the SQLAlchemy models. Row-level security policies and grants are written by hand in each revision ([#750]).
 
-## Backups
-
-Supabase Free has no backups, so Crux makes its own ([#716]).
-
-- **Daily dump:** a `pg_dump` of live, in the daily job. It drops to weekly once the database passes about 100 MB, so Supabase's 5 GB a month of outgoing transfer is not used up.
-- **Before every live migration:** an automatic `pg_dump`.
-- **Who can read the data:** the dump runs as its own read-only role. It and the restore's role, which writes for a restore or a repair, are the only roles allowed past row-level security, and only the release script uses them ([#719], [#735]).
-- **Where they go:** a Cloud Storage bucket with soft delete off, readable only by the release script's account.
-- **How long:** a lifecycle rule deletes each dump after 7 days, and Google applies it within about a day. The Privacy Policy says "deleted data may remain in a backup for up to 8 days", for every deletion (see [`privacy.md`](privacy.md)).
-- **Soft delete** is set to 0 on every Crux bucket, so deleting erases.
-
-### The restore log
-
-A log in its own Cloud Storage bucket, with soft delete off, records what a restore must apply again. The app can only add entries, and only the release script reads them. An entry keeps only IDs, the time and the action, never content, and a lifecycle rule deletes it after 8 days, once the last dump it applies to has expired ([#716], [#719], [#735]). It records:
-
-- every deletion;
-- seals and locks, and the "Reported" mark;
-- warnings and flags, and a warning or dismissal with its waiting misuse card ([#764]);
-- a tap on Continue on a misuse card, and an ended page's first showing, so a restore neither brings the kinds back nor loses a card ([#764]);
-- the authorities' answer on a Reported session, a lock lift that decides a flag while a Reported seal stays, and an erase card waiting and a tap on its Continue ([#777]);
-- the 30-day erasure of kinds waiting for a misuse card or a first showing ([#776]);
-- ticks and quotes withdrawn;
-- closures asked for or kept, contests entered or upheld ([#764]), and copies asked for;
-- misuse-block entries;
-- trial links switched off;
-- age-question answers;
-- each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]);
-- each outage, each date an outage or a notice's acceptance moved, as the new last day per ID, a waiting erasure warning, and each inbox confirmation (see [`dates.md`](dates.md)) ([#772]).
-
-A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
-
-**A full restore** applies the log again. Entries that point at something the restore lost are skipped, and applying an entry twice is harmless. New messages and marks since the dump are lost. A copy already made is kept, since the erasure applies again ([#716], [#735]). A logged home erasure is applied again by calling the erasure routine in [`data-model.md`](data-model.md), so its moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing ([#719]). Before Crux takes traffic, the release script sets the database endpoint's last-answer time to its last answer before the outage, read from the uptime check's history, which the script's account can read, so the restore counts only the real outage. Whether that works, and for how long the history is kept, is open on [#726] ([#772]). A restore may lose a share tick given, which the learner gives again, and a "Start the window" press, let-in entries and an inbox code not yet used, which the owner redoes ([#719], [#772]).
-After a full restore, the release loads the current terms versions and their "What changed" lists into Homes again before Crux takes traffic, so Homes matches the legal pages. An agreement made after the dump is lost with it, so that person is asked again at their next opening ([#769]).
-
-**A repair** ([#716], [#735]):
-
-- It opens the dump in a temporary area of the live database, deleted afterwards. Once the database passes about 250 MB, it uses a throwaway Cloud Run job's own Postgres in Singapore instead.
-- Real learner data never leaves Supabase or Google Cloud for a repair.
-- Repairs are done by script, and the owner sees counts, not content. Rows changed after the bug keep their newer value, and the log still applies.
-
-A test restore of a dump is on the before-trial checklist (see [`quality-bar.md`](quality-bar.md)) ([#716]).
-
-## Environments
-
-| Environment | Runs on | Data |
-|---|---|---|
-| Dev | The owner's computer, with the Supabase CLI's local stack in Docker | Fake data only |
-| CI | A throwaway database on GitHub's machines for each run, from the same local stack | Fake data only |
-| Staging | The Crux tests project: its own Cloud Run, Supabase Free project, bucket and Worker | Synthetic data only |
-| Live | The Crux project | Real learner data |
-
-All of this comes from [#716].
-
-- Staging's AI calls count in the test cap. Its Supabase pauses after a quiet week, and is restored by hand before a release ([#716]).
-- Staging sends no real email, and its daily job runs by hand, so it uses neither Resend's limit nor a Cloud Scheduler job ([#735]).
-- The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
-- CI starts the local stack, then runs `alembic upgrade head` ([#750]).
-- Staging's Worker runs on a subdomain of the domain, in the same Cloudflare account, behind its own copy of the request guards and a gate (see [`security.md`](security.md)). Its address is on Turnstile's hostname list ([#770]).
-
-The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
-
-## Releases
-
-- A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step, and re-applies the previous Cloudflare rules too ([#716], [#770]).
-- The open-path check runs on staging before live, and on live after each release (see [`security.md`](security.md)) ([#770]).
-- Migrations are backward-compatible: add first, remove in a later release. A one-step rollback still works ([#716]).
-- A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` ([#716], [#750]).
-
 ## Logs
 
 - Cloud Run's automatic request logs are dropped for everyone by an exclusion filter. The Worker's call logs are off ([#716]).
 - Crux writes its own logs: status, path, timing and a request number. They never hold a network address or request headers ([#716]). The main file's "Where data lives" states the rule, and its one exception.
 - A logged path is the route's pattern, never the real address, so a trial link's key is never logged. Query strings are not logged, and addresses in browser error reports are stripped the same way. Logs stay 30 days, Google's default ([#735]).
-- Cloudflare sees network addresses at its edge, as a processor. Its automatic flood protection, the burst guard and the hand blocks run there (see [`security.md`](security.md) and [`privacy.md`](privacy.md)) ([#716], [#770]).
+- Cloudflare sees network addresses at its edge, as a processor. Its automatic flood protection, the burst guard and the hand blocks run there (see [`security.md`](security.md), [`privacy.md`](privacy.md) and [`terms-and-policy.md`](terms-and-policy.md)) ([#716], [#770]).
 - Logging addresses returns only as a recorded change, with a reason, a short keep time, shortened or scrambled addresses, and the terms-changed notice ([#716]).
 
 ## The converter
@@ -183,14 +115,13 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 ## Secrets
 
 - Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
-- Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`operations.md`](operations.md)) ([#762]).
+- Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`email.md`](email.md)) ([#762]).
 - Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]). The deploy token can also edit the zone's firewall rules ([#770]).
 - Staging's gate secret is a GitHub secret, filled into Cloudflare's rule text when the rule is applied. The daily job's Cloudflare token is in Secret Manager, and can edit only Cloudflare's lists ([#770]).
 - How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
 ## Gaps
 
-- **Reading the uptime check's history after a restore:** open on [#726] ([#772]).
 - **Open hosting checks on [#726]:** the pooler test, and server time per sitting and per upload. The research reads the Cloud Run cap as gross use, so a month of USD 4.80 could trip staging's USD 2 cap at a bill of 0. The first month's report settles it.
 - **Whether the Cloud Run credit holds** with file work in the trial, and how busy a sitting is: open on [#675] ([#716], [#722]).
 - **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in [`quality-bar.md`](quality-bar.md) ([#678], [#716]).
@@ -201,7 +132,6 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 
 [#675]: https://github.com/calmxz/Crux/issues/675
 [#678]: https://github.com/calmxz/Crux/issues/678
-[#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
@@ -215,10 +145,6 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#762]: https://github.com/calmxz/Crux/issues/762
-[#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
-[#772]: https://github.com/calmxz/Crux/issues/772
-[#777]: https://github.com/calmxz/Crux/issues/777
-[#776]: https://github.com/calmxz/Crux/issues/776

@@ -25,7 +25,7 @@ flowchart TD
 ```
 
 - The loop runs as drawn. A prerequisite topic pauses the current topic inside it (see [`teaching.md`](teaching.md)) ([#664], [#668], [#670]).
-- The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see [`accounts.md`](accounts.md) and [`trial.md`](trial.md)) ([#674], [#677], [#722]).
+- The loop starts after sign-in. Before Crux opens, a guest or a trial-link holder enters it without an account (see [`accounts.md`](accounts.md), [`trial.md`](trial.md) and [`trial-links.md`](trial-links.md)) ([#674], [#677], [#722]).
 - The learner can leave at any step and resume the session at the step they left. What the tutor does on return is in [`sessions.md`](sessions.md) ([#664], [#671]).
 - At any step, a learner who says they are under 18 gets the age question (see [`age.md`](age.md)) ([#681]).
 

@@ -101,7 +101,7 @@ A limit stops a message before the tutor reads it. So Crux sends only that messa
 | The month, or Google's cap | "Crux has used this month's tutoring budget. Back on 1 Dec.", with a tick-box, "Email me when it's back" |
 
 - Reset times are in the learner's own clock (see the main file's "Money") ([#675]).
-- Each ticked learner gets one email when Crux reopens: on the 1st, when a re-run's bigger budget starts, or when an owner's raise reopens it ([#675], [#734]). Where these stand against the sender's limits is in [`operations.md`](operations.md) ([#735]).
+- Each ticked learner gets one email when Crux reopens: on the 1st, when a re-run's bigger budget starts, or when an owner's raise reopens it ([#675], [#734]). Where these stand against the sender's limits is in [`email.md`](email.md) ([#735]).
 - A trial link has no tick-box, since Crux keeps no email for it ([#722]).
 - A guest sees the stop in [`trial.md`](trial.md) ([#734]).
 - Anything that costs no AI keeps working: past sessions, "What you've mastered", files, settings and feedback ([#675]).

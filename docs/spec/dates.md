@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers when a printed date takes effect, when Crux acts on it, how an outage moves it, and the one daily job. Email sending and the owner's daily email are in [`operations.md`](operations.md).
+This file covers when a printed date takes effect, when Crux acts on it, how an outage moves it, and the one daily job. Email sending and the owner's daily email are in [`operations.md`](operations.md) and [`email.md`](email.md).
 
 ## Counting a date
 
@@ -10,7 +10,7 @@ This file covers when a printed date takes effect, when Crux acts on it, how an 
 - **A chance to act** (the undo of a closing, the contest of a misuse closure, the notice periods, the trial's end, Crux closing, a copy link) starts at a moment, in Philippine time. For an email, that moment is when Resend accepts it. Its last day is that moment's Philippine date plus the period, so it lasts from the period to about a day more. Ana closes her account at 2:00 pm on 3 Nov: she can keep it until 11:59 pm on 10 Nov, which is 7 days 9 h 59 min ([#772]).
 - Stated lengths ("7 days to contest", "works for 7 days", "14 days ahead") are floors, so they stay as written ([#772]).
 - A date the owner picks is a last day too: the trial's end, at the earliest today plus 7, and Crux closing ([#772]).
-- **A keep-limit**, how long Crux keeps something nobody acts on, such as a trial request's "at most 30 days", is a ceiling. It is erased at the last daily run within it: the run on the start's Philippine date plus the limit, or the day before when the start comes before that day's run. Dana asks for a trial place at 3:00 pm on 1 Nov: her email goes at 8:05 am on 1 Dec, after 29 days 17 h 5 min. It runs longer only while the daily job is down, as the Privacy Policy says (see [`privacy.md`](privacy.md)) ([#772]).
+- **A keep-limit**, how long Crux keeps something nobody acts on, such as a trial request's "at most 30 days", is a ceiling. It is erased at the last daily run within it: the run on the start's Philippine date plus the limit, or the day before when the start comes before that day's run. Dana asks for a trial place at 3:00 pm on 1 Nov: her email goes at 8:05 am on 1 Dec, after 29 days 17 h 5 min. It runs longer only while the daily job is down, as the Privacy Policy says (see [`terms-and-policy.md`](terms-and-policy.md)) ([#772]).
 - A copy is both: its link works until 11:59 pm on the 7th day after Resend accepts it, and the copy is erased at the next run. Ben's link, accepted at 8:05 am on 11 Nov, works until 11:59 pm on 18 Nov ([#772]).
 
 ## Notices that wait for email
@@ -49,7 +49,7 @@ This file covers when a printed date takes effect, when Crux acts on it, how an 
 - Ana's last day is 10 Nov. A 40-minute outage that day, or one from 11:50 pm on 10 Nov to 12:30 am on 11 Nov, moves it to 11 Nov ([#772]).
 - The move happens before anything acts on a date: the first answer after an outage makes it, and before the daily job acts, and before a request is refused as past its last day, Crux checks the stored time and makes any move first. A missed run with the app up moves nothing; its actions run at the next run ([#772]).
 - No email tells the learner. The screen shows the new date, and a moved trial end shows "The trial now ends at 11:59 pm on 16 Jan.", in the holder's clock. The owner's daily email says what moved (see [`operations.md`](operations.md)) ([#772]).
-- Each move joins the restore log as the new last day per ID, and so does a move when Resend accepts a notice email. After a full restore, the release script resets the stored time (see [`hosting.md`](hosting.md)) ([#772]).
+- Each move joins the restore log as the new last day per ID, and so does a move when Resend accepts a notice email. After a full restore, the release script resets the stored time (see [`backups-and-releases.md`](backups-and-releases.md)) ([#772]).
 
 ## The daily job
 
@@ -88,7 +88,7 @@ The job acts on every date that has passed, so a missed run catches up on the ne
 - the trial, at the first run after its last day ([#733], [#772]);
 - hand blocks at least 12 hours old (see [`security.md`](security.md)) ([#770]).
 
-**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits, the wrong-link counts and the copy page's wrong-code counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735], [#770]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down" in [`operations.md`](operations.md)) ([#763]).
+**The exceptions:** records with a shorter life than a day cannot wait for this job. Network addresses in the code limits, the wrong-link counts and the copy page's wrong-code counts, and the code limits' email addresses, are each deleted by a Cloud Tasks job set for when they expire ([#717], [#735], [#770]). Sign-in codes expire by checking their time when used. The daily job sweeps anything these missed, such as during a pause, and an unused code's email ([#735]). Email retries are Cloud Tasks set for their time too, so they need no Cloud Scheduler job (see "When Resend refuses or is down" in [`email.md`](email.md)) ([#763]).
 
 Some things happen by the date alone, with no job: a re-run's budget returning on the 1st, and the go-public bar judged at the end of its last day ([#676], [#734], [#735]).
 

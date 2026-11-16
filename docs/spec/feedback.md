@@ -159,7 +159,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 - Feedback text shows there as plain text ([#678]).
 - It shows the path, the bar's progress ("14 / 20 mastered"), the feedback answers with unread ones marked, which answers may be quoted, and arrivals by source ([#676], [#677], [#717]).
 - It shows the days the budget turned a learner away ("Limit hit on 9 of 56 days"), apart from learners stopped by their own limit ([#676]).
-- Its other parts are in the area file that owns each one: [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`trial.md`](trial.md), [`misuse.md`](misuse.md), and [`live-faults.md`](live-faults.md).
+- Its other parts are in the area file that owns each one: [`spending.md`](spending.md), [`accounts.md`](accounts.md), [`trial.md`](trial.md), [`trial-links.md`](trial-links.md), [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md), and [`live-faults.md`](live-faults.md).
 - **The daily email** gives new feedback as a count only, never the words or the sender ("2 new feedback answers"), and any "1 quote permission withdrawn" ([#677], [#717]).
 
 ## Gaps

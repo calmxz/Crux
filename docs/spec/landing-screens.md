@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers what a visitor sees before having an account: the landing page, guest mode, Request access, "Who runs Crux", the legal pages, the demo video, and a trial link's entry, notices and endings. All of it comes from [#754] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`age.md`](age.md), [`accounts.md`](accounts.md), [`privacy.md`](privacy.md), [`spending.md`](spending.md), [`misuse.md`](misuse.md), [`hosting.md`](hosting.md) and [`security.md`](security.md). The session screen, the app shell, the sign-in page and the opening page are in [`learning-screen.md`](learning-screen.md), [`app-shell.md`](app-shell.md) and [`account-screens.md`](account-screens.md). The prototype the owner chose from is on the throwaway branch `prototype/754-landing-guest-trial`: the landing page is variant B, and the other screens mix the variants as this file says.
+This file covers what a visitor sees before having an account: the landing page, guest mode, Request access, "Who runs Crux", the legal pages, the demo video, and a trial link's entry, notices and endings. All of it comes from [#754] unless a line says otherwise. The rules these screens show are in [`trial.md`](trial.md), [`trial-links.md`](trial-links.md), [`age.md`](age.md), [`accounts.md`](accounts.md), [`privacy.md`](privacy.md), [`terms-and-policy.md`](terms-and-policy.md), [`spending.md`](spending.md), [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md), [`hosting.md`](hosting.md) and [`security.md`](security.md). The session screen, the app shell, the sign-in page and the opening page are in [`learning-screen.md`](learning-screen.md), [`app-shell.md`](app-shell.md) and [`account-screens.md`](account-screens.md). The prototype the owner chose from is on the throwaway branch `prototype/754-landing-guest-trial`: the landing page is variant B, and the other screens mix the variants as this file says.
 
 ```mermaid
 flowchart TD
@@ -68,7 +68,7 @@ flowchart TD
 ## Who runs Crux
 
 - A page of its own, holding one card, the same from every link: the landing page's footer, the guest sidebar, and a trial link's Settings among the trial's terms links.
-- During the trial, it reads "Crux is built by [the owner's name], in the Philippines.", then privacy@ for questions about your data, "On a trial link, Erase this trial link in Settings erases your sessions, files and feedback.", and the owner's LinkedIn for anything else ([#755]). From opening, it carries the officer's details (see [`privacy.md`](privacy.md)).
+- During the trial, it reads "Crux is built by [the owner's name], in the Philippines.", then privacy@ for questions about your data, "On a trial link, Erase this trial link in Settings erases your sessions, files and feedback.", and the owner's LinkedIn for anything else ([#755]). From opening, it carries the officer's details (see [`terms-and-policy.md`](terms-and-policy.md)).
 
 ## Signing in during the trial
 
@@ -106,7 +106,7 @@ A link that no longer works opens an opening page in place of the app, saying wh
 | Switched off for misuse, from the link's flag: the first showing ([#764]) | "This trial link was switched off", then "The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions that were still there. The owner switched this link off, and its sessions have been erased.", with Request access |
 | Switched off for misuse: later showings, on any browser ([#764]) | The same, leaving out the brackets |
 | Switched off for misuse: a first showing after its kinds are erased, 30 days after the owner's decision ([#776]) | The same, leaving out the brackets |
-| Switched off from a sealed flag ([#764]) | "This trial link was switched off", then the fixed reason line in [`misuse.md`](misuse.md) and "The owner switched this link off, and its sessions have been erased.", with Request access |
+| Switched off from a sealed flag ([#764]) | "This trial link was switched off", then the fixed reason line in [`sealed-sessions.md`](sealed-sessions.md) and "The owner switched this link off, and its sessions have been erased.", with Request access |
 | Just after Yes to the age question | "Your trial has ended", then "Crux is for people 18 and over, so this trial link has been switched off and its sessions have been erased.", with OK, which goes to the landing page |
 | Back later on a link ended by a Yes | "This trial link has ended", then "It no longer works.", with OK |
 | Erased by its holder ([#755]) | "You erased this trial link", then "Its sessions, files and feedback are gone." |

@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. Its dates follow [#772]. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md) and [`misuse.md`](misuse.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
+This file covers the screens around an account: the sign-in page, the steps shown on opening, a locked account, the Settings page, the feedback page and closing an account. Its dates follow [#772]. All of it comes from [#753] unless a line says otherwise. The rules these screens show are in [`accounts.md`](accounts.md), [`age.md`](age.md), [`privacy.md`](privacy.md), [`terms-and-policy.md`](terms-and-policy.md), [`feedback.md`](feedback.md), [`spending.md`](spending.md), [`misuse.md`](misuse.md) and [`sealed-sessions.md`](sealed-sessions.md). The app around them is in [`app-shell.md`](app-shell.md). The prototype the owner chose from is on the throwaway branch `prototype/753-account-screens`, variant A except where this file says otherwise.
 
 ## Signing in
 
@@ -63,7 +63,7 @@ flowchart TD
 
 ### The erase card
 
-- After the owner erases a Reported sealed session (see [`misuse.md`](misuse.md)), the card reads "Crux's owner erased your sealed session "Reaction rates", with its 2 mastered topics.", then the fixed reason line, with Continue. With one topic it reads "with its 1 mastered topic", with none it leaves that part out, and a session that never had a name reads "your sealed session" ([#777]).
+- After the owner erases a Reported sealed session (see [`sealed-sessions.md`](sealed-sessions.md)), the card reads "Crux's owner erased your sealed session "Reaction rates", with its 2 mastered topics.", then the fixed reason line, with Continue. With one topic it reads "with its 1 mastered topic", with none it leaves that part out, and a session that never had a name reads "your sealed session" ([#777]).
 - Each erased session gets its own card, oldest erase first. Each shows at every opening, on any browser, until Continue is tapped once. Under a lock it waits for the lock to end, and it waits until the account or link is erased ([#777]).
 
 ### Keep my account
@@ -75,7 +75,7 @@ flowchart TD
 
 ### The terms step
 
-- The card is headed "Crux's terms changed", then the line in [`privacy.md`](privacy.md), "Read the new Terms" · "What changed", Close my account and Agree.
+- The card is headed "Crux's terms changed", then the line in [`terms-and-policy.md`](terms-and-policy.md), "Read the new Terms" · "What changed", Close my account and Agree.
 - Close my account opens the close-account dialog below, over the terms page.
 
 ### The under-18 closure
@@ -85,7 +85,7 @@ flowchart TD
 ## A locked account
 
 - On opening, the lock's card comes first on its own page, headed "Your account is locked", with "Read my sessions" and Sign out.
-  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. To contest this, email Crux at its address by 11:59 pm on 10 Nov. After that, your account is erased." and "You can still read your sessions and what you've mastered. The tutor can't reply." If a session was sealed while the flag waited, the card adds "Another session was sealed." and the fixed reason line in [`misuse.md`](misuse.md) after the kinds ([#764]).
+  - **A misuse closure:** "Crux's owner closed your account on 3 Nov. The tutor declined 3 of your requests (making drugs or other illegal goods), and the owner read those sessions. To contest this, email Crux at its address by 11:59 pm on 10 Nov. After that, your account is erased." and "You can still read your sessions and what you've mastered. The tutor can't reply." If a session was sealed while the flag waited, the card adds "Another session was sealed." and the fixed reason line in [`sealed-sessions.md`](sealed-sessions.md) after the kinds ([#764]).
   - **A sealed flag:** "One of your sessions was sealed, and your account is locked while Crux's owner decides. Nobody can open the sealed session, including Crux's owner. To reply, email Crux at its address and quote flag 4821." and "You can still read your other sessions. The tutor can't reply." It adds the fixed reason line ([#764]).
   - **A closure decided on a sealed flag:** "Crux's owner closed your account on 3 Nov, about your sealed session.", the fixed reason line, then "To contest this, email Crux at its address by 11:59 pm on 10 Nov, and quote flag 4821. After that, your account is erased." ([#764], [#772])
   - **Past a misuse closure's last day:** "Your time to contest ended at 11:59 pm on 10 Nov. Unless Crux's owner upholds a contest you sent in time, your account will be erased.", with Sign out only. While a contest is held: "Crux's owner has your reply and will decide. Until then, your account stays locked and nothing is erased." After "Keep the closure": "Crux's owner read your reply and kept the closure. Your account will be erased." ([#772])
@@ -109,7 +109,7 @@ One page in the main area, with four parts in this order:
 - **Files:** "Your files: 186 of 200 MB" with a bar, and "See your files". It opens the allowance dialog in [`app-shell.md`](app-shell.md), starting "Your files are using 186 of 200 MB." in place of the "wasn't added" line.
 - **Your feedback:** "Untick to withdraw a quote or end a share." Then each answer sent, newest first: "8 Nov · Helped: yes · Would pay: maybe", its text, the quote tick, the share tick ("Share: Personal essay (the owner can read it up to 8 Nov)"), and "You said Crux may email you about this." when that tick was given. An answer with neither tick reads "Not quoted, not shared."
 - **Account:** the email, Close account, the Terms, Privacy Policy and "Who runs Crux" links, then Sign out, last on the page.
-- **On a trial link,** in place of Account: "Trial link K7Q-4MP", then "Erase this trial link", which opens a dialog where the holder types "delete", as for Close account. While a sealed flag locks the link, it says "A locked trial link can't be erased." (see [`trial.md`](trial.md)) ([#755]).
+- **On a trial link,** in place of Account: "Trial link K7Q-4MP", then "Erase this trial link", which opens a dialog where the holder types "delete", as for Close account. While a sealed flag locks the link, it says "A locked trial link can't be erased." (see [`trial-links.md`](trial-links.md)) ([#755]).
 
 ### The feedback page
 
@@ -130,7 +130,7 @@ One page in the main area, with four parts in this order:
 - **Closing:** subject "Your Crux account closes at 11:59 pm on 10 Nov", the line in [`privacy.md`](privacy.md), and a "Sign in to Crux" button.
 - **The copy page** is the page the day-9 email links to. It shows a loading line while the backend wakes, and the landing page's unreachable line when the backend cannot be reached (see [`landing-screens.md`](landing-screens.md)) ([#769]).
 - **The copy page, once its link has expired or for an unknown code:** "This link has expired. A copy's link works for 7 days after it's sent." ([#762], [#772]).
-- **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 11:59 pm on 18 Nov, Philippine time. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
+- **The copy** (see [`email.md`](email.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 11:59 pm on 18 Nov, Philippine time. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
 ## Misuse emails
 

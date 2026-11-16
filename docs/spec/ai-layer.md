@@ -6,7 +6,7 @@ This file covers how Crux reaches its AI, which model does each job, how a promp
 
 ## Route and projects
 
-- The Google GenAI SDK calls Gemini Enterprise Agent Platform (formerly Vertex AI), for the meantime, at the **global** address at list price ([#679]). Where that means Google may process data is in [`privacy.md`](privacy.md).
+- The Google GenAI SDK calls Gemini Enterprise Agent Platform (formerly Vertex AI), for the meantime, at the **global** address at list price ([#679]). Where that means Google may process data is in [`terms-and-policy.md`](terms-and-policy.md).
 - Crux calls `generateContent`, for the meantime ([#679]).
 - Crux keeps every conversation in its own format, with the model's thought blocks kept unchanged. Every model call goes through one module ([#679]).
 - Crux moves to the Interactions API, with storage off, only when Google's docs give a reason: a notice that `generateContent` is being retired, or a feature Crux needs launching only there. The move means rewriting that module and a full AI test round. The owner checks Google's changelog at each monthly strict test round ([#678], [#679]).
@@ -103,7 +103,7 @@ A blocked call has no tool call, so Crux reads Google's block result itself ([#7
 
 | Block result | Counts as | What happens |
 |---|---|---|
-| Prohibited content | A sealed flag | The session is sealed. A second on the account locks it (see [`misuse.md`](misuse.md)) ([#735]) |
+| Prohibited content | A sealed flag | The session is sealed. A second on the account locks it (see [`sealed-sessions.md`](sealed-sessions.md)) ([#735]) |
 | Any other harm result, should one occur with the filters off | A decline, kind "blocked by Google" | As [`misuse.md`](misuse.md) says ([#733]) |
 | Recitation, language, personal details, or an unspecified policy reason | A failed call, not a decline | The retry below ([#735]) |
 

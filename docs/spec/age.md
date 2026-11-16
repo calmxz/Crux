@@ -7,7 +7,7 @@ This file covers what happens when someone says they are under 18. The rule that
 ## Where the rule is said
 
 - The landing page says Crux is for adults (18+) ([#681]).
-- The Terms of Use state the age line (see [`privacy.md`](privacy.md)). The tick stays "I am 18 or over" ([#677]).
+- The Terms of Use state the age line (see [`terms-and-policy.md`](terms-and-policy.md)). The tick stays "I am 18 or over" ([#677]).
 - Crux keeps no birth date or age ([#681]). What it keeps with the tick is in [`accounts.md`](accounts.md) ([#677]).
 - Share posts on LinkedIn and Facebook carry no age wording ([#681]).
 - The rule is about the learner, not the topic. An adult may learn a school-level topic ([#681]).

@@ -71,7 +71,7 @@ Once a marking fault is fixed, every mark the faulty marker gave since the last 
 - Re-marks run in the Crux project and spend from the owner's share ([#728] Answer 1). Where they pause is in [`spending.md`](spending.md) ([#734]).
 - Checks stay off until the re-marks finish. The owner page shows their progress, and the owner switches checks back on ([#736]).
 - **After a planted-file fail,** a fresh marker checks the model answers of every check that used files since the last round that passed that test. A wrong one is corrected, and its answers re-marked. Checks come back once those re-checks finish ([#736]).
-- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`misuse.md`](misuse.md)), and a blocked re-mark leaves the mark standing (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a blocked re-mark leaves the mark standing (see [`ai-layer.md`](ai-layer.md)) ([#735]).
 
 | Re-mark finds | What happens |
 |---|---|
@@ -100,7 +100,7 @@ The re-mark gives what a correct marker would have given at the time ([#736]).
 
 Only learners whose marks change are told ([#678]).
 
-- **A finished check:** an account gets an email: "We re-marked a check after a fault in our marking. See what changed in Crux." It is a required email (see [`operations.md`](operations.md)). On their next visit, an account or a trial link sees the change on screen ([#736]):
+- **A finished check:** an account gets an email: "We re-marked a check after a fault in our marking. See what changed in Crux." It is a required email (see [`email.md`](email.md)). On their next visit, an account or a trial link sees the change on screen ([#736]):
   - Wrong: "We found a fault in our marking and re-marked your check from 20 Feb. Problem 3 was marked right but isn't. Take a check on that objective any time." ([#678])
   - Unsure: "We can't be sure of Problem 2 after a fault in our marking. Take a check on it any time."
   - Right: "We found a fault in our marking and re-marked your check from 20 Feb. Problem 2 was marked wrong but is right, so 'chain rule' is passed."

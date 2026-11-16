@@ -10,7 +10,7 @@ This file covers what Crux stores, what each item belongs to, where it lives, wh
 - What only an account has (its email, sign-in codes, the 7-day undo, copies) sits on the account. What only a trial link has (its scrambled key, browsers, switched-off state) sits on the link ([#719]).
 - A file belongs to its session. The storage allowance is still counted per home (see [`files.md`](files.md)) ([#719]).
 - Guests have no home, and Crux stores nothing for them (see [Guests](#guests)) ([#719]).
-- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind, flag number and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755], [#777]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`hosting.md`](hosting.md)) ([#719]).
+- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind, flag number and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755], [#777]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`backups-and-releases.md`](backups-and-releases.md)) ([#719]).
 
 ## What belongs to what
 
@@ -51,7 +51,7 @@ All are in the DB unless marked, and go with their session ([#719]).
 | Re-mark records, the "re-marked as correct" note, undone passes waiting for a check, pending re-mark notices | Mastery check | [`live-faults.md`](live-faults.md) |
 | Photo answers (bucket) | Files | [`mastery-check.md`](mastery-check.md), [`files.md`](files.md) |
 | Files and their pages (bucket); each file's outline, state, harmful-file hold, file mistake flags and added page ranges (DB) | Files | [`files.md`](files.md) |
-| A sealed session's seal and flag number | Safety | [`misuse.md`](misuse.md) |
+| A sealed session's seal and flag number | Safety | [`sealed-sessions.md`](sealed-sessions.md) |
 
 The "Couldn't read this file" line belongs to the session, not the file, so it outlives the file until dismissed ([`files.md`](files.md)) ([#719]).
 
@@ -66,17 +66,17 @@ In the DB, and erased with the home ([#719]).
 | Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
-| Decline records, the open flag, a warning with its date, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md) ([#764], [#776], [#777]) |
+| Decline records, the open flag, a warning with its date, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
 | Feedback answers, sends per day, quote and share ticks, the "email me" tick, the first-mastery notice shown, unread marks | Feedback | [`feedback.md`](feedback.md) |
 | Count marks: they go when the account is erased, not when it closes | Feedback | [`feedback.md`](feedback.md) |
 
-A decline in a sealed flag stays with its sealed session, and is erased at the lift or with the session. A lift names no kind (see [`misuse.md`](misuse.md)) ([#719], [#764]).
+A decline in a sealed flag stays with its sealed session, and is erased at the lift or with the session. A lift names no kind (see [`sealed-sessions.md`](sealed-sessions.md)) ([#719], [#764]).
 
 ### Account only
 
 | Items | Module | Lifetime |
 |---|---|---|
-| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state, date moves, an inbox confirmation's code and mark ([#772]) | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md) |
+| The account and its email, sign-up ticks, terms agreement and pending terms step, last visit and idle warnings, closing state, date moves, an inbox confirmation's code and mark ([#772]) | Homes | [`accounts.md`](accounts.md), [`privacy.md`](privacy.md), [`terms-and-policy.md`](terms-and-policy.md) |
 | Sign-in codes; code limits per email and per network address | Sign-in | [`accounts.md`](accounts.md) |
 | "Email me when it's back" address | Spending | [`spending.md`](spending.md) |
 
@@ -84,9 +84,9 @@ A decline in a sealed flag stays with its sealed session, and is erased at the l
 
 | Items | Module | Lifetime |
 |---|---|---|
-| The link and its scrambled key, link code and date made, browser IDs, unseen notices, the device note shown | Homes | [`trial.md`](trial.md) |
-| Wrong-link counts per network address | Sign-in | [`trial.md`](trial.md) |
-| Copy page wrong-code counts per network address ([#770]) | Sign-in | [`operations.md`](operations.md) |
+| The link and its scrambled key, link code and date made, browser IDs, unseen notices, the device note shown | Homes | [`trial-links.md`](trial-links.md) |
+| Wrong-link counts per network address | Sign-in | [`trial-links.md`](trial-links.md) |
+| Copy page wrong-code counts per network address ([#770]) | Sign-in | [`email.md`](email.md) |
 
 Sign-in sessions belong to the Sign-in module, for accounts and links, behind the sign-in cookie ([`accounts.md`](accounts.md)).
 
@@ -108,8 +108,8 @@ These never link to a home with delete with parent. The erasure writes or moves 
 
 | Item | Module | Lifetime |
 |---|---|---|
-| The reported hold: a sealed session marked "Reported" whose home was erased before the authorities' answer was recorded, with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind, the number and the email | Safety | Until the owner erases it ([`misuse.md`](misuse.md)) ([#777]) |
-| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A misuse reason keeps the kinds only until its first showing, or the last run within 30 days of the owner's decision, whichever comes first, then the count and the general line ([#764], [#776]). A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial.md`](trial.md)) |
+| The reported hold: a sealed session marked "Reported" whose home was erased before the authorities' answer was recorded, with its files, its flag's date, kind and number, and for an account its email. Nobody can open the session. The owner sees the date, the kind, the number and the email | Safety | Until the owner erases it ([`sealed-sessions.md`](sealed-sessions.md)) ([#777]) |
+| A dead link's stub: its scrambled key, its scrambled sign-in cookie IDs, its state, its link code and, for a link switched off, the reason. A misuse reason keeps the kinds only until its first showing, or the last run within 30 days of the owner's decision, whichever comes first, then the count and the general line ([#764], [#776]). A link that died by a Yes, or that its holder erased, keeps its state with no code ([#755]) | Homes | The trial's end, or 12 months after the link died, whichever comes first ([`trial-links.md`](trial-links.md)) |
 | A dead link's feedback answers and quote permissions, when it died other than by a Yes or its holder's erasing | Feedback | 6 months after the trial ends, or 12 months after the link died, whichever comes first. A published quote's answer stays until the owner marks it removed ([`feedback.md`](feedback.md)) |
 | A published quote's note and remove-by date, and after an ending other than an under-18 one, its words | Feedback | [`feedback.md`](feedback.md) |
 | Anonymous feedback tallies | Feedback | [`feedback.md`](feedback.md) |
@@ -130,9 +130,9 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | Owner-page settings and switch states | Owning module; switches: Operations | Until changed ([`live-faults.md`](live-faults.md)) |
 | Let-in entries and their notes, the owner's own email list, "email me if spots open" addresses | Sign-in | [`accounts.md`](accounts.md) |
 | Waiting access requests, invites and declines waiting to send, the trial end date | Sign-in, Homes | [`trial.md`](trial.md) |
-| The email queue with each kind, sender counts, required emails' acceptance times | Email | [`operations.md`](operations.md) |
+| The email queue with each kind, sender counts, required emails' acceptance times | Email | [`email.md`](email.md) |
 | Re-mark runs, the planted-file re-check list | Mastery check | [`live-faults.md`](live-faults.md) |
-| Data requests entered on the owner page, daily email items, the daily job's last run | Operations | [`operations.md`](operations.md) |
+| Data requests entered on the owner page, daily email items, the daily job's last run | Operations | [`operations.md`](operations.md), [`email.md`](email.md) |
 | When the uptime checks' endpoint last answered, and each outage's start and end | Operations | [`dates.md`](dates.md) ([#772]) |
 | Terms versions and their "What changed" lists | Homes | For the life of Crux v1 ([#719]) |
 
@@ -140,11 +140,11 @@ In the DB unless marked. None belongs to a learner ([#719]).
 
 | Item | Place | Lifetime |
 |---|---|---|
-| Dumps | Their own bucket | [`hosting.md`](hosting.md) |
+| Dumps | Their own bucket | [`backups-and-releases.md`](backups-and-releases.md) |
 | The restore log | Its own Cloud Storage bucket, soft delete off. The app can only add entries, and only the release script reads them | A lifecycle rule deletes each entry after 8 days ([#719]) |
 | Request logs, error reports, lookup and push log lines | Google's logs | 30 days ([`hosting.md`](hosting.md)) |
 | Billing export | BigQuery | [`operations.md`](operations.md) |
-| Background answers, short-lived expiry jobs and email retries (a queue ID only) | Cloud Tasks | Until they run ([`hosting.md`](hosting.md), [`operations.md`](operations.md)) ([#763]) |
+| Background answers, short-lived expiry jobs and email retries (a queue ID only) | Cloud Tasks | Until they run ([`hosting.md`](hosting.md), [`email.md`](email.md)) ([#763]) |
 | Private source maps, each AI test's last passing round | Build and test records; the build ticket picks the place | [#719] |
 
 Not stored: the note, which Crux builds on each reply from its records ([`sessions.md`](sessions.md)) ([#719]).
@@ -170,7 +170,7 @@ flowchart TD
 - A cost that arrives later for an erased home is added to the nameless month and day totals ([#719]).
 - The move to the reported hold changes the owner of every row under the session, so delete with parent does not reach them. Until erasure the learner sees no change ([#719]).
 - An under-18 closure erases an outstanding copy and its link. Crux then keeps nothing about the person, apart from a Reported session with no answer recorded, its flag's record and its email ([`age.md`](age.md)) ([#719]).
-- The restore log records each home erasure, with any copy's object ID, expiry and scrambled code ([#762]). A restore re-applies it by calling the routine, so the moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing. A replayed age answer calls the routine only, so the dated count gains 1 once (see [`hosting.md`](hosting.md)) ([#719]).
+- The restore log records each home erasure, with any copy's object ID, expiry and scrambled code ([#762]). A restore re-applies it by calling the routine, so the moves and writes happen again before the delete. A replay rewrites a copy's record from the log, and makes and sends nothing. A replayed age answer calls the routine only, so the dated count gains 1 once (see [`backups-and-releases.md`](backups-and-releases.md)) ([#719]).
 - Tests: every table holding a learner's data, apart from those in [Outliving a home](#outliving-a-home), links to a home with delete with parent; each item that outlives a home has its own erasure test; and erasing a home holding a Reported session with no answer recorded, by each path and after a restore, keeps that session, its files, its flag's record and, for an account, its email, while one with its answer recorded is erased with the home ([#719], [#777]).
 
 ## Modules

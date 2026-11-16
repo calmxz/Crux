@@ -2,12 +2,12 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers how someone gets an account and comes back to it, from opening on. Who may join is in the main file's "Who Crux is for". The age question is in [`age.md`](age.md). Closing an account is in [`privacy.md`](privacy.md). The way in before opening is in [`trial.md`](trial.md).
+This file covers how someone gets an account and comes back to it, from opening on. Who may join is in the main file's "Who Crux is for". The age question is in [`age.md`](age.md). Closing an account is in [`privacy.md`](privacy.md). The way in before opening is in [`trial.md`](trial.md) and [`trial-links.md`](trial-links.md).
 
 ## Before opening
 
 - Sign-up is off during the trial. Sign-in by Google or code works only for the owner's own email addresses ([#677], [#717], [#728] Answer 5). A test address goes on the same list (see [`feedback.md`](feedback.md)) ([#734]).
-- No learner signs in during the trial. Trial-link users return through the link only (see [`trial.md`](trial.md)) ([#717], [#728] Answer 5).
+- No learner signs in during the trial. Trial-link users return through the link only (see [`trial-links.md`](trial-links.md)) ([#717], [#728] Answer 5).
 - During the trial the landing page has no "Sign in", and the owner opens the sign-in page by its address. An email not on the list, by code or by Google, is refused before any code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link." From the EU or the UK, it gets the region message instead (see [`landing-screens.md`](landing-screens.md)) ([#754]).
 - The rest of this file holds from opening.
 
@@ -35,9 +35,9 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 ### When the sender runs out
 
-Email sending, and how many of the day's emails can be codes, is in [`operations.md`](operations.md) ([#735]).
+Email sending, and how many of the day's emails can be codes, is in [`email.md`](email.md) ([#735]).
 
-- A code request the sender cannot serve shows: "We can't send codes right now. Use Continue with Google, or try again after 8:00 am." The time is the reset of Resend's day (see [`operations.md`](operations.md)) in the learner's own clock, "after 9:00 am" in Tokyo. When it falls on the learner's next date, the message adds "tomorrow": at 9 pm, "…try again after 8:00 am tomorrow". When the month ran out, when Resend is down, or while a breach notice is still sending, it says "try again later" instead ([#674], [#763]).
+- A code request the sender cannot serve shows: "We can't send codes right now. Use Continue with Google, or try again after 8:00 am." The time is the reset of Resend's day (see [`email.md`](email.md)) in the learner's own clock, "after 9:00 am" in Tokyo. When it falls on the learner's next date, the message adds "tomorrow": at 9 pm, "…try again after 8:00 am tomorrow". When the month ran out, when Resend is down, or while a breach notice is still sending, it says "try again later" instead ([#674], [#763]).
 - The owner page shows a dated count of code requests refused because the sender ran out for the day or the month, each email address once per day ([#674], [#728] Answer 6).
 
 ### Inside LinkedIn's or Facebook's built-in browser
@@ -72,7 +72,7 @@ The rule is in the main file's "Who Crux is for".
 The cap itself is in the main file's "Money".
 
 - Past the cap, an email with no account sees, at "One more thing": "Crux is full for now. Try again later.", with a tick-box, "Email me if spots open". No account is made. Only a ticked email is kept, for that one message ([#674], [#675]). To count "told Crux is full" once a day, a scrambled copy of the email is kept for that day only ([#719]).
-- When the owner raises the cap, everyone who ticked gets one email, as soon as the sender's share allows (see [`operations.md`](operations.md)), in no order. There is no waitlist ([#675], [#735]).
+- When the owner raises the cap, everyone who ticked gets one email, as soon as the sender's share allows (see [`email.md`](email.md)), in no order. There is no waitlist ([#675], [#735]).
 - Learners with an account sign in as usual ([#675]).
 - A spot never frees up by itself. A closed account keeps its spot, and a learner who returns after closing signs up afresh and takes a new spot ([#675], [#677]).
 - The owner page's cap line and counts are in [`spending.md`](spending.md) ([#675]).
@@ -107,7 +107,7 @@ What else an account keeps is in [`sessions.md`](sessions.md), and the marks in 
 
 ## Steps on opening Crux
 
-These come from [`privacy.md`](privacy.md). They show the next time a learner opens Crux, on any browser, whether or not they had to sign in ([#677], [#733]):
+These come from [`privacy.md`](privacy.md) and [`terms-and-policy.md`](terms-and-policy.md). They show the next time a learner opens Crux, on any browser, whether or not they had to sign in ([#677], [#733]):
 
 - During a closing's 7 days: "Keep my account / Sign out".
 - After a change that matters: the "terms changed" step.

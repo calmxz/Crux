@@ -5,7 +5,7 @@ How the engineering skills should consume this repo's domain documentation when 
 ## Before exploring, read these
 
 - **`GLOSSARY.md`** at the repo root — the glossary / ubiquitous language for this project.
-- **`docs/spec/`** — the Crux v1 spec: the current rules. Read `docs/spec/README.md` (shared rules and the index of area files), then the area files that touch the area you're about to work in. The reasons live in the closed tickets each section links, on the pinned wayfinder map, and later in `spec-change` issues. There is no `docs/decisions.md` for v1.
+- **`docs/spec/`** — the Crux v1 spec: the current rules. Read `docs/spec/README.md` (it holds the shared rules and links the index of area files), then the area files that touch the area you're about to work in. The reasons live in the closed tickets each section links, on the pinned wayfinder map, and later in `spec-change` issues. There is no `docs/decisions.md` for v1.
 - **`docs/reference.md`** — technical reference (how things work, gotchas, conventions). Look here for "how", in `docs/spec/` for the rules, and in the linked tickets for "why".
 
 If any of these files don't exist, **proceed silently**. Don't flag their absence; don't suggest creating them upfront. The `/domain-modeling` skill adds glossary terms as they get resolved; rules go into `docs/spec/`.
@@ -18,7 +18,7 @@ Single-context repo:
 /
 ├── GLOSSARY.md
 ├── docs/
-│   ├── spec/             <- v1 spec: README.md (shared rules, index) + one file per area
+│   ├── spec/             <- v1 spec: README.md (shared rules, links the index) + one file per area
 │   └── reference.md      <- technical reference, organized by topic
 ├── backend/
 └── frontend/
