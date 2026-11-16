@@ -111,7 +111,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 ### Who runs Crux
 
 - Crux is run by the owner, named, in the Philippines ([#677]). Until opening, "Who runs Crux" says the owner built it (see [Contacts](#contacts)) ([#754]).
-- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, declined kinds, all kinds alike, as possibly sensitive information about health or sexual life, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent. If the Commission does not answer, or turns the request away, they stay handled this way ([#677], [#776]).
+- Until the Commission says otherwise, Crux handles learning progress as possibly sensitive information about education, declined kinds, all kinds alike, as possibly sensitive information about health or sexual life, and the 18+ tick as information about age. Learning progress means objectives shown and passed, mastered topics, check answers and photos, and preferences. This is why sign-up asks for specific consent. If the Commission does not answer, or turns the request away, declined kinds stay handled as sensitive ([#677], [#776]).
 - Crux follows the same standards wherever its learners are ([#677]).
 
 ### Contacts

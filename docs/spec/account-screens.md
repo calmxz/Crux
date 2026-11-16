@@ -132,7 +132,7 @@ One page in the main area, with four parts in this order:
 - **The copy page, once its link has expired or for an unknown code:** "This link has expired. A copy's link works for 7 days after it's sent." ([#762], [#772]).
 - **The copy** (see [`operations.md`](operations.md)): subject "Your copy of your Crux data", then "Here is the copy of your Crux data you asked for. Your account and everything else has been erased.", a "Download your copy (zip)" button, "This link works until 11:59 pm on 18 Nov, Philippine time. Keep it private: anyone with the link can open your data." and "A missed link can't be made again."
 
-### Misuse emails
+## Misuse emails
 
 The learner hears only after the owner decides. No email names a declined kind. Each gives the count, says the owner read the flagged sessions that were still there, and sends the learner to sign in. The kinds are read in the app ([#677], [#733], [#764]).
 
