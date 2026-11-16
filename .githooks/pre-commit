@@ -1,8 +1,10 @@
 #!/bin/sh
 # Blocks commits that stage a file over 5,000 tokens (tokens = bytes / 4),
-# or a file holding a local machine path (a Windows, macOS or Linux home
-# folder, AppData), which names the account it was written on. The repo is
-# public. Measures the staged blob, so unstaged edits do not count.
+# a file holding a local machine path (a Windows, macOS or Linux home
+# folder, AppData), which names the account it was written on, or a
+# Markdown file whose [#123] short links and "[#123]: <url>" lines do not
+# match. The repo is public. Measures the staged blob, so unstaged edits
+# do not count.
 # Enable once per clone: git config core.hooksPath .githooks
 
 MAX_TOKENS=5000
@@ -13,8 +15,8 @@ MAX_BYTES=$((MAX_TOKENS * 4))
 LOCAL_PATH='([A-Za-z]:|/[a-z])[\\/]+[Uu][Ss][Ee][Rr][Ss][\\/]|[Aa]pp[Dd]ata[\\/]|(^|[^A-Za-z0-9_.~-])/(Users|home)/[A-Za-z0-9._-]+'
 
 # Files nobody writes by hand: lockfiles, codegen output, tool output,
-# vendored code, license text. They skip the size check only: a lockfile
-# can still record a local path. Binary files skip both checks.
+# vendored code, license text. They skip the size and link checks: a
+# lockfile can still record a local path. Binary files skip every check.
 is_exempt() {
 	case "$1" in
 	backend/uv.lock) return 0 ;;
@@ -43,8 +45,47 @@ else
 	list=$(git -c core.quotePath=false diff --cached --numstat --no-renames --diff-filter=ACM) || exit 1
 fi
 
+# Prints "  <path>: <problem>" for each [#123] short link with no
+# "[#123]: <url>" line (GitHub shows it as plain text), and each such line
+# no link uses. Skipped: inline [#123](<url>) links, escaped \[#123] and
+# image ![#123] brackets, code spans, one-line HTML comments, and fenced
+# code. A fence closes only on its own character, at least as long as the
+# one that opened it, as in CommonMark.
+link_check() {
+	awk -v f="  $1" '
+	{ sub(/\r$/, "") }
+	fence != "" {
+		c = $0; sub(/^ +/, "", c); sub(/[ \t]+$/, "", c); run = c
+		gsub(substr(fence, 1, 1), "", run)
+		if (c != "" && run == "" && length(c) >= length(fence)) fence = ""
+		next
+	}
+	match($0, /^ ? ? ?(```+|~~~+)/) {
+		fence = substr($0, RSTART, RLENGTH); sub(/^ +/, "", fence); next
+	}
+	/^ ? ? ?(> ?)*\[#[0-9]+\]:/ {
+		n = $0; sub(/^[^[]*\[/, "", n); sub(/\].*/, "", n); def[n] = 1; next
+	}
+	{
+		line = $0
+		gsub(/<!--.*-->/, "", line)
+		gsub(/`[^`]*`/, "", line)
+		while (match(line, /\[#[0-9]+\]/)) {
+			n = substr(line, RSTART + 1, RLENGTH - 2)
+			before = RSTART > 1 ? substr(line, RSTART - 1, 1) : ""
+			if (substr(line, RSTART + RLENGTH, 1) != "(" && before != "\\" && before != "!") use[n] = 1
+			line = substr(line, RSTART + RLENGTH)
+		}
+	}
+	END {
+		for (n in use) if (!(n in def)) print f ": [" n "] has no \"[" n "]: <url>\" line"
+		for (n in def) if (!(n in use)) print f ": the \"[" n "]: <url>\" line has no [" n "] link"
+	}'
+}
+
 over=""
 paths=""
+links=""
 tab=$(printf '\t')
 while IFS="$tab" read -r added _deleted path; do
 	[ -z "$path" ] && continue
@@ -55,6 +96,13 @@ while IFS="$tab" read -r added _deleted path; do
 	[ -n "$hits" ] && paths="$paths$hits
 "
 	is_exempt "$path" && continue
+	case "$path" in
+	*.md)
+		bad=$(git cat-file -p "$blob$path" | link_check "$path")
+		[ -n "$bad" ] && links="$links$bad
+"
+		;;
+	esac
 	bytes=$(git cat-file -s "$blob$path") || exit 1
 	if [ "$bytes" -gt "$MAX_BYTES" ]; then
 		over="$over  $path: $((bytes / 4)) tokens ($bytes bytes)
@@ -78,8 +126,20 @@ or tool setting) and regenerate the file instead of editing it.
 EOF
 fi
 
+if [ -n "$links" ]; then
+	cat >&2 <<EOF
+[ERROR] link check: $scope Markdown files have short links and link lines
+that do not match:
+
+$links
+Add the missing "[#123]: https://github.com/calmxz/Crux/issues/123" line at
+the end of the file, or delete the line no link uses, then commit again.
+
+EOF
+fi
+
 if [ -z "$over" ]; then
-	[ -z "$paths" ] && exit 0
+	[ -z "$paths$links" ] && exit 0
 	exit 1
 fi
 
