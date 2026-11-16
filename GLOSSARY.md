@@ -119,12 +119,11 @@ A tutor reply whose stream ends before it is complete, for any reason except Goo
 _Avoid_: break (a study block's break is a pause), dropped reply
 
 **All-sessions page**:
-The page that lists every one of the learner's sessions and holds the session search. The sidebar shows only the 10 most recent sessions; "All sessions" and the search button open this page.
-_Avoid_: library, history
+The page that lists every one of the learner's sessions and holds the session search. It opens in the main area, beside the sidebar.
 
 **Session search**:
 The learner's search on the all-sessions page, over their own sessions' names, topics, file names and conversations, with no AI. Not the lookup, which is the tutor's search.
-_Avoid_: lookup, find
+_Avoid_: page search, all-sessions search
 
 **Topic**:
 The specific thing a learner aims to master. It is small enough to split into learning objectives (usually 3 to 5) and to finish in one or two study blocks. The learner can show they know it in writing.

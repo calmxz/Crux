@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the app around the session screen: where the app opens, the session list, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md) and [`misuse.md`](misuse.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
+This file covers the app around the session screen: where the app opens, the session list, the all-sessions page, "What you've mastered", and how files are added, read and removed on screen. All of it comes from [#752] unless a line says otherwise. The session screen itself is in [`learning-screen.md`](learning-screen.md). The rules these screens show are in [`files.md`](files.md), [`sessions.md`](sessions.md) and [`misuse.md`](misuse.md). The prototype the owner chose from is on the throwaway branch `prototype/752-files-and-sessions`, variant A except where this file says otherwise.
 
 ## The shell
 
@@ -36,7 +36,7 @@ flowchart TD
 
 ### Rename and delete
 
-- The session menu ("⋯") is on each sidebar line and next to the session's title. Both hold Rename and Delete.
+- The session menu ("⋯") is on each sidebar line, on each line of the all-sessions page, and next to the session's title. All hold Rename and Delete ([#780]).
 - Renaming edits the name in place, in the line or in the title. On desktop, clicking the title also starts renaming, with a pencil on hover. On a phone, renaming starts only from the menu. Enter saves, Esc cancels, an empty name keeps the old one, and a name is up to 80 characters.
 - Delete opens a warning dialog naming what goes (see [`sessions.md`](sessions.md#deleting-a-session)): 'Delete "Chain rule (MATH101 week 6)"? This deletes everything in it, including 2 mastered topics from your record. It can't be undone.' Other cases name the half-done check, the passed objectives and the files. Cancel and Delete session.
 - When deleting would take a mastered topic or a passed objective off the Record, or a half-done check would go, the learner types "delete", in any case, before the button works. Otherwise the two buttons are enough.
@@ -48,15 +48,15 @@ The page that lists every one of the learner's sessions and holds [the session s
 
 - **Opening:** "All sessions (24)" and the search button always open it fresh: an empty search, every session newest first, at the top.
 - **The page:** titled "All sessions", with "24 sessions" under the title, or "3 of 24 sessions match" while a search is typed. The empty search box reads "Search your sessions".
-- **Lines:** each session is a line: its name and badges, then its last visit, then the progress bar while a topic is under way. The page leaves out the sidebar's "On:" and "Mastered last:" row. Each line has the session menu ("⋯") with Rename and Delete, working as in the sidebar. Sealed sessions are listed with their "Sealed" badge, and tapping one shows the sealed message.
-- **Dates** use the learner's own clock, with "Today" and "Yesterday" as in the sidebar: a session last visited at 8:00 pm on 7 Nov in New York shows "7 Nov" from 9 Nov, although it was 8 Nov in Philippine time (see [`dates.md`](dates.md)).
+- **Lines:** each session is a line: its name and badges, then its last visit, then the progress bar while a topic is under way. The page leaves out the sidebar's "On:" and "Mastered last:" row; the sidebar keeps its full line. Each line has the session menu ("⋯") with Rename and Delete, working as in the sidebar: a sealed line has no Rename, and Delete is greyed out. The "⋯" next to an open session's title stays. Sealed sessions are listed with their "Sealed" badge, and tapping one shows the sealed message.
+- **Dates** use the learner's own clock and print no time, with "Today" and "Yesterday" as in the sidebar: a session last visited at 8:00 pm on 7 Nov in New York shows "7 Nov" from 9 Nov, although it was 8 Nov in Philippine time (see [`dates.md`](dates.md)).
 - **Order:** by last visit, newest first, with no filters and no other sort. With a search typed, matches keep that order; nothing ranks them by how well they match.
 - **Loading:** the first batch of lines loads with the page. When the learner scrolls near the end, the next batch loads by itself, with "Loading...". There is no button. The batch size is left to the build.
 - **Searching:** results follow the typing: the list narrows with each letter, after a short pause whose length is left to the build. The term travels in the request's body, never in an address (see [`security.md`](security.md#keys-in-addresses)), so it is in no history, shared link, log or Cloudflare sample. The page holds it in memory only: Back keeps it, and a reload clears it, including when the browser reloads a page it set aside. The search box asks the browser not to remember entries, so no past term is offered as a suggestion. Crux stores nothing new in the browser.
 - **Back:** going back from a session opened from the page (the Back button or gesture) returns the page as the learner left it: the same search still typed, the same lines in the same order, at the same place, with the batches already loaded. The opened session's new last visit shows the next time the page opens fresh.
 - Only the opened session's line is checked again on the way back: that one session is matched again against the search as it now stands. If it was deleted, its line is gone. With a search typed, a session sealed meanwhile keeps its line only if its name matches, with no snippet; one whose check started, or whose teaching is hidden again after reteaching, loses a snippet from hidden teaching, and keeps its line only if something it still shows matches; a renamed one, or one whose file was removed, keeps its line only if it still matches.
 - **A locked account** can still open the page and search, since a lock leaves reading open. Each line's menu greys what the lock greys (see [`account-screens.md`](account-screens.md)).
-- **The backend call** returns the learner's sessions a batch at a time, newest visit first, with an optional search term in its body and each match's snippet.
+- **One new backend call** returns the learner's sessions a batch at a time, newest visit first, with an optional search term in its body and each match's snippet.
 
 ### What a match shows
 
@@ -136,7 +136,7 @@ The page that lists every one of the learner's sessions and holds [the session s
 
 | Module | What it holds |
 |---|---|
-| App shell | The sidebar and drawer, with the search button and the 10 most recent sessions, where the app opens, and the main area's switch between a session, the Record, the all-sessions page and the sealed message ([#780]) |
+| App shell | The sidebar and drawer, with the search button, the 10 most recent sessions and "All sessions (24)", where the app opens, and the main area's switch between a session, the Record, the all-sessions page and the sealed message ([#780]) |
 | Session list | Lines, badges, progress bars, the session menu, renaming and the delete warning |
 | Record | "What you've mastered", with its By date and By session filter |
 | Files | The start box's chips, the file button and dropping, file states, the removal and allowance dialogs, and the pinned file lines |

@@ -160,7 +160,7 @@ flowchart TD
 
 ## On screen
 
-The session screen is in [`learning-screen.md`](learning-screen.md): the objective's passed mark with its link in the objectives panel, the refresh offer's buttons, the quick-problem choice as a typed tutor message, the lookup's "paused" line, and jump points hidden during a check ([#751]). The session list with rename and delete, the delete warning, "What you've mastered" and jump points in the conversation are in [`app-shell.md`](app-shell.md) ([#752]).
+The session screen is in [`learning-screen.md`](learning-screen.md): the objective's passed mark with its link in the objectives panel, the refresh offer's buttons, the quick-problem choice as a typed tutor message, the lookup's "paused" line, and jump points hidden during a check ([#751]). The session list with rename and delete, the delete warning, the all-sessions page, "What you've mastered" and jump points in the conversation are in [`app-shell.md`](app-shell.md) ([#752], [#780]).
 
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#665]: https://github.com/calmxz/Crux/issues/665
