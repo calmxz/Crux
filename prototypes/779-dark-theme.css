@@ -167,3 +167,7 @@ table.t td { border-bottom:1px solid var(--line2); padding:7px 8px; }
 [data-mark="B"] mark { font-weight:400; background:var(--hlStrong); color:var(--onHlStrong); }
 [data-mark="B"] .msg.hit { outline:none; background:var(--hlStrong); color:var(--onHlStrong); }
 [data-mark="B"] .msg.hit .small { color:var(--onHlStrong); }
+/* Q "filled controls in dark": A lighter fill with dark text; B an edge in the link blue; C as drawn */
+[data-theme="dark"][data-fill="B"] .btn.primary, [data-theme="dark"][data-fill="B"] .seg button[aria-pressed="true"] { box-shadow:inset 0 0 0 1px var(--accent); }
+[data-theme="dark"][data-fill="B"] .msg.me { box-shadow:inset 0 0 0 1px var(--accent); }
+[data-theme="dark"][data-fill="B"] .tick input:checked { outline:1px solid var(--accent); outline-offset:0; }
