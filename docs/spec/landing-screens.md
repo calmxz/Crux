@@ -41,7 +41,8 @@ flowchart TD
 ## Guest mode
 
 - A guest works in the **guest app**: the app shell from [`app-shell.md`](app-shell.md) with the guest's own sidebar, and the session screen from [`learning-screen.md`](learning-screen.md).
-- The sidebar (the drawer on a phone) holds "Your topic", with the guest's session and "This tab only" under its name; then "Sample topics"; and at its foot Request access, with "Your own trial link: saved sessions, your own files and photo answers.", then the Trial Terms, Privacy Notice and "Who runs Crux" links. It has no "What you've mastered", Feedback, Settings or "+ New session".
+- The sidebar (the drawer on a phone) holds "Your topic", with the guest's session and "This tab only" under its name; then "Sample topics"; and at its foot Request access, with "Your own trial link: saved sessions, your own files and photo answers.", then the Trial Terms, Privacy Notice and "Who runs Crux" links, then "⚙ Settings". It has no "What you've mastered", Feedback or "+ New session" ([#779]).
+- The guest's Settings page has one part, Appearance: the same three choices as an account's (see [`account-screens.md`](account-screens.md)), and "Your choice lasts until you close this tab." How the choice works is in [`themes.md`](themes.md) ([#779]).
 - On the guest's own topic, the top bar shows the replies left all along: "7 of 10 replies left". A sample topic has no count.
 - At the 10th reply, "That's the end of guest mode for your own topic" shows in the thread, with a button for each sample topic and Request access. The chat box gives way to "Your own topic has used its 10 replies."
 - A sample topic's mini check uses the check bar, reading "Mini check · Problem 1 of 2 · closed book", with no Photo button.
@@ -135,7 +136,7 @@ Request access shows on these pages only while the trial runs. A showing is the 
 |---|---|
 | Landing page | The start box with the ticks, the chips, the video, the 18+ line, the Request access section, the region, wake, unreachable, stopped and opening states, "Who runs Crux" and the page-not-found page |
 | Entry ticks | The two ticks and the trial link notice, in the start box or the chat box's place, held once per browser |
-| Guest mode | The guest sidebar, the reply count, the 10-reply line, the sample's end line, the guest stops and the block ending |
+| Guest mode | The guest sidebar, the guest Settings page ([#779]), the reply count, the 10-reply line, the sample's end line, the guest stops and the block ending |
 | Request access | The Request access page and its received and region states |
 | Trial link | The device banner, the notice pages (with the trial's moved or taken-back end), the ended pages (with the erased link's), the locked link's wording, and the opening order |
 | Legal pages | The Trial Terms, the Trial Privacy Notice, the Terms and the Privacy Policy, with their "What changed" lists ([#769]) |
@@ -151,3 +152,4 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#779]: https://github.com/calmxz/Crux/issues/779

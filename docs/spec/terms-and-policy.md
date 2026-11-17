@@ -65,6 +65,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - the processors below, and where they process data;
 - the dated anonymous counts, including the under-18 count, and the cookieless arrivals count;
 - the sign-in cookie;
+- "Your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779]);
 - the human check, the email sender, the code limits and the region check;
 - the burst guard, the hand blocks and their keep time, and the owner's reading of Cloudflare's request analytics only to find a network to block ([#770]);
 - the misuse flag, sealed sessions, and the email of their account, being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
@@ -105,3 +106,4 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#776]: https://github.com/calmxz/Crux/issues/776
+[#779]: https://github.com/calmxz/Crux/issues/779

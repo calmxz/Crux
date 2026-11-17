@@ -21,7 +21,7 @@ flowchart TD
 
 ## Reaching it
 
-- The owner page is its own app, at its own address. "Owner" sits at the sidebar foot of the owner's own app, above Feedback and Settings, shown only to the owner's main address (see [`app-shell.md`](app-shell.md)).
+- The owner page is its own app, at its own path on the main app's site, so the browser's theme choice reaches it (see [`themes.md`](themes.md)) ([#779]). "Owner" sits at the sidebar foot of the owner's own app, above Feedback and Settings, shown only to the owner's main address (see [`app-shell.md`](app-shell.md)).
 - Anyone else at the address, signed in or not, test addresses included, gets the "Page not found" page an unknown address gets (see [`landing-screens.md`](landing-screens.md)). A signed-out owner gets it too.
 - The daily email's links go through the sign-in page's own address, carrying the item as an opaque ID that survives Google's sign-in. A signed-in owner lands on the item; a signed-out owner signs in, then lands on it. Only owner-page items can be carried. Anyone else who signs in from such a link gets "Page not found" at the item.
 - The top bar holds "Back to Crux".
@@ -98,3 +98,4 @@ The Trial area leaves the menu when the trial ends.
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#779]: https://github.com/calmxz/Crux/issues/779

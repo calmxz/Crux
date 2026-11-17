@@ -103,11 +103,12 @@ flowchart TD
 
 ### The Settings page
 
-One page in the main area, with four parts in this order:
+One page in the main area, with five parts in this order ([#779]):
 
 - **Tutoring:** "Today's tutoring: 70% used" with a bar, and "This week: 45% used" under it (see [`spending.md`](spending.md)).
 - **Files:** "Your files: 186 of 200 MB" with a bar, and "See your files". It opens the allowance dialog in [`app-shell.md`](app-shell.md), starting "Your files are using 186 of 200 MB." in place of the "wasn't added" line.
 - **Your feedback:** "Untick to withdraw a quote or end a share." Then each answer sent, newest first: "8 Nov · Helped: yes · Would pay: maybe", its text, the quote tick, the share tick ("Share: Personal essay (the owner can read it up to 8 Nov)"), and "You said Crux may email you about this." when that tick was given. An answer with neither tick reads "Not quoted, not shared."
+- **Appearance:** "Theme", then "Match my device", "Light" and "Dark", then "'Match my device' follows your phone or computer's own setting." How the choice works is in [`themes.md`](themes.md) ([#779]).
 - **Account:** the email, Close account, the Terms, Privacy Policy and "Who runs Crux" links, then Sign out, last on the page.
 - **On a trial link,** in place of Account: "Trial link K7Q-4MP", then "Erase this trial link", which opens a dialog where the holder types "delete", as for Close account. While a sealed flag locks the link, it says "A locked trial link can't be erased." (see [`trial-links.md`](trial-links.md)) ([#755]).
 
@@ -149,13 +150,9 @@ The learner hears only after the owner decides. No email names a declined kind. 
 |---|---|
 | Sign-in | The sign-in page: the two ways in, the human check, the code step, its messages, "One more thing", the full and blocked cards, and the note after closing |
 | Opening steps | The opening pages and their order: the card past a last day ([#772]), the lock, the misuse card ([#764]), the erase card ([#777]), "Keep my account" with its feedback list, the terms step and the under-18 closure; the lock bar and the read-only states |
-| Settings | The Settings page's four parts, "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
+| Settings | The Settings page's five parts, Appearance among them ([#779]), "See your files", unticking quotes and shares, Sign out, the close-account dialog with its typed "delete", and on a trial link the link code and "Erase this trial link" ([#755]) |
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
 | Copy page | The page the day-9 email links to: its loading and unreachable lines, and its expired page ([#769]) |
-
-## Gaps
-
-- **Themes:** in v1. How they look and behave, and which screen files and module rows hold them, are specified on [#779] ([#769]).
 
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
