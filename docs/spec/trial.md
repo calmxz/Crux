@@ -73,6 +73,7 @@ If the day's emails have run out, an invite or decline waits for Resend's next d
 - Files and photo answers are kept with the link's sessions. They are erased at once when removed or when their session is deleted, and erased with the link when it dies, apart from those in a sealed session reported to the authorities ([#719]).
 - Turnstile's signals go partly to Cloudflare's own use, and the Crux email is a Gmail with no processor agreement during the trial (see [`terms-and-policy.md`](terms-and-policy.md)).
 - Error reports carry no learner text.
+- "On a trial link, your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779])
 - The dated under-18 count exists.
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
@@ -137,3 +138,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#779]: https://github.com/calmxz/Crux/issues/779

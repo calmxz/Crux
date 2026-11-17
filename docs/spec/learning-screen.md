@@ -37,7 +37,7 @@ stateDiagram-v2
 
 ## The mastery check
 
-- When the check starts, the thread is cleared to the check alone. A dark check bar shows "Mastery check · Problem k of N · closed book".
+- When the check starts, the thread is cleared to the check alone. A check bar in the theme's text colour, with its text in the page colour, shows "Mastery check · Problem k of N · closed book" (see [`themes.md`](themes.md)) ([#779]).
 - On desktop, the rail shows numbered progress dots at the top, and, in place of the files, "Files, earlier teaching and jump points are hidden until the result". The objectives, the paused topic and the preferences stay. On a phone, the check bar sits above the strip.
 - A guest's sample topic uses the same bar for its 2-problem mini check, reading "Mini check · Problem 1 of 2 · closed book", with no Photo button (see [`landing-screens.md`](landing-screens.md)) ([#754]).
 - Answers go in the chat box. A Photo button replaces the file button. Reminders, "Marking…" and the end step are messages in the thread, answered in the chat box.
@@ -140,3 +140,4 @@ The app shell, the session list, the all-sessions page and its search, the Recor
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#779]: https://github.com/calmxz/Crux/issues/779

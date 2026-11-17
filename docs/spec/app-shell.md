@@ -60,9 +60,9 @@ The page that lists every one of the learner's sessions and holds [the session s
 
 ### What a match shows
 
-- A session matched in its conversation shows one snippet under its line, from the newest message that holds any typed word: up to two lines around the match, with "You:" or "Tutor:", "(waiting)" on a message still waiting, and "and 1 more in this conversation" when others match. The cut falls only between words outside maths, so a formula always shows whole and drawn as in the session; a word inside it is never highlighted. A diagram or graph shows as "(diagram)".
+- A session matched in its conversation shows one snippet under its line, from the newest message that holds any typed word: up to two lines around the match, with "You:" or "Tutor:", "(waiting)" on a message still waiting, and "and 1 more in this conversation" when others match. The cut falls only between words outside maths, so a formula always shows whole and drawn as in the session; a word inside it is never highlighted. A diagram or graph shows as "(diagram)". Matched words are bold, on a soft tint (see [`themes.md`](themes.md)) ([#779]).
 - A line found only by a topic or a file name shows "Topic: Range" or "File: MATH101 week 5.pdf" under the name. A line found by its name shows no such line.
-- Tapping a snippet opens the session at that message, highlighted. A session that opens at something needing an answer opens there instead, with no highlight: an open check, at the check; mid-teaching on a topic last worked on 7 or more days ago, at "continue" and "refresh first"; a session held by a harmful file, at its restated hold; and a due age question, at its card. A due age question comes before an open check, since the check pauses until the tap (see [`age.md`](age.md)). The tutor's restatement of where it was, and the after-mastery welcome back, don't count: those sessions open at the message.
+- Tapping a snippet opens the session at that message, highlighted: it keeps its own colours, ringed in Crux's orange (see [`themes.md`](themes.md)) ([#779]). A session that opens at something needing an answer opens there instead, with no highlight: an open check, at the check; mid-teaching on a topic last worked on 7 or more days ago, at "continue" and "refresh first"; a session held by a harmful file, at its restated hold; and a due age question, at its card. A due age question comes before an open check, since the check pauses until the tap (see [`age.md`](age.md)). The tutor's restatement of where it was, and the after-mastery welcome back, don't count: those sessions open at the message.
 - In a locked account nothing can be answered, so a snippet opens at its message, highlighted, with the lock bar as usual.
 
 ### When nothing shows
@@ -152,3 +152,4 @@ The session screen's modules (see [`learning-screen.md`](learning-screen.md#fron
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#779]: https://github.com/calmxz/Crux/issues/779

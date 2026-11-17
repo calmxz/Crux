@@ -37,7 +37,7 @@ These run on the owner's Android phone ([#678]). iPhone is untested: a known gap
 - The proof ([#769]):
   - oxlint's jsx-a11y rules;
   - axe (`@axe-core/playwright`) inside the browser paths (see [`ordinary-tests.md`](ordinary-tests.md));
-  - a contrast test over both themes' colours as drawn, the diagrams' and graphs' colours included (Mermaid's drawn colours, not only those Crux sets), against AA's ratios: 4.5:1 for text, and 3:1 for large text, interface parts and the parts of a picture needed to read it;
+  - a contrast test over both themes' colours as drawn, the diagrams' and graphs' colours included (Mermaid's drawn colours, not only those Crux sets), against AA's ratios: 4.5:1 for text, and 3:1 for large text, interface parts and the parts of a picture needed to read it. It runs on every pull request and blocks a merge; what it measures is in [`themes.md`](themes.md) ([#779]);
   - the owner's own keyboard and screen-reader pass before the trial.
 - How a picture reads as text is in [`learning-screen.md`](learning-screen.md) ([#769]).
 
@@ -161,3 +161,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#776]: https://github.com/calmxz/Crux/issues/776
+[#779]: https://github.com/calmxz/Crux/issues/779

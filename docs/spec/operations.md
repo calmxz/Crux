@@ -11,6 +11,7 @@ This file covers knowing when something is wrong and how the owner is told. Emai
 - Each release keeps private source maps, and a local command turns a minified browser trace into file and line ([#717]).
 - New kinds of error push to the Google Cloud app, at most 20 an hour per project, then quiet for 6 hours. The uptime check is separate ([#717]).
 - Errors carry no learner text: the type, the place in the code and the request number. Any message that could hold learner text is replaced, for example "[answer, 58 characters]" ([#717]).
+- Errors carry no theme choice, and nor does Sentry if it is added (see [`themes.md`](themes.md)) ([#779]).
 - **At opening:** if only browser errors were hard to fix in the trial, Sentry is added for the browser. If Error Reporting failed more broadly, Sentry replaces it for both, with Error Reporting's notifications off. Either way Sentry collects no network addresses: its browser setting off, "Prevent Storing of IP Addresses" on, and a rule removing the location it derives ([#717]). Addresses can still reach Sentry through request headers such as `X-Forwarded-For`, cookies and query parameters, so the SDK's deny lists cover all three, and the backend SDK's user info is off ([#762]). The Worker's country and address headers join those deny lists. If added, Sentry is bundled and sends through Crux's own address (see [`security.md`](security.md)) ([#769]).
 
 ## The outside check
@@ -100,3 +101,4 @@ The daily email's layout and the owner page are in [`owner-screens.md`](owner-sc
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#779]: https://github.com/calmxz/Crux/issues/779

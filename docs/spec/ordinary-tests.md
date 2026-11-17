@@ -140,7 +140,8 @@ These are the tests the closed tickets sent here, by area.
 - Component tests run in Vitest, with no coverage target ([#769]).
 - Component tests cover a reply arriving with its maths held back until complete, both kinds of broken reply, a guest's broken reply, and a wide equation breaking or scrolling ([#771]).
 - About five browser paths, in Chromium, block a merge: a guest's first reply, a trial link landing signed in, sign-in by code, a mastery check through to its Result, and the owner page turning another account away. The build ticket picks the exact paths ([#769]).
-- A sixth opens every route once, and each kind of opening and ended page once, and runs axe on each, leaving out Turnstile's own frame. It runs in both themes, and its stub reply holds a diagram, a graph and maths. It blocks a merge, like the five ([#769]).
+- A sixth opens every route once, and each kind of opening and ended page once, and runs axe on each, leaving out Turnstile's own frame. It runs in both themes, the guest Settings page included, and its stub reply holds one diagram of each of the three Mermaid types, a graph, maths, an equation too wide to fit and maths KaTeX cannot draw. It blocks a merge, like the five ([#769], [#779]).
+- The contrast test runs inside the sixth path, in both themes, bringing up every state its parts show in. It blocks a merge too (see [`themes.md`](themes.md)) ([#779]).
 - One browser path renders a reply with maths, a diagram and a graph under the real content security policy, with no policy errors. No browser path turns the policy off (see [`security.md`](security.md)) ([#769]).
 - The headers' browser path is in [`security.md`](security.md) ([#769]).
 
@@ -182,3 +183,4 @@ These are the tests the closed tickets sent here, by area.
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#779]: https://github.com/calmxz/Crux/issues/779

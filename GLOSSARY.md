@@ -70,7 +70,7 @@ The person who runs Crux, shares it, and decides whether a paid launch comes nex
 _Avoid_: admin
 
 **Owner page**:
-The owner's own app, at its own address, where the owner approves requests, judges misuse flags, reads feedback and counts, and changes limits and switches. Only the owner's main address can open it.
+The owner's own app, at its own path on the main app's site, where the owner approves requests, judges misuse flags, reads feedback and counts, and changes limits and switches. Only the owner's main address can open it.
 _Avoid_: admin panel, dashboard
 
 **Budget**:
@@ -124,6 +124,15 @@ The page that lists every one of the learner's sessions and holds the session se
 **Session search**:
 The learner's search on the all-sessions page, over their own sessions' names, topics, file names and conversations, with no AI. Not the lookup, which is the tutor's search.
 _Avoid_: page search, all-sessions search
+
+**Theme**:
+The set of colours every screen is drawn in, light or dark.
+
+**Theme choice**:
+"Match my device", "Light" or "Dark", set on the Settings page. "Match my device" follows the phone's or computer's own light or dark setting. The browser keeps it; a guest's tab holds it.
+
+**Anchor colours**:
+The few colours the spec pins for each theme. Every other colour follows the theme rules and the contrast test.
 
 **Topic**:
 The specific thing a learner aims to master. It is small enough to split into learning objectives (usually 3 to 5) and to finish in one or two study blocks. The learner can show they know it in writing.
