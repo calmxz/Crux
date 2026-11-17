@@ -68,7 +68,7 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 
 ### The services' own emails
 
-Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Zoho or Workspace go to the owner's own email, the one on the owner's phone. Google Cloud's Essential Contacts for Security, Billing, Suspension and Technical point there on the Crux projects ([#717]).
+Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Workspace go to the owner's own email, the one on the owner's phone. Google Cloud's Essential Contacts for Security, Billing, Suspension and Technical point there on the Crux projects ([#717]).
 
 ## Reading Google's bill
 

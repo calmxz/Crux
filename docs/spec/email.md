@@ -74,13 +74,12 @@ What a copy holds, and when one is made, is in [Copies and requests](#copies-and
 
 The address is privacy@ the domain (see [`terms-and-policy.md`](terms-and-policy.md)) ([#717]).
 
-- **In the trial:** Cloudflare Email Routing forwards it to a dedicated Crux Gmail, and replies come from that Gmail. It has no processor agreement, which the owner accepted for the trial.
-- **From opening:** Zoho Mail's free plan if Zoho offers it to Crux (it is available only in some data centers) and Zoho's processor agreement covers it, otherwise Google Workspace Business Starter, about USD 84 a year ([#762]). Trial mail in the Gmail is moved or deleted at the switch.
+- **In the trial and from opening:** Cloudflare Email Routing forwards it to a dedicated Crux Gmail, and replies come from that Gmail. It has no processor agreement, an exception the owner accepted until the owner forms a one person corporation to run Crux ([#717]).
+- **Once that corporation is formed:** Google Workspace Business Starter, about USD 84 a year, in the corporation's name ([#717], [#762]). Mail in the Gmail is moved or deleted at the switch.
 - Crux's emails that ask for a reply carry privacy@ as their reply address: the warning, dismissal and closure emails, the contest decisions, the erasure warning and the closing email. Invites, copy links and sign-in codes carry none, so a reply can't bring a link into the inbox ([#755]).
 
 ## Gaps
 
-- **Zoho's free plan:** whether Zoho offers it to Crux, and whether its processor agreement covers it. Open on [#726] ([#717], [#762]).
 - **Resend's figures on every reply:** Resend's page says only that "the API returns headers that track your email sending quotas". Checked at the build's first real send, a refusal included. If they are missing, how Crux counts comes back as a recorded change ([#763]).
 - **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; stale dates in a retried email; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
 
@@ -93,7 +92,6 @@ The copy's email with its link is in [`account-screens.md`](account-screens.md) 
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
-[#726]: https://github.com/calmxz/Crux/issues/726
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#753]: https://github.com/calmxz/Crux/issues/753
