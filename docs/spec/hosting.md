@@ -33,7 +33,7 @@ All of this comes from [#716].
 - The owner's USD 10 monthly Developer Program credit may pay what is left after it, though Gemini likely uses that credit first ([#716]).
 - **Spend caps:** USD 6 a month on live, USD 2 on staging. Google's cap counts "gross" use, read as before the free credit and any credits. The first month's billing report settles that reading ([#716], [#726]).
 - Cloud Storage takes no spend cap. Its cost is bounded by the 20 GB store total in [`files.md`](files.md), about USD 0.40 a month at full, though accepted files may pass it ([#716], [#732]).
-- Other hosting costs outside the AI budget are the domain (below), a minimum instance if the fallback is needed (below), alerting (see [`operations.md`](operations.md)), and Workspace if Zoho's agreement fails ([#675], [#716], [#717]).
+- Other hosting costs outside the AI budget are the domain (below), a minimum instance if the fallback is needed (below), alerting (see [`operations.md`](operations.md)), and Workspace once the owner forms a one person corporation (see [`email.md`](email.md)) ([#675], [#716], [#717]).
 
 ### When the Cloud Run cap is reached
 

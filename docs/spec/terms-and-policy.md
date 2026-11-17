@@ -83,7 +83,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 | Cloudflare | Static files, the Worker, DNS, the registrar, Email Routing, Turnstile | Its self-serve agreement. It sees network addresses at its edge, and its Security Analytics keeps sampled request details, with addresses and paths, for 31 days, which the owner reads only to find a network to block. The hand blocks sit in its settings ([#770]). Turnstile reads the network address, browser details and connection fingerprint, and Cloudflare uses those signals partly for its own purposes, outside the agreement ([#716], [#717]) |
 | Supabase | The database | Part of its Terms on every plan, with Supabase Pte. Ltd (Singapore). Data stored in Singapore ([#717]) |
 | Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log 30 days and in its backups up to 7 days after ([#717], [#762]) |
-| The Crux Gmail, in the trial | The Crux email | No agreement, an exception the owner accepted. Zoho or Workspace from opening ([#717]) |
+| The Crux Gmail | The Crux email | No agreement, an exception the owner accepted until a one person corporation runs Crux. Workspace from then ([#717]) |
 
 ## Gaps
 

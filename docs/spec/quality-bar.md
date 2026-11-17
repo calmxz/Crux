@@ -132,7 +132,6 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 | The advisory letter sent, at least a month before opening ([#677]) | owner |
 | The Terms and Privacy Policy published, with the officer's contact ([#677]) | owner |
 | The reworded consent tick, naming learning progress and the decline record, and the EU/UK check in sign-up ([#677], [#776]) | check |
-| The Crux email's switch: Zoho if its agreement covers the free plan, otherwise Workspace, with trial mail moved or deleted ([#717]) | owner |
 | The Sentry judgement, with its address settings if added ([#717]) | owner |
 | Google's sign-in screen moved to production, with the Privacy Policy on the domain ([#717]) | owner |
 | The crisis line's number and link verified again, and the directory's terms read ([#735]) | owner |
