@@ -12,12 +12,13 @@ var QS = {
   bar:   { name: 'Check bar', opts: { A: 'Inverted', B: 'Blue bar', C: 'Raised strip' } },
   pic:   { name: 'Pictures', opts: { A: 'Crux colours', B: 'Mermaid dark', C: 'Light card' } },
   out:   { name: 'Outside parts', opts: { A: 'Follow theme', B: 'Always light' } },
+  files: { name: 'Your files', opts: { A: 'As they are', B: 'Dimmed', C: 'Pages inverted' } },
   light: { name: 'Light fixes', opts: { draft: 'As drawn', A: 'All lines', B: 'Controls only' } },
   get:   { name: 'Getting it', opts: { A: 'Device only', B: 'Switch only', C: 'Both' } },
   place: { name: 'Switch place', opts: { A: 'Settings', B: 'Sidebar foot', C: 'Both' } }
 };
 var DEF = { scene: 'learn', dev: 'desktop', device: 'light', choice: 'device', who: 'account',
-  pal: 'A', bar: 'A', pic: 'A', out: 'A', light: 'draft', get: 'C', place: 'A', dlg: '0', hit: '0' };
+  pal: 'A', bar: 'A', pic: 'A', out: 'A', files: 'A', light: 'draft', get: 'C', place: 'A', dlg: '0', hit: '0' };
 var S = {};
 
 function readState() {
@@ -49,7 +50,7 @@ function signedOutTheme() { // signed-out pages: no switch there, so the device 
 function applyTheme(theme) {
   var root = document.documentElement, k = themeTokens(theme, S.pal, S.light);
   Object.keys(k).forEach(function (n) { root.style.setProperty('--' + n, k[n]); });
-  root.dataset.theme = theme; root.dataset.bar = S.bar; root.dataset.picopt = S.pic;
+  root.dataset.theme = theme; root.dataset.bar = S.bar; root.dataset.picopt = S.pic; root.dataset.files = S.files;
   root.dataset.gdark = (S.out === 'A' && theme === 'dark') ? '1' : '0';
   root.dataset.tdark = root.dataset.gdark;
   root.style.colorScheme = theme;

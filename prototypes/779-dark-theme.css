@@ -155,3 +155,12 @@ table.t td { border-bottom:1px solid var(--line2); padding:7px 8px; }
 .device.phone .page[style*="grid"] { grid-template-columns:1fr !important; }
 [data-picopt="C"] .pic .cap, [data-picopt="C"] .pic .drawn { color:#5f6673; }
 [data-picopt="C"] .pic .drawn .ok { color:#1a7f45; }
+/* the learner's own files and photos: Crux does not choose their colours */
+.ufile { width:230px; border-radius:6px; padding:10px; font-size:12px; border:1px solid var(--line); position:relative; }
+.upage { background:#ffffff; color:#202124; } .upage p { margin:4px 0; }
+.uphoto { background:linear-gradient(135deg,#efe6d2,#d8c9a9); color:#3c3c3c; height:150px; display:flex; flex-direction:column; justify-content:space-between; }
+.uphoto .pencil { font-family:"Segoe Print", "Comic Sans MS", cursive; font-size:15px; margin-top:30px; color:#5a5a5a; }
+.chart { display:flex; gap:6px; align-items:flex-end; height:50px; margin:6px 0; } .chart i { width:24px; display:block; }
+.pn { display:block; font-size:10.5px; color:#5f6368; margin-top:4px; }
+[data-theme="dark"][data-files="B"] .ufile { filter:brightness(.8); }
+[data-theme="dark"][data-files="C"] .upage { filter:invert(1) hue-rotate(180deg); }

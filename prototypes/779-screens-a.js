@@ -116,7 +116,8 @@ function scene_pics() {
     '<p>Inline maths <span data-tex="e^{i\\pi} + 1 = 0"></span>, a wide one in its sideways box:</p><div class="mathbox" tabindex="0" role="region" aria-label="Equation, scrolls sideways"><span data-display data-tex="\\int_0^1 \\left(3x^2 + 2x + 1\\right)\\,dx = \\left[x^3 + x^2 + x\\right]_0^1 = 3 \\qquad \\sum_{n=1}^{\\infty} \\frac{1}{n^2} = \\frac{\\pi^2}{6}"></span></div>' +
     '<p>Maths KaTeX cannot draw: <code class="raw">\\frac{1}{\\notamacro{2}}</code></p></div>' +
     '<div class="msg tutor"><div class="who">Things Crux does not colour</div><div class="row">' +
-    '<div class="outside" style="background:#ffffff;color:#1d2330;width:150px">A page of the learner\'s PDF<br><span style="font-size:11px">Pages show as the file has them.</span></div>' +
-    '<div class="outside" style="background:#d9c9a8;color:#1d2330;width:150px">A photo answer<br><span style="font-size:11px">Photos show as taken.</span></div></div></div>' +
+    '<div class="ufile upage"><b>Lecture 4: The chain rule</b><p>If y = f(u) and u = g(x), then dy/dx = dy/du &middot; du/dx.</p>' +
+    '<div class="chart"><i style="height:60%;background:#d93025"></i><i style="height:85%;background:#1e8e3e"></i><i style="height:40%;background:#1a73e8"></i></div><span class="pn">Page 3 of 12, from chain-rule-notes.pdf</span></div>' +
+    '<div class="ufile uphoto"><span class="pencil">dy/dx = 2x &middot; cos(x&sup2;)</span><span class="pn">A photo answer, as taken</span></div></div></div>' +
     '</div></div>';
 }
