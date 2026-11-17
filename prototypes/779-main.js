@@ -14,11 +14,12 @@ var QS = {
   out:   { name: 'Outside parts', opts: { A: 'Follow theme', B: 'Always light' } },
   files: { name: 'Your files', opts: { A: 'As they are', B: 'Dimmed', C: 'Pages inverted' } },
   light: { name: 'Light fixes', opts: { draft: 'As drawn', A: 'All lines', B: 'Controls only' } },
+  gst:   { name: 'Guest', opts: { A: 'Device only', B: 'Tab switch', C: 'Browser switch' } },
   get:   { name: 'Getting it', opts: { A: 'Device only', B: 'Switch only', C: 'Both' } },
   place: { name: 'Switch place', opts: { A: 'Settings', B: 'Sidebar foot', C: 'Both' } }
 };
 var DEF = { scene: 'learn', dev: 'desktop', device: 'light', choice: 'device', who: 'account',
-  pal: 'A', bar: 'A', pic: 'A', out: 'A', files: 'A', light: 'draft', get: 'C', place: 'A', dlg: '0', hit: '0' };
+  pal: 'A', bar: 'A', pic: 'A', out: 'A', files: 'A', gst: 'A', light: 'draft', get: 'C', place: 'A', dlg: '0', hit: '0' };
 var S = {};
 
 function readState() {
@@ -88,7 +89,8 @@ function render() {
   readState();
   var scene = window['scene_' + S.scene] ? S.scene : 'learn';
   var signedOut = scene === 'signin' || scene === 'landing';
-  var eff = signedOut ? { theme: signedOutTheme(), signedOut: true } : effective();
+  var guestDevice = scene === 'guest' && S.who !== 'trial' && S.gst === 'A';
+  var eff = signedOut ? { theme: signedOutTheme(), signedOut: true } : guestDevice ? { theme: S.device, why: 'a guest follows the device (guest option A)' } : effective();
   var k = applyTheme(eff.theme);
   renderBar(); renderNote(eff);
   var dev = document.getElementById('device');
