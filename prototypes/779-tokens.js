@@ -100,3 +100,7 @@ function lum(hex) {
 function ratio(a, b) { var x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); }
 
 if (typeof module !== 'undefined') module.exports = { TOKENS: TOKENS, PAIRS: PAIRS, themeTokens: themeTokens, ratio: ratio };
+
+// Q "search match", option B: a highlight strong enough for 3:1 against the card, with no bold.
+TOKENS.lightDraft.hlStrong = '#b8860b'; TOKENS.lightDraft.onHlStrong = '#1d2330';
+['darkA', 'darkB', 'darkC'].forEach(function (p) { TOKENS[p].hlStrong = '#c9a227'; TOKENS[p].onHlStrong = '#16181c'; });

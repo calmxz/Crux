@@ -70,7 +70,7 @@ input.txt::placeholder { color:var(--mute); }
 .msg.tutor { background:var(--surface); border:1px solid var(--line); align-self:flex-start; border-bottom-left-radius:4px; }
 .msg.me { background:var(--accentFill); color:var(--onAccent); align-self:flex-end; border-bottom-right-radius:4px; }
 .msg.me .wait { display:block; font-size:12px; margin-top:4px; }
-.msg.hit { background:var(--hlMsg); outline:2px solid var(--prog); }
+.msg.hit { outline:2px solid var(--prog); outline-offset:3px; }
 .who { font-size:11px; color:var(--mute); margin-bottom:2px; text-transform:uppercase; letter-spacing:.5px; }
 .sysline { align-self:center; max-width:92%; text-align:center; font-size:13px; padding:6px 12px; border-radius:10px; background:var(--sys); color:var(--sysInk); }
 .sysline.warn { background:var(--warn); color:var(--warnInk); } .sysline.stop { background:var(--stop); color:var(--stopInk); }
@@ -164,3 +164,6 @@ table.t td { border-bottom:1px solid var(--line2); padding:7px 8px; }
 .pn { display:block; font-size:10.5px; color:#5f6368; margin-top:4px; }
 [data-theme="dark"][data-files="B"] .ufile { filter:brightness(.8); }
 [data-theme="dark"][data-files="C"] .upage { filter:invert(1) hue-rotate(180deg); }
+[data-mark="B"] mark { font-weight:400; background:var(--hlStrong); color:var(--onHlStrong); }
+[data-mark="B"] .msg.hit { outline:none; background:var(--hlStrong); color:var(--onHlStrong); }
+[data-mark="B"] .msg.hit .small { color:var(--onHlStrong); }
