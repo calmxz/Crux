@@ -34,7 +34,7 @@ function sidebar(cur, opt) {
   });
   if (!opt.guest) h += '<div class="allline"><a data-go=\'{"scene":"shell"}\'>All sessions (24)</a></div>';
   h += '</div><div class="foot">';
-  if (opt.guest) h += '<span class="small mute">7 of 10 replies used (draft)</span>' + (S.gst === 'A' ? '' : '<div><span class="small mute">Theme (draft)' + (S.gst === 'B' ? ', this tab only' : '') + '</span><span class="tagnew">new</span><div style="margin-top:4px">' + themeControl(true) + '</div></div>');
+  if (opt.guest) h += '<span class="small mute">7 of 10 replies used (draft)</span>' + (S.gst === 'A' ? '' : 'DE'.indexOf(S.gst) >= 0 ? '<a data-go=\'{"scene":"settings","who":"guest"}\'>&#9881; Settings</a><span class="tagnew">new</span>' : '<div><span class="small mute">Theme (draft)' + (S.gst === 'B' ? ', this tab only' : '') + '</span><span class="tagnew">new</span><div style="margin-top:4px">' + themeControl(true) + '</div></div>');
   else h += '<a data-go=\'{"scene":"record"}\'>What you\'ve mastered</a><a>Feedback</a>';
   if (!opt.guest) h += sideFootTheme() + '<a data-go=\'{"scene":"settings"}\'>&#9881; Settings</a><span class="em">' + (opt.trial ? 'Trial link' : 'maria.santos@example.com') + '</span>';
   if (opt.owner) h += '<a data-go=\'{"scene":"owner"}\'>Owner</a>';

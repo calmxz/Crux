@@ -22,6 +22,11 @@ function scene_record() {
 }
 
 function scene_settings() {
+  if (S.who === 'guest') return sidebar(-1, { guest: true }) + '<div class="main">' + topbar('Settings') + '<div class="page" style="max-width:720px"><h1>Settings</h1>' +
+    ('DE'.indexOf(S.gst) < 0 ? '<p class="mute">Guest options A to C have no Settings page. Pick D or E.</p>' :
+    '<div class="part new"><h2>Appearance <span class="tagnew">new, draft</span></h2><div class="row" style="margin-top:0"><span>Theme</span>' + themeControl(false) + '</div>' +
+    '<p class="small mute" style="margin:8px 0 0">"Match my device" follows your phone or computer\'s own setting.' + (S.gst === 'D' ? ' Your choice lasts until you close this tab.' : '') + ' (draft)</p></div>' +
+    '<p class="small mute">A guest has no tutoring bars, files, feedback or account, so Appearance is the only part.</p>') + '</div></div>';
   var trial = S.who === 'trial';
   var appearance = (S.get !== 'A' && S.place !== 'B') ? '<div class="part new"><h2>Appearance <span class="tagnew">new, draft</span></h2>' +
     '<div class="row" style="margin-top:0"><span>Theme</span>' + themeControl(false) + '</div>' +

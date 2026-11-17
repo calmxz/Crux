@@ -14,7 +14,7 @@ var QS = {
   out:   { name: 'Outside parts', opts: { A: 'Follow theme', B: 'Always light' } },
   files: { name: 'Your files', opts: { A: 'As they are', B: 'Dimmed', C: 'Pages inverted' } },
   light: { name: 'Light fixes', opts: { draft: 'As drawn', A: 'All lines', B: 'Controls only' } },
-  gst:   { name: 'Guest', opts: { A: 'Device only', B: 'Tab switch', C: 'Browser switch' } },
+  gst:   { name: 'Guest', opts: { A: 'Device only', B: 'Tab switch', C: 'Browser switch', D: 'Settings page, tab', E: 'Settings page, browser' } },
   get:   { name: 'Getting it', opts: { A: 'Device only', B: 'Switch only', C: 'Both' } },
   place: { name: 'Switch place', opts: { A: 'Settings', B: 'Sidebar foot', C: 'Both' } }
 };
