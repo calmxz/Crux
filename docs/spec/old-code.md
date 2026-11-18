@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file is the comparison against the old code, not product rules. It covers the verdicts, each module's fate, what is copied with its tests, and what is left behind, for the backend and the frontend, and when the old code leaves the main branch. No product file links to it: every build ticket names it beside its area files (see [`spec-process.md`](spec-process.md)) ([#750], [#769]). The facts behind it are on [#749] and [#768].
+This file is the comparison against the old code, not product rules. It covers the verdicts, each module's fate, what is copied with its tests, and what is left behind, for the backend and the frontend, where the new code lives, and when the old code leaves the main branch. No product file links to it: every build ticket names it beside its area files (see [`spec-process.md`](spec-process.md)) ([#750], [#769]). The facts behind it are on [#749] and [#768].
 
 ## Terms
 
