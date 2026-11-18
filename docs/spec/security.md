@@ -55,11 +55,12 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 ### Staging and releases
 
 - **Staging's gate:** staging's copy of the no-session rule also refuses every request to the staging host, pages included, unless it carries a long random secret. The open-path check sends it in a header. The owner's browser holds it in a cookie, set once from one staging page left open for pasting it (draft). So no one else spends the shared 100,000 or the test budget through staging ([#770]).
-- The secret is a GitHub secret, filled into the rule when the rule is applied, so it sits in Cloudflare's rule text, never in the repo ([#770]).
-- The burst guard, both copies of the no-session rule and the hand-block rule live in the repo. The open paths come from the API contract's public routes ([#770]).
+- The secret is a GitHub secret, filled into the rule when the rule is applied, so it sits in Cloudflare's rule text, never in the repo ([#770]). The committed rule text holds a placeholder in its place ([#781]).
+- The burst guard, both copies of the no-session rule and the hand-block rule live in the repo, in `cloudflare/` (see [`tools.md`](tools.md)). The open paths come from the API contract's public routes ([#770], [#781]).
+- A generator writes the open paths from the contract's public routes into a committed file in `cloudflare/`. CI fails when that file and `docs/api/openapi.yaml` disagree ([#781]).
 - A release changes staging's copy when it reaches staging, and live's at the live step. The burst guard and the hand-block rule serve both hosts, so they never change when a release reaches staging. A release never changes the hand-block list's entries ([#770]).
 - **The open-path check** calls every open path with no sign-in cookie, expecting Crux's own answer, and one member route with no sign-in cookie, expecting Cloudflare's 403. Its bodies fail validation on every open path, so it adds no wrong-link or wrong-code count and sends no email, AI call or push. It runs on staging before live, and on live after each release. Staging's browser paths run locally, so this check is what catches a rule mistake before live ([#770]).
-- No release or rollback leaves the serving code with an open path refused, or a member route open with no sign-in cookie. A dropped open path stops the release on staging. A rollback re-applies the previous rules with the previous code, in its one step (see [`backups-and-releases.md`](backups-and-releases.md)) ([#716], [#770]).
+- No release or rollback leaves the serving code with an open path refused, or a member route open with no sign-in cookie. A dropped open path stops the release on staging. A rollback sets live's copy of the no-session rule, the burst guard and the hand-block rule to the text committed with the code it restores, in its one step (see [`backups-and-releases.md`](backups-and-releases.md)) ([#716], [#770], [#781]).
 
 ### Limits and cost
 
@@ -116,7 +117,7 @@ These specifics are left to the build ticket. They were checked while deciding, 
 - The rule expressions, such as `starts_with(http.request.uri.path, "/api/")`. The cookie tests use `http.cookie` ("the entire cookie as a string", with no plan note); the per-cookie field needs Pro. The gate's test matches the secret's value.
 - The Worker's `run_worker_first` list is `/api/*`.
 - **Signed out or blocked:** after a Cloudflare 403 on a member route, the app calls one open path. An answer in Crux's error shape, or the burst guard's 429, means signed out, since custom rules run before rate limiting. A Cloudflare 403 means blocked. An ordinary test covers each outcome.
-- **Releases:** each rule is changed on its own through the API, since replacing the whole custom ruleset would remove the other rules. The order of widening and narrowing live's copy around the traffic switch, in a release and a rollback; what happens when one rule's change fails part-way; and how a failed check reaches the owner, such as the failed release job's email.
+- **Releases:** each rule is changed on its own through the API (see [`backups-and-releases.md`](backups-and-releases.md)). The order of widening and narrowing live's copy around the traffic switch, in a release and a rollback; what happens when one rule's change fails part-way; and how a failed check reaches the owner, such as the failed release job's email.
 - **The open-path check:** a browser user agent, since Browser Integrity Check challenges a missing or unusual one; and a check that the no-session rule, not a hand block or another rule, made a refusal before it counts as a miss.
 - **Hand-block upkeep:** a block's age from the list entry's own added time, measured to the scheduled 8:05 am, not from a comment the token could edit. How the owner is told of a failed lift, an old block, or a list that holds more entries than the owner added.
 - **The gate cookie:** `SameSite=Lax`, so Google's sign-in return to staging carries it.
@@ -131,3 +132,4 @@ These specifics are left to the build ticket. They were checked while deciding, 
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#781]: https://github.com/calmxz/Crux/issues/781

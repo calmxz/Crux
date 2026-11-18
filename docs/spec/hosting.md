@@ -117,7 +117,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 - Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
 - Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`email.md`](email.md)) ([#762]).
 - Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]). The deploy token can also edit the zone's firewall rules ([#770]).
-- Staging's gate secret is a GitHub secret, filled into Cloudflare's rule text when the rule is applied. The daily job's Cloudflare token is in Secret Manager, and can edit only Cloudflare's lists ([#770]).
+- Staging's gate secret is a GitHub secret, filled into Cloudflare's rule text when the rule is applied ([#770]). The release keeps it in no file or state of its own. Cloudflare's reply to each rule update carries the whole rule set, the secret included, so the release script never prints or saves the replies ([#781]). The daily job's Cloudflare token is in Secret Manager, and can edit only Cloudflare's lists ([#770]).
 - How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
 ## Gaps
@@ -148,3 +148,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#781]: https://github.com/calmxz/Crux/issues/781
