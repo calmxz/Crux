@@ -3,7 +3,7 @@
 Research for issue #727 (child of #661), in two parts:
 
 - **Part 1, the docs (items 1 to 9).** Read from Anthropic's own docs, terms and policies on **2026-11-02**, with no API call.
-- **Part 2, the measurements.** Run on **2026-11-18** through Anthropic's API with the owner's key, for USD 2.02 of the owner's credit.
+- **Part 2, the measurements.** Run on **2026-11-18** through Anthropic's API with the owner's key, for about USD 2 of the owner's credit.
 
 Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs like [S1] point to the list at the end. The files are listed under "The parts".
 
@@ -12,10 +12,10 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 ## Part 2 in brief
 
 - **Teaching:** Haiku 5.5 at `low` teaches as #684 asked and follows Crux's rules. Its tool reports are the weak point: imperfect in 6 of 6 sittings, against Sonnet 5.5's 3 of 3 clean. Graphs, diagrams and file mistakes work on both.
-- **The mastery check:** written-out working first tripped the `reasoning_extraction` safeguard, in 9 of 16 model-answer calls and 7 of 7 independent checks. A wording change fixed it, with 0 refusals in 162 later calls.
+- **The mastery check:** written-out working first tripped the `reasoning_extraction` safeguard, in 9 of 16 model-answer calls and 7 of 7 independent checks. A wording change fixed it, with 0 refusals in 92 later model-answer and independent-check calls.
 - **Check accuracy:** model answers were right in every repeat, and no wrong answer was marked right. Marking was too strict until the must-contain points were limited to what the problem asks.
-- **Cost:** a 15-reply sitting costs about USD 0.0063 on Haiku with a 1-hour cache, against the spec's 0.045 on Flash-Lite. A 6-problem check costs 0.07 to 0.12, about 5 to 10 days of a learner's tutoring limit, so checks need a limit of their own.
-- **The account:** an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today. A new organization would be.
+- **Cost:** a 15-reply sitting of teaching costs about USD 0.0063 on Haiku with a 1-hour cache. The spec's 0.045 on Flash-Lite also counts a check and a progress update. A 6-problem check costs 0.07 to 0.12, about 5 to 10 days of a learner's tutoring limit, so checks need a limit of their own.
+- **The account:** read by the owner as an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today. A new organization would be.
 
 ## Answer (Part 1, with Part 2's updates)
 
@@ -25,7 +25,7 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 | 2. Spend controls, rate limits | Prepaid credit, auto-reload off, plus a monthly spend limit on a workspace. Start-tier limits far exceed 25 learners. | Yes | #675: put back "prepaid credit with auto top-up off"; set the backstop as a workspace spend limit. |
 | 3. Availability, terms | Offered in the Philippines; adult tutoring is allowed, with an AI notice in the product. | Partly | #677: the region check must block every unsupported region, not only the EU and UK. Show the AI notice on screen. |
 | 4. Data | Inputs and outputs deleted within 30 days; no training; flagged chats kept 2 years. DPA applies. Storage US, inference global or US. | Partly | #677 and #717: new retention and abuse-monitoring lines. The DPA names no processing location. |
-| 5. Sign-in without a key | Yes: Cloud Run's Google identity signs in through workload identity federation. The owner's account is an organization (Part 2). | Yes | #716: the backend signs in to Anthropic through federation; Agent Platform and its role are dropped. |
+| 5. Sign-in without a key | Yes: Cloud Run's Google identity signs in through workload identity federation. The owner read the account as an organization (Part 2). | Yes, if the account is an organization | #716: the backend signs in to Anthropic through federation; Agent Platform and its role are dropped. |
 | 6. Daily bill comparison | Anthropic's cost API can replace Google's billing export. It needs an admin credential, kept apart from the app's. | Partly | #717: new source, data up to 24 hours late, and a full-admin credential on its own identity. |
 | 7. Safety refusals | Everyday biology and health lessons are not affected, the docs say. Part 2: no `bio` or `cyber` refusal on biology, chemistry or SQL-injection checks, but check prompts that asked for written-out working drew `reasoning_extraction` refusals, which are billed and get no fallback. | Partly | #679 and #678: a refusal rule for study blocks and checks; model answers framed as the learner's worked solution; the independent check returns no working. |
 | 8. History edits | All three count as edits as Crux's prompt is ordered today. Each breaks the cache. Part 2: the owner's organization is not enforced today, but a new one would get a 400. | No | #679, #667 and #719: freeze the prompt start; send changes in the newest turn; restart the conversation on file removal; a build test with the beta header. |
@@ -62,6 +62,7 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 - **The subprocessor list and its locations.** The Trust Center page needs a browser.
 - **Chemistry and security beyond ordinary lessons.** Part 2 tested propane combustion and SQL-injection defence only.
 - **How to continue a conversation after a refused turn** with empty content. No tutor turn was refused in Part 2.
+- **The credit's program terms,** accepted when an organization is linked for the plan's credit [S5]. Whether they limit a service that other people use was not read.
 - **The effective date of the regions and usage policies.** Both pages showed a version effective 2026-11-12, after the 2026-11-02 reading.
 - **Teaching beyond algebra,** and a bare right answer to a fresh problem, which no Part 2 sitting reached.
 

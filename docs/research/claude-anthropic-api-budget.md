@@ -4,9 +4,9 @@ Part 2 of #727, measured on **2026-11-18**. Index: `claude-anthropic-api.md`. Pr
 
 ## Answer
 
-- **Teaching costs about a seventh of the spec's Flash-Lite figure.** A 15-reply sitting on Haiku 5.5 at `low` costs about 0.006 with a 1-hour cache, against the spec's 0.045 sitting's worth.
+- **Teaching costs far less than the spec's Flash-Lite figure.** A 15-reply sitting on Haiku 5.5 at `low` costs about 0.006 with a 1-hour cache. The spec's sitting's worth is 0.045, but that figure also counts a check and a progress update, costed by arithmetic, so the two are not like for like.
 - **Mastery checks are now most of the AI spend.** A 6-problem check costs 0.07 to 0.12, about 5 to 10 days of a learner's tutoring limit. So #675's conflict is confirmed: checks need a limit of their own.
-- **The owner's account** is an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today.
+- **The owner's account** reads as an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today.
 
 ## A sitting's cost
 
@@ -37,10 +37,11 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 | Sittings in the USD 2 day | about 44 | about 317 | about 103 |
 | A learner's daily limit (2 sittings' worth) | 0.090 | 0.0126 | 0.039 |
 | A learner's month at most (17 sittings' worth) | 0.77 | 0.107 | 0.33 |
-| 25 learners at full use, teaching only | 19.1 | 2.68 | 8.29 |
+| 25 learners at full use (17 sittings' worth each) | 19.1 | 2.68 | 8.29 |
 
 - **The arithmetic, for Haiku with the 1-hour cache:** 8 / 0.0063 = 1,270. 2 / 0.0063 = 317. 17 x 0.0063 = 0.107, and 25 x 0.107 = 2.68.
 - **And for Flash-Lite:** 8 / 0.045 = 178. 17 x 0.045 = 0.77, and 25 x 0.77 = 19.1.
+- **Not like for like.** The Flash-Lite column is the spec's sitting: 15 turns plus the check and a progress update, costed by arithmetic (#688). The Haiku columns are measured teaching only, with checks costed below. A Flash-Lite sitting of teaching alone would cost less than 0.045.
 
 ### Mastery checks against the limit
 
@@ -58,9 +59,11 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 
 ### The credit
 
-- **The owner's credit is USD 100 a month.** Its terms match the Max plan's API credit: it "arrives each billing cycle", expires at the cycle's end, and "Included credits are spent first" [S5].
+- **The owner's credit is USD 100 a month.** That it is the Max plan's API credit is an inference from the amount and "monthly": Max's credit is "$100 USD" a month [S5]. Such credits arrive "each billing cycle", expire at the cycle's end, and "Included credits are spent first" [S5].
+- **Use for Crux:** the page says "you can use them to build and run your own applications and agents" [S5]. Linking also accepts program terms that the page does not show. They were not read.
+- **When it runs out:** "If the organization has no credits left, API requests stop until your next monthly API credits arrive" [S5], unless bought credit remains.
 - So the USD 8 learners' budget, the owner's USD 3 and about USD 5 of tests fit inside it many times over. The credit lasts only while the owner's plan does.
-- **The run itself cost USD 2.02:** the smoke and history-edit tests, the sittings, the hard cases, the probe, both whole checks and the grading batch (0.37).
+- **The run itself cost about USD 2:** 2.02 logged, across the smoke and history-edit tests, the sittings, the hard cases, the probe, both whole checks and the grading batch (0.37). A first teaching run crashed after about 12 calls that were not logged, a few cents at most.
 
 ## The owner's account
 
@@ -70,7 +73,7 @@ Checked by the owner in the Console and claude.ai on **2026-11-18**:
 |---|---|---|
 | Account type | An organization, as the owner read the Console. Not yet confirmed on the Admin keys page | Items 5 and 6 can proceed: the Admin API and federation need an organization [S18][S20] |
 | When the organization was linked | 2026-10-17, as claude.ai shows it | Not the creation date. The test below settles item 8 directly. |
-| The credit | USD 100 a month | See above |
+| The credit | USD 100 a month, taken to be the Max plan's credit | See above |
 
 ## History edits on this account
 

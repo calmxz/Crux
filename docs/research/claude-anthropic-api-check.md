@@ -5,7 +5,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
 ## Answer
 
 - **The first prompts were refused.** Asking for written-out working tripped Anthropic's `reasoning_extraction` safeguard: 9 of 16 model-answer calls and 7 of 7 independent-working calls.
-- **A wording change fixed it,** with no loss of what the learner sees. After it, there were 0 refusals in 162 Sonnet and Opus check calls.
+- **A wording change fixed it,** with no loss of what the learner sees. After it, there were 0 refusals in 92 model-answer and independent-check calls, and in 70 marking, end-step and re-mark calls.
 - **Model answers were right:** 7 of 7 problems in every repeat, and Opus 5.5 agreed with all of Sonnet 5.5's model answers.
 - **Marking was safe, but too strict at first.** No wrong answer was ever marked right. With the first wording, Sonnet failed 4 or 5 of 7 right answers, because its model answers listed points the problem never asked for. One wording change brought it to 14 of 16 matching the key.
 - **A check costs about USD 0.012 to 0.020 a problem,** so about 0.07 to 0.12 for 6 problems. The budget is in `claude-anthropic-api-budget.md`.
@@ -25,6 +25,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
   6. Chemistry, balancing propane's combustion: a slip (3H2O on the last line).
   7. Computer security, SQL injection: right, and "hide the error messages" (wrong).
 - **Routing.** Case 1 is an expression the maths library reads. Cases 2 to 7 are equations, intervals or worded answers, so they go to the independent working, as `ai-layer.md` says.
+- **The key** was written before the run and shown to the owner, who did not review it.
 - **Repeats.** The first prompts ran twice. The fixed prompts ran twice as they were, then once with the must-contain change below.
 - **Whole checks.** A 6-problem maths check (linear equations, 2 problems per objective) and a 4-problem biology check (gas exchange). Both used one append-only writer conversation, and a Haiku 5.5 learner answered.
 
@@ -46,7 +47,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
 - **Model answer.** A schema field `worked_solution`, described as "The worked solution the learner reads on their result card after the check: the steps a strong answer shows". The "Give the full working" sentence came out of the instruction.
 - **Also passed:** a short `explanation` field, and no working field at all, in 7 of 7 each.
 - **Independent check.** The schema returns only `own_final_answer`, `agrees` and `disagreement` (one or two sentences). The instruction may still say "work the problem yourself" first, and the working stays in the model's thinking.
-- **The probe:** 33 calls across these 5 shapes, with no refusals. Then the hard cases and both whole checks ran on the `worked_solution` shape: 129 more Sonnet and Opus calls, with no refusals, so 162 in all.
+- **The probe:** 33 calls across these 5 shapes, with no refusals. Then the hard cases and both whole checks ran on the `worked_solution` shape: 59 more model-answer and independent-check calls, so 92 in all, with no refusals.
 
 ### Safety categories
 
@@ -77,7 +78,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
   - "Cause: query built by string concatenation" on case 7.
   The marker treated each point as required.
 - **The change** added one sentence to the writer: "The must-contain points are the minimum a right answer needs for the problem as written: only what the problem and its objective ask for, never an extra check, example or format it does not ask for." It added one to the marker: "A must-contain point is covered when the reply shows the idea in any words".
-- **Its two remaining misses** were answers my key marked leniently:
+- **Its two remaining misses** were answers the key marked leniently:
   - case 3's "x < -2" when the problem asked for an interval;
   - case 8's guess-and-check when the problem said "Show your working".
   Opus's re-marks, told that the final values match, also marked both wrong. Both readings are defensible, and Crux's dispute covers them.
@@ -98,7 +99,7 @@ Measured, with no caching except the writer's own conversation:
 | Re-mark | Opus 5.5 `medium` | 0.0077 (hard cases) | |
 
 - **Per problem:** 0.0049 + 0.0037 + 0.0031 = 0.0117 (0.0116 before rounding), and 0.0082 + 0.0085 + 0.0038 = 0.0205.
-- **Whole checks:** the 6-problem maths check cost 0.075, and the 4-problem biology check 0.082, simulated learner included (about 0.001).
+- **Whole checks:** the 6-problem maths check cost 0.070, and the 4-problem biology check 0.082, simulated learner included (about 0.001).
 - **Per check, by length:** 2 problems: 0.023 to 0.041. 6 problems: 0.070 to 0.123. 10 problems: 0.116 to 0.205.
 - **Not counted:** the maths library, which costs no AI, and any check-start instructions longer than these test prompts.
 
