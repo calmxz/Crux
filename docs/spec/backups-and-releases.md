@@ -67,7 +67,8 @@ The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 
 ## Releases
 
-- A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step, and re-applies the previous Cloudflare rules too ([#716], [#770]).
+- A release goes to staging first, then to live as a no-traffic revision with a private address, then takes all traffic in one step. Rollback is one step. It sets live's copy of the no-session rule, the burst guard and the hand-block rule to the text committed with the code it restores. Staging's copy stays with staging's code ([#716], [#770], [#781]).
+- The release applies the Cloudflare rules with a script on Cloudflare's Rulesets API, updating each rule by its own ID from the committed files in `cloudflare/`: staging's copy at the staging step, the rest at the live step (see [`security.md`](security.md)). Each rule's ID is a fixed reference set in its committed file (Cloudflare's `ref`), so any commit's files find their rules. The first apply creates each rule ([#781]).
 - The open-path check runs on staging before live, and on live after each release (see [`security.md`](security.md)) ([#770]).
 - Migrations are backward-compatible: add first, remove in a later release. A one-step rollback still works ([#716]).
 - A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` ([#716], [#750]).
@@ -90,3 +91,4 @@ The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#776]: https://github.com/calmxz/Crux/issues/776
+[#781]: https://github.com/calmxz/Crux/issues/781

@@ -23,7 +23,7 @@ These are process terms, so they stay out of the glossary.
 - Each file has one subject and stays under the repo's file-size check of 5,000 tokens.
 - The spec states the current rule only. Each section links its source tickets, which keep the reasons.
 - The glossary stays at the repo root and holds no rules. The spec uses its terms.
-- The spec lives in this repo, in `docs/spec/`. If the map decides the new code lives in a new repo, the spec moves with it.
+- The spec lives in this repo, in `docs/spec/`, beside the new code ([#781](https://github.com/calmxz/Crux/issues/781)).
 
 ## Linked rules
 

@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers the tools the backend and the frontend are built with, and how each side's API code comes from the contract. Where the code runs is in [`hosting.md`](hosting.md). The checks that guard the repo are in [`quality-bar.md`](quality-bar.md), and the tests in [`ordinary-tests.md`](ordinary-tests.md).
+This file covers the repo's folders, the tools the backend and the frontend are built with, and how each side's API code comes from the contract. Where the code runs is in [`hosting.md`](hosting.md). The checks that guard the repo are in [`quality-bar.md`](quality-bar.md), and the tests in [`ordinary-tests.md`](ordinary-tests.md).
 
 ## Terms
 
@@ -10,6 +10,22 @@ These are build terms, so they stay out of the glossary.
 
 - **Gap rule:** one of the four ESLint rules oxlint lacks, which ESLint runs after oxlint ([#769]).
 - **Tools package:** a separate `package.json` and lockfile for a tool that needs an older TypeScript than the app ([#769]).
+
+## The repo's folders
+
+The new code lives in this repo, beside the spec. When the old code leaves the main branch is in [`old-code.md`](old-code.md) ([#781]).
+
+| Folder | Holds |
+|---|---|
+| `backend/` | The image behind both Cloud Run services (the API and the tasks service), the daily job, Alembic migrations, `gen_contracts.py`, the release, restore and repair scripts, the AI tests |
+| `frontend/` | The React app; the owner app at its own path on the same site; the Worker and the one Wrangler config that ships it with the site's files; the security headers; the legal page text; the browser paths; the tools package |
+| `cloudflare/` | The four rules (the burst guard, live's and staging's copies of the no-session rule, the hand-block rule) and what the release runs to apply them (see [`security.md`](security.md)) |
+| `supabase/` | The local stack's config |
+
+All of this comes from [#781].
+
+- The contract stays at `docs/api/openapi.yaml`. The converter is Gotenberg's own image and needs only deploy settings ([#781]).
+- Each build ticket decides the inside of its folder ([#781]).
 
 ## The backend's tools
 
@@ -56,3 +72,4 @@ If either of the first two checks fails ([#769]):
 
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#781]: https://github.com/calmxz/Crux/issues/781
