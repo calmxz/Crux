@@ -1,15 +1,23 @@
-# Can Crux's AI layer run on Claude through Anthropic's API? Part 1, the docs
+# Can Crux's AI layer run on Claude through Anthropic's API?
 
-Research for issue #727 (child of #661), Part 1 only (items 1 to 9). Read from Anthropic's own docs, terms and policies on **2026-11-02**. Prices are USD per 1M tokens (MTok). Source IDs like [S1] point to the list at the end. No API call was made and nothing was spent. Part 2 (measuring) is not in these files. Items 1 to 9 are in two parts, listed under "The parts".
+Research for issue #727 (child of #661), in two parts:
+
+- **Part 1, the docs (items 1 to 9).** Read from Anthropic's own docs, terms and policies on **2026-11-02**, with no API call.
+- **Part 2, the measurements.** Run on **2026-11-18** through Anthropic's API with the owner's key, for USD 2.02 of the owner's credit.
+
+Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs like [S1] point to the list at the end. The files are listed under "The parts".
 
 **Stop rule: did not fire.** The Philippines is a supported region [S1], and the terms allow a product that serves adult end users [S2][S3]. Nothing found rules Claude out.
 
-**Two unknowns gate items 5, 6 and 8.** Check both in the Console before Part 2:
+## Part 2 in brief
 
-- **Is the owner's Console account an organization?** "The Admin API is unavailable for individual accounts" [S20]. Workload identity federation needs service accounts and an admin role [S18]. If the account is individual, items 5 and 6 need a switch to an organization first.
-- **When was the account created?** Accounts created on or after 2026-08-31 get a 400 error on an edited history [S13]. Older accounts do not, unless they ask for it.
+- **Teaching:** Haiku 5.5 at `low` teaches as #684 asked and follows Crux's rules. Its tool reports are the weak point: imperfect in 6 of 6 sittings, against Sonnet 5.5's 3 of 3 clean. Graphs, diagrams and file mistakes work on both.
+- **The mastery check:** written-out working first tripped the `reasoning_extraction` safeguard, in 9 of 16 model-answer calls and 7 of 7 independent checks. A wording change fixed it, with 0 refusals in 162 later calls.
+- **Check accuracy:** model answers were right in every repeat, and no wrong answer was marked right. Marking was too strict until the must-contain points were limited to what the problem asks.
+- **Cost:** a 15-reply sitting costs about USD 0.0063 on Haiku with a 1-hour cache, against the spec's 0.045 on Flash-Lite. A 6-problem check costs 0.07 to 0.12, about 5 to 10 days of a learner's tutoring limit, so checks need a limit of their own.
+- **The account:** an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today. A new organization would be.
 
-## Answer
+## Answer (Part 1, with Part 2's updates)
 
 | Item | Answer in one line | Fits the spec as decided? | What would have to change |
 |---|---|---|---|
@@ -17,43 +25,47 @@ Research for issue #727 (child of #661), Part 1 only (items 1 to 9). Read from A
 | 2. Spend controls, rate limits | Prepaid credit, auto-reload off, plus a monthly spend limit on a workspace. Start-tier limits far exceed 25 learners. | Yes | #675: put back "prepaid credit with auto top-up off"; set the backstop as a workspace spend limit. |
 | 3. Availability, terms | Offered in the Philippines; adult tutoring is allowed, with an AI notice in the product. | Partly | #677: the region check must block every unsupported region, not only the EU and UK. Show the AI notice on screen. |
 | 4. Data | Inputs and outputs deleted within 30 days; no training; flagged chats kept 2 years. DPA applies. Storage US, inference global or US. | Partly | #677 and #717: new retention and abuse-monitoring lines. The DPA names no processing location. |
-| 5. Sign-in without a key | Yes: Cloud Run's Google identity signs in through workload identity federation. | Yes, if the account is an organization | #716: the backend signs in to Anthropic through federation; Agent Platform and its role are dropped. |
+| 5. Sign-in without a key | Yes: Cloud Run's Google identity signs in through workload identity federation. The owner's account is an organization (Part 2). | Yes | #716: the backend signs in to Anthropic through federation; Agent Platform and its role are dropped. |
 | 6. Daily bill comparison | Anthropic's cost API can replace Google's billing export. It needs an admin credential, kept apart from the app's. | Partly | #717: new source, data up to 24 hours late, and a full-admin credential on its own identity. |
-| 7. Safety refusals | Everyday biology and health lessons are not affected, the docs say. A refusal returns an empty reply that Crux must handle. | Partly | #679 and #678: a refusal rule for study blocks and checks; no "write out your reasoning" fields. |
-| 8. History edits | All three count as edits as Crux's prompt is ordered today. Each breaks the cache; on new accounts, sent-back thinking also gets a 400. | No | #679, #667 and #719: freeze the prompt start; send changes in the newest turn; restart the conversation on file removal. |
+| 7. Safety refusals | Everyday biology and health lessons are not affected, the docs say. Part 2: no `bio` or `cyber` refusal on biology, chemistry or SQL-injection checks, but check prompts that asked for written-out working drew `reasoning_extraction` refusals, which are billed and get no fallback. | Partly | #679 and #678: a refusal rule for study blocks and checks; model answers framed as the learner's worked solution; the independent check returns no working. |
+| 8. History edits | All three count as edits as Crux's prompt is ordered today. Each breaks the cache. Part 2: the owner's organization is not enforced today, but a new one would get a 400. | No | #679, #667 and #719: freeze the prompt start; send changes in the newest turn; restart the conversation on file removal; a build test with the beta header. |
 | 9. Prices and dates | Sonnet 5.5's cache read is USD 0.10, not 0.20. Batch is half price. About 30% more tokens than older Claude models. | Yes | #679 and #678: use the prices in item 9. |
 
 ## The parts
 
-- Items 1 to 6 (credit, spend limits and rate limits, availability and terms, data, sign-in, the bill comparison): `claude-anthropic-api-account.md`.
-- Items 7 to 9 (safety refusals, history edits, prices and dates): `claude-anthropic-api-model.md`.
+- Part 1, items 1 to 6 (credit, spend limits and rate limits, availability and terms, data, sign-in, the bill comparison): `claude-anthropic-api-account.md`.
+- Part 1, items 7 to 9 (safety refusals, history edits, prices and dates): `claude-anthropic-api-model.md`.
+- Part 2, teaching against #684, pictures, file mistakes and tool reports: `claude-anthropic-api-teaching.md`.
+- Part 2, the mastery check (refusals, accuracy, cost per call): `claude-anthropic-api-check.md`.
+- Part 2, costs, the re-costed budget, the owner's account and the history-edit test: `claude-anthropic-api-budget.md`.
 
-## Inputs for the grilling session that reopens #679
+## Inputs for the decision that reopens #679
 
-| Ticket | What this file changes |
+| Ticket | What these files change |
 |---|---|
-| #679 | Prices (item 9); refusal handling (item 7); no reasoning-trace fields; a frozen prompt start and append-only history (item 8) |
-| #675 | Prepaid credit with auto-reload off, plus a workspace spend limit, as the backstop (items 1, 2) |
+| #679 | Prices (item 9); refusal handling (item 7); no reasoning-trace fields; a frozen prompt start and append-only history (item 8). Part 2: Haiku 5.5 at `low` can teach, with its tool-report reliability as an AI test; model answers framed as the learner's worked solution, and an independent check that returns only an answer and a verdict; the 1-hour cache for the prompt start |
+| #675 | Prepaid credit with auto-reload off, plus a workspace spend limit, as the backstop (items 1, 2). Part 2: a sitting's worth of about USD 0.0063; a separate limit for mastery checks, which cost 0.07 to 0.12 for 6 problems |
+| #669 | Part 2: must-contain points are the minimum the problem asks for, and a point counts as covered in any words |
 | #677 | Retention, training and flagged-data lines; the DPA; US storage, global or US inference; a wider region block; an on-screen AI notice (items 3, 4) |
 | #716 | Federation from Cloud Run, `workspace:inference` scope; Agent Platform and its model-call role dropped (item 5) |
 | #717 | The bill source becomes Anthropic's cost API with its own admin identity; the abuse-monitoring line (items 4, 6) |
-| #678 | Batches at half price, 29-day result storage, no fallbacks; refusals counted as passes in safety tests (items 7, 9) |
+| #678 | Batches at half price, 29-day result storage, no fallbacks; refusals counted as passes in safety tests (items 7, 9). Part 2: grading on Opus 5.5 through the Batch API cost about USD 0.031 a transcript |
 | #667 | File removal restarts the conversation from a summary (item 8) |
 | #719 | Store each reply's `content` array and the sent `system` and `tools` exactly; added page ranges kept or cleared server-side (item 8) |
-| The map | AI spend from Anthropic's credit, then bought credits; the card only through bought credits (item 1) |
+| The map | AI spend from Anthropic's credit, then bought credits; the card only through bought credits (item 1). Part 2: the owner's credit is USD 100 a month, tied to the owner's plan |
 
 ## Not verified
 
-- **Account type and account age** (top of this file). Both are in the Console.
-- **The spend order of a non-Max promotional credit** against bought credits. The credit terms do not say [S4].
+- **Account type on the Admin keys page.** The owner read the Console as an organization; the Admin keys page would confirm it.
+- **The spend order of a non-Max promotional credit** against bought credits. The credit terms do not say [S4]. The owner's credit is the monthly kind, which is spent first [S5].
 - **Evaluation-tier rate limits.** Not published [S7].
 - **The subprocessor list and its locations.** The Trust Center page needs a browser.
-- **Which category covers chemistry,** and whether a worked solution for the learner triggers `reasoning_extraction`.
-- **How to continue a conversation after a refused turn** with empty content.
-- **Whether federation works on an individual Console account.** The pages state the admin role and service accounts, not the account type.
-- **The effective date of the regions and usage policies.** Both pages show a version effective 2026-11-12, after today.
+- **Chemistry and security beyond ordinary lessons.** Part 2 tested propane combustion and SQL-injection defence only.
+- **How to continue a conversation after a refused turn** with empty content. No tutor turn was refused in Part 2.
+- **The effective date of the regions and usage policies.** Both pages showed a version effective 2026-11-12, after the 2026-11-02 reading.
+- **Teaching beyond algebra,** and a bare right answer to a fresh problem, which no Part 2 sitting reached.
 
-## Sources (all read 2026-11-02)
+## Sources (Part 1 read 2026-11-02; [S24] reread 2026-11-18)
 
 - [S1] Anthropic Supported Regions Policy, https://www.anthropic.com/supported-countries (effective 2026-11-12): Philippines listed; "Use by persons while physically located in an unsupported region" barred.
 - [S2] Anthropic Commercial Terms of Service, https://www.anthropic.com/legal/commercial-terms (effective 2025-06-17): A.1 end users; B no training; C DPA incorporated.
