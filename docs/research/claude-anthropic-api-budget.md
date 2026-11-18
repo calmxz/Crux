@@ -15,12 +15,14 @@ Part 2 of #727, measured on **2026-11-18**. Index: `claude-anthropic-api.md`. Pr
 | | Haiku 5.5 `low` (6 sittings) | Sonnet 5.5 `low` (3 sittings) |
 |---|---|---|
 | Measured, 5-minute cache, replies seconds apart | 0.0057 (0.0046 to 0.0062) | 0.082 (0.079 to 0.088) |
+| No caching at all | 0.0224 | 0.457 |
 | 5-minute cache expired before every reply | 0.0195 | 0.351 |
 | 1-hour cache, every reply within the hour | 0.0063 | 0.091 |
 | Share of input tokens read from cache, measured | 96% | 97% |
 | Output tokens a sitting, thinking included | about 5,900 | about 4,700 |
 
 - **The scenarios come from the per-call usage by arithmetic:**
+  - "No caching" prices every cache read and cache write as plain input. Caching cuts a sitting about 3.9 times on Haiku (0.0224 / 0.0057) and about 5.6 times on Sonnet (0.457 / 0.082).
   - "Expired" turns the first call of each reply from a cache read into a 5-minute cache write, at 1.25 times input [S21].
   - "1 hour" prices every cache write at 2 times input [S21] and keeps every read.
 - **The budget figure is the 1-hour cache.** Real learners pause for more than 5 minutes, which the scripted sittings did not. The 1-hour cache costs about 10% more than the measured best case, while expiry every reply costs more than 3 times as much.
@@ -47,6 +49,7 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 
 - **A check's cost:** 0.012 to 0.020 a problem, so 2 problems cost 0.023 to 0.041, 6 cost 0.070 to 0.123, and 10 cost 0.116 to 0.205. Add 0.003 for each slip fix or walk-through.
 - **Against a day's limit:** a 6-problem check is 0.070 / 0.0126 = 5.6 to 0.123 / 0.0126 = 9.8 days of a learner's daily limit. At #727's question stage the estimate was 0.11; the measurement agrees.
+- **With Haiku 5.5 marking** (`claude-anthropic-api-check.md`), a 6-problem check is 0.053 to 0.101, so 0.053 / 0.0126 = 4.2 to 0.101 / 0.0126 = 8.0 days. The examples below use Sonnet marking.
 - **Example monthly costs for 25 learners**, as examples for #675 and not a recommendation. A month is 4.33 weeks.
 
 | Example check limit | Per learner a month | 25 learners a month |

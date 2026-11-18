@@ -13,7 +13,7 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 
 - **Teaching:** Haiku 5.5 at `low` teaches as #684 asked and follows Crux's rules. Its tool reports are the weak point: imperfect in 6 of 6 sittings, against Sonnet 5.5's 3 of 3 clean. Graphs, diagrams and file mistakes work on both.
 - **The mastery check:** written-out working first tripped the `reasoning_extraction` safeguard, in 9 of 16 model-answer calls and 7 of 7 independent checks. A wording change fixed it, with 0 refusals in 92 later model-answer and independent-check calls.
-- **Check accuracy:** model answers were right in every repeat, and no wrong answer was marked right. Marking was too strict until the must-contain points were limited to what the problem asks.
+- **Check accuracy:** model answers were right in every repeat, and no wrong answer was marked right. Marking was too strict until the must-contain points were limited to what the problem asks. A follow-up run found that Haiku 5.5 gave Sonnet's mark on all 16 hard-case answers in 2 repeats, for about a fifth less per check.
 - **Cost:** a 15-reply sitting of teaching costs about USD 0.0063 on Haiku with a 1-hour cache. The spec's 0.045 on Flash-Lite also counts a check and a progress update. A 6-problem check costs 0.07 to 0.12, about 5 to 10 days of a learner's tutoring limit, so checks need a limit of their own.
 - **The account:** read by the owner as an organization, linked on 2026-10-17, with a USD 100 monthly credit. It is not enforced on the history-editing check today. A new organization would be.
 
@@ -36,14 +36,14 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 - Part 1, items 1 to 6 (credit, spend limits and rate limits, availability and terms, data, sign-in, the bill comparison): `claude-anthropic-api-account.md`.
 - Part 1, items 7 to 9 (safety refusals, history edits, prices and dates): `claude-anthropic-api-model.md`.
 - Part 2, teaching against #684, pictures, file mistakes and tool reports: `claude-anthropic-api-teaching.md`.
-- Part 2, the mastery check (refusals, accuracy, cost per call): `claude-anthropic-api-check.md`.
+- Part 2, the mastery check (refusals, accuracy, Haiku 5.5 as the marker, cost per call): `claude-anthropic-api-check.md`.
 - Part 2, costs, the re-costed budget, the owner's account and the history-edit test: `claude-anthropic-api-budget.md`.
 
 ## Inputs for the decision that reopens #679
 
 | Ticket | What these files change |
 |---|---|
-| #679 | Prices (item 9); refusal handling (item 7); no reasoning-trace fields; a frozen prompt start and append-only history (item 8). Part 2: Haiku 5.5 at `low` can teach, with its tool-report reliability as an AI test; model answers framed as the learner's worked solution, and an independent check that returns only an answer and a verdict; the 1-hour cache for the prompt start |
+| #679 | Prices (item 9); refusal handling (item 7); no reasoning-trace fields; a frozen prompt start and append-only history (item 8). Part 2: Haiku 5.5 at `low` can teach, with its tool-report reliability as an AI test; model answers framed as the learner's worked solution, and an independent check that returns only an answer and a verdict; the 1-hour cache for the prompt start; Haiku 5.5 as a measured option for marking and the end step |
 | #675 | Prepaid credit with auto-reload off, plus a workspace spend limit, as the backstop (items 1, 2). Part 2: a sitting's worth of about USD 0.0063; a separate limit for mastery checks, which cost 0.07 to 0.12 for 6 problems |
 | #669 | Part 2: must-contain points are the minimum the problem asks for, and a point counts as covered in any words |
 | #677 | Retention, training and flagged-data lines; the DPA; US storage, global or US inference; a wider region block; an on-screen AI notice (items 3, 4) |
