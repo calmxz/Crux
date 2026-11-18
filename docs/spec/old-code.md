@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file is the comparison against the old code, not product rules. It covers the verdicts, each module's fate, what is copied with its tests, and what is left behind, for the backend and the frontend, where the new code lives, and when the old code leaves the main branch. No product file links to it: every build ticket names it beside its area files (see [`spec-process.md`](spec-process.md)) ([#750], [#769]). The facts behind it are on [#749] and [#768].
+This file is the comparison against the old code, not product rules. It covers the verdicts, each module's fate, what is copied with its tests, and what is left behind, for the backend and the frontend, where the new code lives, when the old code leaves the main branch, and the removal of the old deployment. No product file links to it: every build ticket names it beside its area files (see [`spec-process.md`](spec-process.md)) ([#750], [#769]). The facts behind it are on [#749] and [#768].
 
 ## Terms
 
@@ -13,6 +13,7 @@ This file is the comparison against the old code, not product rules. It covers t
 - **Planted case:** a deliberate bad example, run once to prove a check fails on it ([#750]).
 - **The old-code tag:** a git tag, `old-code`, on the last commit of `main` that holds the old code. Copies and references in this file are read from it ([#781]).
 - **The skeleton ticket:** the first build ticket. It removes the old code and lands the new code's folders and CI ([#781]).
+- **The cleanup:** the one-time removal of the old deployment, done after [#797] and before the lock. It is the only step that touches the old deployment, and is tracked on [#799] ([#797]).
 
 ## The verdict
 
@@ -127,26 +128,52 @@ All of this comes from [#769].
 
 ### What leaves the main branch
 
-- **Leaves, kept in the tag:** `backend/`, `frontend/`, the old contract at `docs/api/openapi.yaml` (the new one is written fresh at that path), `docs/auth/`, `docs/db/`, `docs/deploy/`, `docs/dev/`, `docs/security/`, `render.yaml`, both `docker-compose` files, `dev.ps1`, `pyrightconfig.json`, `.env.example`, `data/.gitkeep`, `.git-blame-ignore-revs`, `.out-of-scope/llm-settlement-reconciliation.md`, `e2e.yml`, `audit.yml`, the backend, frontend and security jobs in `ci.yml`, and the old entries in `dependabot.yml`, replaced by entries for the new folders ([#781]).
+- **Leaves, kept in the tag:** `backend/`, `frontend/`, the old contract at `docs/api/openapi.yaml` (the new one is written fresh at that path), `docs/auth/`, `docs/db/`, `docs/deploy/`, `docs/dev/`, `docs/security/`, `render.yaml`, both `docker-compose` files, `dev.ps1`, `pyrightconfig.json`, `.env.example`, `data/.gitkeep`, `.git-blame-ignore-revs`, `.out-of-scope/llm-settlement-reconciliation.md`, `e2e.yml`, `audit.yml`, `backup.yml` (turned off by the cleanup), the backend, frontend and security jobs in `ci.yml`, and the old entries in `dependabot.yml`, replaced by entries for the new folders ([#781], [#797]).
 - **Stays:** `docs/spec/`, `GLOSSARY.md`, `LICENSE`, `docs/research/` (the notes behind five research tickets), the file-size job in `ci.yml`, `claude.yml` and `claude-code-review.yml` ([#781]).
-- **Stays, with its old paths revised by the skeleton ticket:** `CODING_STANDARDS.md`, `codeql.yml` and `.github/codeql/`, `plugins/basedpyright-lsp` and `.claude-plugin/`, `.githooks/`, `.gitattributes`, `.gitignore`, `docs/agents/`, and `README.md`, whose status is rewritten in the same change. The repo's GitHub description, topics and homepage change in the same step ([#781]).
+- **Stays, with its old paths revised by the skeleton ticket:** `CODING_STANDARDS.md`, `codeql.yml` and `.github/codeql/`, `plugins/basedpyright-lsp` and `.claude-plugin/`, `.githooks/`, `.gitattributes`, `.gitignore`, `docs/agents/`, and `README.md`, whose status is rewritten in the same change. The repo's GitHub description, topics and homepage change in the same step ([#781]). The cleanup changes the README, the description and the homepage first, as below ([#797]).
 
-### The old database's backup
+## The old deployment
 
-- The nightly backup of the old database, `backup.yml` with what it runs, stays until the decision on bringing the deployment back says otherwise. That decision comes before the lock, open on [#797] ([#781]).
-- If the backup continues, the skeleton pull request moves what it runs (`backend/scripts/backup.py`, `backend/pyproject.toml`, `backend/uv.lock`, `backend/.python-version`) out of `backend/`, which becomes the new backend's folder, and updates `backup.yml` to match, so no nightly run fails. The skeleton ticket picks the new place ([#781]).
+The old deployment does not come back. The new app's first deployment is the one the spec describes, on the new domain (see [`hosting.md`](hosting.md)) ([#797]).
+
+- The old database holds only the owner's own test accounts and data, so no learner gets a notice. Nothing from it carries into the new database ([#750], [#797]).
+- After the cleanup, the old app cannot be run with sign-in or the tutor. The old code is read, not run. The copied pieces' tests still run, since they use in-memory SQLite ([#797]).
+
+### What the cleanup removes
+
+- The nightly backup, `backup.yml`, is turned off with GitHub's "Disable workflow" switch, so it never runs again, by schedule or by hand. The file stays until the skeleton pull request removes it with the old code, so no frozen file changes ([#797]).
+- Its 5 GitHub secrets: `DATABASE_URL`, `R2_ACCESS_KEY_ID`, `R2_BUCKET`, `R2_ENDPOINT` and `R2_SECRET_ACCESS_KEY` ([#797]).
+- The old Supabase project, deleted, not paused ([#797]).
+- In Cloudflare R2: the backup bucket with its 7 copies, and the old app's uploaded files, in whichever bucket holds them ([#797]).
+- Every R2 token made for the old app or its backup, revoked, so a leaked old key opens nothing ([#797]).
+- The Render service `crux-api` ([#797]).
+- The Vercel project and this repo's connection to it, so the failing "Vercel" check leaves pull requests. Its address, `crux-tutor.vercel.app`, then shows Vercel's not-found page. Someone else may later take the name; the owner accepts that ([#797]).
+- The 3 GitHub environments: "main - crux-api", "Preview" and "Production" ([#797]).
+- The old app's `GEMINI_API_KEY`, revoked in Google ([#797]).
+
+### When and in what order
+
+- Right after [#797], before the lock. The skeleton ticket carries nothing old apart from the code ([#797]).
+- First the public text: the cleanup pull request is reviewed and merged, the homepage link is cleared and the description rewritten. Every new line is true from the moment it appears ([#797]).
+- Then the nightly job is turned off, so it never fails against a deleted database. Then the owner deletes, in order: the Supabase project, the R2 files, bucket and tokens, the Render service, the Vercel project, and the environments ([#797]).
+- The old Gemini key goes last: once [#726] has made its model calls, or straight away if that research uses the owner's Google login. At the latest, it goes when that ticket closes ([#797]).
+- The cleanup is its own issue, [#799], not a ticket on the map. The map's Destination is reached only once the cleanup is done, so the spec locks only after it ([#797]).
+- The owner's Supabase account has one other project, which takes no free slot by the time live and staging are made. Render's `DATABASE_URL` points at the project the counts above came from ([#797]).
+
+### What the public text says
+
+- The cleanup pull request replaces the README's paragraph on the old code with ``The spec is in [`docs/spec/`](docs/spec/README.md).`` (draft wording). The README no longer mentions the old code ([#797]).
+- The cleanup clears the repo's GitHub homepage link ([#797]).
+- It replaces the GitHub description with "An adaptive tutor that teaches a topic until you understand it, and calls it mastered only once you've proven it. Being re-specified from scratch." (draft wording) ([#797]).
 
 ## After v1
 
 Learner statistics, keyboard shortcuts and pinning a session are lines on the map's Out of scope list ([#769]).
 
-## Gaps
-
-- **Bringing the deployment back, and existing accounts and data:** open on [#797]. The new schema has no path from the old migrations ([#750]).
-
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#719]: https://github.com/calmxz/Crux/issues/719
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#749]: https://github.com/calmxz/Crux/issues/749
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#768]: https://github.com/calmxz/Crux/issues/768
@@ -156,3 +183,4 @@ Learner statistics, keyboard shortcuts and pinning a session are lines on the ma
 [#780]: https://github.com/calmxz/Crux/issues/780
 [#781]: https://github.com/calmxz/Crux/issues/781
 [#797]: https://github.com/calmxz/Crux/issues/797
+[#799]: https://github.com/calmxz/Crux/issues/799
