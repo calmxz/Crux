@@ -47,17 +47,17 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 
 ### Mastery checks against the limit
 
-- **A check's cost:** 0.012 to 0.020 a problem, so 2 problems cost 0.023 to 0.041, 6 cost 0.070 to 0.123, and 10 cost 0.116 to 0.205. Add 0.003 for each slip fix or walk-through.
-- **Against a day's limit:** a 6-problem check is 0.070 / 0.0126 = 5.6 to 0.123 / 0.0126 = 9.8 days of a learner's daily limit. At #727's question stage the estimate was 0.11; the measurement agrees.
-- **With Haiku 5.5 marking** (`claude-anthropic-api-check.md`), a 6-problem check is 0.053 to 0.101, so 0.053 / 0.0126 = 4.2 to 0.101 / 0.0126 = 8.0 days. The examples below use Sonnet marking.
+- **A check's cost:** 0.012 to 0.020 a problem, so 2 problems cost 0.024 to 0.041, 6 cost 0.071 to 0.123, and 10 cost 0.118 to 0.205. Add 0.003 for each slip fix or walk-through.
+- **Against a day's limit:** a 6-problem check is 0.071 / 0.0126 = 5.6 to 0.123 / 0.0126 = 9.8 days of a learner's daily limit. At #727's question stage the estimate was 0.11; the measurement agrees.
+- **With Haiku 5.5 marking** (`claude-anthropic-api-check.md`), a 6-problem check is 0.054 to 0.101, so 0.054 / 0.0126 = 4.3 to 0.101 / 0.0126 = 8.0 days. The examples below use Sonnet marking.
 - **Example monthly costs for 25 learners**, as examples for #675 and not a recommendation. A month is 4.33 weeks.
 
 | Example check limit | Per learner a month | 25 learners a month |
 |---|---|---|
-| 1 check of 6 problems a week | 0.30 to 0.53 | 7.6 to 13.3 |
-| 3 checks of 6 problems a week | 0.91 to 1.60 | 23 to 40 |
+| 1 check of 6 problems a week | 0.31 to 0.53 | 7.7 to 13.3 |
+| 3 checks of 6 problems a week | 0.92 to 1.60 | 23 to 40 |
 
-- **The arithmetic:** 4.33 x 0.070 = 0.30, and 4.33 x 0.123 = 0.53. Three a week: 13 x 0.070 = 0.91, and 13 x 0.123 = 1.60.
+- **The arithmetic:** 4.33 x 0.071 = 0.31, and 4.33 x 0.123 = 0.53. Three a week: 13 x 0.071 = 0.92, and 13 x 0.123 = 1.60.
 - **Against the old estimate:** #727's question estimated about USD 16 a month at typical use and 32 at full use, for 25 learners. Measured, teaching at full use is about 2.7, with the 1-hour cache, and checks make up the rest at whatever limit #675 sets.
 
 ### The credit

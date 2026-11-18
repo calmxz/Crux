@@ -117,21 +117,22 @@ Measured, with no caching except the writer's own conversation:
 
 | Call | Model | Maths, per call | Worded (biology), per call |
 |---|---|---|---|
-| Write a problem and its model answer | Sonnet 5.5 `medium` | 0.0049 | 0.0082 |
+| Write a problem and its model answer | Sonnet 5.5 `medium` | 0.0051 | 0.0082 |
 | Independent working | Opus 5.5 `medium` | 0.0037 | 0.0085 |
 | Mark | Sonnet 5.5 `medium` | 0.0031 | 0.0038 |
-| **Per problem** | | **0.0116** | **0.0205** |
+| **Per problem** | | **0.0118** | **0.0205** |
 | End step (slip fix or walk-through) | Sonnet 5.5 `medium` | 0.0032 (hard cases) | |
 | Re-mark | Opus 5.5 `medium` | 0.0077 (hard cases) | |
 | Mark, Haiku instead | Haiku 5.5 `medium` | 0.00023 (hard cases) | 0.00020 (hard cases) |
 | End step, Haiku instead | Haiku 5.5 `medium` | 0.00015 (hard cases) | |
-| **Per problem, Haiku marking** | | **0.0088** | **0.0169** |
+| **Per problem, Haiku marking** | | **0.0090** | **0.0168** |
 
-- **Per problem:** 0.0049 + 0.0037 + 0.0031 = 0.0117 (0.0116 before rounding), and 0.0082 + 0.0085 + 0.0038 = 0.0205.
-- **Per problem, Haiku marking:** 0.0049 + 0.0037 + 0.0002 = 0.0088, and 0.0082 + 0.0085 + 0.0002 = 0.0169. This is arithmetic: Haiku's mark cost comes from the hard cases, not from a whole check. The saving is about 24% on maths and 18% on worded problems.
-- **Whole checks:** the 6-problem maths check cost 0.070, and the 4-problem biology check 0.082, simulated learner included (about 0.001).
-- **Per check, by length:** 2 problems: 0.023 to 0.041. 6 problems: 0.070 to 0.123. 10 problems: 0.116 to 0.205.
-- **Per check, Haiku marking:** 6 problems: 6 x 0.0088 = 0.053 to 6 x 0.0169 = 0.101.
+- **Per problem:** 0.0051 + 0.0037 + 0.0031 = 0.0119 (0.0118 before rounding), and 0.0082 + 0.0085 + 0.0038 = 0.0205.
+- **Only the passing runs count.** An earlier maths run stopped after its first write. That write is left out.
+- **Per problem, Haiku marking:** 0.0051 + 0.0037 + 0.0002 = 0.0090, and 0.0082 + 0.0085 + 0.0002 = 0.0169 (0.0168 before rounding). This is arithmetic: Haiku's mark cost comes from the hard cases, not from a whole check. The saving is about 24% on maths and 18% on worded problems.
+- **Whole checks:** the 6-problem maths check cost 0.072, and the 4-problem biology check 0.083, simulated learner included (about 0.001).
+- **Per check, by length:** 2 problems: 0.024 to 0.041. 6 problems: 0.071 to 0.123. 10 problems: 0.118 to 0.205.
+- **Per check, Haiku marking:** 6 problems: 6 x 0.0090 = 0.054 to 6 x 0.0168 = 0.101.
 - **Not counted:** the maths library, which costs no AI, and any check-start instructions longer than these test prompts.
 
 ## What this changes
