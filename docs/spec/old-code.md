@@ -136,7 +136,7 @@ All of this comes from [#769].
 
 The old deployment does not come back. The new app's first deployment is the one the spec describes, on the new domain (see [`hosting.md`](hosting.md)) ([#797]).
 
-- The old database holds only the owner's own test accounts and data, so no learner gets a notice. Nothing from it carries into the new database ([#750], [#797]).
+- The old database holds only the owner's own test accounts and data: two accounts, and one session and one message under no current account. No learner gets a notice. Nothing from it carries into the new database ([#750], [#797]).
 - After the cleanup, the old app cannot be run with sign-in or the tutor. The old code is read, not run. The copied pieces' tests still run, since they use in-memory SQLite ([#797]).
 
 ### What the cleanup removes
