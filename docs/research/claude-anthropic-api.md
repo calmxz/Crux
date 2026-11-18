@@ -38,6 +38,7 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 - Part 2, teaching against #684, pictures, file mistakes and tool reports: `claude-anthropic-api-teaching.md`.
 - Part 2, the mastery check (refusals, accuracy, Haiku 5.5 as the marker, cost per call): `claude-anthropic-api-check.md`.
 - Part 2, costs, the re-costed budget, the owner's account and the history-edit test: `claude-anthropic-api-budget.md`.
+- Follow-up, what the monthly plan credit's terms allow (read 2026-11-18): `claude-anthropic-api-credit.md`.
 
 ## Inputs for the decision that reopens #679
 
@@ -52,17 +53,18 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 | #678 | Batches at half price, 29-day result storage, no fallbacks; refusals counted as passes in safety tests (items 7, 9). Part 2: grading on Opus 5.5 through the Batch API cost about USD 0.031 a transcript |
 | #667 | File removal restarts the conversation from a summary (item 8) |
 | #719 | Store each reply's `content` array and the sent `system` and `tools` exactly; added page ranges kept or cleared server-side (item 8) |
-| The map | AI spend from Anthropic's credit, then bought credits; the card only through bought credits (item 1). Part 2: the owner's credit is USD 100 a month, tied to the owner's plan |
+| The map | AI spend from Anthropic's credit, then bought credits; the card only through bought credits (item 1). Part 2: the owner's credit is USD 100 a month, tied to the owner's plan. The credit's terms add no limit on a service for other people; it refreshes on the plan's billing date and stops requests when spent (`claude-anthropic-api-credit.md`) |
 
 ## Not verified
 
 - **Account type on the Admin keys page.** The owner read the Console as an organization; the Admin keys page would confirm it.
 - **The spend order of a non-Max promotional credit** against bought credits. The credit terms do not say [S4]. The owner's credit is the monthly kind, which is spent first [S5].
-- **Evaluation-tier rate limits.** Not published [S7].
+- **Evaluation-tier rate limits.** Not published [S7]. They no longer matter for a linked organization, which starts at least at the Start tier [S5].
 - **The subprocessor list and its locations.** The Trust Center page needs a browser.
 - **Chemistry and security beyond ordinary lessons.** Part 2 tested propane combustion and SQL-injection defence only.
 - **How to continue a conversation after a refused turn** with empty content. No tutor turn was refused in Part 2.
-- **The credit's program terms,** accepted when an organization is linked for the plan's credit [S5]. Whether they limit a service that other people use was not read.
+- **An explicit statement that the plan credit may fund a service for other people.** The program terms are the Credit Terms [S4], which add no limit on end users; the permission rests on the Commercial Terms (`claude-anthropic-api-credit.md`). No page says it outright.
+- **Which plan grants the owner's credit.** USD 100 a month fits Max or a small Team plan [S5].
 - **The effective date of the regions and usage policies.** Both pages showed a version effective 2026-11-12, after the 2026-11-02 reading.
 - **Teaching beyond algebra,** and a bare right answer to a fresh problem, which no Part 2 sitting reached.
 
@@ -102,3 +104,4 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 - [S32] Model deprecations, https://platform.claude.com/docs/en/about-claude/model-deprecations
 - [S33] Models overview, https://platform.claude.com/docs/en/about-claude/models/overview
 - [S34] Model IDs and versions, https://platform.claude.com/docs/en/about-claude/models/model-ids-and-versions
+- [S35] to [S40], read 2026-11-18 for the plan credit's terms: listed with their quotes in `claude-anthropic-api-credit.md`.

@@ -32,6 +32,7 @@ Part of "Can Crux's AI layer run on Claude through Anthropic's API?" (issue #727
 - At 5,000 uncached input tokens and 1,000 output tokens a call, that is 375,000 and 75,000 a minute. Both are under a fifth of Start tier.
 - Batches have their own limits: Start tier 1,000 requests a minute, 200,000 queued [S7].
 - Fits the spec: yes. The Evaluation tier's limits are unknown until the owner checks the Console's Rate limits page.
+- **Update, 2026-11-18:** an organization linked to an eligible plan moves up to at least the Start tier, so the Evaluation tier does not apply to it (`claude-anthropic-api-credit.md`, [S5]).
 
 ## 3. Availability and terms
 

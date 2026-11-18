@@ -63,7 +63,7 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 ### The credit
 
 - **The owner's credit is USD 100 a month.** That it is the Max plan's API credit is an inference from the amount and "monthly": Max's credit is "$100 USD" a month [S5]. Such credits arrive "each billing cycle", expire at the cycle's end, and "Included credits are spent first" [S5].
-- **Use for Crux:** the page says "you can use them to build and run your own applications and agents" [S5]. Linking also accepts program terms that the page does not show. They were not read.
+- **Use for Crux:** the page says "you can use them to build and run your own applications and agents" [S5]. Linking also accepts program terms, which are the Supplemental Credit Terms [S4]. They add no limit on a service for other people; see `claude-anthropic-api-credit.md`.
 - **When it runs out:** "If the organization has no credits left, API requests stop until your next monthly API credits arrive" [S5], unless bought credit remains.
 - So the USD 8 learners' budget, the owner's USD 3 and about USD 5 of tests fit inside it many times over. The credit lasts only while the owner's plan does.
 - **The run itself cost about USD 2:** 2.02 logged, across the smoke and history-edit tests, the sittings, the hard cases, the probe, both whole checks and the grading batch (0.37). A first teaching run crashed after about 12 calls that were not logged, a few cents at most.
