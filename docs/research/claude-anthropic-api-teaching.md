@@ -112,7 +112,7 @@ The first prompt's column comes from the grader and the notes above, not from th
   - C2 and B2 are the two errors that changed a status.
 - **Judgement calls,** counted as right above:
   - A "which would you do first?" question that the learner solved in full was recorded in B1 but not in C2.
-  - A confirmation between steps, such as "Your first step is right", was filed as help in A2 and B1 but not in C1. Counting it as help would put C1 among the failures.
+  - A prompt between steps, such as "What's the next step?", was filed as help in A2 but not in C1. Counting it as help would put C1 among the failures.
   - A2 filed the file's page-5 example as `own`. The prompt says a problem from the learner's file is their own.
 - **Also seen:**
   - B1 called `offer_mastery_check` while objective 3 was in progress, and its reply said so.
