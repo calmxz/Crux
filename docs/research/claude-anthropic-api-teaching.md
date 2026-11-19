@@ -6,7 +6,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
 
 - **Teaching holds on Haiku 5.5 at `low`.** On a Crux-style prompt it kept one step per turn, warmth and a twin for the learner's own problem, and its maths was correct in 6 of 6 sittings.
 - **The weak point is reporting.** Haiku's `record_problem_result` calls were imperfect in 6 of 6 sittings: 2 missed records, and wrong `helped` flags, objective numbers or duplicates. Sonnet 5.5's were right in 3 of 3.
-- **A revised reporting prompt helped but did not pass.** In a follow-up, it removed the missed and duplicate records, but 4 of 43 records had a wrong value, and 2 of 6 sittings were clean. Two sittings also stated a maths step wrongly. See [Follow-up](#follow-up-a-revised-reporting-prompt).
+- **A revised reporting prompt helped but did not pass.** In a follow-up, it removed the missed and duplicate records, but 5 of 43 records had a wrong value, and 2 of 6 sittings were clean. Two sittings also stated a maths step wrongly. See [Follow-up](#follow-up-a-revised-reporting-prompt).
 - **Pictures and file mistakes work** on both models: graphs and flowcharts came through the tools, and both reported the lesson file's planted mistake.
 - **A sitting costs about USD 0.006 on Haiku** with caching, and about 0.08 on Sonnet. The costs and the budget are in `claude-anthropic-api-budget.md`.
 
@@ -99,18 +99,25 @@ Run on 2026-11-19, after #727 closed. Only the reporting part of the tutor promp
 | Records | 47 | 43 |
 | Missed records | 2 | 0 |
 | Problems recorded more than once | 1, three times | 0 |
-| Records with a wrong value | at least 2 | 4 |
+| Records with a wrong value | at least 2 | 5 |
 | Sittings with every record right | 0 | 2 (A2 and C1) |
 
 The first prompt's column comes from the grader and the notes above, not from this hand check.
 
-- **The 4 wrong values:**
-  - **C2:** the learner's sign misconception was filed as `wrong`. That drops the trouble mark, so objective 1 was shown after one fresh problem, not two. It is the only error that changed a status.
+- **The 5 wrong values:**
+  - **C2:** the learner's sign misconception was filed as `wrong`. That drops the trouble mark, so objective 1 was shown after one fresh problem, not two.
+  - **B2:** the tutor gave the steps for 4x + 3 = 23 before the learner started ("undo the +4 first, then undo the x 4"), but filed it with `helped: false`. That made objective 1 shown, so all 3 of B2's check offers came too early.
   - **A1:** 2(x + 4) = 3(x - 1) has the unknown on both sides, but it was filed under brackets (2), not 3.
   - **B1 and B2:** the learner's own problem, 2x - 7 = 9, came after a twin but was filed with `helped: false`. An own problem never makes an objective shown, so no status changed.
+  - C2 and B2 are the two errors that changed a status.
+- **Judgement calls,** counted as right above:
+  - A "which would you do first?" question that the learner solved in full was recorded in B1 but not in C2.
+  - A confirmation between steps, such as "Your first step is right", was filed as help in A2 and B1 but not in C1. Counting it as help would put C1 among the failures.
+  - A2 filed the file's page-5 example as `own`. The prompt says a problem from the learner's file is their own.
 - **Also seen:**
   - B1 called `offer_mastery_check` while objective 3 was in progress, and its reply said so.
   - In both B sittings, the learner gave up on the twin, and it was filed as `wrong`. The result list has no value for giving up.
+  - C2's note on 2(x - 3) = -x + 9 says "subtracted 6", but the learner added 6. Crux doesn't act on the note.
   - The grader's one verdict per sitting passed A1 and B1 and missed C2's misconception. A reporting test needs a check per record.
 - **What neither run tested.** The simulated learners made few mistakes: 2 sign misconceptions (C) and 2 give-ups (B). B never made its scripted slip or bracket mistake, and no learner gave a bare answer. So no slip, slip fix or bare answer was ever reported.
 

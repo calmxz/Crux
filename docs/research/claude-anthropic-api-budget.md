@@ -67,7 +67,7 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 - **When it runs out:** "If the organization has no credits left, API requests stop until your next monthly API credits arrive" [S5], unless bought credit remains.
 - So the USD 8 learners' budget, the owner's USD 3 and about USD 5 of tests fit inside it many times over. The credit lasts only while the owner's plan does.
 - **The run itself cost about USD 2:** 2.02 logged, across the smoke and history-edit tests, the sittings, the hard cases, the probe, both whole checks and the grading batch (0.37). A first teaching run crashed after about 12 calls that were not logged, a few cents at most.
-- **The follow-ups added about 0.36** on 2026-11-19: the revised reporting prompt's 6 sittings and their grades, and Haiku writing the hard cases. That brings the logged total to 2.39.
+- **The follow-ups added about 0.37:** the Haiku marker for 0.008, then 0.36 on 2026-11-19 for the revised reporting prompt's 6 sittings and their grades, and Haiku writing the hard cases. The logged total is 2.39.
 
 ## The owner's account
 
