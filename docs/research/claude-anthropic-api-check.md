@@ -9,6 +9,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
 - **Model answers were right:** 7 of 7 problems in every repeat, and Opus 5.5 agreed with all of Sonnet 5.5's model answers.
 - **Marking was safe, but too strict at first.** No wrong answer was ever marked right. With the first wording, Sonnet failed 4 or 5 of 7 right answers, because its model answers listed points the problem never asked for. One wording change brought it to 14 of 16 matching the key.
 - **Haiku 5.5 marked as Sonnet did.** Given Sonnet's model answers, it gave Sonnet's mark on all 16 hard-case answers in 2 of 2 repeats, at about a fourteenth of the cost per mark.
+- **Haiku 5.5 can write model answers, with the independent check kept.** Its final answers matched the key in 2 of 2 repeats. But Opus caught one wrong worked solution in 14, and Haiku's must-contain points again went past the problem, costing one right answer its mark.
 - **A check costs about USD 0.012 to 0.020 a problem,** so about 0.07 to 0.12 for 6 problems. With Haiku marking, that falls to about 0.009 to 0.017 a problem, because writing and the independent check are most of the cost. The budget is in `claude-anthropic-api-budget.md`.
 
 ## How it was measured
@@ -111,6 +112,34 @@ A follow-up run on the same day changed only the marker:
   - The whole checks were not rerun with Haiku.
   - Treat this as a first reading, not a rate.
 
+### Haiku 5.5 as the writer
+
+A second follow-up, on 2026-11-19, changed the writer too:
+
+- **What ran:** Haiku 5.5 at `medium` wrote every model answer, with the must-contain wording. It also marked and ran the end step, as above. Opus 5.5 still ran the independent check on cases 2 to 7. No re-marks ran.
+- **Repeats:** 2. The Sonnet baseline is repeats 3 to 5, and only repeat 5 had the must-contain wording.
+
+| | Sonnet writes and marks | Haiku writes and marks (2 repeats) |
+|---|---|---|
+| Final answers that match the key | 7 of 7 in each of 3 repeats | 7 of 7 and 7 of 7 |
+| Opus agrees with the model answer | 18 of 18 | 11 of 12 |
+| Marks that match the key | 14 of 16 (repeat 5) | 13 of 16 and 13 of 16 |
+| Wrong answers marked right | 0 | 0 |
+| Refusals | 0 | 0 in 62 calls |
+
+- **Opus caught a wrong worked solution.** In repeat 2, case 4's worked solution added a second example: "from $2x < 6$, dividing by $-2$ gives $x > -3$". The right result is $x < 3$, and the solution's own check contradicts it. Its final answer and must-contain points were right, so only the independent check caught it. The learner reads the worked solution on the result card.
+- **The must-contain points went past the problem again,** despite the wording change:
+  - case 7, both repeats: "The cause is building queries by concatenating untrusted input". The problem asks only what SQL injection is and one prevention. This is the kind of point the wording change was written to stop.
+  - case 7, repeat 2: an example of an always-true condition, "' OR '1'='1".
+  - case 5, both repeats: a point that the two features "increase the rate of diffusion".
+- **The new miss:** case 5's right answer was marked wrong in both repeats, for not saying the features raise the rate. Sonnet's repeat 5 marked it right. Case 7's extra point cost no mark, because the right answer says the input is "pasted into" the query.
+- **The same marks in both repeats,** answer by answer. The other two misses are the strict marks from before: case 3's "x < -2" and case 8's guess-and-check.
+- **The walk-through end step still never ran.** Case 8 was marked wrong, not unsure, in both repeats.
+- **Cost per write:** 0.00032 on Haiku, against 0.00624 on Sonnet in repeats 3 to 5, about 19 times less (0.00624 / 0.00032 = 19.5). Haiku wrote about as much: 544 output tokens a write, against 535.
+- **The independent check cost the same** on either writer's answers: 0.0068 a call, against 0.0067.
+- **A hard-case problem,** written, checked and marked: 0.00032 + 0.0068 + 0.00024 = 0.0074 on Haiku, against 0.00624 + 0.0067 + 0.00321 = 0.0161 on Sonnet.
+- **Limits:** 2 repeats of 7 problems. One wrong worked solution in 14 writes is a first reading, not a rate.
+
 ## Cost per call
 
 Measured, with no caching except the writer's own conversation:
@@ -126,6 +155,8 @@ Measured, with no caching except the writer's own conversation:
 | Mark, Haiku instead | Haiku 5.5 `medium` | 0.00023 (hard cases) | 0.00020 (hard cases) |
 | End step, Haiku instead | Haiku 5.5 `medium` | 0.00015 (hard cases) | |
 | **Per problem, Haiku marking** | | **0.0090** | **0.0168** |
+| Write, Haiku instead | Haiku 5.5 `medium` | 0.00032 (hard cases) | |
+| **Per problem, Haiku writing and marking** | | **0.0042** | **0.0090** |
 
 - **Per problem:** 0.0051 + 0.0037 + 0.0031 = 0.0119 (0.0118 before rounding), and 0.0082 + 0.0085 + 0.0038 = 0.0205.
 - **Only the passing runs count.** An earlier maths run stopped after its first write. That write is left out.
@@ -133,6 +164,8 @@ Measured, with no caching except the writer's own conversation:
 - **Whole checks:** the 6-problem maths check cost 0.072, and the 4-problem biology check 0.083, simulated learner included (about 0.001).
 - **Per check, by length:** 2 problems: 0.024 to 0.041. 6 problems: 0.071 to 0.123. 10 problems: 0.118 to 0.205.
 - **Per check, Haiku marking:** 6 problems: 6 x 0.0090 = 0.054 to 6 x 0.0168 = 0.101.
+- **Per problem, Haiku writing and marking:** 0.0037 + 0.0003 + 0.0002 = 0.0042, and 0.0085 + 0.0003 + 0.0002 = 0.0090. This is also arithmetic: Haiku's write cost comes from the hard cases, and a worded write may cost more. The independent check is about 88% and 94% of it.
+- **Per check, Haiku writing and marking:** 6 problems: 6 x 0.0042 = 0.025 to 6 x 0.0090 = 0.054.
 - **Not counted:** the maths library, which costs no AI, and any check-start instructions longer than these test prompts.
 
 ## What this changes
@@ -143,3 +176,4 @@ Measured, with no caching except the writer's own conversation:
 - **#669 and #679:** the must-contain points are the minimum for the problem as written, and marking counts a point covered in any words. Both belong in the written marking rules.
 - **#675:** a check costs about 5 to 10 days of a learner's tutoring limit (see `claude-anthropic-api-budget.md`).
 - **#802:** Haiku 5.5 is a measured option for marking and the end step. It matched Sonnet's marks on the hard cases and cuts a check's cost by about a fifth. Writing problems and the independent check stay the larger costs.
+- **#802:** Haiku 5.5 is a measured option for writing problems too, only with the independent check kept: it caught the one wrong worked solution. With Haiku writing and marking, a problem costs 0.0042 to 0.0090, against 0.0118 to 0.0205 on Sonnet, and the Opus check is most of the rest. Its must-contain points still go past the problem at times, so the writer wording needs more work before marking is as close to the key as Sonnet's.

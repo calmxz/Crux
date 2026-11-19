@@ -49,7 +49,7 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 
 - **A check's cost:** 0.012 to 0.020 a problem, so 2 problems cost 0.024 to 0.041, 6 cost 0.071 to 0.123, and 10 cost 0.118 to 0.205. Add 0.003 for each slip fix or walk-through.
 - **Against a day's limit:** a 6-problem check is 0.071 / 0.0126 = 5.6 to 0.123 / 0.0126 = 9.8 days of a learner's daily limit. At #727's question stage the estimate was 0.11; the measurement agrees.
-- **With Haiku 5.5 marking** (`claude-anthropic-api-check.md`), a 6-problem check is 0.054 to 0.101, so 0.054 / 0.0126 = 4.3 to 0.101 / 0.0126 = 8.0 days. The examples below use Sonnet marking.
+- **With Haiku 5.5 marking** (`claude-anthropic-api-check.md`), a 6-problem check is 0.054 to 0.101, so 0.054 / 0.0126 = 4.3 to 0.101 / 0.0126 = 8.0 days. With Haiku 5.5 writing as well, and the Opus check kept, it is 0.025 to 0.054, so 0.025 / 0.0126 = 2.0 to 0.054 / 0.0126 = 4.3 days. The examples below use Sonnet writing and marking.
 - **Example monthly costs for 25 learners**, as examples for #675 and not a recommendation. A month is 4.33 weeks.
 
 | Example check limit | Per learner a month | 25 learners a month |
@@ -67,6 +67,7 @@ The spec's amounts are a learners' budget of USD 8 a month, a USD 2 daily ceilin
 - **When it runs out:** "If the organization has no credits left, API requests stop until your next monthly API credits arrive" [S5], unless bought credit remains.
 - So the USD 8 learners' budget, the owner's USD 3 and about USD 5 of tests fit inside it many times over. The credit lasts only while the owner's plan does.
 - **The run itself cost about USD 2:** 2.02 logged, across the smoke and history-edit tests, the sittings, the hard cases, the probe, both whole checks and the grading batch (0.37). A first teaching run crashed after about 12 calls that were not logged, a few cents at most.
+- **The follow-ups added about 0.36** on 2026-11-19: the revised reporting prompt's 6 sittings and their grades, and Haiku writing the hard cases. That brings the logged total to 2.39.
 
 ## The owner's account
 

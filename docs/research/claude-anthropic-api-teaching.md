@@ -6,6 +6,7 @@ Part 2 of #727, measured on **2026-11-18** through Anthropic's API with the owne
 
 - **Teaching holds on Haiku 5.5 at `low`.** On a Crux-style prompt it kept one step per turn, warmth and a twin for the learner's own problem, and its maths was correct in 6 of 6 sittings.
 - **The weak point is reporting.** Haiku's `record_problem_result` calls were imperfect in 6 of 6 sittings: 2 missed records, and wrong `helped` flags, objective numbers or duplicates. Sonnet 5.5's were right in 3 of 3.
+- **A revised reporting prompt helped but did not pass.** In a follow-up, it removed the missed and duplicate records, but 4 of 43 records had a wrong value, and 2 of 6 sittings were clean. Two sittings also stated a maths step wrongly. See [Follow-up](#follow-up-a-revised-reporting-prompt).
 - **Pictures and file mistakes work** on both models: graphs and flowcharts came through the tools, and both reported the lesson file's planted mistake.
 - **A sitting costs about USD 0.006 on Haiku** with caching, and about 0.08 on Sonnet. The costs and the budget are in `claude-anthropic-api-budget.md`.
 
@@ -78,8 +79,63 @@ Scripted chats, one per model and request:
 - No tutor reply reached `max_tokens`.
 - Three simulated-learner replies reached their own 400-token cap. That does not affect the tutor.
 
+## Follow-up: a revised reporting prompt
+
+Run on 2026-11-19, after #727 closed. Only the reporting part of the tutor prompt changed.
+
+- **The change.** The prompt's one line on `record_problem_result` became a "Reporting results" section:
+  - report in the turn a problem ends, before the reply, including a turn that offers the check;
+  - one record a problem, with a whole twin counted as one problem;
+  - the objective from the problem's form: the unknown on both sides is 3, otherwise brackets is 2, otherwise 1;
+  - `helped` is true after any nudge, hint, worked step or similar example;
+  - `result` is the most serious thing that happened: misconception, wrong, slip not fixed, slip fixed, bare right, right.
+- **These rules are a test choice, not Crux's.** `ai-layer.md` doesn't say how to report a problem that took several attempts. The rules were written to agree with the test's stand-in for Crux, and the owner has not chosen them.
+- **The same run otherwise:** Haiku 5.5 at `low`, learners A, B and C twice each, 15 turns, and the same Opus grader.
+- **Scoring by hand.** Each record was checked against its transcript under the rules above. A problem counts when the learner was asked to solve it. A "what would you do first?" question doesn't count.
+- **The pass mark:** every answered problem recorded once with the right values, in all 6 sittings.
+
+| | First prompt (6 sittings) | Revised prompt (6 sittings) |
+|---|---|---|
+| Records | 47 | 43 |
+| Missed records | 2 | 0 |
+| Problems recorded more than once | 1, three times | 0 |
+| Records with a wrong value | at least 2 | 4 |
+| Sittings with every record right | 0 | 2 (A2 and C1) |
+
+The first prompt's column comes from the grader and the notes above, not from this hand check.
+
+- **The 4 wrong values:**
+  - **C2:** the learner's sign misconception was filed as `wrong`. That drops the trouble mark, so objective 1 was shown after one fresh problem, not two. It is the only error that changed a status.
+  - **A1:** 2(x + 4) = 3(x - 1) has the unknown on both sides, but it was filed under brackets (2), not 3.
+  - **B1 and B2:** the learner's own problem, 2x - 7 = 9, came after a twin but was filed with `helped: false`. An own problem never makes an objective shown, so no status changed.
+- **Also seen:**
+  - B1 called `offer_mastery_check` while objective 3 was in progress, and its reply said so.
+  - In both B sittings, the learner gave up on the twin, and it was filed as `wrong`. The result list has no value for giving up.
+  - The grader's one verdict per sitting passed A1 and B1 and missed C2's misconception. A reporting test needs a check per record.
+- **What neither run tested.** The simulated learners made few mistakes: 2 sign misconceptions (C) and 2 give-ups (B). B never made its scripted slip or bracket mistake, and no learner gave a bare answer. So no slip, slip fix or bare answer was ever reported.
+
+The teaching checks, from the grader:
+
+| Check | First prompt | Revised prompt |
+|---|---|---|
+| One step per turn | 5 yes, 1 partly | 6 yes |
+| Summarizes and offers to continue | 5 yes, 1 partly | 2 yes, 4 partly |
+| Every turn ends with something to do | 2 yes, 4 partly | 4 partly, 2 no |
+| The maths it states is correct | 6 yes | 4 yes, 2 no |
+| Reports each answered problem | 6 partly | 3 yes, 3 partly |
+
+The other checks didn't change: warmth, the topic, twins, B's nudge and C's sign question. One learner, A2, asked for a graph this time, and `show_graph` drew it.
+
+- **Two maths errors:**
+  - **C2,** right after the sign lesson: "Subtracting 2 first, then dividing by 5, is the method" for 5x - 2 = 13. The learner had added 2, which is right.
+  - **B2:** "undo the +4 first" for 4x + 3 = 23.
+- **Turn endings.** Most of the turns without a task end on the check offer, or are send-offs after the learner chose to start the check. The revised sittings offered the check 11 times, against 7.
+- **Cause unknown.** The new text says nothing about maths or turn endings, and 6 sittings can't separate the change from run-to-run variation.
+- **Cost:** 0.0069 a sitting with a 1-hour cache (0.0042 to 0.0087), against 0.0063. That's about 23 calls and 204,000 input tokens a sitting. There were no refusals in 137 tutor calls, and no reply reached `max_tokens`. The 6 grades cost 0.21.
+
 ## What this changes
 
+- **#802:** Haiku teaching has not passed its reporting test. A further prompt is a new test with its own count. Its learners should be scripted to make each kind of mistake. The reporting rules need the owner's choice before any pass counts.
 - **#679:** Haiku 5.5 at `low` can take the teaching job, with a strict tool schema. Its tool-reporting reliability needs the same AI test that `ai-layer.md` plans for Flash-Lite. Sonnet 5.5 reported cleanly at about 14 times the cost.
 - **#679:** the test confirms the "what the tutor reports" tool set works on Claude, including #751's graph, diagram and file-mistake outputs.
 - **#678:** the 12 grades cost USD 0.37 through the Batch API at half price, about 0.031 a transcript, on Opus 5.5 at `medium`.
