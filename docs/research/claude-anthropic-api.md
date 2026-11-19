@@ -39,6 +39,7 @@ Prices are USD per 1M tokens (MTok) unless a figure says otherwise. Source IDs l
 - Part 2, the mastery check (refusals, accuracy, Haiku 5.5 as the marker and the writer, cost per call): `claude-anthropic-api-check.md`.
 - Part 2, costs, the re-costed budget, the owner's account and the history-edit test: `claude-anthropic-api-budget.md`.
 - Follow-up, what the monthly plan credit's terms allow (read 2026-11-18): `claude-anthropic-api-credit.md`.
+- Follow-up for #802, tutor reports at three effort levels on Haiku 5.5 and Sonnet 5.5, and Opus 5.5's role at three efforts (run 2026-11-19): `claude-anthropic-api-effort.md`.
 
 ## Inputs for the decision that reopens #679
 
