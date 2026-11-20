@@ -66,7 +66,7 @@ In the DB, and erased with the home ([#719]).
 | Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
-| Decline records, the open flag, a warning with its date, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
+| Decline records, the open flag, a warning with its date, a misuse card waiting, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
 | Feedback answers, sends per day, quote and share ticks, the "email me" tick, the first-mastery notice shown, unread marks | Feedback | [`feedback.md`](feedback.md) |
 | Count marks: they go when the account is erased, not when it closes | Feedback | [`feedback.md`](feedback.md) |
 
@@ -98,7 +98,7 @@ A guest's data is held in their browser, never by Crux ([#719]):
 - The browser holds the random ID and the 10-reply count, signed. Clearing or restoring browser data can reset the count. The guest cap bounds what that can spend (see [`trial.md`](trial.md)).
 - Entry ticks are held in the browser and signed, for guests and trial-link users alike, so they stay "once per browser".
 - The model answers and marks of a mini check are held in the tab encrypted, so only Crux can read them, until the result is shown.
-- A conversation holding a prohibited-content block or a Yes to the age question gets no further replies.
+- A conversation holding a Yes to the age question gets no further replies.
 - A resent older state is accepted for the reply count, the block and the age rules, since a new tab allows the same. So a guest's mini check gets no allowance past the caps: it stops at them like any guest reply (see [`trial.md`](trial.md)).
 - A guest's time zone is used for the request and not kept.
 
@@ -143,7 +143,6 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | Dumps | Their own bucket | [`backups-and-releases.md`](backups-and-releases.md) |
 | The restore log | Its own Cloud Storage bucket, soft delete off. The app can only add entries, and only the release script reads them | A lifecycle rule deletes each entry after 8 days ([#719]) |
 | Request logs, error reports, lookup and push log lines | Google's logs | 30 days ([`hosting.md`](hosting.md)) |
-| Billing export | BigQuery | [`operations.md`](operations.md) |
 | Background answers, short-lived expiry jobs and email retries (a queue ID only) | Cloud Tasks | Until they run ([`hosting.md`](hosting.md), [`email.md`](email.md)) ([#763]) |
 | Private source maps, each AI test's last passing round | Build and test records; the build ticket picks the place | [#719] |
 
@@ -197,8 +196,8 @@ The backend splits by area. Only an item's module writes it. The one exception i
 
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#719]: https://github.com/calmxz/Crux/issues/719
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770

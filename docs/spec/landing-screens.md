@@ -48,15 +48,14 @@ flowchart TD
 - A sample topic's mini check uses the check bar, reading "Mini check · Problem 1 of 2 · closed book", with no Photo button.
 - After a sample's result card, Crux's own fixed line, with no AI call: "That's the sample. Try another, try your own topic, or ask for a trial link.", with those three buttons. Once the own topic's 10 replies are used, the line and its buttons leave out the own topic: "That's the sample. Try another, or ask for a trial link." After the trial, they leave out the trial link. A sample has no after-mastery menu.
 - An upload gets the pinned line "Uploading your own files needs a trial link." with Request access, as [`app-shell.md`](app-shell.md) places refused uploads.
-- **When Google blocks a guest's message as prohibited content,** the session ends in place. The thread stays, with a red line, "The tutor can't help with this, so this guest session has ended.", and the chat box gives way to "This guest session has ended." with "Back to the start", which opens the landing page. The replies left stay with the browser.
 - **When a guest's reply breaks** (see [`ai-layer.md`](ai-layer.md)), Crux holds nothing to finish, so the guest's browser asks again by itself, once, when the connection is back, whatever the cause. The words so far are removed and the new reply replaces them. The guest sees one reply, and it counts once toward the 10. It stops like any guest reply. After a second break the guest sees "No reply." with Try again, and Try again counts as a new reply. The browser holds the count, so the guest caps are the real bound ([#771]).
 - **After Yes to the age question,** the tab goes back to the landing page, with no message, and the ticks show again in the start box.
 
 ### Guest stops
 
-- **Mid-conversation,** the stop line shows in the thread, then the video, and the chat box gives way to the stop line. If the stop caught a message and the distress check answers yes, the care line and the crisis line follow the stop line.
+- **Mid-conversation,** the stop line shows in the thread, then the video, and the chat box gives way to the stop line.
 - A mini check stopped at the caps stays in the tab. Sending again after the reset carries on, if the tab is still open.
-- A mini check dropped at Google's cap, by the guest-mode switch or while checks are switched off shows "Your mini check was dropped." under the stop line.
+- A mini check dropped at a workspace limit or a credit stop, by the guest-mode switch or while checks are switched off shows "Your mini check was dropped." under the stop line.
 - The guest-mode switch's line reads "Guest mode is paused while we fix something.", in the thread, or in the start box's place before typing, with the video (see [`live-faults.md`](live-faults.md)).
 
 ## Request access
