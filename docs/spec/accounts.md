@@ -47,14 +47,14 @@ Email sending, and how many of the day's emails can be codes, is in [`email.md`]
 - On iPhone, or wherever the jump fails, Crux shows its own note, naming the app it is in: "Google sign-in doesn't work inside the LinkedIn app. Open this page in your browser, or use a code." ([#674]).
 - The code works inside these browsers ([#674]). The real-phone tests are in [`quality-bar.md`](quality-bar.md) ([#678]).
 
-## From the EU or the UK
+## From a barred country
 
 The rule is in the main file's "Who Crux is for".
 
-- With a code: when someone taps "Email me a code", Crux checks the country. From the EU or the UK, an email with no account sees "Crux isn't available in your region yet." No code is sent ([#677], [#733]).
+- With a code: when someone taps "Email me a code", Crux checks the country. From the EU, the UK, or a country Anthropic doesn't support, an email with no account sees "Crux isn't available in your region yet." No code is sent ([#677], [#733]).
 - With Google: Google hands back the email. If it has no account, Crux drops it and shows the same message ([#733]).
 - Crux checks the email against its accounts and does not store it. No account is made and nothing is kept ([#677], [#733]).
-- An email with an account signs in as normal from anywhere ([#733]).
+- An email with an account signs in as normal from anywhere. From a barred country it gets no AI, as [`security.md`](security.md) says ([#733], [#802]).
 
 ## New learners: "One more thing"
 
@@ -132,21 +132,22 @@ The sign-in page, "One more thing" with its two ticks, the in-app-browser note, 
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#679]: https://github.com/calmxz/Crux/issues/679
+[#680]: https://github.com/calmxz/Crux/issues/680
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
+[#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#772]: https://github.com/calmxz/Crux/issues/772
-[#680]: https://github.com/calmxz/Crux/issues/680
-[#722]: https://github.com/calmxz/Crux/issues/722
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

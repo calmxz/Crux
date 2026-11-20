@@ -11,7 +11,7 @@ This file covers opening a trial link, the link code, erasing a link, what a lin
 - The first time this link opens on a browser, the entry ticks show if they have not been given there, with this notice ([#717], [#722], [#733]): "This link is for you only. Anyone with it sees your sessions and uses your limit. If it's used on more than 3 browsers, it may be switched off. Don't type or upload personal details, such as your name on a problem sheet."
 - The key sits after a `#` (see [`security.md`](security.md)) ([#770]). The link is then swapped for a sign-in cookie, and the key leaves the address bar. That browser stays signed in until 30 days without a visit ([#717]).
 - Another device opens the same link from the invite email and sees the same sessions. A one-time note after the first sign-in says: "To use Crux on another device, open your invite email there and tap the link." ([#717])
-- A link works from anywhere, including the EU and the UK, like an account (see [`hosting.md`](hosting.md)) ([#735]).
+- A link opens from anywhere, like an account. From a barred country it gets no AI, as [`security.md`](security.md) says ([#735], [#802]).
 - There is no device code and no "copy my link" ([#717]). A new link opened on a browser replaces the old sign-in there ([#733]).
 - A person who loses the email asks again and, if approved, gets a new, empty trial space ([#717]).
 - The key is stored scrambled. A network that tries 10 wrong links in an hour is refused for the rest of the hour. Its address is kept only that hour ([#717]).
@@ -86,3 +86,4 @@ A holder who does not visit cannot be reached ([#733]).
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

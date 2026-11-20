@@ -8,7 +8,7 @@ This file covers the first two of the main file's "Stages": the trial without ac
 
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
-- From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
+- From the EU, the UK, or a country Anthropic doesn't support, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717], [#802]).
 - The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](trial-links.md#the-link-code)) ([#755]).
 - If the trial does not show that opening is worth it, Crux stays a portfolio project, and guest mode stays ([#677], [#733]).
 

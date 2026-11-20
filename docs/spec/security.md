@@ -9,8 +9,21 @@ This file covers the visitor's country and address, keys in addresses, the reque
 - Cloudflare removes `CF-IPCountry` from a Worker's calls to an origin outside Cloudflare, such as Cloud Run (Cloudflare's HTTP headers page) ([#769]).
 - So the Worker reads the country from `request.cf.country` and the address from `CF-Connecting-IP`. It sends both to the backend in Crux's own headers, after deleting any incoming headers of those names ([#769]).
 - The backend reads only those headers, behind the secret-header check, and never `X-Forwarded-For` ([#769]). The address is what the code limits, the wrong-link counts and the copy page's wrong-code counts read ([#716], [#717], [#762], [#770]).
-- The country `XX` (no data), `T1` (Tor) and an empty country get the region message, like the EU and the UK ([#769]).
+- The country `XX` (no data), `T1` (Tor) and an empty country get the region message, like a barred country ([#769], [#802]).
 - The Worker drops `Referer` on its calls to Cloud Run, so a page's path never reaches the backend that way ([#769]).
+
+### The country on every AI request
+
+Crux checks the country where someone new comes in (see [`hosting.md`](hosting.md)), and also on every request that calls the AI, for accounts, trial links and guests. From the EU, the UK, or a country Anthropic doesn't support, or the unknown countries above, no AI call runs at all ([#802]):
+
+- A message gets "Crux isn't available in your region yet." in place of a reply, and no distress check runs.
+- An account's or trial link's message is kept as waiting. A guest's isn't kept: the tutor never reads it later, and it is left out of the conversation the tab sends back.
+- A check under way pauses as half-done, as when the whole tutor is switched off (see [`live-faults.md`](live-faults.md)). A check answer sent from there is not kept, and the problem is swapped on return. A guest's mini check is dropped.
+- Anything that costs no AI keeps working.
+- Crux keeps one yes-or-no for each account and trial link: whether the learner's latest action (opening the app, returning to the tab, sending, uploading) came from an allowed country. The open page's midnight call doesn't change it. It never holds the country, and it is erased with the account or link. Guests have none.
+- Background work (a waiting answer, a file read, a waiting read) runs only while that yes-or-no is yes.
+- A new request from an allowed country, or reopening the app from one, resumes the waiting work.
+- The owner re-checks Anthropic's supported-countries page before each stage (see [`quality-bar.md`](quality-bar.md)).
 
 ## Keys in addresses
 
@@ -133,3 +146,4 @@ These specifics are left to the build ticket. They were checked while deciding, 
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#780]: https://github.com/calmxz/Crux/issues/780
 [#781]: https://github.com/calmxz/Crux/issues/781
+[#802]: https://github.com/calmxz/Crux/issues/802

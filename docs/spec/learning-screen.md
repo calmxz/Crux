@@ -7,6 +7,9 @@ This file covers the session screen: where teaching, the mastery check, its resu
 ## One screen
 
 - A session is one screen: a top bar, the conversation, the chat box, and the objectives panel. The mastery check, its result and Crux's own lines all happen in that conversation, never on a separate screen.
+- Under the chat box, in every session, sits "Crux is an AI tutor and can make mistakes." ([#802])
+- At a limit, that limit's message, with the month's "Email me when it's back" tick-box, takes the chat box's place, with the file button beside it. During a started check, the box stays for its answers. The box comes back when the page finds the limit lifted (see [`at-a-limit.md`](at-a-limit.md)) ([#802]).
+- Where the check counter ("2 checks this week") and the reading counter ("Files: 60 of 100 pages read this week") show is left to the build ticket, which drafts it for the owner ([#802]).
 - The screen's states:
 
 ```mermaid
@@ -58,17 +61,19 @@ stateDiagram-v2
 ## Crux's own lines
 
 - Crux's own lines are centred lines in the thread, coloured by kind (information, warning, stop, care), and stay in the conversation. They include:
-  - the line after a filling reply, the limit messages and the month's tick-box (see [`spending.md`](spending.md) and [`at-a-limit.md`](at-a-limit.md));
+  - the line after the last reply past the bar (see [`at-a-limit.md`](at-a-limit.md)). The limit messages take the chat box's place instead (see [`spending.md`](spending.md)) ([#802]);
   - the "paused" lines and the re-mark notices (see [`live-faults.md`](live-faults.md));
   - "The tutor is busy right now", the lines when our AI provider refuses a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md) and [`refusals.md`](refusals.md));
-  - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
+  - the care line, the neutral care line and the crisis line (see [`refusals.md`](refusals.md) and [`misuse.md`](misuse.md)) ([#802]);
+  - "Refused by our AI provider", with its date, in place of a refused message once the learner leaves the page (see [`refusals.md`](refusals.md)) ([#802]);
+  - the quiet line 50 minutes after the tutor's last reply (see [`ai-layer.md`](ai-layer.md)) ([#802]);
   - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back";
   - "Crux can't be reached right now. Try again later.", after a Cloudflare refusal and one try 10 seconds later, while the message shows as sending; a typed message stays in the box (see [`security.md`](security.md)) ([#770]).
-- A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`at-a-limit.md`](at-a-limit.md) and [`live-faults.md`](live-faults.md)). After a broken reply, it is answered at the next opening or with the learner's next message ([#771]).
+- A message waiting for another reason stays in the thread with its waiting mark. It is answered once its block clears, or, when the tutor was switched off, by a tap (see [`at-a-limit.md`](at-a-limit.md) and [`live-faults.md`](live-faults.md)). After a broken reply, it is answered at the next opening or with the learner's next message ([#771]).
 - The age question is a card in the thread of whichever session is open, with Yes and No. When no conversation is open, it shows in the main area (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the after-first-mastery notice are pinned lines above the chat box. Each shows once, as its own file says, and stays until dismissed or until the learner leaves. Neither shows inside a check; one due during a check waits until the result (see [`spending.md`](spending.md) and [`feedback.md`](feedback.md)).
 - A held session's pinned line cannot be dismissed, and goes when its file is removed. Pinned lines stack with that line first, then in the order they came (see [`app-shell.md`](app-shell.md)) ([#752]).
-- The near-limit pop-up and the care line at a limit have no wording yet. The build ticket drafts both for the owner.
+- The near-limit pop-up, the care line, the neutral care line and the quiet line have no wording yet. The build ticket drafts them for the owner ([#802]).
 - The lines in [While a reply arrives](#while-a-reply-arrives), [When a reply breaks](#when-a-reply-breaks) and [Screen readers](#screen-readers) are drafts. The build ticket settles their wording with the owner ([#771]).
 
 ## Pictures
@@ -124,7 +129,7 @@ A guest's broken reply is in [`landing-screens.md`](landing-screens.md).
 | Module | What it holds |
 |---|---|
 | Session screen | The top bar, the conversation, the chat box and the panel, laid out for phone and desktop, and the switch into and out of the check |
-| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]); a reply as it arrives, the break lines, and what a screen reader hears ([#771]) |
+| Conversation | Tutor and learner messages, Crux's own lines by kind, waiting marks, pinned lines, the buttons and cards in the thread, and a message's sending state with its one retry after a Cloudflare refusal ([#770]); the AI notice under the chat box, and the limit message that takes its place ([#802]); a reply as it arrives, the break lines, and what a screen reader hears ([#771]) |
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |
@@ -141,3 +146,4 @@ The app shell, the session list, the all-sessions page and its search, the Recor
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#779]: https://github.com/calmxz/Crux/issues/779
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802
