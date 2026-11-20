@@ -44,8 +44,8 @@ All are in the DB unless marked, and go with their session ([#719]).
 | Items | Module | Lifetime |
 |---|---|---|
 | The session, its name, last-visit order, request, goal and level answers, jump points, resume point and step state | Learning | [`sessions.md`](sessions.md) |
-| Messages, Crux's fixed lines, blocked-message markers and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md) |
-| Waiting messages, messages kept while the tutor is off or a file is read, and claims on them | Learning | [`spending.md`](spending.md), [`live-faults.md`](live-faults.md), [`hosting.md`](hosting.md) |
+| Messages, Crux's fixed lines, blocked-message markers and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md), [`refusals.md`](refusals.md) |
+| Waiting messages, messages kept while the tutor is off or a file is read, and claims on them | Learning | [`at-a-limit.md`](at-a-limit.md), [`live-faults.md`](live-faults.md), [`hosting.md`](hosting.md) |
 | Topics, queued, paused and replaced topics, last-worked-on times, learning objectives and their status, trouble marks, missed-problem counts, dropped objectives and their offer, pass dates, mastered topics, menu sources, offers for passes from other sessions | Learning | [`teaching.md`](teaching.md), [`learning-loop.md`](learning-loop.md), [`sessions.md`](sessions.md) |
 | Mastery checks, problems and model answers, typed answers, marks, half-done checks, pause state, swap counts, disputes, complexity judgements | Mastery check | [`mastery-check.md`](mastery-check.md) |
 | Re-mark records, the "re-marked as correct" note, undone passes waiting for a check, pending re-mark notices | Mastery check | [`live-faults.md`](live-faults.md) |

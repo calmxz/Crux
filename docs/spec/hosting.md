@@ -60,7 +60,7 @@ Only if the owner's phone test still fails after all four ([#716]):
 
 ### Background answers
 
-What a background answer is, and when it runs, is in [`spending.md`](spending.md). A new message must still start within the main file's 5 seconds ([#734]).
+What a background answer is, and when it runs, is in [`at-a-limit.md`](at-a-limit.md). A new message must still start within the main file's 5 seconds ([#734]).
 
 - They run on the tasks service through Cloud Tasks, so they carry on if the learner leaves ([#735]).
 - Opening the app queues the learner's waiting messages and kept files' reads, oldest session first, with the open session ahead of them ([#734]).

@@ -26,7 +26,7 @@ This file covers what happens when someone says they are under 18. The rule that
 Crux shows its own fixed question, with Yes and No buttons: "Crux is for people 18 and over. Are you under 18?" ([#679])
 
 - The tap decides. The model never ends anyone's access ([#679], [#728] Answer 2).
-- While the question is open, a typed reply gets a short "please tap Yes or No" ([#679]). The distress check in [`spending.md`](spending.md) runs on it ([#734]).
+- While the question is open, a typed reply gets a short "please tap Yes or No" ([#679]). The distress check in [`at-a-limit.md`](at-a-limit.md) runs on it ([#734]).
 - The question holds the whole account or trial link. It shows in every session and on every browser, and there is no tutoring anywhere until the tap ([#733]).
 - It stays open if the session is deleted. Reading past sessions and "What you've mastered" still works ([#733]).
 - For a guest, it lasts as long as the tab ([#733]).

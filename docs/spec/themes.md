@@ -42,7 +42,7 @@ The anchor colours. Every other colour follows the rules here and the contrast t
 
 ## Pictures, maths and outside parts
 
-- Diagrams and graphs are drawn in the theme's own colours. Crux sets Mermaid's colour settings from the theme, in both themes (see [`ai-layer.md`](ai-layer.md)).
+- Diagrams and graphs are drawn in the theme's own colours. Crux sets Mermaid's colour settings from the theme, in both themes (see [`maths-library.md`](maths-library.md)).
 - Maths takes the theme's text colour, including maths KaTeX cannot draw (see [`learning-screen.md`](learning-screen.md)).
 - Crux draws "Continue with Google" to Google's branding guidelines: their dark button in the dark theme, their light button in light.
 - The human check (Turnstile) gets the theme Crux is showing, light or dark, set explicitly rather than Turnstile's "auto". While it has not passed, a theme change draws it again in the new theme, so a box that shows later matches the page. Once it has passed, it keeps its theme until the page loads again, so a passed check stays passed.

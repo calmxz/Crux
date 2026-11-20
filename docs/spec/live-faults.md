@@ -35,7 +35,7 @@ Learners see what is paused: "Checks are paused while we fix something; your pro
 **The whole tutor** ([#736])
 
 - A message sent while it is off is kept, marked as waiting, with this line: "The tutor is down while we fix something. Your message is saved: tap it to try again." It is answered when the learner refreshes the page, taps the message, sends another message there, or next opens the app. A tap too early leaves it waiting.
-- The distress check in [`spending.md`](spending.md) runs on that message.
+- The distress check in [`at-a-limit.md`](at-a-limit.md) runs on that message.
 - A check under way pauses as half-done, as below. An answer sent to an open problem meanwhile is not kept, and the problem is swapped on return.
 - Guests see guest mode's paused line, below.
 
@@ -71,7 +71,7 @@ Once a marking fault is fixed, every mark the faulty marker gave since the last 
 - Re-marks run in the Crux project and spend from the owner's share ([#728] Answer 1). Where they pause is in [`spending.md`](spending.md) ([#734]).
 - Checks stay off until the re-marks finish. The owner page shows their progress, and the owner switches checks back on ([#736]).
 - **After a planted-file fail,** a fresh marker checks the model answers of every check that used files since the last round that passed that test. A wrong one is corrected, and its answers re-marked. Checks come back once those re-checks finish ([#736]).
-- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a blocked re-mark leaves the mark standing (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a blocked re-mark leaves the mark standing (see [`refusals.md`](refusals.md)) ([#735]).
 
 | Re-mark finds | What happens |
 |---|---|

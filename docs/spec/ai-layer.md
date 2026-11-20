@@ -2,7 +2,7 @@
 
 **Draft: not locked.** Part of the [Crux v1 spec](README.md). Terms are as [`GLOSSARY.md`](../../GLOSSARY.md) defines them.
 
-This file covers how Crux reaches its AI, which model does each job, how a prompt is built, what the tutor reports, what happens when a call fails or is blocked, the maths library, and the distress check's call. The amounts are in the main file's "Money". What Crux decides instead of the model is in the main file's "Crux decides". This file is written from [#679] as it stands. Research [#727] may reopen it, and a reopening edits this file ([#680]).
+This file covers how Crux reaches its AI, which model does each job, how a prompt is built, what the tutor reports, and what happens when a call fails. Blocked calls and the distress check's call are in [`refusals.md`](refusals.md), and the maths library is in [`maths-library.md`](maths-library.md). The amounts are in the main file's "Money". What Crux decides instead of the model is in the main file's "Crux decides". This file is written from [#679] as it stands. Research [#727] may reopen it, and a reopening edits this file ([#680]).
 
 ## Route and projects
 
@@ -97,72 +97,9 @@ A broken reply is one whose stream ends before the reply is complete, for any re
 - A broken attempt is counted like any reply (see [`spending.md`](spending.md)). Answering again after a broken reply and the retry after a block are separate, each once per message.
 - A guest's browser acts for the guest, since Crux holds nothing for them (see [`landing-screens.md`](landing-screens.md)).
 
-## When Google blocks a call
-
-A blocked call has no tool call, so Crux reads Google's block result itself ([#733]). This covers a blocked message and a blocked reply ([#735]).
-
-| Block result | Counts as | What happens |
-|---|---|---|
-| Prohibited content | A sealed flag | The session is sealed. A second on the account locks it (see [`sealed-sessions.md`](sealed-sessions.md)) ([#735]) |
-| Any other harm result, should one occur with the filters off | A decline, kind "blocked by Google" | As [`misuse.md`](misuse.md) says ([#733]) |
-| Recitation, language, personal details, or an unspecified policy reason | A failed call, not a decline | The retry below ([#735]) |
-
-**A failed call of this kind** gets one retry per message, with a hidden line: "Explain in your own words. Don't quote the text." The file's pages still go. The line is not saved or carried to later turns, and the retry runs even if the blocked attempt filled a limit ([#735]). If the retry is blocked too, the learner sees "The tutor couldn't answer that. Try asking another way." A background answer leaves that line in place of the reply ([#735]).
-
-**A reply blocked partway through:** the words shown so far are removed, and Crux saves none of them. A failed call of the kind above then gets its retry. After a harm result, the learner sees "The tutor can't continue that reply". This and a fault on Crux's side (see [A broken reply](#a-broken-reply)) are the two exceptions to the main file's "a reply is never cut off midway" ([#735], [#771]).
-
-**A blocked message** stays in the conversation for the learner, and is left out of later prompts and the lookup. It counts once. Messages answered together count as one message. A tool result from a removed reply is dropped ([#735]).
-
-**During a mastery check** ([#735]):
-
-- A blocked problem is thrown away unseen, and a new one is written. It is not a decline.
-- If marking is blocked after the retry, the problem is swapped at once: "We couldn't mark that one because our AI provider's filter stopped the marking. This doesn't count against you. Here's a new problem."
-- After 2 swaps on the same problem, or 2 blocked writes in a row, the check pauses as half-done. The owner's daily email lists it. Opening the check resumes it, with the problem swapped and the count back at 0.
-- A blocked slip fix or walk-through is treated like blocked marking.
-- A blocked dispute stays unused: "We couldn't check that dispute. Try again later."
-- A blocked re-mark leaves the mark standing, and the daily email lists it.
-- A prohibited-content result seals the session. The check waits half-done until the seal is lifted.
-
-**Reading a file:** a failed call of this kind follows the failed-read rule in [`files.md`](files.md) after its retry. A harm result gets no retry: prohibited content seals the session, and any other counts as a harmful file. Overload, or a cap, never uses up a read's tries ([#735]).
-
-## The maths library
-
-The library is SymPy. Where it runs in a check is in [`mastery-check.md`](mastery-check.md).
-
-- **What it reads:** only LaTeX, with the Lark backend. `parse_expr` and `sympify` never run on outside text ([#716]).
-- **What goes to it:** expression and number answers, quantities with units, a file's maths step, and a graph's function. Equations, sets, intervals and worded answers go to the AI's independent working ([#716], [#751]).
-- **Units:** SymPy's own units module checks quantities with units ("15 m/s") wherever the library reads: model answers, learners' final answers, file mistakes and graphs' axes ([#751]).
-- **How it compares:** by simplifying and a numeric spot-check. Each comparison runs in a separate process, killed after a few seconds ([#716]).
-
-| Result | When |
-|---|---|
-| Match | The difference simplifies to 0, or is near 0 at several random points |
-| No match | Any valid point clearly differs |
-| Can't tell | A point cannot be evaluated, the time runs out, or the answer is not an expression or number |
-
-- **Model answers:** a match is saved. No match throws the problem away unseen, and a new one is written and checked. "Can't tell" goes to the AI's independent working ([#679]).
-- **Final answers:** it also compares the learner's final answer with the model answer. A disagreement with the marker brings a fresh re-mark, told whether the final values match, before the learner sees a result ([#679]).
-- The library never marks alone, and the working is still judged ([#679]).
-- **Pictures:** a diagram's Mermaid text must parse before it is drawn. A graph's function is read like an answer, and the library works out the points and any tangent's slope. If either fails, nothing is drawn, and the tutor explains in words. Crux stores the description, not an image ([#751]).
-- **Diagrams:** the parse check allows only the three type words in [`teaching.md`](teaching.md), so any other type fails like any picture. It refuses settings, styles, classes, colours, images and icons in the Mermaid text, so the contrast test holds and no diagram loads anything from outside ([#769]).
-- **Diagram build notes,** checked while deciding ([#769]):
-  - The refused grammar includes frontmatter `config:`, `%%{init}%%`, `style`, `classDef`, `class`, `:::`, `linkStyle`, sequence `rect` and `box` colours, and flowchart `img` and `icon` shapes.
-  - The frontend runs Mermaid with `securityLevel: 'strict'`, and with `theme`, `themeVariables`, `themeCSS` and `fontFamily` added to its `secure` list.
-- **File mistakes:** the library does the file's step itself and compares it with the file's result. Match: no flag. No match: the flag goes ahead. Can't tell: the tutor judges alone (see [`files.md`](files.md)) ([#751]).
-
-## The distress check's call
-
-When a limit or a switch stops a message, Crux asks the model whether the person is in distress. What follows from the answer is in [`spending.md`](spending.md) ([#734]).
-
-- The call sends only the stopped message, and asks one yes-or-no question ([#734]). The answer comes in a fixed format ([#735]).
-- It spends from the distress check's pot, USD 0.05 a day, paid from the owner's share. The owner can change the amount on the owner page ([#734]).
-- No check runs when the pot or the share has run out, or when Google's cap has stopped Crux ([#734]).
-- A call that fails, is blocked, or returns anything else counts as "no". It is never a decline, and it never seals a session ([#735]).
-
 ## Gaps
 
 - **The AI layer may change:** research [#727] checks Claude through Anthropic's API ([#680]).
-- **Build checks on Google's behaviour:** how a block arrives mid-stream, and whether a blocked attempt is charged ([#735]).
 - **How reliably Flash-Lite at `low` calls its tools:** a tutor that forgets to report a solved problem leaves an objective unshown. Open on [#678] ([#679]).
 - **Whether the topic slice keeps the file rules on real decks,** and whether Gemini can read pages straight from the bucket: see [`files.md`](files.md).
 - **What a sitting costs on Agent Platform:** see [`spending.md`](spending.md).
@@ -180,7 +117,6 @@ The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor 
 [#727]: https://github.com/calmxz/Crux/issues/727
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
-[#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#769]: https://github.com/calmxz/Crux/issues/769

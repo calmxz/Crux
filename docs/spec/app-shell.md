@@ -29,7 +29,7 @@ flowchart TD
 ## The session list
 
 - Each line has three rows:
-  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a limit, a switch, a hold, the age question, or a broken reply ([#771]) (see [`spending.md`](spending.md));
+  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a limit, a switch, a hold, the age question, or a broken reply ([#771]) (see [`at-a-limit.md`](at-a-limit.md));
   - "On: Range" while a topic is under way, or "Mastered last: The chain rule" when none is, then the last visit ("Today", "Yesterday", then a date such as "6 Nov"). A line with neither shows only the last visit;
   - while a topic is under way, a small bar and "3 of 4": that topic's objectives shown or passed, the same count as the phone strip (see [`learning-screen.md`](learning-screen.md)).
 - Session names need not be unique. Every link points at a session, not its name.
@@ -88,7 +88,7 @@ The page that lists every one of the learner's sessions and holds [the session s
 - During a session, files come in through the file button in the chat box. On desktop, files dropped on the session screen are added the same way. Never during a check (see [`files.md`](files.md#types-and-limits)).
 - A file's state shows under its name in the objectives panel: "Reading…", "Your file is saved. It'll be read when you're back tomorrow.", "Saved. It'll be read when files are back." while files are switched off, or "Couldn't read this file, so it wasn't added. Try again, or use another file." with Dismiss.
 - The conversation keeps only the tutor's messages and Crux's own lines the spec already calls for when something changes. While a file given with the request is read, "Reading…" also shows in the conversation, in place of the reply the learner is waiting for.
-- The fixed line after a read fills the limit reads "Lecture 7.pdf uploaded successfully." (see [`spending.md`](spending.md#files-at-a-limit)).
+- The fixed line after a read fills the limit reads "Lecture 7.pdf uploaded successfully." (see [`at-a-limit.md`](at-a-limit.md#files-at-a-limit)).
 - A file of the wrong type, a file over 50 MB, or an upload over 100 pages gets a pinned line above the chat box, or under the start box. It stays until dismissed or until the learner leaves, and the file is never added:
   - "lecture 6.ppt: Please save this as a PDF or `.pptx`"
   - '"Full year notes.pdf" has 340 pages, over the 100-page limit for one upload: upload just the chapter you need.'

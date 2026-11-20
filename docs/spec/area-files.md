@@ -23,7 +23,8 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`sessions.md`](sessions.md) | What Crux remembers: sessions, the note, the lookup, the session search, passed work across sessions, the 7-day refresh, renaming and deleting | 671 (+664, 674, 676, 677, 678, 681, 716, 722, 731, 780) | 2,900 |
 | [`accounts.md`](accounts.md) | Sign-up and sign-in, codes and their limits, staying signed in, the let-in list, registering with the Commission | 674 (+675, 677, 679, 681, 717, 753, 754, 772, 776, 777) | 1,250 |
 | [`age.md`](age.md) | The tutor's age question, closing an under-18 account, the same for guests and trial links | 681 (+677, 679, 717, 722, 754, 777) | 600 |
-| [`spending.md`](spending.md) | Tutoring limits, Google's caps, started checks finishing, spending messages, what the owner page changes | 675 (+667, 671, 674, 676, 677, 678, 679, 716, 717, 722, 728, 731, 733, 734, 771) | 1,100 |
+| [`spending.md`](spending.md) | What is counted, the budget and the ceiling, tutoring limits, Google's caps, spending messages, what the owner page changes | 675 (+667, 671, 674, 676, 677, 678, 679, 716, 717, 722, 728, 731, 733, 734, 771) | 1,650 |
+| [`at-a-limit.md`](at-a-limit.md) | The reply that fills the bar, what a stopped message keeps, files at a limit, a learner in distress at a limit, started checks finishing | 675 (+671, 678, 719, 731, 733, 734, 735, 736, 771) | 1,250 |
 | [`trial.md`](trial.md) | Guest mode, Request access, the advisory opinion, ending the trial | 677, 722 (+717, 754, 770, 772, 776, 777, 779) | 2,050 |
 | [`trial-links.md`](trial-links.md) | Trial links: opening one, the link code, erasing a link, what a link carries, misuse, when a link dies, telling a link holder | 677, 722 (+717, 770, 772, 776, 777) | 1,250 |
 | [`privacy.md`](privacy.md) | When the owner reads sessions, deleting and retention | 677 (+679, 681, 716, 717, 722, 753, 770, 772, 776, 777) | 1,900 |
@@ -31,7 +32,9 @@ Sizes estimate the current rules, stated without reasons. Source tickets decided
 | [`misuse.md`](misuse.md) | The harm line, the misuse flag, the owner's decision, misuse closures | 677 (+665, 667, 732, 733, 753, 754, 772, 776, 777) | 1,850 |
 | [`sealed-sessions.md`](sealed-sessions.md) | Sealed flags, what a seal tells the learner, a Reported session | 677 (+733, 772, 776, 777) | 1,350 |
 | [`feedback.md`](feedback.md) | The feedback page, counts, who sees the owner page, the go-public bar, budget-caused misses | 676 (+674, 675, 677, 678, 679, 681, 717, 722, 728, 733, 734, 772) | 1,200 |
-| [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed and blocked calls, the maths library, the distress check's call | 679, 684 (+678, 716, 728, 733, 734, 735, 769, 771) | 1,300 |
+| [`ai-layer.md`](ai-layer.md) | Route and projects, models and call settings, the prompt, tool calls, failed calls | 679, 684 (+678, 716, 728, 733, 734, 735, 769, 771) | 1,750 |
+| [`refusals.md`](refusals.md) | Blocked calls and the distress check's call | 679 (+733, 734, 735, 771) | 700 |
+| [`maths-library.md`](maths-library.md) | The maths library: what it reads, how it compares, pictures and diagrams | 679 (+716, 769) | 500 |
 | [`hosting.md`](hosting.md) | Hosting and runtime, background answers, the Worker, the database, logs, the converter, secrets | 716 (+675, 678, 717, 722, 726, 732, 733, 734, 735, 750, 754, 769, 770, 771, 781) | 2,050 |
 | [`backups-and-releases.md`](backups-and-releases.md) | Backups and the restore log, environments and staging, releases | 716 (+678, 679, 726, 735, 750, 769, 770, 772, 776, 777, 781) | 1,200 |
 | [`security.md`](security.md) | The visitor's country and address, keys in addresses, the request guards, the content security policy, the other headers, where they are set, their checks, build notes | 769 (+716, 717, 770, 780, 781) | 2,500 |

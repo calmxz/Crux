@@ -58,13 +58,13 @@ stateDiagram-v2
 ## Crux's own lines
 
 - Crux's own lines are centred lines in the thread, coloured by kind (information, warning, stop, care), and stay in the conversation. They include:
-  - the line after a filling reply, the limit messages and the month's tick-box (see [`spending.md`](spending.md));
+  - the line after a filling reply, the limit messages and the month's tick-box (see [`spending.md`](spending.md) and [`at-a-limit.md`](at-a-limit.md));
   - the "paused" lines and the re-mark notices (see [`live-faults.md`](live-faults.md));
-  - "The tutor is busy right now", the lines when Google blocks a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md));
+  - "The tutor is busy right now", the lines when Google blocks a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md) and [`refusals.md`](refusals.md));
   - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
   - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back";
   - "Crux can't be reached right now. Try again later.", after a Cloudflare refusal and one try 10 seconds later, while the message shows as sending; a typed message stays in the box (see [`security.md`](security.md)) ([#770]).
-- A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`spending.md`](spending.md) and [`live-faults.md`](live-faults.md)). After a broken reply, it is answered at the next opening or with the learner's next message ([#771]).
+- A stopped message stays in the thread with its waiting mark. It is answered after the reset, or, when the tutor was switched off, by a tap (see [`at-a-limit.md`](at-a-limit.md) and [`live-faults.md`](live-faults.md)). After a broken reply, it is answered at the next opening or with the learner's next message ([#771]).
 - The age question is a card in the thread of whichever session is open, with Yes and No. When no conversation is open, it shows in the main area (see [`app-shell.md`](app-shell.md)) ([#752]).
 - The near-limit pop-up and the after-first-mastery notice are pinned lines above the chat box. Each shows once, as its own file says, and stays until dismissed or until the learner leaves. Neither shows inside a check; one due during a check waits until the result (see [`spending.md`](spending.md) and [`feedback.md`](feedback.md)).
 - A held session's pinned line cannot be dismissed, and goes when its file is removed. Pinned lines stack with that line first, then in the order they came (see [`app-shell.md`](app-shell.md)) ([#752]).
@@ -73,9 +73,9 @@ stateDiagram-v2
 
 ## Pictures
 
-- A diagram or graph shows inside the tutor's message, with a caption. When and how the tutor draws is in [`teaching.md`](teaching.md); how Crux checks a picture is in [`ai-layer.md`](ai-layer.md).
+- A diagram or graph shows inside the tutor's message, with a caption. When and how the tutor draws is in [`teaching.md`](teaching.md); how Crux checks a picture is in [`maths-library.md`](maths-library.md).
 - Diagrams are drawn from Mermaid text on the frontend. Graphs are drawn from the points SymPy works out; the drawing library is left to the build.
-- The frontend draws only what Mermaid parses as one of the three types in [`teaching.md`](teaching.md), with Mermaid's settings locked (see [`ai-layer.md`](ai-layer.md)) ([#769]).
+- The frontend draws only what Mermaid parses as one of the three types in [`teaching.md`](teaching.md), with Mermaid's settings locked (see [`maths-library.md`](maths-library.md)) ([#769]).
 - Every picture has a text alternative built from its own data, with no AI call. The caption stays visible ([#769]):
   - A flowchart or state diagram reads as a list of its boxes and arrows. A sequence diagram reads as its messages in order.
   - In teaching, a graph reads as its range, its marked points or tangent, and a short table of its points (about nine). The formula is named only if the picture labels it.
@@ -90,7 +90,7 @@ stateDiagram-v2
 ## While a reply arrives
 
 - A tutor reply shows word by word as it arrives. Check problems, marks, model answers and the result show whole ([#771]).
-- Maths appears once the piece is complete, so no LaTeX shows while a reply arrives. A diagram or graph shows "Checking the picture..." until its check passes, even after the words end. If the check fails, the placeholder goes and the tutor explains in words (see [`ai-layer.md`](ai-layer.md)) ([#771]).
+- Maths appears once the piece is complete, so no LaTeX shows while a reply arrives. A diagram or graph shows "Checking the picture..." until its check passes, even after the words end. If the check fails, the placeholder goes and the tutor explains in words (see [`maths-library.md`](maths-library.md)) ([#771]).
 - Before the first word, the screen shows "The tutor is writing...", except where the spec already names the wait: "Starting the tutor…", "Reading…", "Marking…", a problem being written, or the line of whatever stopped the message. The busy line at 5 seconds stands ([#771]).
 
 ## When a reply breaks
