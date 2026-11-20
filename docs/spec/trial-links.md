@@ -33,7 +33,8 @@ This file covers opening a trial link, the link code, erasing a link, what a lin
 The main file's "Stages" sets the rule. In detail:
 
 - Every step of the learning loop, with files in a session and photo answers in a check, under the rules decided for accounts (see [`files.md`](files.md) and [`mastery-check.md`](mastery-check.md)) ([#722]).
-- The same tutoring limit as an account (see [`spending.md`](spending.md)) ([#677]).
+- The same limits as an account, shared across its browsers: the tutoring limit, 2 checks and 100 pages a week (see [`spending.md`](spending.md)) ([#677], [#802]).
+- The region yes-or-no an account keeps (see [`security.md`](security.md)) ([#802]).
 - An account's storage allowance, in the shared store (see [`files.md`](files.md)) ([#722]).
 - Sessions stay under the link until it dies (below). Removing a file or deleting a session erases at once, apart from a sealed session (see [`sealed-sessions.md`](sealed-sessions.md)) ([#717], [#722], [#733]).
 - Anonymous feedback, which is kept. A tap on Yes to the age question removes its words and quote permissions (see [`feedback.md`](feedback.md)) ([#677], [#717], [#734]).

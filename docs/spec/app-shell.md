@@ -29,7 +29,7 @@ flowchart TD
 ## The session list
 
 - Each line has three rows:
-  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a limit, a switch, a hold, the age question, or a broken reply ([#771]) (see [`at-a-limit.md`](at-a-limit.md));
+  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a switch, the region stop, a hold, the age question, a file's waiting read, or a broken reply ([#771], [#802]) (see [`at-a-limit.md`](at-a-limit.md));
   - "On: Range" while a topic is under way, or "Mastered last: The chain rule" when none is, then the last visit ("Today", "Yesterday", then a date such as "6 Nov"). A line with neither shows only the last visit;
   - while a topic is under way, a small bar and "3 of 4": that topic's objectives shown or passed, the same count as the phone strip (see [`learning-screen.md`](learning-screen.md)).
 - Session names need not be unique. Every link points at a session, not its name.
@@ -151,5 +151,6 @@ The session screen's modules (see [`learning-screen.md`](learning-screen.md#fron
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#771]: https://github.com/calmxz/Crux/issues/771
-[#780]: https://github.com/calmxz/Crux/issues/780
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802

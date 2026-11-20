@@ -75,6 +75,8 @@ If the day's emails have run out, an invite or decline waits for Resend's next d
 - Error reports carry no learner text.
 - "On a trial link, your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779])
 - The dated under-18 count exists.
+- The link keeps its checks started and pages read this week, for the limits, and whether its latest action came from an allowed country, never the country. Both go with the link ([#802]).
+- A refused message's text is erased when it is refused. Only "Refused by our AI provider" and its date stay ([#802]).
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
 - "Crux handles the kinds of requests the tutor declines as possibly sensitive information." ([#776])

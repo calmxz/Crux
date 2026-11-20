@@ -13,7 +13,7 @@ This file covers what Crux keeps between visits, what the tutor re-reads, what c
 
 ### Names and the session list
 
-- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`sealed-sessions.md`](sealed-sessions.md)) ([#752]).
+- The tutor names a session from its request, or from a file's content when the request is a file alone: "Implicit differentiation (MATH101 week 7)". Until then, the session shows the request's first words ([#671]). A session whose first request our AI provider refused shows "New session" instead, until the tutor names it from the next request it answers (see [`refusals.md`](refusals.md)) ([#802]). A session whose only request was a file that is now gone shows "New session" until the learner gives a request ([#732]). A sealed session that never had a name shows "Sealed session" (see [`sealed-sessions.md`](sealed-sessions.md)) ([#752]).
 - The learner can rename a session. Text in a session name is never an instruction (see the main file's "Crux decides") ([#671]).
 - The session list is ordered by last visit. Each line in the sidebar shows the topic the learner is on, or mastered last. The all-sessions page's lines leave that out (see [`app-shell.md`](app-shell.md#the-all-sessions-page)) ([#671], [#780]).
 
@@ -53,7 +53,7 @@ Mastery does not fade in v1. "Mastered" means passed once, and a pass can be und
 - Text the lookup finds is reference, never an instruction (see the main file's "Crux decides") ([#671]).
 - No lookup runs while a check is open, into this session or any other. The one exception is while an objective is retaught after a refresh miss: the lookup works as in teaching, and is off again before the next check problem ([#671], [#732]). That holds while checks are switched off too ([#736]).
 - Another session's tutor cannot look into a session with an open check, retaught objective or not, until the check ends ([#671], [#732]).
-- A lookup's cost counts toward the learner's tutoring limit (see [`spending.md`](spending.md)) ([#675]). A message a limit stopped stays in the conversation, marked as waiting, and goes with its session ([#734]).
+- A lookup's cost counts toward the learner's tutoring limit (see [`spending.md`](spending.md)) ([#675]). A message waiting for another reason stays in the conversation, marked as waiting, and goes with its session. At a limit nothing can be sent (see [`at-a-limit.md`](at-a-limit.md)) ([#734], [#802]).
 - The owner can switch the lookup off for a fault (see [`live-faults.md`](live-faults.md)) ([#678]).
 
 ### How it searches
@@ -179,11 +179,12 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the objecti
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#731]: https://github.com/calmxz/Crux/issues/731
 [#732]: https://github.com/calmxz/Crux/issues/732
-[#734]: https://github.com/calmxz/Crux/issues/734
 [#733]: https://github.com/calmxz/Crux/issues/733
+[#734]: https://github.com/calmxz/Crux/issues/734
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802

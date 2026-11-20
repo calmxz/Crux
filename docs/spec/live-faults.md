@@ -35,13 +35,13 @@ Learners see what is paused: "Checks are paused while we fix something; your pro
 **The whole tutor** ([#736])
 
 - A message sent while it is off is kept, marked as waiting, with this line: "The tutor is down while we fix something. Your message is saved: tap it to try again." It is answered when the learner refreshes the page, taps the message, sends another message there, or next opens the app. A tap too early leaves it waiting.
-- The distress check in [`at-a-limit.md`](at-a-limit.md) runs on that message.
+- No distress check runs on that message ([#802]).
 - A check under way pauses as half-done, as below. An answer sent to an open problem meanwhile is not kept, and the problem is swapped on return.
 - Guests see guest mode's paused line, below.
 
 **Guest mode** ([#736])
 
-- The public link shows that guest mode is paused, with the demo video. A guest's message is never kept, and the distress check runs on it. A started mini check is dropped. It is also dropped when checks are off, since guests keep nothing.
+- The public link shows that guest mode is paused, with the demo video. A guest's message is never kept, and no distress check runs on it ([#802]). A started mini check is dropped. It is also dropped when checks are off, since guests keep nothing.
 
 **The mastery check** ([#678], [#736])
 

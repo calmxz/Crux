@@ -44,9 +44,9 @@ All are in the DB unless marked, and go with their session ([#719]).
 | Items | Module | Lifetime |
 |---|---|---|
 | The session, its name, last-visit order, request, goal and level answers, jump points, resume point and step state | Learning | [`sessions.md`](sessions.md) |
-| Messages, Crux's fixed lines, blocked-message markers and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md), [`refusals.md`](refusals.md) |
+| Messages, Crux's fixed lines, refused-message markers ("Refused by our AI provider" and the date) and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md), [`refusals.md`](refusals.md) |
 | Waiting messages, messages kept while the tutor is off or a file is read, and claims on them | Learning | [`at-a-limit.md`](at-a-limit.md), [`live-faults.md`](live-faults.md), [`hosting.md`](hosting.md) |
-| Topics, queued, paused and replaced topics, last-worked-on times, learning objectives and their status, trouble marks, missed-problem counts, dropped objectives and their offer, pass dates, mastered topics, menu sources, offers for passes from other sessions | Learning | [`teaching.md`](teaching.md), [`learning-loop.md`](learning-loop.md), [`sessions.md`](sessions.md) |
+| Topics, queued, paused and replaced topics, last-worked-on times, learning objectives and their status, trouble marks, "fixed slip" notes ([#802]), missed-problem counts, dropped objectives and their offer, pass dates, mastered topics, menu sources, offers for passes from other sessions | Learning | [`teaching.md`](teaching.md), [`learning-loop.md`](learning-loop.md), [`sessions.md`](sessions.md) |
 | Mastery checks, problems and model answers, typed answers, marks, half-done checks, pause state, swap counts, disputes, complexity judgements | Mastery check | [`mastery-check.md`](mastery-check.md) |
 | Re-mark records, the "re-marked as correct" note, undone passes waiting for a check, pending re-mark notices | Mastery check | [`live-faults.md`](live-faults.md) |
 | Photo answers (bucket) | Files | [`mastery-check.md`](mastery-check.md), [`files.md`](files.md) |
@@ -63,7 +63,8 @@ In the DB, and erased with the home ([#719]).
 |---|---|---|
 | The record, preferences | Learning | [`sessions.md`](sessions.md), [`teaching.md`](teaching.md) |
 | The time zone: the browser sends it with each request, and the home keeps the latest | Homes | With the home ([#719]) |
-| Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
+| Spend for the current day and week, checks started and pages read this week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
+| The region marker: whether the latest action came from an allowed country, never the country | Safety | [`security.md`](security.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
 | Decline records, the open flag, a warning with its date, a misuse card waiting, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
@@ -126,7 +127,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | Nameless counts: arrivals, path counts, the dated under-18 count, refused codes, accounts ever made, the go-public window and its turn-away days | Feedback, Sign-in | For the life of Crux v1 ([#719]) |
 | "Told Crux is full": a scrambled email per day, on both sign-in paths | Sign-in | That day only: a Cloud Tasks job deletes it at the end of the owner's day, and the daily job sweeps any it missed ([#719]) |
 | Trial turned-away counts | Spending | [`spending.md`](spending.md) |
-| The month's, today's, the guests' daily and monthly, the owner's share and the distress check's spend; nameless totals; re-run budget state; alert markers | Spending | [`spending.md`](spending.md) |
+| The month's, today's, the guests' daily and monthly, the owner's share and the three distress pots' spend; nameless totals; re-run budget state; alert markers | Spending | [`spending.md`](spending.md) |
 | Owner-page settings and switch states | Owning module; switches: Operations | Until changed ([`live-faults.md`](live-faults.md)) |
 | Let-in entries and their notes, the owner's own email list, "email me if spots open" addresses | Sign-in | [`accounts.md`](accounts.md) |
 | Waiting access requests, invites and declines waiting to send, the trial end date | Sign-in, Homes | [`trial.md`](trial.md) |
@@ -204,3 +205,4 @@ The backend splits by area. Only an item's module writes it. The one exception i
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

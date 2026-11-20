@@ -32,6 +32,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - age-question answers;
 - each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]);
 - each outage, each date an outage or a notice's acceptance moved, as the new last day per ID, a waiting erasure warning, and each inbox confirmation (see [`dates.md`](dates.md)) ([#772]).
+- each refused message's erasure: the text erased, the marker kept, any waiting state cleared, and a session name taken from the refused words reset ([#802]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
