@@ -17,7 +17,7 @@ Someone who uses Crux on the public link without an account, before Crux opens, 
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
-The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, the holder taps Yes to Crux's age question, or the holder erases the link.
+The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within an account's limits. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, the holder taps Yes to Crux's age question, or the holder erases the link.
 _Avoid_: invite, code, password
 
 **Link code**:
@@ -78,11 +78,19 @@ The most money Crux can spend on tutoring in a month, including tutoring for gue
 _Avoid_: quota
 
 **Owner's share**:
-The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault, for the check on a message a limit or a switch stopped, and for the small call that tests whether Google has reopened after its cap. It is separate from the budget. When it runs out, only those stop, until the owner raises the share or the month resets.
+The most money the owner's own tutoring can spend in a month. It also pays for re-marking learners' mastery checks after a marking fault, for the distress checks (their daily pots, and accounts' and trial links' refusal checks for a while once the day's pot is used up), and for the small call that tests whether Anthropic accepts calls again after a stop. It is separate from the budget. When it runs out, only those stop, until the owner raises the share or the month resets.
 
 **Tutoring limit**:
-The most tutoring one learner can use, measured by what it costs. There is a daily limit and a weekly limit, and whichever runs out first applies. When it runs out, the learner is not tutored until it resets. The one exception: they can finish a mastery check that has already started.
+The most tutoring one learner can use, measured by what it costs. There is a daily limit and a weekly limit, and whichever runs out first applies. When it runs out, the learner can't send anything to the tutor until it resets. The one exception: they can finish a mastery check that has already started. Mastery checks and a file's first read don't use it: they have the check limit and the reading limit.
 _Avoid_: allowance, quota, credits
+
+**Check limit**:
+How many mastery checks one learner can start in a week. A check counts in the week it starts.
+_Avoid_: check allowance, check quota
+
+**Reading limit**:
+How many pages of a learner's files Crux reads into outlines in a week.
+_Avoid_: allowance (that is the files' storage space), page quota
 
 **Preference**:
 How the learner likes to be taught, such as with real-world examples. Crux remembers it across sessions only if the learner agrees.
@@ -115,7 +123,7 @@ One period of learning without a break, during one visit, with no set length. A 
 _Avoid_: sitting, lesson, visit
 
 **Broken reply**:
-A tutor reply whose stream ends before it is complete, for any reason except Google blocking it: the learner's connection is lost, or something fails on Crux's side. Crux answers it by itself, and the learner taps nothing.
+A tutor reply whose stream ends before it is complete, for any reason except the AI provider refusing it: the learner's connection is lost, or something fails on Crux's side. Crux answers it by itself, and the learner taps nothing.
 _Avoid_: break (a study block's break is a pause), dropped reply
 
 **All-sessions page**:
@@ -163,7 +171,7 @@ Every topic the learner has mastered and every learning objective they have pass
 _Avoid_: profile, progress, history
 
 **Slip**:
-A careless mistake in a method the learner knows. The learner fixes it on their own once the tutor points to it. Unlike a misconception, it does not change the learning objective's status, even one already shown.
+A careless mistake in a method the learner knows. The learner fixes it on their own once the tutor points to it. Unlike a misconception, it never takes a learning objective's status away, even one already shown. On a fresh problem, a slip the learner fixes counts as solving it with no help.
 _Avoid_: typo, error
 
 **Diagnostic**:

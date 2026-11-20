@@ -8,7 +8,7 @@ This file covers the first two of the main file's "Stages": the trial without ac
 
 - Crux is deployed with sign-up off. Sign-in is for the owner only (see [`accounts.md`](accounts.md)) ([#677], [#728] Answer 5).
 - The landing page shows the demo video and guest mode, in place of the pre-written example ([#677]). It also offers Request access ([#717]).
-- From the EU or the UK, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717]).
+- From the EU, the UK, or a country Anthropic doesn't support, the public link shows the demo video and the region message (see [`accounts.md`](accounts.md)), with no guest mode and no Request access ([#677], [#717], [#802]).
 - The trial stays without accounts. Crux erases the email once the invite is sent, and keeps no record of its own that ties a person to a trial link ([#717], [#722]). The one exception is the holder's own: an email they send quoting their link code, deleted once answered (see [The link code](trial-links.md#the-link-code)) ([#755]).
 - If the trial does not show that opening is worth it, Crux stays a portfolio project, and guest mode stays ([#677], [#733]).
 
@@ -35,8 +35,8 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 - Replies are counted per browser by a random ID, which the browser holds with the count, signed ([#719]). It is never used for counting learners or for analytics ([#677]).
 - Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
 - Guest mode also has a monthly cap, USD 2 for the meantime, changeable on the owner page, so guests cannot use most of the month's budget ([#719]).
-- **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Guest mode is full for this month. Back on 1 Dec.", [#754]) and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video, with Request access while the trial runs ([#734], [#754]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`spending.md`](spending.md) runs ([#734]).
-- When Google's cap stops Crux, a guest sees the month's line and the video. Google refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734]).
+- **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Guest mode is full for this month. Back on 1 Dec.", [#754]) and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video, with Request access while the trial runs ([#734], [#754]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]).
+- When a workspace limit or the credit stops Crux, a guest sees the month's line and the video. Anthropic refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734], [#802]).
 - The owner page has a switch for guest mode (see [`live-faults.md`](live-faults.md)) ([#678]).
 
 ## Request access
@@ -75,6 +75,8 @@ If the day's emails have run out, an invite or decline waits for Resend's next d
 - Error reports carry no learner text.
 - "On a trial link, your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779])
 - The dated under-18 count exists.
+- The link keeps its checks started and pages read this week, for the limits, and each objective's hidden "fixed slip" note until the objective passes its check, and whether its latest action came from an allowed country, never the country. Both go with the link ([#802]).
+- A refused message's text is erased when it is refused. Only "Refused by our AI provider" and its date stay ([#802]).
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).
 - "Crux handles the kinds of requests the tutor declines as possibly sensitive information." ([#776])
@@ -130,8 +132,8 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#754]: https://github.com/calmxz/Crux/issues/754
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
@@ -139,3 +141,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

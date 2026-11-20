@@ -29,7 +29,7 @@ flowchart TD
 ## The session list
 
 - Each line has three rows:
-  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a limit, a switch, a hold, the age question, or a broken reply ([#771]) (see [`spending.md`](spending.md));
+  - the session's name, then its badges, in this order: "Sealed", "Remove a file to continue" (held by a harmful file), "Check open", and "1 waiting". A sealed line shows only "Sealed". "1 waiting" counts messages marked as waiting for any reason: a switch, the region stop, a hold, the age question, a file's waiting read, or a broken reply ([#771], [#802]) (see [`at-a-limit.md`](at-a-limit.md));
   - "On: Range" while a topic is under way, or "Mastered last: The chain rule" when none is, then the last visit ("Today", "Yesterday", then a date such as "6 Nov"). A line with neither shows only the last visit;
   - while a topic is under way, a small bar and "3 of 4": that topic's objectives shown or passed, the same count as the phone strip (see [`learning-screen.md`](learning-screen.md)).
 - Session names need not be unique. Every link points at a session, not its name.
@@ -86,9 +86,9 @@ The page that lists every one of the learner's sessions and holds [the session s
 ## Files on screen
 
 - During a session, files come in through the file button in the chat box. On desktop, files dropped on the session screen are added the same way. Never during a check (see [`files.md`](files.md#types-and-limits)).
-- A file's state shows under its name in the objectives panel: "Reading…", "Your file is saved. It'll be read when you're back tomorrow.", "Saved. It'll be read when files are back." while files are switched off, or "Couldn't read this file, so it wasn't added. Try again, or use another file." with Dismiss.
+- A file's state shows under its name in the objectives panel: "Reading…", "Your file is saved. It'll be read when you're back tomorrow.", "Your file is saved. It'll be read when you're back on Monday." at the reading limit ([#802]), "Saved. It'll be read when files are back." while files are switched off, or "Couldn't read this file, so it wasn't added. Try again, or use another file." with Dismiss.
 - The conversation keeps only the tutor's messages and Crux's own lines the spec already calls for when something changes. While a file given with the request is read, "Reading…" also shows in the conversation, in place of the reply the learner is waiting for.
-- The fixed line after a read fills the limit reads "Lecture 7.pdf uploaded successfully." (see [`spending.md`](spending.md#files-at-a-limit)).
+- The fixed line after a read fills the limit reads "Lecture 7.pdf uploaded successfully." (see [`at-a-limit.md`](at-a-limit.md#files-at-a-limit)).
 - A file of the wrong type, a file over 50 MB, or an upload over 100 pages gets a pinned line above the chat box, or under the start box. It stays until dismissed or until the learner leaves, and the file is never added:
   - "lecture 6.ppt: Please save this as a PDF or `.pptx`"
   - '"Full year notes.pdf" has 340 pages, over the 100-page limit for one upload: upload just the chapter you need.'
@@ -124,7 +124,7 @@ The page that lists every one of the learner's sessions and holds [the session s
 
 - Tapping its line shows the sealed message in the main area, in place of the session: "This session is sealed. Nobody can open it, including Crux's owner. Your other sessions keep working. Please don't upload that file again. To reply, email Crux at its address and quote flag 4821." "Your other sessions keep working" is left out when the account is also locked. The address works for trial links, which have no account email. The message adds the fixed reason line in [`sealed-sessions.md`](sealed-sessions.md) ([#764]).
 - When a session is sealed while the learner is in it, the main area gives way to the sealed message at once. Later visits open as [The shell](#the-shell) says.
-- Its line shows its name if it has one. A session sealed on its first typed request never had a name, so it shows "Sealed session", never the first words of the blocked request.
+- Its line shows its name if it has one. A session sealed on its first typed request never had a name, so it shows "Sealed session", never the first words of the declined request.
 - Every way into it from "What you've mastered", or from a "passed in" mark, shows the sealed message. A message naming it elsewhere uses its line's name, and leaves out "open … to pick it up": "You mastered this in Reaction rates on 20 Oct." (see [`sealed-sessions.md`](sealed-sessions.md)).
 
 ## Jump points
@@ -151,5 +151,6 @@ The session screen's modules (see [`learning-screen.md`](learning-screen.md#fron
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#771]: https://github.com/calmxz/Crux/issues/771
-[#780]: https://github.com/calmxz/Crux/issues/780
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802

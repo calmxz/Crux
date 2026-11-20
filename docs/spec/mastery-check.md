@@ -7,7 +7,7 @@ This file covers the mastery check, from the offer to the result and what follow
 ## The offer
 
 - When the learner is ready (see [`teaching.md`](teaching.md)), the tutor offers the check ([#668]).
-- The offer states the length and the split: "6 problems, 2 each on objectives 2 and 3. Ready?" The learner can say "not yet" and keep learning. The tutor offers again later ([#664], [#669]). The offer has "Start the check" and "Not yet" buttons, and a typed reply also works when there is room left (see [`spending.md`](spending.md)) ([#734]).
+- The offer states the length and the split: "6 problems, 2 each on objectives 2 and 3. Ready?" The learner can say "not yet" and keep learning. The tutor offers again later ([#664], [#669]). The offer has "Start the check" and "Not yet" buttons, and a typed reply also works when there is room left (see [`at-a-limit.md`](at-a-limit.md)) ([#734]).
 - The offer states the honour rule: closed book, so no notes, no searching and no other AI. Nothing is enforced ([#669]).
 - There is no early check. A learner who asks before every objective is shown is pointed to the quick route ("I know this": one fresh problem per remaining objective), then offered the check ([#669]).
 - The check is a clear test, set apart from teaching: announced, with no hints, and with the result and feedback at the end ([#669]).
@@ -41,7 +41,9 @@ This file covers the mastery check, from the offer to the result and what follow
 ### Model answers
 
 - With each problem, the tutor writes a model answer in a fixed format, with "must contain" points. It is checked and saved before the learner sees the problem ([#669], [#679]).
-- The maths library checks it first, where it can read the answer. Otherwise a separate, independent working by the AI checks it. No match, or a disagreement, discards the problem unseen, and a new one is written ([#669], [#679], [#716]). What the library reads and how it compares is in [`ai-layer.md`](ai-layer.md).
+- Must-contain points are the minimum the problem asks for, covered in any words ([#802]).
+- No check prompt names or frames a field as "working" or "reasoning". The model answer's text is the worked solution, the text the learner reads on the result card. The check returns only its verdicts ([#802]).
+- The maths library checks the final answer first, where it can read it. A separate, independent check by the AI then reads every model answer's worked solution, on every problem, including those the library matches. No match, a disagreement, or a flagged worked solution discards the problem unseen, and a new one is written ([#669], [#679], [#716], [#802]). What the library reads and how it compares is in [`maths-library.md`](maths-library.md).
 
 ## Answers
 
@@ -100,7 +102,7 @@ This file covers the mastery check, from the offer to the result and what follow
 - A refresh is a short recap of the current objective and the objectives still ahead. Then comes one practice problem on the objectives still ahead only, with help allowed. Then the check continues ([#669], [#731]).
 - The refresh offer says the learner can also ask for a recap of the objectives already answered. That recap has no problem, and their answers do not change ([#731]).
 - A real miss (not a slip) in the practice problem puts that objective back to in progress, with the trouble mark. The check stays half-done ([#668], [#731]).
-- The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]). That teaching stops at the spending limits like any teaching, and the check stays half-done (see [`spending.md`](spending.md)) ([#734]).
+- The tutor then teaches that objective until it is shown again, then the check continues. Earlier answers still count ([#731]). That teaching stops at the spending limits like any teaching, and the check stays half-done (see [`at-a-limit.md`](at-a-limit.md)) ([#734]).
 - When the check continues, that objective gets 2 problems, as any objective with the trouble mark does. If it had 1, the tutor says the check has grown by one ([#669], [#731]).
 - Leaving during that teaching resumes it on return. After 7 or more days away, this same refresh offer comes first, and a real miss in it follows these same rules ([#664], [#732]).
 - While that objective is taught again, no problem is open. The session's files and earlier teaching come back, and the lookup works as in teaching (see [`sessions.md`](sessions.md)). Both are hidden, and the lookup is off, again before the next check problem ([#731], [#732]). If the owner switches checks off then, this teaching carries on, and the next problem waits until checks are back ([#736]).
@@ -108,10 +110,11 @@ This file covers the mastery check, from the offer to the result and what follow
 ### Pauses
 
 - A check pauses as half-done when the owner switches checks or the whole tutor off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
-- It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see [`spending.md`](spending.md)) ([#675], [#679]).
-- If Google blocks marking, the problem is swapped at once, with no mark. Repeated blocks pause the check. A sealed session holds its check half-done (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- It also pauses when the model is down or overloaded, at a workspace limit or a credit stop, or at the owner's share for the owner's own check (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#679], [#802]).
+- If our AI provider refuses marking, the problem is swapped at once, with no mark. Repeated refusals pause the check. A sealed session holds its check half-done (see [`refusals.md`](refusals.md)) ([#735], [#802]).
+- From a barred country, a check under way pauses as half-done, and an answer sent from there is not kept (see [`security.md`](security.md)) ([#802]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
-- Spending limits never stop a check that has started, apart from reteaching (above). A check accepted when a limit is already full does not start (see [`spending.md`](spending.md)) ([#675], [#734]).
+- Spending limits never stop a check that has started, apart from reteaching (above). A check accepted with no checks left this week, or at a used ceiling or month, does not start. A full tutoring limit doesn't stop it (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#734], [#802]).
 
 ## Re-marks after a marking fault
 
@@ -150,3 +153,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the offer a
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#802]: https://github.com/calmxz/Crux/issues/802

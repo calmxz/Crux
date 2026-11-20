@@ -8,8 +8,8 @@ This file covers what the owner may read, deleting and closing, and how long dat
 
 The owner reads a conversation only in two cases ([#677]):
 
-- **Shared:** on the feedback page, the learner ticks to share, and picks a named session or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal". The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see [`feedback.md`](feedback.md)) ([#677], [#733]).
-- **Flagged:** a flag opens only the sessions where the tutor declined something, chat text only. The owner reads each one from its start up to the flag, plus any new declines while the flag waits. Access ends when the owner acts on the flag or, after a closure, when the lock ends ([#677], [#733]).
+- **Shared:** on the feedback page, the learner ticks to share, and picks a named session or "all my sessions". The tick warns: "This shares everything you wrote, including anything personal, except messages our AI provider refused" ([#802]). The owner reads each one from its start up to the tick. Later messages and later sessions stay closed. Unticking in Settings ends the owner's access (see [`feedback.md`](feedback.md)) ([#677], [#733]).
+- **Flagged:** a flag opens only the sessions where the tutor declined something, chat text only. A refused message shows only as "Refused by our AI provider", with its date, in a flag and in a share ([#802]). The owner reads each one from its start up to the flag, plus any new declines while the flag waits. Access ends when the owner acts on the flag or, after a closure, when the lock ends ([#677], [#733]).
 
 No flag shows the owner a file or a photo, and a sealed flag shows no session at all (see [`misuse.md`](misuse.md) and [`sealed-sessions.md`](sealed-sessions.md)). The owner page never opens a declined file, even on a share. A copy includes it, packed unread when the copy is made, unless it is sealed ([#733]). Other sessions stay closed. Deleting a session erases it at once, including from the owner's view ([#733]).
 
@@ -51,6 +51,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Data | How long (job-enforced limits run longer only while the job is down) |
 |---|---|
 | Conversations, files, check answers and their marks | Until the session is deleted or the account is erased ([#671], [#677]) |
+| A refused message's text | Erased when its reply is refused; only "Refused by our AI provider" and its date remain ([#802]) |
+| An objective's "fixed slip" note | Until the objective passes its check, or the session is deleted or the account is erased ([#802]) |
 | Account marks (dates of steps first reached, latest pay answer) | Until the account is erased. Deleting a session does not remove them ([#676]) |
 | Photo answers | Like typed answers, stored shrunk, outside the file allowance ([#677]) |
 | Preferences | Stored only after the learner agrees, until removed or the account is erased ([#668], [#671]) |
@@ -66,7 +68,8 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | A dead trial link's stub: scrambled key and cookie IDs, state, reason | The trial's end, or 12 months after the link died, whichever comes first. A misuse reason's kinds go at its first showing, or 30 days after the owner's decision, whichever comes first (see [`misuse.md`](misuse.md)) ([#719], [#764], [#776]) |
 | "Told Crux is full" email, scrambled | That day only ([#719]) |
 | The learner's time zone | With the account or trial link ([#719]) |
-| Per-account spend | Current day and week only. Older days only as totals with no account ([#677]) |
+| Per-account spend, checks started and pages read | Current day and week only. Older days only as totals with no account ([#677], [#802]) |
+| The region marker: whether the latest action came from an allowed country, never the country | Overwritten by each action, and erased with the account or trial link ([#802]) |
 | "Email me if spots open" email | Until its one email is sent, or 3 months ([#677]) |
 | "Email me when it's back" email | Until sent ([#677]) |
 | Let-in list email | Up to 7 days, or until the owner removes it, and erased at sign-up ([#679]) |
@@ -80,7 +83,7 @@ An account with no visit for 12 months is closed and erased, after emails 30 day
 | Sent emails, at Resend | 30 days in its log, and up to 7 days after in its backups ([#717], [#762]) |
 | Closed-for-misuse email, scrambled | 12 months ([#677]) |
 | Backups | Deleted data may remain in a backup for up to 8 days. A restore re-applies every deletion and listed safety or privacy action made since its dump, from a log that keeps only IDs, times and actions for about 8 days (see [`backups-and-releases.md`](backups-and-releases.md)) ([#716], [#735]) |
-| Google's copy | Only prompts its filters flag, up to 90 days, with no opt-out. Google staff may read flagged content, and it is never used for training. A short-term cache of at most 24 hours. Deleting in Crux cannot reach these ([#677], [#679], [#717]) |
+| The provider's copy, at Anthropic | Prompts and replies are deleted within 30 days. A chat its safety checks flag is kept up to 2 years, and its classification scores up to 7 years. By default nothing is used for training. Stored in the US, processed in any country. Deleting in Crux cannot reach these ([#802]) |
 
 ## On screen
 
@@ -100,14 +103,15 @@ Layout is not decided (see the main file's Gaps). Close account with its dialog 
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
-[#735]: https://github.com/calmxz/Crux/issues/735
 [#734]: https://github.com/calmxz/Crux/issues/734
+[#735]: https://github.com/calmxz/Crux/issues/735
 [#743]: https://github.com/calmxz/Crux/issues/743
 [#753]: https://github.com/calmxz/Crux/issues/753
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

@@ -22,7 +22,7 @@ The owner switches off the part its test covers, until a fix passes ([#678], [#7
 - Switching a part off asks first, naming what learners will see. Switching one on needs "A fix passed the test" ticked ([#755]).
 - A fault only in a decline's kind, with the decline still made, switches nothing. It is handled like any other strict fail, below ([#736]).
 - A failing distress check has no switch. It keeps running until a fix passes, and it blocks releases like any strict fail ([#736]).
-- A fault no fix can solve leaves its part off, with no time limit. If Flash-Lite cannot pass the job, the fallback in [`ai-layer.md`](ai-layer.md) applies, as a recorded change ([#679], [#736]).
+- A fault no fix can solve leaves its part off, with no time limit. If the model cannot pass the job, the fallback in [`ai-layer.md`](ai-layer.md) applies, as a recorded change ([#679], [#736], [#802]).
 
 ### Any other strict fail
 
@@ -35,13 +35,13 @@ Learners see what is paused: "Checks are paused while we fix something; your pro
 **The whole tutor** ([#736])
 
 - A message sent while it is off is kept, marked as waiting, with this line: "The tutor is down while we fix something. Your message is saved: tap it to try again." It is answered when the learner refreshes the page, taps the message, sends another message there, or next opens the app. A tap too early leaves it waiting.
-- The distress check in [`spending.md`](spending.md) runs on that message.
+- No distress check runs on that message ([#802]).
 - A check under way pauses as half-done, as below. An answer sent to an open problem meanwhile is not kept, and the problem is swapped on return.
 - Guests see guest mode's paused line, below.
 
 **Guest mode** ([#736])
 
-- The public link shows that guest mode is paused, with the demo video. A guest's message is never kept, and the distress check runs on it. A started mini check is dropped. It is also dropped when checks are off, since guests keep nothing.
+- The public link shows that guest mode is paused, with the demo video. A guest's message is never kept, and no distress check runs on it ([#802]). A started mini check is dropped. It is also dropped when checks are off, since guests keep nothing.
 
 **The mastery check** ([#678], [#736])
 
@@ -68,10 +68,10 @@ Once a marking fault is fixed, every mark the faulty marker gave since the last 
 
 - If the fault was in the model answers, a fresh marker checks each saved model answer first and corrects it, as a dispute does. Otherwise the saved model answers stand ([#669], [#736]).
 - The re-mark reads any slip fix or walk-through saved with the answer ([#736]).
-- Re-marks run in the Crux project and spend from the owner's share ([#728] Answer 1). Where they pause is in [`spending.md`](spending.md) ([#734]).
+- Re-marks run in the Crux workspace and spend from the owner's share ([#728] Answer 1). Where they pause is in [`spending.md`](spending.md) ([#734]).
 - Checks stay off until the re-marks finish. The owner page shows their progress, and the owner switches checks back on ([#736]).
 - **After a planted-file fail,** a fresh marker checks the model answers of every check that used files since the last round that passed that test. A wrong one is corrected, and its answers re-marked. Checks come back once those re-checks finish ([#736]).
-- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a blocked re-mark leaves the mark standing (see [`ai-layer.md`](ai-layer.md)) ([#735]).
+- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a refused re-mark leaves the mark standing (see [`refusals.md`](refusals.md)) ([#735]).
 
 | Re-mark finds | What happens |
 |---|---|
@@ -122,3 +122,4 @@ Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802

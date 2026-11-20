@@ -44,9 +44,9 @@ All are in the DB unless marked, and go with their session ([#719]).
 | Items | Module | Lifetime |
 |---|---|---|
 | The session, its name, last-visit order, request, goal and level answers, jump points, resume point and step state | Learning | [`sessions.md`](sessions.md) |
-| Messages, Crux's fixed lines, blocked-message markers and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md) |
-| Waiting messages, messages kept while the tutor is off or a file is read, and claims on them | Learning | [`spending.md`](spending.md), [`live-faults.md`](live-faults.md), [`hosting.md`](hosting.md) |
-| Topics, queued, paused and replaced topics, last-worked-on times, learning objectives and their status, trouble marks, missed-problem counts, dropped objectives and their offer, pass dates, mastered topics, menu sources, offers for passes from other sessions | Learning | [`teaching.md`](teaching.md), [`learning-loop.md`](learning-loop.md), [`sessions.md`](sessions.md) |
+| Messages, Crux's fixed lines, refused-message markers ("Refused by our AI provider" and the date) and "couldn't answer" lines; each turn's idempotency key | Learning | [`sessions.md`](sessions.md), [`ai-layer.md`](ai-layer.md), [`refusals.md`](refusals.md) |
+| Waiting messages, messages kept while the tutor is off or a file is read, and claims on them | Learning | [`at-a-limit.md`](at-a-limit.md), [`live-faults.md`](live-faults.md), [`hosting.md`](hosting.md) |
+| Topics, queued, paused and replaced topics, last-worked-on times, learning objectives and their status, trouble marks, "fixed slip" notes ([#802]), missed-problem counts, dropped objectives and their offer, pass dates, mastered topics, menu sources, offers for passes from other sessions | Learning | [`teaching.md`](teaching.md), [`learning-loop.md`](learning-loop.md), [`sessions.md`](sessions.md) |
 | Mastery checks, problems and model answers, typed answers, marks, half-done checks, pause state, swap counts, disputes, complexity judgements | Mastery check | [`mastery-check.md`](mastery-check.md) |
 | Re-mark records, the "re-marked as correct" note, undone passes waiting for a check, pending re-mark notices | Mastery check | [`live-faults.md`](live-faults.md) |
 | Photo answers (bucket) | Files | [`mastery-check.md`](mastery-check.md), [`files.md`](files.md) |
@@ -63,10 +63,11 @@ In the DB, and erased with the home ([#719]).
 |---|---|---|
 | The record, preferences | Learning | [`sessions.md`](sessions.md), [`teaching.md`](teaching.md) |
 | The time zone: the browser sends it with each request, and the home keeps the latest | Homes | With the home ([#719]) |
-| Spend for the current day and week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
+| Spend for the current day and week, checks started and pages read this week, the near-limit pop-up shown | Spending | [`spending.md`](spending.md), [`privacy.md`](privacy.md) |
+| The region marker: whether the latest action came from an allowed country, never the country | Safety | [`security.md`](security.md), [`privacy.md`](privacy.md) |
 | A stop record per day: kept until the daily email covering that day is sent, then only nameless totals | Spending | [#719] |
 | The age question's open state | Safety | [`age.md`](age.md) |
-| Decline records, the open flag, a warning with its date, a misuse card waiting, the block count, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
+| Decline records, the open flag, a warning with its date, a misuse card waiting, a lock and its end, a misuse closure and contest, re-marks waiting on a seal, the authorities' answer on a Reported session, an erase card waiting | Safety | [`misuse.md`](misuse.md), [`sealed-sessions.md`](sealed-sessions.md) ([#764], [#776], [#777]) |
 | Feedback answers, sends per day, quote and share ticks, the "email me" tick, the first-mastery notice shown, unread marks | Feedback | [`feedback.md`](feedback.md) |
 | Count marks: they go when the account is erased, not when it closes | Feedback | [`feedback.md`](feedback.md) |
 
@@ -98,8 +99,8 @@ A guest's data is held in their browser, never by Crux ([#719]):
 - The browser holds the random ID and the 10-reply count, signed. Clearing or restoring browser data can reset the count. The guest cap bounds what that can spend (see [`trial.md`](trial.md)).
 - Entry ticks are held in the browser and signed, for guests and trial-link users alike, so they stay "once per browser".
 - The model answers and marks of a mini check are held in the tab encrypted, so only Crux can read them, until the result is shown.
-- A conversation holding a prohibited-content block or a Yes to the age question gets no further replies.
-- A resent older state is accepted for the reply count, the block and the age rules, since a new tab allows the same. So a guest's mini check gets no allowance past the caps: it stops at them like any guest reply (see [`trial.md`](trial.md)).
+- A conversation holding the tutor's report of sexual content involving minors, or a Yes to the age question, gets no further replies ([#802]).
+- A resent older state is accepted for the reply count, that ending and the age rules, since a new tab allows the same. So a guest's mini check gets no allowance past the caps: it stops at them like any guest reply (see [`trial.md`](trial.md)).
 - A guest's time zone is used for the request and not kept.
 
 ### Outliving a home
@@ -126,7 +127,7 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | Nameless counts: arrivals, path counts, the dated under-18 count, refused codes, accounts ever made, the go-public window and its turn-away days | Feedback, Sign-in | For the life of Crux v1 ([#719]) |
 | "Told Crux is full": a scrambled email per day, on both sign-in paths | Sign-in | That day only: a Cloud Tasks job deletes it at the end of the owner's day, and the daily job sweeps any it missed ([#719]) |
 | Trial turned-away counts | Spending | [`spending.md`](spending.md) |
-| The month's, today's, the guests' daily and monthly, the owner's share and the distress check's spend; nameless totals; re-run budget state; alert markers | Spending | [`spending.md`](spending.md) |
+| The month's, today's, the guests' daily and monthly, the owner's share and the three distress pots' spend; nameless totals; re-run budget state; alert markers | Spending | [`spending.md`](spending.md) |
 | Owner-page settings and switch states | Owning module; switches: Operations | Until changed ([`live-faults.md`](live-faults.md)) |
 | Let-in entries and their notes, the owner's own email list, "email me if spots open" addresses | Sign-in | [`accounts.md`](accounts.md) |
 | Waiting access requests, invites and declines waiting to send, the trial end date | Sign-in, Homes | [`trial.md`](trial.md) |
@@ -143,7 +144,6 @@ In the DB unless marked. None belongs to a learner ([#719]).
 | Dumps | Their own bucket | [`backups-and-releases.md`](backups-and-releases.md) |
 | The restore log | Its own Cloud Storage bucket, soft delete off. The app can only add entries, and only the release script reads them | A lifecycle rule deletes each entry after 8 days ([#719]) |
 | Request logs, error reports, lookup and push log lines | Google's logs | 30 days ([`hosting.md`](hosting.md)) |
-| Billing export | BigQuery | [`operations.md`](operations.md) |
 | Background answers, short-lived expiry jobs and email retries (a queue ID only) | Cloud Tasks | Until they run ([`hosting.md`](hosting.md), [`email.md`](email.md)) ([#763]) |
 | Private source maps, each AI test's last passing round | Build and test records; the build ticket picks the place | [#719] |
 
@@ -197,11 +197,12 @@ The backend splits by area. Only an item's module writes it. The one exception i
 
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#719]: https://github.com/calmxz/Crux/issues/719
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

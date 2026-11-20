@@ -21,7 +21,7 @@ Each message shows in the card under the button or field it is about:
 | The sender is out for the day or the month, Resend is down, or a breach notice is still sending ([#763]) | Email me a code | The sender-out message in [`accounts.md`](accounts.md) |
 | 10 codes today for one email | Email me a code | "Too many codes today. Use Continue with Google, or try again tomorrow." |
 | 3 codes this hour for one email, or 20 from one network | Email me a code | "Too many code requests. Try again in an hour, or use Continue with Google." |
-| From the EU or the UK | The button tapped | "Crux isn't available in your region yet." |
+| From the EU, the UK, or a country Anthropic doesn't support | The button tapped | "Crux isn't available in your region yet." |
 | Inside LinkedIn's or Facebook's browser | Continue with Google | The in-app note in [`accounts.md`](accounts.md) |
 | A wrong code | The code boxes | "That code isn't right. 3 tries left." |
 | An expired code, or the fifth wrong try | The code boxes | "This code doesn't work any more. Send a new one." |
@@ -154,6 +154,8 @@ The learner hears only after the owner decides. No email names a declined kind. 
 | Feedback | The feedback page, the share list and warning, the sent and stopped states, and the sidebar link |
 | Copy page | The page the day-9 email links to: its loading and unreachable lines, and its expired page ([#769]) |
 
+[#677]: https://github.com/calmxz/Crux/issues/677
+[#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#754]: https://github.com/calmxz/Crux/issues/754
@@ -162,9 +164,7 @@ The learner hears only after the owner decides. No email names a declined kind. 
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#769]: https://github.com/calmxz/Crux/issues/769
-[#779]: https://github.com/calmxz/Crux/issues/779
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
-[#677]: https://github.com/calmxz/Crux/issues/677
-[#733]: https://github.com/calmxz/Crux/issues/733
+[#779]: https://github.com/calmxz/Crux/issues/779

@@ -53,7 +53,7 @@ The tools are in [`operations.md`](operations.md) ([#717]).
 
 **Before the trial, on the owner's own sittings** ([#678]):
 
-- A week of Crux's spend count against Google's bill. More than 10% apart tightens the limits by the gap.
+- Crux's spend count against the Console's Usage page, compared by hand each month. More than 10% apart tightens the limits by the gap ([#802]).
 - The cost per reply of the note at 40 mastered topics, and the cost of a lookup reply. If either is too costly, the owner decides then, as a recorded change ([#732]).
 
 **During the trial, from trial-link users** ([#678], [#679], [#717]):
@@ -64,13 +64,13 @@ The age question's reliability on the chosen model is what the high-risk age tes
 
 ## Build checks
 
-These settle how Google's services behave, while that part is built:
+These settle how the AI provider behaves, while that part is built:
 
-- that `OFF` holds on Agent Platform for the pinned models; how a block arrives mid-stream; whether a blocked attempt is charged ([#735]);
-- whether Gemini reads each listed image format ([#732]);
-- whether Gemini can read a topic's pages straight from the bucket on the global address ([#716]);
-- whether Google bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
-- the smoke test: the model-call-only role is enough for the service accounts, after which the Express API keys are deleted ([#716]).
+- how a refusal arrives mid-stream, and whether a refused attempt is charged ([#735], [#802]);
+- whether Claude reads each listed image format ([#732], [#802]);
+- how Crux sends a topic's pages to Claude, within the 100,000-token rule ([#716], [#802]);
+- whether Anthropic bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
+- the smoke test: workspace spend limits work on the individual account ([#716], [#802]).
 
 ## The repo
 
@@ -88,7 +88,7 @@ These settle how Google's services behave, while that part is built:
 | Item | Who |
 |---|---|
 | Every AI test passes, including those on files and photo answers ([#678], [#722]) | check |
-| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
+| The tutor's instructions frozen, and the tests' workspace limit raised first if the deep round will not fit ([#736], [#802]) | owner |
 | A deep round, on the version that starts the trial ([#678]) | check |
 | The grader judges its example list correctly ([#678]) | check |
 | Every ordinary test for what guests and trial links can reach passes, including the isolation test ([#678], [#736]) | check |
@@ -96,20 +96,19 @@ These settle how Google's services behave, while that part is built:
 | The real-phone tests for the trial ([#717]) | owner |
 | The spend, note and lookup measures ([#678]) | owner |
 | The fidelity test on real decks: Word equations, SmartArt, speaker notes ([#716], [#722]) | check |
-| The build checks, and the smoke test with the Express keys deleted ([#716], [#732], [#735]) | check |
+| The build checks, and the smoke test of the workspace limits ([#716], [#732], [#735], [#802]) | check |
 | A deliberate error reaches the owner's phone within minutes, which also proves the request-log filter keeps Crux's own logs ([#717]) | owner |
 | An uptime alert and a new-request push reach the phone, and so do two requests 2 minutes apart. The Google Cloud app receives a push ([#717], [#735], [#762]) | owner |
 | The breach plan, with how the NPC takes breach notices confirmed ([#678], [#762]) | owner |
 | A test restore of a dump that replays the log ([#716], [#735]) | check |
 | The Trial Terms and Trial Privacy Notice published ([#677], [#717]) | owner |
-| The spend caps set: the Crux and Crux tests projects, and Cloud Run on live and staging ([#679], [#716]) | owner |
+| The Cloud Run spend caps set on live and staging ([#716], [#802]) | owner |
 | The domain bought and verified with Resend, and Email Routing to the Crux Gmail ([#717]) | owner |
-| The billing export on, before the first Gemini call in the Crux project ([#717]) | owner |
+| The three Anthropic workspaces and their limits set, workspace limits confirmed on the individual account, and Anthropic's supported-countries page re-checked ([#802]) | owner |
 | Essential Contacts set ([#717]) | owner |
 | Push protection on ([#717]) | check |
-| The processor terms of Google Cloud, Cloudflare, Supabase and Resend accepted ([#717]) | owner |
+| The processor terms of Anthropic, Google Cloud, Cloudflare, Supabase and Resend accepted ([#717], [#802]) | owner |
 | Two-step sign-in on the Resend account ([#717]) | owner |
-| The crisis line's number and link verified, and the directory's terms read ([#735]) | owner |
 | The owner's keyboard and screen-reader pass over every screen, the owner pages included ([#769]) | owner |
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |
@@ -124,17 +123,17 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 |---|---|
 | Every ordinary test for what only accounts reach passes: sign-up and sign-in, the code limits, account closing and the idle warnings, the age tick-box, and the rest ([#678], [#717], [#736]) | check |
 | The real-phone tests for opening ([#678]) | owner |
-| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
+| The tutor's instructions frozen, and the tests' workspace limit raised first if the deep round will not fit ([#736], [#802]) | owner |
 | A deep round, on the version that opens ([#678]) | check |
 | The OWASP self-review ([#678]) | owner |
 | The README ([#678]) | check |
 | Sittings per mastery reviewed ([#678]) | owner |
 | The advisory letter sent, at least a month before opening ([#677]) | owner |
 | The Terms and Privacy Policy published, with the officer's contact ([#677]) | owner |
-| The reworded consent tick, naming learning progress and the decline record, and the EU/UK check in sign-up ([#677], [#776]) | check |
+| The reworded consent tick, naming learning progress and the decline record, and the region check in sign-up and on every AI request ([#677], [#776], [#802]) | check |
 | The Sentry judgement, with its address settings if added ([#717]) | owner |
 | Google's sign-in screen moved to production, with the Privacy Policy on the domain ([#717]) | owner |
-| The crisis line's number and link verified again, and the directory's terms read ([#735]) | owner |
+| Anthropic's supported-countries page re-checked again ([#802]) | owner |
 | The burst guard's 300 and the two request pushes' numbers re-set from the trial's real counts (see [`security.md`](security.md)) ([#770]) | owner |
 
 ## Gaps
@@ -161,3 +160,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

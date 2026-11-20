@@ -11,7 +11,7 @@ This file covers opening a trial link, the link code, erasing a link, what a lin
 - The first time this link opens on a browser, the entry ticks show if they have not been given there, with this notice ([#717], [#722], [#733]): "This link is for you only. Anyone with it sees your sessions and uses your limit. If it's used on more than 3 browsers, it may be switched off. Don't type or upload personal details, such as your name on a problem sheet."
 - The key sits after a `#` (see [`security.md`](security.md)) ([#770]). The link is then swapped for a sign-in cookie, and the key leaves the address bar. That browser stays signed in until 30 days without a visit ([#717]).
 - Another device opens the same link from the invite email and sees the same sessions. A one-time note after the first sign-in says: "To use Crux on another device, open your invite email there and tap the link." ([#717])
-- A link works from anywhere, including the EU and the UK, like an account (see [`hosting.md`](hosting.md)) ([#735]).
+- A link opens from anywhere, like an account. From a barred country it gets no AI, as [`security.md`](security.md) says ([#735], [#802]).
 - There is no device code and no "copy my link" ([#717]). A new link opened on a browser replaces the old sign-in there ([#733]).
 - A person who loses the email asks again and, if approved, gets a new, empty trial space ([#717]).
 - The key is stored scrambled. A network that tries 10 wrong links in an hour is refused for the rest of the hour. Its address is kept only that hour ([#717]).
@@ -33,7 +33,8 @@ This file covers opening a trial link, the link code, erasing a link, what a lin
 The main file's "Stages" sets the rule. In detail:
 
 - Every step of the learning loop, with files in a session and photo answers in a check, under the rules decided for accounts (see [`files.md`](files.md) and [`mastery-check.md`](mastery-check.md)) ([#722]).
-- The same tutoring limit as an account (see [`spending.md`](spending.md)) ([#677]).
+- The same limits as an account, shared across its browsers: the tutoring limit, 2 checks and 100 pages a week (see [`spending.md`](spending.md)) ([#677], [#802]).
+- The region yes-or-no an account keeps (see [`security.md`](security.md)), and an objective's hidden "fixed slip" note (see [`teaching.md`](teaching.md)) ([#802]).
 - An account's storage allowance, in the shared store (see [`files.md`](files.md)) ([#722]).
 - Sessions stay under the link until it dies (below). Removing a file or deleting a session erases at once, apart from a sealed session (see [`sealed-sessions.md`](sealed-sessions.md)) ([#717], [#722], [#733]).
 - Anonymous feedback, which is kept. A tap on Yes to the age question removes its words and quote permissions (see [`feedback.md`](feedback.md)) ([#677], [#717], [#734]).
@@ -46,7 +47,7 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 - The owner can switch a link off. The person may request again ([#717]).
 - Declines count toward a misuse flag per link, raised as for accounts (see [`misuse.md`](misuse.md)) ([#677], [#717], [#733]).
 - The owner reads the chat in the flagged sessions, then dismisses the flag or switches the link off. There is no warning, since there is no email ([#677], [#733]).
-- A sealed flag from the tutor's report locks the link, as for accounts. One from Google's block seals only that session, and a second locks the link ([#735]). The owner decides from the date and the kind, and either lifts the lock or seal, or switches the link off. What is sealed stays in place (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733]).
+- A sealed flag from the tutor's report locks the link, as for accounts. The owner decides from the date and the kind, and either lifts the lock, or switches the link off. What is sealed stays in place (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733]).
 - After a dismissal, the holder sees the misuse card on their next visit (see [`misuse.md`](misuse.md)). A link switched off from its flag shows a reason Crux writes: the kinds in the harm list's words, from the decline records, or for a sealed flag the fixed reason line ([#733], [#764]).
 - A share on the feedback page ends when the link dies ([#733]).
 
@@ -86,3 +87,4 @@ A holder who does not visit cannot be reached ([#733]).
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
+[#802]: https://github.com/calmxz/Crux/issues/802

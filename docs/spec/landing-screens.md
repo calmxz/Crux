@@ -6,7 +6,7 @@ This file covers what a visitor sees before having an account: the landing page,
 
 ```mermaid
 flowchart TD
-  link["Public link"] --> eu{"From the EU<br/>or the UK?"}
+  link["Public link"] --> eu{"From the EU, the UK, or a<br/>country Anthropic doesn't support?"}
   eu -->|yes| region["Landing page: video<br/>and the region message"]
   eu -->|no| land["Landing page: start box,<br/>ticks, sample chips, video"]
   land -->|"both ticks, then Start<br/>or a sample chip"| guest["Guest app"]
@@ -31,7 +31,7 @@ flowchart TD
 - Further down the page: a Request access section, "Your own trial link: saved sessions, your own files and photo answers.", with a button that opens the Request access page. Then the footer: the Trial Terms, Privacy Notice and "Who runs Crux" links.
 - The top bar holds Request access. There is no "Sign in" during the trial (see [Signing in during the trial](#signing-in-during-the-trial)).
 - Request access shows, on this page and in guest mode, only while the trial runs (see [`trial.md`](trial.md)).
-- **From the EU or the UK:** the video and the region message, "Crux isn't available in your region yet.", in place of the start box and the chips, with no Request access.
+- **From the EU, the UK, or a country Anthropic doesn't support:** the video and the region message, "Crux isn't available in your region yet.", in place of the start box and the chips, with no Request access.
 - **Before typing, when guest mode is full or paused:** the stop line takes the start box's place. The video and Request access stay.
 - **While the backend wakes,** Start shows "Starting the tutor…" until the first reply. **When it can't be reached,** the start box and Request access are greyed, with "Crux can't be reached right now. Try again later." On a Cloudflare refusal, warm-on-open tries again after 10 seconds and greys them only if refused again. It keeps asking, less often each time, while the tab is on screen, and the greying clears when a try succeeds (see [`security.md`](security.md)) ([#770]).
 - **After the trial,** if Crux stays a portfolio project: the same page with no Request access.
@@ -44,19 +44,20 @@ flowchart TD
 - The sidebar (the drawer on a phone) holds "Your topic", with the guest's session and "This tab only" under its name; then "Sample topics"; and at its foot Request access, with "Your own trial link: saved sessions, your own files and photo answers.", then the Trial Terms, Privacy Notice and "Who runs Crux" links, then "⚙ Settings". It has no "What you've mastered", Feedback or "+ New session" ([#779]).
 - The guest's Settings page has one part, Appearance: the same three choices as an account's (see [`account-screens.md`](account-screens.md)), and "Your choice lasts until you close this tab." How the choice works is in [`themes.md`](themes.md) ([#779]).
 - On the guest's own topic, the top bar shows the replies left all along: "7 of 10 replies left". A sample topic has no count.
+- Under the guest's chat box sits "Crux is an AI tutor and can make mistakes.", as in every session ([#802]).
 - At the 10th reply, "That's the end of guest mode for your own topic" shows in the thread, with a button for each sample topic and Request access. The chat box gives way to "Your own topic has used its 10 replies."
 - A sample topic's mini check uses the check bar, reading "Mini check · Problem 1 of 2 · closed book", with no Photo button.
 - After a sample's result card, Crux's own fixed line, with no AI call: "That's the sample. Try another, try your own topic, or ask for a trial link.", with those three buttons. Once the own topic's 10 replies are used, the line and its buttons leave out the own topic: "That's the sample. Try another, or ask for a trial link." After the trial, they leave out the trial link. A sample has no after-mastery menu.
 - An upload gets the pinned line "Uploading your own files needs a trial link." with Request access, as [`app-shell.md`](app-shell.md) places refused uploads.
-- **When Google blocks a guest's message as prohibited content,** the session ends in place. The thread stays, with a red line, "The tutor can't help with this, so this guest session has ended.", and the chat box gives way to "This guest session has ended." with "Back to the start", which opens the landing page. The replies left stay with the browser.
+- **When the tutor reports sexual content involving minors in a guest's session,** the session ends in place. The thread stays, with a red line, "The tutor can't help with this, so this guest session has ended.", and the chat box gives way to "This guest session has ended." with "Back to the start", which opens the landing page. The replies left stay with the browser. Nothing is kept about the guest, and the owner gets a push, at most once a day (see [`operations.md`](operations.md)) ([#802]).
 - **When a guest's reply breaks** (see [`ai-layer.md`](ai-layer.md)), Crux holds nothing to finish, so the guest's browser asks again by itself, once, when the connection is back, whatever the cause. The words so far are removed and the new reply replaces them. The guest sees one reply, and it counts once toward the 10. It stops like any guest reply. After a second break the guest sees "No reply." with Try again, and Try again counts as a new reply. The browser holds the count, so the guest caps are the real bound ([#771]).
 - **After Yes to the age question,** the tab goes back to the landing page, with no message, and the ticks show again in the start box.
 
 ### Guest stops
 
-- **Mid-conversation,** the stop line shows in the thread, then the video, and the chat box gives way to the stop line. If the stop caught a message and the distress check answers yes, the care line and the crisis line follow the stop line.
+- **Mid-conversation,** the stop line shows in the thread, then the video, and the chat box gives way to the stop line.
 - A mini check stopped at the caps stays in the tab. Sending again after the reset carries on, if the tab is still open.
-- A mini check dropped at Google's cap, by the guest-mode switch or while checks are switched off shows "Your mini check was dropped." under the stop line.
+- A mini check dropped at a workspace limit or a credit stop, by the guest-mode switch or while checks are switched off shows "Your mini check was dropped." under the stop line.
 - The guest-mode switch's line reads "Guest mode is paused while we fix something.", in the thread, or in the start box's place before typing, with the video (see [`live-faults.md`](live-faults.md)).
 
 ## Request access
@@ -74,7 +75,7 @@ flowchart TD
 ## Signing in during the trial
 
 - The landing page has no "Sign in" during the trial. The owner reaches the sign-in page by its own address.
-- An email not on the owner's list, by code or by Google, gets this under the button tapped, and no code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link.", with Request access. From the EU or the UK, the region message shows in its place (see [`accounts.md`](accounts.md)).
+- An email not on the owner's list, by code or by Google, gets this under the button tapped, and no code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link.", with Request access. From a barred country, the region message shows in its place (see [`accounts.md`](accounts.md)).
 - From opening, the landing page shows "Sign in or sign up", and the refusal goes.
 
 ## Trial links
@@ -136,7 +137,7 @@ Request access shows on these pages only while the trial runs. A showing is the 
 |---|---|
 | Landing page | The start box with the ticks, the chips, the video, the 18+ line, the Request access section, the region, wake, unreachable, stopped and opening states, "Who runs Crux" and the page-not-found page |
 | Entry ticks | The two ticks and the trial link notice, in the start box or the chat box's place, held once per browser |
-| Guest mode | The guest sidebar, the guest Settings page ([#779]), the reply count, the 10-reply line, the sample's end line, the guest stops and the block ending |
+| Guest mode | The guest sidebar, the guest Settings page ([#779]), the reply count, the 10-reply line, the sample's end line, the guest stops, the AI notice ([#802]) and the ending on the tutor's report ([#802]) |
 | Request access | The Request access page and its received and region states |
 | Trial link | The device banner, the notice pages (with the trial's moved or taken-back end), the ended pages (with the erased link's), the locked link's wording, and the opening order |
 | Legal pages | The Trial Terms, the Trial Privacy Notice, the Terms and the Privacy Policy, with their "What changed" lists ([#769]) |
@@ -153,3 +154,4 @@ The app shell gains the guest sidebar. The session screen gains the reply count 
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

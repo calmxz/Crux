@@ -32,6 +32,7 @@ A log in its own Cloud Storage bucket, with soft delete off, records what a rest
 - age-question answers;
 - each home erasure, with its moves and writes and any copy's object ID, expiry and scrambled code, and re-marks that change a mark ([#719], [#762]);
 - each outage, each date an outage or a notice's acceptance moved, as the new last day per ID, a waiting erasure warning, and each inbox confirmation (see [`dates.md`](dates.md)) ([#772]).
+- each refused message's erasure: the text erased, the marker kept, any waiting state cleared, and a session name taken from the refused words reset ([#802]).
 
 A new safety or privacy action joins this list in the same change that adds it, with a test that it survives a restore ([#735]).
 
@@ -57,7 +58,7 @@ A test restore of a dump is on the before-trial checklist (see [`quality-bar.md`
 
 All of this comes from [#716].
 
-- Staging's AI calls count in the test cap. Its Supabase pauses after a quiet week, and is restored by hand before a release ([#716]).
+- Staging's AI calls run in the Crux tests workspace and count in its limit ([#802]). Its Supabase pauses after a quiet week, and is restored by hand before a release ([#716]).
 - Staging sends no real email, and its daily job runs by hand, so it uses neither Resend's limit nor a Cloud Scheduler job ([#735]).
 - The owner-page switches apply to the owner's account on live. Dev, the AI tests and staging have their own settings (see [`live-faults.md`](live-faults.md)) ([#678], [#679]).
 - CI starts the local stack, then runs `alembic upgrade head` ([#750]).
@@ -89,6 +90,7 @@ The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
-[#777]: https://github.com/calmxz/Crux/issues/777
 [#776]: https://github.com/calmxz/Crux/issues/776
+[#777]: https://github.com/calmxz/Crux/issues/777
 [#781]: https://github.com/calmxz/Crux/issues/781
+[#802]: https://github.com/calmxz/Crux/issues/802

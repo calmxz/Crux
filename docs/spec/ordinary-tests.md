@@ -45,7 +45,7 @@ These are the tests the closed tickets sent here, by area.
 - No lookup runs while a check problem is open, and none of a session's teaching is reachable then. The lookup runs during reteaching after a refresh miss, even with checks switched off, and is off during the refresh, the end step and any paused check.
 - Deleting a session removes its entries from "What you've mastered".
 - A sealed session is unreachable by lookup, share, background answer or re-mark.
-- The session search finds only the learner's own sessions; finds a sealed session by its name only; skips a check's hidden teaching and files, finds them during reteaching, and skips them again before the next problem; skips messages Google blocked and Crux's own lines; and loses a deleted session at once.
+- The session search finds only the learner's own sessions; finds a sealed session by its name only; skips a check's hidden teaching and files, finds them during reteaching, and skips them again before the next problem; skips messages our AI provider refused and Crux's own lines; and loses a deleted session at once.
 
 **Files** ([#670], [#677], [#716], [#722], [#732])
 
@@ -58,21 +58,23 @@ These are the tests the closed tickets sent here, by area.
 **The mastery check** ([#678], [#679], [#735])
 
 - The menu order, and the maths library's checks.
-- A blocked mark swaps the problem, and the check pauses after 2 swaps.
+- A refused mark swaps the problem, and the check pauses after 2 swaps.
 
-**Spending** ([#675], [#679], [#717], [#728], [#734])
+**Spending** ([#675], [#679], [#717], [#728], [#734], [#802])
 
 - The daily ceiling stops replies and restarts at midnight.
-- A check started at 90% of a learner's limit runs to the end, and so does a half-done one resumed on a ceiling day.
-- A tap on "Start the check" at a full limit. A typed "yes" at a full limit is kept. Reteaching stopped at a limit.
+- A check started with the tutoring limit full runs to the end, and so does a half-done one resumed on a ceiling day.
+- A tap on "Start the check" with no checks left, and at a used ceiling or month. Reteaching stopped at a limit closes the box and keeps the check half-done.
+- The check limit's 2 starts a week. The reading limit's 100 pages a week, a crossing file read in full, the counter past the limit, and a file message waiting with its read.
 - The pop-up at 75%, once each for the day and the week, never inside a check. The cap's "full" message.
-- A provider refusal shows the month's message, and keeps a check half-done.
-- A kept message is answered on opening, oldest first, with the open session ahead.
+- A workspace-limit or credit stop shows the month's message, with the renewal date for the credit, and keeps a check half-done. After a credit stop, the reopen test runs hourly.
+- At a limit the chat box is off and nothing sent is kept. A message queued before the bar filled is answered past it, and one queued at the ceiling, the month or a stop goes back to the box. The page rechecks on a tab return and at midnight.
+- A message waiting for another reason is answered on opening after the reset, oldest first, with the open session ahead.
 - A background answer is not a sitting, opens no check problem, and does not restart the 7 days.
 - A filling read's fixed line shows only for a usable file.
 - A guest's mini check stops at the guest caps, the ceiling and the month, even when an older saved state is resent ([#719]).
 - Re-marks pause at the owner's share. A re-run's ceiling is a quarter of its budget.
-- The owner's pushes and daily email: the ceiling's push at most once a day; the Gemini-cap push with Crux's count beside Google's cap; the other pushes in [`operations.md`](operations.md); and the day's turned-away count in the next morning's email.
+- The owner's pushes and daily email: the ceiling's push at most once a day; the push when a workspace limit or the credit stops Crux; the distress pots' pushes, at most once a day each; the other pushes in [`operations.md`](operations.md); and the day's turned-away count in the next morning's email.
 
 **Counts and feedback** ([#676], [#678], [#734])
 
@@ -80,6 +82,7 @@ These are the tests the closed tickets sent here, by area.
 - A test account behaves as the owner's for limits and counts.
 - The first-mastery notice shows once, never during a check. The Feedback link is hidden during a check.
 - A "yes" from a learner with no mastery does not count.
+- Turned away counts an opening or a session switch at a limit, once a day, not a tab return ([#802]).
 - The budget-caused miss: 7 days is budget-caused, and 6 a normal miss. One learner at their own cap on 7 days is not budget-caused. One re-run in the effort.
 - After a re-mark, a learner stays counted as mastered only if another topic was mastered inside the same window.
 - The window button's guards, and its same-day undo. Feedback limits. A locked or closing account can untick but not send. A published quote after an under-18 ending.
@@ -103,7 +106,7 @@ These are the tests the closed tickets sent here, by area.
 - A flag opens only sessions with a decline. No file shows on any flag. A flag dies with its account. A trial link's flag has no warning.
 - A sealed flag locks at once, and the owner sees only the date and the kind.
 - A lock is read-only. A contest holds the erasure. A misuse closure erases on day 10, one run after the owner's reminder, and blocks the email for 12 months ([#772]).
-- A blocked reply counts as a decline, tested with a made-up block result. A second prohibited-content block locks the account.
+- A refused reply counts by its category, tested with made-up refusal categories, an unknown one included ([#802]).
 - A sealed session marked "Reported" with no answer recorded stays past its account's erasure, and an unmarked or answered one goes ([#777]). The erasure tests in [`data-model.md`](data-model.md) pass ([#719]).
 
 **The trial** ([#677], [#717], [#722], [#733])
@@ -118,7 +121,7 @@ These are the tests the closed tickets sent here, by area.
 **Switches and re-marks** ([#678], [#736])
 
 - Each switch does what [`live-faults.md`](live-faults.md) says, and is undone by switching back on.
-- A message sent while the whole tutor is off is kept, gets the distress check, and is answered on a refresh, a tap, another send or the next opening.
+- A message sent while the whole tutor is off is kept, gets no distress check, and is answered on a refresh, a tap, another send or the next opening.
 - A read under way when files go off is dropped, with no try used and no charge.
 - A re-mark covers every mark from the faulty period, in both directions, and gives what a correct marker would have given then. A wrong or unsure result undoes a pass, and the objective stays shown. Several checks on one objective: any right one passes it. Checks stay off until the re-marks finish.
 - An answer sent to an open check problem while the whole tutor is off is not kept, and the problem is swapped.
@@ -182,5 +185,6 @@ These are the tests the closed tickets sent here, by area.
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
-[#780]: https://github.com/calmxz/Crux/issues/780
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802
