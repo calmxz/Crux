@@ -41,7 +41,9 @@ This file covers the mastery check, from the offer to the result and what follow
 ### Model answers
 
 - With each problem, the tutor writes a model answer in a fixed format, with "must contain" points. It is checked and saved before the learner sees the problem ([#669], [#679]).
-- The maths library checks it first, where it can read the answer. Otherwise a separate, independent working by the AI checks it. No match, or a disagreement, discards the problem unseen, and a new one is written ([#669], [#679], [#716]). What the library reads and how it compares is in [`maths-library.md`](maths-library.md).
+- Must-contain points are the minimum the problem asks for, covered in any words ([#802]).
+- No check prompt names or frames a field as "working" or "reasoning". The model answer's text is the worked solution, the text the learner reads on the result card. The check returns only its verdicts ([#802]).
+- The maths library checks the final answer first, where it can read it. A separate, independent check by the AI then reads every model answer's worked solution, on every problem, including those the library matches. No match, a disagreement, or a flagged worked solution discards the problem unseen, and a new one is written ([#669], [#679], [#716], [#802]). What the library reads and how it compares is in [`maths-library.md`](maths-library.md).
 
 ## Answers
 
@@ -108,8 +110,9 @@ This file covers the mastery check, from the offer to the result and what follow
 ### Pauses
 
 - A check pauses as half-done when the owner switches checks or the whole tutor off for a fault, or while the age question is open or the account is locked ([#678], [#679], [#733]).
-- It also pauses when Flash-Lite is down or overloaded, or when the provider refuses calls (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#679]).
-- If Google blocks marking, the problem is swapped at once, with no mark. Repeated blocks pause the check. A sealed session holds its check half-done (see [`refusals.md`](refusals.md)) ([#735]).
+- It also pauses when the model is down or overloaded, at a workspace limit or a credit stop, or at the owner's share for the owner's own check (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#679], [#802]).
+- If our AI provider refuses marking, the problem is swapped at once, with no mark. Repeated refusals pause the check. A sealed session holds its check half-done (see [`refusals.md`](refusals.md)) ([#735], [#802]).
+- From a barred country, a check under way pauses as half-done, and an answer sent from there is not kept (see [`security.md`](security.md)) ([#802]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
 - Spending limits never stop a check that has started, apart from reteaching (above). A check accepted when a limit is already full does not start (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#734]).
 
@@ -150,3 +153,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): the offer a
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#802]: https://github.com/calmxz/Crux/issues/802

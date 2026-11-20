@@ -20,11 +20,12 @@ This file covers how the tutor teaches a topic until the learner is ready for th
   - A visible cause is named, with a pointed question.
   - "I don't know" goes to the help ladder.
 - A misconception is shown where it breaks, then confirmed fixed with a fresh question. The objective gets the trouble mark ([#668]).
-- A slip gets a light nudge at the spot. Fixed by the learner, nothing changes, even on a shown objective. Not fixed, it is treated as a misconception or a gap ([#668]).
+- A slip gets a light nudge at the spot. Fixed by the learner, nothing is taken away, even on a shown objective. Not fixed, it is treated as a misconception or a gap ([#668]).
+- On a fresh problem, a slip the learner fixes counts as solving it with no help. The objective then carries a hidden "fixed slip" note, which Crux hands the tutor with the statuses until the objective passes its check. The note never changes a status, the check, or what the learner sees ([#802]).
 
 ### The learner's own problem
 
-- The tutor never works the learner's own problem, typed or in any file. It teaches on a twin, then coaches the learner through their own ([#667]).
+- The tutor never works the learner's own problem, typed or in any file, worked examples included ([#802]). It teaches on a twin, then coaches the learner through their own ([#667]).
 - The twin is taught faded: the tutor works the early step or steps, and the learner the rest. How many adapts to how they are doing ([#668]).
 - On the learner's own problem, step 3 of the help ladder shows the step on the twin and hands the problem back. The tutor never writes the answer. It only confirms a right one ([#668]).
 
@@ -32,6 +33,11 @@ This file covers how the tutor teaches a topic until the learner is ready for th
 
 - Every objective shows a status: not started, in progress, shown, passed, or dropped ([#668], [#669]). Crux keeps the statuses and hands them to the tutor (see the main file's "Crux decides").
 - **Shown:** the learner solved a fresh problem on the objective with no help. Their working, or their reply when asked, shows the method ([#668]).
+- **Help** on a fresh problem is a help-ladder step, steps given before the learner starts, an answer to the learner's question that tells the move, or a pointer written into how the problem is set. Naming the objective's own method on a method objective ("Using expansion, solve...") is not help ([#802]).
+- **Not help:** "How did you get that?" after a bare answer, a twin or example taught before the fresh problem is set, and the one-step-per-turn prompt ("What's the next step?") ([#802]).
+- **Giving up:** on a shown objective, a real miss: back to in progress, with the trouble mark, and one of the 3 missed fresh problems. On an objective not yet shown, it counts as helped, not solved ([#802]).
+- **Only problems the tutor sets to be solved count.** A full answer to a "what would you do first?" question never counts, even if wrong. The tutor answers it as teaching, then sets a fresh problem. A misconception in it is treated in the moment, and gives the trouble mark only if a later fresh question shows it ([#802]).
+- How the tutor reports each result to Crux is in [`ai-layer.md`](ai-layer.md), and the library's check of a practice answer is in [`maths-library.md`](maths-library.md) ([#802]).
 - **Fresh problem:** one the tutor writes at that point, not seen before in the topic. It is not the learner's own problem, not a twin they were taken through, and not earlier practice ([#668]). The diagnostic, the quick route and the check use the same rule.
 - A real miss (not a slip) on a shown objective puts it back to in progress. This includes a refresh problem after 7 or more days away (see [`sessions.md`](sessions.md)) ([#668], [#671]). The refresh before a resumed check is in [`mastery-check.md`](mastery-check.md).
 - **Trouble mark:** an objective gets it when it goes back to in progress, needs a misconception fixed, or fails a check. It then needs 2 fresh problems in a row, unhelped, to be shown. Using a hint does not give the trouble mark ([#668], [#669]). Nor does a re-mark that undoes a pass ([#736]).
@@ -106,3 +112,4 @@ The session screen is in [`learning-screen.md`](learning-screen.md): each object
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#769]: https://github.com/calmxz/Crux/issues/769
+[#802]: https://github.com/calmxz/Crux/issues/802
