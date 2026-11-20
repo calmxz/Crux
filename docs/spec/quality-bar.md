@@ -88,7 +88,7 @@ These settle how the AI provider behaves, while that part is built:
 | Item | Who |
 |---|---|
 | Every AI test passes, including those on files and photo answers ([#678], [#722]) | check |
-| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
+| The tutor's instructions frozen, and the tests' workspace limit raised first if the deep round will not fit ([#736], [#802]) | owner |
 | A deep round, on the version that starts the trial ([#678]) | check |
 | The grader judges its example list correctly ([#678]) | check |
 | Every ordinary test for what guests and trial links can reach passes, including the isolation test ([#678], [#736]) | check |
@@ -104,12 +104,12 @@ These settle how the AI provider behaves, while that part is built:
 | The Trial Terms and Trial Privacy Notice published ([#677], [#717]) | owner |
 | The spend caps set: the Crux and Crux tests projects, and Cloud Run on live and staging ([#679], [#716]) | owner |
 | The domain bought and verified with Resend, and Email Routing to the Crux Gmail ([#717]) | owner |
-| The billing export on, before the first Gemini call in the Crux project ([#717]) | owner |
+| The three Anthropic workspaces and their limits set, workspace limits confirmed on the individual account, and Anthropic's supported-countries page re-checked ([#802]) | owner |
 | Essential Contacts set ([#717]) | owner |
 | Push protection on ([#717]) | check |
 | The processor terms of Google Cloud, Cloudflare, Supabase and Resend accepted ([#717]) | owner |
 | Two-step sign-in on the Resend account ([#717]) | owner |
-| The crisis line's number and link verified, and the directory's terms read ([#735]) | owner |
+| Anthropic's supported-countries page re-checked ([#802]) | owner |
 | The owner's keyboard and screen-reader pass over every screen, the owner pages included ([#769]) | owner |
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |
@@ -124,17 +124,17 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 |---|---|
 | Every ordinary test for what only accounts reach passes: sign-up and sign-in, the code limits, account closing and the idle warnings, the age tick-box, and the rest ([#678], [#717], [#736]) | check |
 | The real-phone tests for opening ([#678]) | owner |
-| The tutor's instructions frozen, and the test cap raised first if the deep round will not fit ([#736]) | owner |
+| The tutor's instructions frozen, and the tests' workspace limit raised first if the deep round will not fit ([#736], [#802]) | owner |
 | A deep round, on the version that opens ([#678]) | check |
 | The OWASP self-review ([#678]) | owner |
 | The README ([#678]) | check |
 | Sittings per mastery reviewed ([#678]) | owner |
 | The advisory letter sent, at least a month before opening ([#677]) | owner |
 | The Terms and Privacy Policy published, with the officer's contact ([#677]) | owner |
-| The reworded consent tick, naming learning progress and the decline record, and the EU/UK check in sign-up ([#677], [#776]) | check |
+| The reworded consent tick, naming learning progress and the decline record, and the region check in sign-up and on every AI request ([#677], [#776], [#802]) | check |
 | The Sentry judgement, with its address settings if added ([#717]) | owner |
 | Google's sign-in screen moved to production, with the Privacy Policy on the domain ([#717]) | owner |
-| The crisis line's number and link verified again, and the directory's terms read ([#735]) | owner |
+| Anthropic's supported-countries page re-checked again ([#802]) | owner |
 | The burst guard's 300 and the two request pushes' numbers re-set from the trial's real counts (see [`security.md`](security.md)) ([#770]) | owner |
 
 ## Gaps

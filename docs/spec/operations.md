@@ -65,7 +65,7 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - a request asked for by email whose email is still not accepted, and from 7 days after the owner entered it, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
 - a required email still unsent, a check paused by repeated refusals, a refused re-mark, and a refusal category Crux doesn't know, by name ([#735], [#802]);
 - Resend's month full, by Crux's count or a refusal ([#763]);
-- a monthly AI test round that did not run, and a full test cap ([#736]).
+- a monthly AI test round that did not run, and a reached tests' workspace limit ([#736], [#802]).
 
 ### The services' own emails
 
