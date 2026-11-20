@@ -36,7 +36,7 @@ There is no question about price. Pricing belongs to the paid-launch effort ([#6
 ### Sharing a session
 
 - The share tick has two choices, a named session or "all my sessions". The page names the session ("Share: Personal essay") with a list to change it, starting on the session the learner came from, or else the one they opened last. With no sessions, there is no share choice ([#733], [#734]).
-- It warns: "This shares everything you wrote, including anything personal" ([#677], [#733]).
+- It warns: "This shares everything you wrote, including anything personal, except messages our AI provider refused" ([#677], [#733], [#802]).
 - What the owner can then read is in [`privacy.md`](privacy.md). The owner reads up to the tick, and later messages and later sessions stay closed ([#733]).
 - Unticking in Settings, under "Your feedback", ends the owner's access ([#733]).
 - A share from a trial link ends when the link dies ([#733]).

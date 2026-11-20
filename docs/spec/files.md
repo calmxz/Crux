@@ -74,7 +74,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Per file:** up to 50 MB ([#667], [#716]).
 - Over either limit: "upload just the chapter you need" ([#667]).
 - **When:** several files, with the request or added later, never during a mastery check ([#667]). A photo answer is the one exception (see [`mastery-check.md`](mastery-check.md)) ([#669]).
-- Reading a file counts toward the learner's tutoring limit, like any reply. No other limit caps how often a learner uploads. A file sent before the limit is read in full. What happens when a read fills the limit, or a file arrives at a full one, is in [`at-a-limit.md`](at-a-limit.md) ([#675], [#734]).
+- A file's read into its outline uses the reading limit, 100 pages a week, not the tutoring limit (see [`spending.md`](spending.md)). A file whose read starts within the week's pages is read in full, and the next file waits. Teaching from a file stays on the tutoring limit. What happens when a read meets the ceiling or the month, or a file arrives at a stop, is in [`at-a-limit.md`](at-a-limit.md) ([#675], [#734], [#802]).
 - Looking at files costs no AI, so it works past every spending limit ([#675]).
 
 ## Storing and reading a file
@@ -102,10 +102,10 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 ## Pages sent to the tutor
 
-- **Outline:** each file is read once on upload into an outline of where each topic sits ("chain rule: slides 28-36") ([#679]).
+- **Outline:** each file is read once on upload into an outline of where each topic sits ("chain rule: slides 28-36") ([#679]). It is read in parts, each under 100,000 tokens, carrying the outline so far forward, with no cache ([#802]).
 - **Topic slice:** while a topic is taught, its pages go in full with every turn, with the outline. Crux splits the pages from the PDF ([#679], [#716]).
 - The tutor can ask Crux for another page range, when the learner names a page or the tutor needs one. The range stays until the topic ends ([#679]).
-- A topic has at most 20 added pages. Past that, the least recently used added range drops out ([#679]).
+- A topic has at most 20 added pages. Past that, the least recently used added range drops out ([#679]). A Haiku prompt also stays under 100,000 tokens: Crux drops the least recently used added ranges until it is under about 75,000, and a dropped page asked about again is re-sent from storage (see [`ai-layer.md`](ai-layer.md)) ([#802]).
 - Pages are read again from Crux's own storage whenever needed ([#679]).
 - Crux chooses which pages are sent (see the main file's "Crux decides"). The prompt's order, the models and their settings are in [`ai-layer.md`](ai-layer.md) ([#679]).
 - When the owner switches files off for a fault, uploads stop, and existing files are kept out of teaching and check problems. A read under way is dropped, with no try used up and no charge. What the learner sees is in [`live-faults.md`](live-faults.md) ([#678], [#736]).
@@ -128,7 +128,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - A learner can remove a file at any time, except that files in a session with an open check stay until the check ends ([#667], [#671]).
 - The tutor stops using a removed file. Objectives stay unless the learner changes them. Mastered topics stay mastered ([#667]).
-- Removing a file erases it, its pages and its outline at once ([#677], [#732]).
+- Removing a file erases it, its pages and its outline at once ([#677], [#732]). The topic's prompt then restarts without its pages, since the prompt is append-only (see [`ai-layer.md`](ai-layer.md)) ([#802]).
 - What the tutor already said about the file stays in the conversation until the session is deleted. Removing a file tells the learner so: "What the tutor already said about this file stays in the conversation. To erase that too, delete the session." ([#732])
 - Deleting a session removes its files, even during a check (see [`sessions.md`](sessions.md)) ([#671]).
 - A trial link's files, pages and photo answers are erased with its sessions when the link dies: the owner switches it off, the holder taps Yes to Crux's age question, the holder erases it, or the trial ends ([#722], [#728], [#755]).
@@ -138,7 +138,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 
 - **Whether the 20 GB store holds with trial links uploading:** open on [#675]. Every new link can hold 200 MB, and a lost link stays until the trial ends. At 100 full links, uploads stop for everyone ([#722]).
 - **Whether the Cloud Run credit holds with file work in the trial:** open on [#675] ([#722]).
-- **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]).
+- **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]). The outline read in parts is untested too ([#802]).
 - **Whether Gemini can read a topic's pages straight from the bucket**, instead of Crux sending them: a build check, open on [#678] ([#716]).
 - **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
 
