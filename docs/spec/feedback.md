@@ -99,7 +99,7 @@ Counts of learners, each with a date ([#676]):
 ### Other counts
 
 - **Arrivals:** see [Arrivals](#arrivals) ([#717], [#719]).
-- **Turned away:** learners stopped by their own limit, and emails told "Crux is full for now", are in [`spending.md`](spending.md) ([#675]).
+- **Turned away:** learners who open Crux or switch to a session at their own limit and find it closed, and emails told "Crux is full for now", are in [`spending.md`](spending.md) ([#675], [#802]).
 - **Refused sign-in codes:** in [`accounts.md`](accounts.md) ([#674], [#728] Answer 6).
 - **Under-18 endings:** in [`age.md`](age.md) ([#681], [#728]).
 
@@ -145,13 +145,13 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ### A miss caused by the budget
 
-- A miss is **caused by the budget** when the ceiling, the month's budget or Google's cap turned a learner away on at least 7 of the window's 56 days ([#675], [#676], [#679]).
-- A day counts only when one of those turned a learner away. A learner stopped by their own limit does not count, however often. Nor does a full learner cap ([#675], [#676]).
+- A miss is **caused by the budget** when the ceiling, the month's budget, or a workspace or credit stop turned a learner away on at least 7 of the window's 56 days ([#675], [#676], [#679], [#802]).
+- A day counts only when one of those turned a learner away: a learner opened Crux or switched to a session and found that limit's message where the chat box was. Switching back to the tab doesn't count ([#802]). A learner stopped by their own limit does not count, however often. Nor does a full learner cap ([#675], [#676]).
 - A budget-caused miss does not use up the one retry. The window is re-run: the same bar, counted from zero, for 8 weeks, on a bigger budget the owner fixes before it starts. Only the budget changes, and other fixes wait for the normal retry ([#676]).
 - What a re-run does to the ceiling, and how long its budget lasts, is in [`spending.md`](spending.md) ([#734]).
 - There is at most one budget re-run in the whole effort, in either window. A second budget-caused miss counts as a normal miss ([#676]).
-- Before a re-run, the owner raises the budget and Google's cap ([#675], [#679]).
-- On the current budget, Flash-Lite gives about 176 sittings a month, or about 133 with no cache hits, against the bar's 40 to 60 over the window. The owner raises the learner cap during a window when it fills and people are waiting ([#679]).
+- Before a re-run, the owner raises the budget and Crux's workspace limit ([#675], [#679], [#802]).
+- On the current budget, Haiku 5.5 gives about 2,980 sittings' worth a month (25 / 0.0084), against the bar's 40 to 60 over the window ([#802]). The owner raises the learner cap during a window when it fills and people are waiting ([#679]).
 
 ## The owner page
 
@@ -164,7 +164,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## Gaps
 
-- **Whether the bar is reachable on real costs:** what a sitting costs on Agent Platform, and sittings per mastery, are not measured. See [`spending.md`](spending.md) and [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
+- **Whether the bar is reachable on real costs:** a sitting's worth on page-heavy topics, and sittings per mastery, are not measured ([#802]). See [`spending.md`](spending.md) and [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
 
 ## On screen
 
@@ -189,3 +189,4 @@ The after-first-mastery notice is a pinned line above the chat box (see [`learni
 [#753]: https://github.com/calmxz/Crux/issues/753
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#772]: https://github.com/calmxz/Crux/issues/772
+[#802]: https://github.com/calmxz/Crux/issues/802

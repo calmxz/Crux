@@ -16,7 +16,7 @@ This file covers what runs where, the database, logs, and secrets. Backups, envi
 | Converter | Gotenberg, a third, private Cloud Run service | See [The converter](#the-converter) |
 | Database | Supabase Free Postgres, Singapore | See [The database](#the-database) |
 | Files | A Cloud Storage bucket, Crux project, Singapore | See [`files.md`](files.md) |
-| AI | Agent Platform, global address | See [`ai-layer.md`](ai-layer.md) |
+| AI | Anthropic's Messages API, `global` inference | See [`ai-layer.md`](ai-layer.md) |
 
 All of this comes from [#716].
 
@@ -30,8 +30,8 @@ All of this comes from [#716].
 ### Cost
 
 - Cloud Run's free tier is a dollar credit valued at Tier 1 prices, about USD 5.22 a month, shared across the billing account. The tests project, staging, the tasks service and the converter draw on it too. In Singapore it covers about 128,000 busy CPU-seconds ([#716]).
-- The owner's USD 10 monthly Developer Program credit may pay what is left after it, though Gemini likely uses that credit first ([#716]).
-- **Spend caps:** USD 6 a month on live, USD 2 on staging. Google's cap counts "gross" use, read as before the free credit and any credits. The first month's billing report settles that reading ([#716], [#726]).
+- The owner's USD 10 monthly Developer Program credit may pay what is left after it ([#716], [#802]).
+- **Spend caps:** USD 6 a month on live, USD 2 on staging. That cap counts "gross" use, read as before the free credit and any credits. The first month's billing report settles that reading ([#716], [#726]).
 - Cloud Storage takes no spend cap. Its cost is bounded by the 20 GB store total in [`files.md`](files.md), about USD 0.40 a month at full, though accepted files may pass it ([#716], [#732]).
 - Other hosting costs outside the AI budget are the domain (below), a minimum instance if the fallback is needed (below), alerting (see [`operations.md`](operations.md)), and Workspace once the owner forms a one person corporation (see [`email.md`](email.md)) ([#675], [#716], [#717]).
 
@@ -64,11 +64,11 @@ What a background answer is, and when it runs, is in [`at-a-limit.md`](at-a-limi
 
 - They run on the tasks service through Cloud Tasks, so they carry on if the learner leaves ([#735]).
 - Opening the app queues the learner's waiting messages and kept files' reads, oldest session first, with the open session ahead of them ([#734]).
-- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, and asks for finished answers while any are waiting, or after a broken reply ([#734], [#735], [#771]). It asks only while its tab is on screen, and less often the longer it waits ([#736]).
+- A block clearing queues them too. A tap, or an owner's raise, reaches the backend. The open app calls the backend when midnight passes, each time the learner comes back to the tab while a limit holds, and asks for finished answers while any are waiting, or after a broken reply ([#734], [#735], [#771], [#802]). It asks only while its tab is on screen, and less often the longer it waits ([#736]).
 - Crux claims each waiting message in the database before answering it, so a second browser or a second opening does nothing. A claim expires, so a stopped instance cannot hold a message for good ([#734], [#735]).
-- One background answer runs at a time per learner, and Crux checks the limits before each one ([#735]). A broken reply's new answer does not stop at the learner's own tutoring limit (see [`ai-layer.md`](ai-layer.md)) ([#771]).
+- One background answer runs at a time per learner, and Crux checks the limits and the region marker before each one (see [`security.md`](security.md)) ([#735], [#802]). A broken reply's new answer does not stop at the learner's own tutoring limit (see [`ai-layer.md`](ai-layer.md)) ([#771]).
 - A new message goes through the backend as usual, and does not wait for this queue. If it runs beside a background answer, the limit can pass by at most that one reply ([#735]).
-- A new message in a session with waiting messages is answered together with them. If one of them is already being answered, the new message follows it, as with any reply under way ([#734], [#735]).
+- A new message in a session with waiting messages is answered together with them, except a message waiting for its file's read, which keeps waiting. If one of them is already being answered, the new message follows it, as with any reply under way ([#734], [#735], [#802]).
 - A call that fails on overload leaves the message waiting, for the next opening or the next block to clear ([#735]).
 
 ## The Worker
@@ -77,7 +77,7 @@ What a background answer is, and when it runs, is in [`at-a-limit.md`](at-a-limi
 - Cloud Run accepts only calls from the Worker. The Worker adds a secret header, and middleware checks it first with `hmac.compare_digest`. A failure returns a plain 404 ([#716]).
 - The secret is at least 32 random bytes, rotatable through a current and next pair, rotated at each release or on any sign of a leak, and never logged ([#716]).
 - Only `/api/*` runs the Worker. It turns any answer from Cloud Run not in Crux's error shape into Crux's "can't be reached" code. The request guards in front of it are in [`security.md`](security.md) ([#770]).
-- **Nothing blocks the whole site.** Crux checks the country only where someone new comes in: sign-up, a code for an email with no account, guest mode and Request access (see the main file's "Who Crux is for"). Accounts and trial links work from anywhere, and the outside check is not affected ([#733], [#735]).
+- **Nothing blocks the whole site.** Crux checks the country where someone new comes in: sign-up, a code for an email with no account, guest mode and Request access (see the main file's "Who Crux is for"). It also checks it on every request that calls the AI, for accounts, trial links and guests, as [`security.md`](security.md) says. The outside check is not affected ([#733], [#735], [#802]).
 
 ### The domain
 
@@ -114,9 +114,9 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 ## Secrets
 
-- Google's own services use service accounts, with no stored keys (see [`ai-layer.md`](ai-layer.md)) ([#716]).
+- Google's own services use service accounts, with no stored keys. The Anthropic API key is stored, as [`ai-layer.md`](ai-layer.md) says ([#716], [#802]).
 - Copy links are signed as their own service account, which can read only the copies bucket. The backend may ask Google to sign as it, and nothing else uses it (see [`email.md`](email.md)) ([#762]).
-- Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717]). The deploy token can also edit the zone's firewall rules ([#770]).
+- Other secrets live in Google Secret Manager, as Worker secrets, or as GitHub encrypted secrets, never in the repo. These are the Anthropic API key, the Resend key, the Turnstile secret, the database password, the Worker's secret header and the Cloudflare deploy token ([#717], [#802]). The deploy token can also edit the zone's firewall rules ([#770]).
 - Staging's gate secret is a GitHub secret, filled into Cloudflare's rule text when the rule is applied ([#770]). The release keeps it in no file or state of its own. Cloudflare's reply to each rule update carries the whole rule set, the secret included, so the release script never prints or saves the replies ([#781]). The daily job's Cloudflare token is in Secret Manager, and can edit only Cloudflare's lists ([#770]).
 - How the repo is guarded is in [`quality-bar.md`](quality-bar.md) ([#717]).
 
@@ -149,3 +149,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#781]: https://github.com/calmxz/Crux/issues/781
+[#802]: https://github.com/calmxz/Crux/issues/802

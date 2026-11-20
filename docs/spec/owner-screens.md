@@ -38,8 +38,8 @@ flowchart TD
 | Trial (during the trial only) | Requests ("maria.reyes@example.com · Asked 2 Nov · 16 days left", counted to its 30-day erasure ([#772]), with Approve and Decline), trial links, dead links, and the end of the trial |
 | Safety | Flags, misuse closures, entered requests, the reported hold, and "Tell learners about a breach" |
 | Feedback | Answers, with unread ones marked, which may be quoted and the email when its tick was given; "Mark published" with where; withdrawn published quotes with their remove-by date and "Mark removed"; and shared sessions. An answer counts as read once opened |
-| Counts | The go-public bar's progress ("14 / 20 mastered") with "Start the window" and its same-day undo, the path, "Limit hit on 9 of 56 days", arrivals by source, and the other counts: learners stopped by their own limit, "Told Crux is full: 30, 12 ticked email", refused sign-in codes and the dated under-18 count. In the trial, links turned away and guest-mode stops |
-| Money and limits | The budget used and left, today against the ceiling, the owner's share with its raise, the distress check's pot, Crux's count beside Google's bill; the limits (the ceiling, the tutoring limits, the learner cap, the daily and monthly guest caps, the owner's share and the pot); the cap line ("Learner cap full (25 of 25). Raise it before you re-share.", "25 + N let in"); and the let-in list with each entry's erasure date ("erased on 10 Nov", [#772]), "keep until I remove it" and the blocked-email note |
+| Counts | The go-public bar's progress ("14 / 20 mastered") with "Start the window" and its same-day undo, the path, "Limit hit on 9 of 56 days", arrivals by source, and the other counts: learners turned away (an opening or a session switch at a limit, [#802]), "Told Crux is full: 30, 12 ticked email", refused sign-in codes and the dated under-18 count. In the trial, links turned away and guest-mode stops |
+| Money and limits | The budget used and left, today against the ceiling, the owner's share with its raise, the three distress pots; the limits (the ceiling, the tutoring limits, the check limit, the reading limit, the learner cap, the daily and monthly guest caps, the owner's share and the three pot amounts); the credit's renewal day ([#802]); the cap line ("Learner cap full (25 of 25). Raise it before you re-share.", "25 + N let in"); and the let-in list with each entry's erasure date ("erased on 10 Nov", [#772]), "keep until I remove it" and the blocked-email note |
 | Switches | A switch for each part and guest mode, and re-mark progress |
 
 The Trial area leaves the menu when the trial ends.
@@ -64,13 +64,12 @@ The Trial area leaves the menu when the trial ends.
   - "Delete the account". From 7 days with its email unsent, "Confirm from the inbox" gives a one-time code to paste into a new email, never a reply, to the account's address from the Crux inbox, and marks it confirmed when the owner types back the code from a reply that agrees (see [`dates.md`](dates.md)) ([#772]).
 - **The reported hold** lists every Reported session from its mark: the date, the kind, the flag number and, for an account, its email. One whose account or link lives reads "Account live" or "Link live", with "The authorities answered", then Lift and Erase. During a misuse closure's 7 days, Lift and Erase are greyed out, with "Wait for the closure to be decided". Once its account or link is erased, it has Erase only ([#777]).
 - **"The authorities answered"** opens a dialog: "Check the answer came through the channel you reported by, not only by email. A From line can be faked. Only tap this once the authorities no longer need the session. You can then lift the seal or erase it. If the account is erased first, the session goes with it." On a trial link the last sentence reads "If the trial link dies first, the session goes with it." Crux enforces nothing here; the first two sentences are a reminder ([#777]).
-- **Erase** on a live session whose own seal still locks the account or link opens a dialog with "Lift the lock", which lifts it in the same step. A Google seal with no lock has Erase only. Lift on a session whose own seal still locks the account or link lifts that lock ([#777]).
+- **Erase** on a live session whose own seal still locks the account or link opens a dialog with "Lift the lock", which lifts it in the same step. Lift on a session whose own seal still locks the account or link lifts that lock ([#777]).
 - **"Tell learners about a breach"** takes the text and shows a preview, then confirms with the counts and when the sending finishes. In the trial: "Send this to 3 emails and 14 live trial links?". From opening, with the date, the time and the hours from now: "Send this to 150 accounts and 40 other emails? The last go at about 8 am on 14 Mar, 33 hours from now.", or "Send this to 25 accounts and 6 other emails? All are sent now." when all fit in today's room. The estimate counts the day's room, the month's, and email already waiting ahead of the notice. When the month's room runs out first: "…The last go after Resend's month restarts, on a date Resend doesn't give." ([#763])
 
 ## Money and switches
 
-- **A raise** in the money opens a dialog: "Raise Google's cap first. Set it to about USD 15.50.", with the amount worked out from the new totals (the learners' budget, the owner's share and the margin). Raise works only once "I raised Google's cap" is ticked. "Start the window" for a re-run asks the same.
-- Money shows "Crux can't read the credits left. Check them in Google Cloud."
+- **A raise** in the money opens a dialog: "Raise Crux's workspace limit in the Console first. Set it to about USD 37.", with the amount worked out from the new totals (the learners' budget, the owner's share and the margin). Raise works only once "I raised the limit" is ticked ([#802]). "Start the window" for a re-run asks the same.
 - **Switching a part off** asks first, naming what learners will see.
 - **Switching a part on** needs "A fix passed the test" ticked. While re-marks run, the checks switch is greyed until they finish.
 
@@ -89,7 +88,7 @@ The Trial area leaves the menu when the trial ends.
 | Owner safety | Flags with the session reader beside the list, warn, dismiss, close, lift, Reported, misuse closures and contests, entered requests with the copy button, the name match and the waiting erasures, the reported hold with "The authorities answered", Lift and Erase ([#777]), "Confirm from the inbox" with its code ([#772]), and the breach form |
 | Owner feedback | Answers with unread marks, published quotes and their remove-by dates, and shared sessions with the reader |
 | Owner counts | The bar, the window with Start and the same-day undo, the path, arrivals and the other counts |
-| Owner money | The money, Google's bill, the limits, the raise dialog with its tick, the learner cap and the let-in list |
+| Owner money | The money, the renewal day, the limits, the raise dialog with its tick, the learner cap and the let-in list |
 | Owner switches | The switches with their confirms and tick, and re-mark progress |
 
 [#719]: https://github.com/calmxz/Crux/issues/719
@@ -99,3 +98,4 @@ The Trial area leaves the menu when the trial ends.
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

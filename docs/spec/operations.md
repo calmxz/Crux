@@ -31,7 +31,9 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 
 - when the month's budget runs out;
 - when the day's ceiling is hit, saying when, at most once a day ([#675], [#728] Answer 8);
-- when Google's Gemini cap is reached, with Crux's count beside Google's cap ([#728] Answer 8);
+- when a workspace limit or the credit stops Crux, the urgent push ([#728] Answer 8, [#802]);
+- when the accounts' or the guests' distress pot runs out, at most once a day each ([#802]);
+- when the tutor's report ends a guest session for content involving minors, at most once a day (see [`landing-screens.md`](landing-screens.md)) ([#802]);
 - when the 20 GB store is full;
 - when the owner's share reaches 100%;
 - for each new access request;
@@ -51,7 +53,6 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - the budget at 50% and 80%;
 - the learner cap filled;
 - the owner's share at 80%;
-- Crux's count against Google's bill, when the gap is over 10%, with where it is;
 - how many learners were turned away the day before ([#728] Answer 8). For the trial's wording, see [`spending.md`](spending.md) ([#734]);
 - code requests refused because the sender's share ran out ([#735]);
 - new feedback as a count, and withdrawn quotes (see [`feedback.md`](feedback.md));
@@ -62,7 +63,7 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 - an erasure warning waiting: "1 erasure warning ends on 15 Mar: check the Crux inbox for a reply.", then from the first run after that date, "1 erasure warning has ended. Its session is erased on 17 Mar: check the Crux inbox for a reply.", its date updated if an outage delays the run, also kept in the Today area ([#755], [#772]);
 - dates an outage moved: "Crux was down 40 minutes on 10 Nov: 3 dates moved by a day." ([#772]);
 - a request asked for by email whose email is still not accepted, and from 7 days after the owner entered it, the prompt to confirm it from the Crux inbox (see [`dates.md`](dates.md)) ([#772]);
-- a required email still unsent, and a check paused by repeated blocks ([#735]);
+- a required email still unsent, a check paused by repeated refusals, a refused re-mark, and a refusal category Crux doesn't know, by name ([#735], [#802]);
 - Resend's month full, by Crux's count or a refusal ([#763]);
 - a monthly AI test round that did not run, and a full test cap ([#736]).
 
@@ -70,12 +71,9 @@ One email through Resend, at 8:05 am Philippine time from the daily job, first i
 
 Emails from Google Cloud, Cloudflare, Supabase, Resend, GitHub, and later Workspace go to the owner's own email, the one on the owner's phone. Google Cloud's Essential Contacts for Security, Billing, Suspension and Technical point there on the Crux projects ([#717]).
 
-## Reading Google's bill
+## Checking the bill
 
-- Google's billing export goes to a BigQuery dataset in Singapore, read by the daily job through a read-only role. It is turned on before the first Gemini call, since it has no backfill ([#717]).
-- The job reads the last complete day, per model and token type, with credits on their own lines, and compares it with Crux's own count ([#717]).
-- A gap over 10% goes in the daily email, for example "Google +35%: 3.5 Flash-Lite output tokens +USD 0.10" ([#717]).
-- This is free at this size. Crux's own count stays what enforces the limits ([#717]).
+There is no daily bill comparison, since an individual Anthropic account has no Admin API. The owner compares Crux's count with the Console's Usage page by hand at each monthly test round. Crux's own count stays what enforces the limits ([#717], [#802]).
 
 ## Gaps
 
@@ -102,3 +100,4 @@ The daily email's layout and the owner page are in [`owner-screens.md`](owner-sc
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#772]: https://github.com/calmxz/Crux/issues/772
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

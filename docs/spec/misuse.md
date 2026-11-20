@@ -24,7 +24,7 @@ Google's usage policy also applies, and is linked ([#677]).
 
 ## Misuse
 
-Crux counts declines, and the owner decides. A trial link follows [`trial-links.md`](trial-links.md) ([#677], [#717], [#733]). A guest has no flag, since nothing is kept after the tab closes ([#677]).
+Crux counts declines, and the owner decides. A trial link follows [`trial-links.md`](trial-links.md) ([#677], [#717], [#733]). A guest has no flag, since nothing is kept after the tab closes ([#677]). The tutor's report of sexual content involving minors ends a guest's session instead (see [`landing-screens.md`](landing-screens.md)) ([#802]).
 
 **The flag**
 
