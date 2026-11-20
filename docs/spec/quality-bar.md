@@ -64,12 +64,12 @@ The age question's reliability on the chosen model is what the high-risk age tes
 
 ## Build checks
 
-These settle how Google's services behave, while that part is built:
+These settle how the AI provider behaves, while that part is built:
 
-- that `OFF` holds on Agent Platform for the pinned models; how a block arrives mid-stream; whether a blocked attempt is charged ([#735]);
-- whether Gemini reads each listed image format ([#732]);
-- whether Gemini can read a topic's pages straight from the bucket on the global address ([#716]);
-- whether Google bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
+- how a refusal arrives mid-stream, and whether a refused attempt is charged ([#735], [#802]);
+- whether Claude reads each listed image format ([#732], [#802]);
+- how Crux sends a topic's pages to Claude, within the 100,000-token rule ([#716], [#802]);
+- whether Anthropic bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
 - the smoke test: the model-call-only role is enough for the service accounts, after which the Express API keys are deleted ([#716]).
 
 ## The repo
@@ -161,3 +161,4 @@ Done before anyone but the owner signs up, even privately to one friend ([#677])
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

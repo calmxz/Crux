@@ -66,7 +66,7 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 - the dated anonymous counts, including the under-18 count, and the cookieless arrivals count;
 - the sign-in cookie;
 - "Your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779]);
-- the human check, the email sender, the code limits and the region check;
+- the human check, the email sender, the code limits, and the region check with the one yes-or-no it keeps per account and trial link ([#802]);
 - the burst guard, the hand blocks and their keep time, and the owner's reading of Cloudflare's request analytics only to find a network to block ([#770]);
 - the misuse flag, sealed sessions, and the email of their account, being kept longer only if reported to the authorities, what is saved with each decline, what a flag or a share lets the owner read, and the blocked-email list;
 - the guest and trial rules;
@@ -79,7 +79,8 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 
 | Processor | Used for | Agreement and place |
 |---|---|---|
-| Google Cloud | Cloud Run, Cloud Storage, Agent Platform, Error Reporting, Monitoring, BigQuery | Google Cloud's data processing addendum. Data "may be processed in any country", and Crux's data is stored in Singapore ([#679], [#717]) |
+| Anthropic | The AI | Its data processing addendum, with breach notice to Crux within 48 hours; the owner's 72-hour duty to the Commission comes after it. Stored in the US, processed in any country ([#802]) |
+| Google Cloud | Cloud Run, Cloud Storage, Error Reporting, Monitoring | Google Cloud's data processing addendum. Data "may be processed in any country", and Crux's data is stored in Singapore ([#679], [#717], [#802]) |
 | Cloudflare | Static files, the Worker, DNS, the registrar, Email Routing, Turnstile | Its self-serve agreement. It sees network addresses at its edge, and its Security Analytics keeps sampled request details, with addresses and paths, for 31 days, which the owner reads only to find a network to block. The hand blocks sit in its settings ([#770]). Turnstile reads the network address, browser details and connection fingerprint, and Cloudflare uses those signals partly for its own purposes, outside the agreement ([#716], [#717]) |
 | Supabase | The database | Part of its Terms on every plan, with Supabase Pte. Ltd (Singapore). Data stored in Singapore ([#717]) |
 | Resend | Crux's email | Covers all plans. Processing mainly in the US, with sent emails in its log 30 days and in its backups up to 7 days after ([#717], [#762]) |
@@ -102,8 +103,9 @@ The Privacy Policy says ([#677], [#679], [#681], [#716], [#717], [#732], [#733])
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735
 [#754]: https://github.com/calmxz/Crux/issues/754
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

@@ -82,7 +82,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - Files, their pages and photo answers live in a Cloud Storage bucket in the Crux project, in Singapore ([#716]). Soft delete is off on every Crux bucket, so deleting erases ([#677], [#716]).
 - The browser uploads straight to the bucket, with a one-time link from the backend ([#716]).
 - File work is conversion, splitting into pages, and the outline read. It runs on the tasks service through Cloud Tasks, so it carries on if the learner leaves or the phone locks ([#679], [#716]).
-- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]). Overload, a cap, or files switched off does not use up a try, and a read Google blocks follows [`refusals.md`](refusals.md) ([#735]).
+- The file shows "Reading…" until the work is done, and counts toward the allowance while it does. A failed job is retried up to 3 times ([#716], [#732]). Overload, a limit, a stop, or files switched off does not use up a try, and a read our AI provider refuses follows [`refusals.md`](refusals.md) ([#735], [#802]).
 - After the last failed try, Crux erases the file and any pages it made. A line keeps its name, with "Couldn't read this file, so it wasn't added. Try again, or use another file.", until the learner dismisses it. The tutor says what went wrong ([#667], [#716], [#732]).
 
 ### While a file is being read
@@ -154,15 +154,16 @@ The files and their mistake marks show in the objectives panel (see [`learning-s
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#679]: https://github.com/calmxz/Crux/issues/679
+[#681]: https://github.com/calmxz/Crux/issues/681
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
-[#681]: https://github.com/calmxz/Crux/issues/681
 [#722]: https://github.com/calmxz/Crux/issues/722
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#734]: https://github.com/calmxz/Crux/issues/734
-[#736]: https://github.com/calmxz/Crux/issues/736
 [#735]: https://github.com/calmxz/Crux/issues/735
+[#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#802]: https://github.com/calmxz/Crux/issues/802

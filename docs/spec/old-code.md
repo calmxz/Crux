@@ -44,7 +44,7 @@ The modules are the ones in [`data-model.md`](data-model.md) ([#719]).
 All of this comes from [#750].
 
 - **Tutor AI:** the whole `agent/` (tool loop, prompt, tools) is rebuilt. Two things in `services/llm.py` are borrowed as design: the test stub, and no overload retry once streaming starts ([#750], [#771]).
-- **Spending:** the pricing piece is the rate table, the dated rate change and `usage_cost` in `services/cost_meter.py`. Its `gemini/...` model names become Agent Platform's, and its rates are re-checked against Agent Platform's price list. A dated rate change takes effect when Google's billing applies it; the build ticket checks Google's notice, and until then the copied date stays in UTC. The limits are written new ([#750]).
+- **Spending:** the pricing piece is the rate table, the dated rate change and `usage_cost` in `services/cost_meter.py`. Its `gemini/...` model names become Claude's, and its rates are re-checked against Anthropic's price list, cache writes and reads included. A dated rate change takes effect when Anthropic's billing applies it; the build ticket checks Anthropic's notice, and until then the copied date stays in UTC. The limits are written new ([#750]).
 - **Operations:** the three copied files change their imports and drop their Render comment. The rebuilt database setup keeps psycopg's `connect_timeout`, which the copied `/ready` probe relies on. Error handling, logging and the backup are written new ([#750]).
 
 ## Copied tests and scripts
@@ -156,7 +156,7 @@ The old deployment does not come back. The new app's first deployment is the one
 - Right after [#797], before the lock. The skeleton ticket carries nothing old apart from the code ([#797]).
 - First the public text: the cleanup pull request is reviewed and merged, the homepage link is cleared and the description rewritten. Every new line is true from the moment it appears ([#797]).
 - Then the nightly job is turned off, so it never fails against a deleted database. Then the owner deletes, in order: the Supabase project, the R2 files, bucket and tokens, the Render service, the Vercel project, and the environments ([#797]).
-- The old Gemini key goes last: once [#726] has made its model calls, or straight away if that research uses the owner's Google login. At the latest, it goes when that ticket closes ([#797]).
+- The old Gemini key no longer waits: no ticket calls Gemini any more, so it can be revoked at any point in the cleanup ([#797], [#802]).
 - The cleanup is its own issue, [#799], not a ticket on the map. The map's Destination is reached only once the cleanup is done, so the spec locks only after it ([#797]).
 - The owner's Supabase account has one other project, which takes no free slot by the time live and staging are made. Render's `DATABASE_URL` points at the project the counts above came from ([#797]).
 
@@ -173,7 +173,6 @@ Learner statistics, keyboard shortcuts and pinning a session are lines on the ma
 [#664]: https://github.com/calmxz/Crux/issues/664
 [#677]: https://github.com/calmxz/Crux/issues/677
 [#719]: https://github.com/calmxz/Crux/issues/719
-[#726]: https://github.com/calmxz/Crux/issues/726
 [#749]: https://github.com/calmxz/Crux/issues/749
 [#750]: https://github.com/calmxz/Crux/issues/750
 [#768]: https://github.com/calmxz/Crux/issues/768
@@ -184,3 +183,4 @@ Learner statistics, keyboard shortcuts and pinning a session are lines on the ma
 [#781]: https://github.com/calmxz/Crux/issues/781
 [#797]: https://github.com/calmxz/Crux/issues/797
 [#799]: https://github.com/calmxz/Crux/issues/799
+[#802]: https://github.com/calmxz/Crux/issues/802

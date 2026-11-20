@@ -36,7 +36,7 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 - Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
 - Guest mode also has a monthly cap, USD 2 for the meantime, changeable on the owner page, so guests cannot use most of the month's budget ([#719]).
 - **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Guest mode is full for this month. Back on 1 Dec.", [#754]) and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video, with Request access while the trial runs ([#734], [#754]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`at-a-limit.md`](at-a-limit.md) runs ([#734]).
-- When Google's cap stops Crux, a guest sees the month's line and the video. Google refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734]).
+- When a workspace limit or the credit stops Crux, a guest sees the month's line and the video. Anthropic refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734], [#802]).
 - The owner page has a switch for guest mode (see [`live-faults.md`](live-faults.md)) ([#678]).
 
 ## Request access
@@ -130,8 +130,8 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
 [#754]: https://github.com/calmxz/Crux/issues/754
-[#762]: https://github.com/calmxz/Crux/issues/762
 [#755]: https://github.com/calmxz/Crux/issues/755
+[#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763
 [#764]: https://github.com/calmxz/Crux/issues/764
 [#770]: https://github.com/calmxz/Crux/issues/770
@@ -139,3 +139,4 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#776]: https://github.com/calmxz/Crux/issues/776
 [#777]: https://github.com/calmxz/Crux/issues/777
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#802]: https://github.com/calmxz/Crux/issues/802

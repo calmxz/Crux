@@ -46,7 +46,7 @@ Left out, since Crux keeps no email for a link: the "email me" tick-boxes, "You 
 - The owner can switch a link off. The person may request again ([#717]).
 - Declines count toward a misuse flag per link, raised as for accounts (see [`misuse.md`](misuse.md)) ([#677], [#717], [#733]).
 - The owner reads the chat in the flagged sessions, then dismisses the flag or switches the link off. There is no warning, since there is no email ([#677], [#733]).
-- A sealed flag from the tutor's report locks the link, as for accounts. One from Google's block seals only that session, and a second locks the link ([#735]). The owner decides from the date and the kind, and either lifts the lock or seal, or switches the link off. What is sealed stays in place (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733]).
+- A sealed flag from the tutor's report locks the link, as for accounts. The owner decides from the date and the kind, and either lifts the lock, or switches the link off. What is sealed stays in place (see [`sealed-sessions.md`](sealed-sessions.md)) ([#733]).
 - After a dismissal, the holder sees the misuse card on their next visit (see [`misuse.md`](misuse.md)). A link switched off from its flag shows a reason Crux writes: the kinds in the harm list's words, from the decline records, or for a sealed flag the fixed reason line ([#733], [#764]).
 - A share on the feedback page ends when the link dies ([#733]).
 

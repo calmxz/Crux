@@ -87,7 +87,6 @@ These are test and build terms, so they stay out of the glossary ([#678]).
   - a wrong answer read from the working, a slip nudged and a misconception shown;
   - narrowing bundles its questions and waits for "go";
   - 3 to 5 numbered options, with the tutor's pick marked.
-- The retry's hidden line, on a page that triggers Google's recitation block ([#735], [#736]).
 - The topic slice on real decks: notation, "as on slide 31", flagged mistakes, and pages the tutor adds on request ([#679], [#736]).
 - A file with nothing learnable: a receipt gets "I can't teach from this file" ([#736]).
 - Diagrams and graphs that match the tutor's explanation, drawn when they help and not on every turn ([#751]).
@@ -160,7 +159,7 @@ flowchart TD
 
 ### The monthly round
 
-- While Crux is live for anyone but the owner, from the trial on, the strict tests run once a month with nothing changed. This catches provider-side changes, such as safety filters. The owner also checks Google's changelog then (see [`ai-layer.md`](ai-layer.md)) ([#678], [#679]).
+- While Crux is live for anyone but the owner, from the trial on, the strict tests run once a month with nothing changed. This catches provider-side changes, such as safety filters ([#678], [#679], [#802]).
 - It runs on a schedule. A fail pushes to the owner's phone. The owner reads it and acts, aiming for the same day, as [`live-faults.md`](live-faults.md) says ([#736]).
 - A round that did not run, and a full test cap, are listed in the owner's daily email ([#736]).
 
@@ -188,3 +187,4 @@ When the Crux tests project's cap is reached, rounds stop, and with them release
 [#736]: https://github.com/calmxz/Crux/issues/736
 [#751]: https://github.com/calmxz/Crux/issues/751
 [#771]: https://github.com/calmxz/Crux/issues/771
+[#802]: https://github.com/calmxz/Crux/issues/802

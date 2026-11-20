@@ -22,7 +22,7 @@ The owner switches off the part its test covers, until a fix passes ([#678], [#7
 - Switching a part off asks first, naming what learners will see. Switching one on needs "A fix passed the test" ticked ([#755]).
 - A fault only in a decline's kind, with the decline still made, switches nothing. It is handled like any other strict fail, below ([#736]).
 - A failing distress check has no switch. It keeps running until a fix passes, and it blocks releases like any strict fail ([#736]).
-- A fault no fix can solve leaves its part off, with no time limit. If Flash-Lite cannot pass the job, the fallback in [`ai-layer.md`](ai-layer.md) applies, as a recorded change ([#679], [#736]).
+- A fault no fix can solve leaves its part off, with no time limit. If the model cannot pass the job, the fallback in [`ai-layer.md`](ai-layer.md) applies, as a recorded change ([#679], [#736], [#802]).
 
 ### Any other strict fail
 
@@ -122,3 +122,4 @@ Guest mode's paused line is in [`landing-screens.md`](landing-screens.md) ([#754
 [#754]: https://github.com/calmxz/Crux/issues/754
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#780]: https://github.com/calmxz/Crux/issues/780
+[#802]: https://github.com/calmxz/Crux/issues/802

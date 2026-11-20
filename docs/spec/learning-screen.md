@@ -60,7 +60,7 @@ stateDiagram-v2
 - Crux's own lines are centred lines in the thread, coloured by kind (information, warning, stop, care), and stay in the conversation. They include:
   - the line after a filling reply, the limit messages and the month's tick-box (see [`spending.md`](spending.md) and [`at-a-limit.md`](at-a-limit.md));
   - the "paused" lines and the re-mark notices (see [`live-faults.md`](live-faults.md));
-  - "The tutor is busy right now", the lines when Google blocks a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md) and [`refusals.md`](refusals.md));
+  - "The tutor is busy right now", the lines when our AI provider refuses a reply, and the swap lines (see [`ai-layer.md`](ai-layer.md) and [`refusals.md`](refusals.md));
   - the care line at a limit, and the crisis line (see [`misuse.md`](misuse.md));
   - "please tap Yes or No" (see [`age.md`](age.md)), and "Your check is ready when you're back";
   - "Crux can't be reached right now. Try again later.", after a Cloudflare refusal and one try 10 seconds later, while the message shows as sending; a typed message stays in the box (see [`security.md`](security.md)) ([#770]).
@@ -139,5 +139,5 @@ The app shell, the session list, the all-sessions page and its search, the Recor
 [#769]: https://github.com/calmxz/Crux/issues/769
 [#770]: https://github.com/calmxz/Crux/issues/770
 [#771]: https://github.com/calmxz/Crux/issues/771
-[#780]: https://github.com/calmxz/Crux/issues/780
 [#779]: https://github.com/calmxz/Crux/issues/779
+[#780]: https://github.com/calmxz/Crux/issues/780
