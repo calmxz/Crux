@@ -63,6 +63,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 | The ceiling | "Crux is full for today. Back tomorrow." No email is offered. |
 | The month, or a workspace limit | "Crux has used this month's tutoring budget. Back on 1 Dec.", with a tick-box, "Email me when it's back" |
 | The credit | The month's message, with the credit's renewal date: "Back on 11 Dec." |
+| The Max plan's last credit, with no decision | "Crux is paused for now.", with the "Email me when it's back" tick-box |
 
 - Reset times are in the learner's own clock (see the main file's "Money") ([#675]).
 - Each ticked learner gets one email when Crux reopens: on the 1st, when a re-run's bigger budget starts, when an owner's raise reopens it, or when calls come back after a credit stop ([#675], [#734], [#802]). Where these stand against the sender's limits is in [`email.md`](email.md) ([#735]).

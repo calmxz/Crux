@@ -122,6 +122,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 ## Gaps
 
+- **The UK regulator's guidance on travellers** is unchecked. The EU's is checked: a traveller using a service that doesn't target the EU is outside its law ([#802]).
 - **Open hosting checks on [#726]:** the pooler test, and server time per sitting and per upload. The research reads the Cloud Run cap as gross use, so a month of USD 4.80 could trip staging's USD 2 cap at a bill of 0. The first month's report settles it.
 - **Whether the Cloud Run credit holds** with file work in the trial, and how busy a sitting is: open on [#675] ([#716], [#722]).
 - **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in [`quality-bar.md`](quality-bar.md) ([#678], [#716]).

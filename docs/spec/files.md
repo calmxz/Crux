@@ -68,7 +68,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Types:** PDF, images, PowerPoint and Word. PowerPoint and Word are read as fully as a PDF, equations and diagrams included, plus PowerPoint speaker notes ([#667]).
 - **Formats:** images in JPEG, PNG, WebP or HEIC, PowerPoint as `.pptx`, and Word as `.docx`. Photo answers take the same image formats ([#732]).
 - An older `.ppt` or `.doc` gets "Please save this as a PDF or `.pptx`", or `.docx` for Word ([#732]).
-- If Gemini cannot read one of these image formats, Crux converts it first. A build check confirms this ([#732]).
+- If Claude cannot read one of these image formats, Crux converts it first. A build check confirms this ([#732]).
 - One image counts as one page. It is kept and sent to the tutor as an image ([#667], [#732]).
 - **Per upload:** up to 100 pages. A slide or a photo counts as a page ([#667]).
 - **Per file:** up to 50 MB ([#667], [#716]).
@@ -139,8 +139,8 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 - **Whether the 20 GB store holds with trial links uploading:** open on [#675]. Every new link can hold 200 MB, and a lost link stays until the trial ends. At 100 full links, uploads stop for everyone ([#722]).
 - **Whether the Cloud Run credit holds with file work in the trial:** open on [#675] ([#722]).
 - **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]). The outline read in parts is untested too ([#802]).
-- **Whether Gemini can read a topic's pages straight from the bucket**, instead of Crux sending them: a build check, open on [#678] ([#716]).
-- **Whether Gemini reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
+- **How Crux sends a topic's pages to Claude,** within the 100,000-token rule: a build check, open on [#678] ([#716], [#802]).
+- **Whether Claude reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
 
 ## On screen
 

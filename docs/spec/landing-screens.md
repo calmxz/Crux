@@ -75,7 +75,7 @@ flowchart TD
 ## Signing in during the trial
 
 - The landing page has no "Sign in" during the trial. The owner reaches the sign-in page by its own address.
-- An email not on the owner's list, by code or by Google, gets this under the button tapped, and no code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link.", with Request access. From the EU or the UK, the region message shows in its place (see [`accounts.md`](accounts.md)).
+- An email not on the owner's list, by code or by Google, gets this under the button tapped, and no code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link.", with Request access. From a barred country, the region message shows in its place (see [`accounts.md`](accounts.md)).
 - From opening, the landing page shows "Sign in or sign up", and the refusal goes.
 
 ## Trial links

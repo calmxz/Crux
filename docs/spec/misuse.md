@@ -15,11 +15,11 @@ This file covers the Terms' harm line, how the tutor applies it, and what happen
 - harassing, threatening or targeting a real person;
 - methods of self-harm.
 
-Google's usage policy also applies, and is linked ([#677]).
+Anthropic's usage policy also applies, and is linked ([#677], [#802]).
 
 - A subject can be studied, not carried out. The chemistry of combustion is taught, and building a device is not. LD50 is taught, and a synthesis route is not ([#677]).
 - The tutor applies the line the same way every time. A cover story ("for my novel", "hypothetically", "for school") does not change a decline. It judges the whole conversation, not each message alone ([#677]).
-- A learner who says something like "I don't want to be here anymore" is not refused. The tutor pauses the lesson, responds with care, and points to a crisis line ([#677]). The line is fixed text, in the tutor's replies and in Crux's own line alike: "Please contact your local crisis hotline.", for the meantime. A number later is a recorded change ([#735], [#802]). A typed reply while the age question is open never reaches the tutor at that moment, so a separate check runs (see [`refusals.md`](refusals.md)). No check runs at a limit, on a message a switch stopped, or from a barred country ([#734], [#736], [#802]). Two exceptions get no care line: a distress message whose reply and distress check are both refused gets a decline, and a guest's refusal past the guests' pot gets only the refusal line ([#802]). A request for a method that shows the learner's own distress gets the same care, and is not reported as a decline. One behind a cover story is ([#733]).
+- A learner who says something like "I don't want to be here anymore" is not refused. The tutor pauses the lesson, responds with care, and points to a crisis line ([#677]). The line is fixed text, in the tutor's replies and in Crux's own line alike: "Please contact your local crisis hotline.", for the meantime. A number later is a recorded change ([#735], [#802]). A typed reply while the age question is open never reaches the tutor at that moment, so a separate check runs (see [`refusals.md`](refusals.md)). No check runs at a limit, on a message a switch stopped, or from a barred country ([#734], [#736], [#802]). Two exceptions get no care line: a distress message whose reply is refused and whose distress check is refused or fails gets a decline, and a guest's refusal past the guests' pot gets only the refusal line ([#802]). A request for a method that shows the learner's own distress gets the same care, and is not reported as a decline. One behind a cover story is ([#733]).
 - Harmful requests and files are declined (see [`learning-loop.md`](learning-loop.md) and [`files.md`](files.md)) ([#665], [#667]).
 
 ## Misuse
@@ -86,6 +86,10 @@ The warned, dismissed and closed emails are in [`account-screens.md`](account-sc
 - A misuse closure's lock also bars deleting a session and removing a file. The sessions the owner may read to judge a contest stay until the owner decides. The learner asks by email to have one erased, by its exact name, and Crux warns the account's address and erases it after the warning's last day, as [`dates.md`](dates.md) says ([#755], [#772]). The warning names the session, even when a session the tutor never named carries its request's first words, which can echo a declined request ([#764]). A session whose first request our AI provider refused shows "New session" instead ([#802]). A sealed-flag lock lasts until the owner decides, so it does not bar them; the sealed session itself can never be deleted ([#753]).
 - Erasing wins over a flag. A flag waiting when an account is erased goes with it, with no block. A tap on Yes erases at once, with no block. A learner who closes and signs up again starts with no warning on record ([#681], [#733]).
 - The email is then kept scrambled for 12 months, to block rejoining. How the block works at sign-up is in [`accounts.md`](accounts.md) ([#677], [#733]).
+
+## Gaps
+
+- **Two sessions sharing a name** when a learner asks by email to erase one by its exact name, under a misuse lock or during a closing: older than [#802], and more frequent now that a refused first request shows "New session" ([#802]).
 
 ## On screen
 

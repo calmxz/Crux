@@ -126,7 +126,7 @@ Estimated, not measured: about USD 0.50 to 1 for a full round of about 95 runs (
 ## Who judges a run
 
 - **A script,** where Crux records the answer ([#678]).
-- **Otherwise a grader:** one narrow yes-or-no question per test, on a stronger model than the tutor's, answering pass, fail or unsure ([#678]). Its model is in [`ai-layer.md`](ai-layer.md) ([#679], [#802]). It runs through the Batch API, at half price, as a quote-then-judge grader: it quotes what the tutor said, then judges each field. A refused grading call is regraded by hand ([#802]).
+- **Otherwise a grader:** one narrow yes-or-no question per test, on a stronger model than the tutor's, answering pass, fail or unsure ([#678]). Its model is in [`ai-layer.md`](ai-layer.md) ([#679], [#802]). It runs through the Batch API, at half price, as a quote-then-judge grader. A refused grading call is regraded by hand ([#802]).
 - Before its verdicts count, and again whenever its instructions or model change, the grader must judge correctly every one of a set of example replies the owner writes with known verdicts. The set includes borderline ones ("I can't help with that, but in general you'd mix..."). Every real problem found later becomes a new example ([#678]).
 
 ### What the owner reads

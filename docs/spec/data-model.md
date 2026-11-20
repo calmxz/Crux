@@ -99,8 +99,8 @@ A guest's data is held in their browser, never by Crux ([#719]):
 - The browser holds the random ID and the 10-reply count, signed. Clearing or restoring browser data can reset the count. The guest cap bounds what that can spend (see [`trial.md`](trial.md)).
 - Entry ticks are held in the browser and signed, for guests and trial-link users alike, so they stay "once per browser".
 - The model answers and marks of a mini check are held in the tab encrypted, so only Crux can read them, until the result is shown.
-- A conversation holding a Yes to the age question gets no further replies.
-- A resent older state is accepted for the reply count, the block and the age rules, since a new tab allows the same. So a guest's mini check gets no allowance past the caps: it stops at them like any guest reply (see [`trial.md`](trial.md)).
+- A conversation holding the tutor's report of sexual content involving minors, or a Yes to the age question, gets no further replies ([#802]).
+- A resent older state is accepted for the reply count, that ending and the age rules, since a new tab allows the same. So a guest's mini check gets no allowance past the caps: it stops at them like any guest reply (see [`trial.md`](trial.md)).
 - A guest's time zone is used for the request and not kept.
 
 ### Outliving a home

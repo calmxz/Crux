@@ -114,7 +114,7 @@ This file covers the mastery check, from the offer to the result and what follow
 - If our AI provider refuses marking, the problem is swapped at once, with no mark. Repeated refusals pause the check. A sealed session holds its check half-done (see [`refusals.md`](refusals.md)) ([#735], [#802]).
 - From a barred country, a check under way pauses as half-done, and an answer sent from there is not kept (see [`security.md`](security.md)) ([#802]).
 - A paused check resumes under the half-done rules, with the open problem swapped ([#678]).
-- Spending limits never stop a check that has started, apart from reteaching (above). A check accepted when a limit is already full does not start (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#734]).
+- Spending limits never stop a check that has started, apart from reteaching (above). A check accepted with no checks left this week, or at a used ceiling or month, does not start. A full tutoring limit doesn't stop it (see [`at-a-limit.md`](at-a-limit.md)) ([#675], [#734], [#802]).
 
 ## Re-marks after a marking fault
 

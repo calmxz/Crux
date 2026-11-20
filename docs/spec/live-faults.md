@@ -71,7 +71,7 @@ Once a marking fault is fixed, every mark the faulty marker gave since the last 
 - Re-marks run in the Crux workspace and spend from the owner's share ([#728] Answer 1). Where they pause is in [`spending.md`](spending.md) ([#734]).
 - Checks stay off until the re-marks finish. The owner page shows their progress, and the owner switches checks back on ([#736]).
 - **After a planted-file fail,** a fresh marker checks the model answers of every check that used files since the last round that passed that test. A wrong one is corrected, and its answers re-marked. Checks come back once those re-checks finish ([#736]).
-- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a blocked re-mark leaves the mark standing (see [`refusals.md`](refusals.md)) ([#735]).
+- A sealed session is never re-marked while sealed, and its re-mark runs if the seal is lifted (see [`sealed-sessions.md`](sealed-sessions.md)), and a refused re-mark leaves the mark standing (see [`refusals.md`](refusals.md)) ([#735]).
 
 | Re-mark finds | What happens |
 |---|---|

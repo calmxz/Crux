@@ -133,6 +133,7 @@ A guest's broken reply is in [`landing-screens.md`](landing-screens.md).
 | Objectives panel | The rail and the strip, statuses, the trouble mark, passed links, dropped objectives, the paused topic, preferences, files and mistake marks |
 | Mastery check | The check bar, progress, photo answers and "Marking…" |
 | Result | The result card and the problem sheet with Dispute |
+| Limits | The check counter and the reading counter, wherever the build places them ([#802]) |
 | Pictures | Drawing Mermaid diagrams and graphs, and their text alternatives ([#769]) |
 | Maths | Drawing LaTeX with KaTeX, line breaks and the sideways box, and maths that cannot be drawn ([#771]) |
 

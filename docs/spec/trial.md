@@ -35,7 +35,7 @@ At the limit: "That's the end of guest mode for your own topic", with links to t
 - Replies are counted per browser by a random ID, which the browser holds with the count, signed ([#719]). It is never used for counting learners or for analytics ([#677]).
 - Guest mode has its own daily spend cap inside the daily ceiling, USD 0.25 for the meantime, changeable on the owner page. The cap stays the same after the trial ends, if guest mode stays on ([#734]).
 - Guest mode also has a monthly cap, USD 2 for the meantime, changeable on the owner page, so guests cannot use most of the month's budget ([#719]).
-- **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Guest mode is full for this month. Back on 1 Dec.", [#754]) and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video, with Request access while the trial runs ([#734], [#754]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]). If the stop caught a message, the distress check in [`at-a-limit.md`](at-a-limit.md) runs ([#734]).
+- **When guest mode stops:** at the guest cap, the monthly guest cap, the daily ceiling or the month's budget, a guest sees "Guest mode is full for today. Back tomorrow." (for the month, "Guest mode is full for this month. Back on 1 Dec.", [#754]) and the demo video ([#677], [#679], [#734]). Someone who has not typed sees only that line and the video, with Request access while the trial runs ([#734], [#754]). A guest's mini check stops at them like any guest reply, since a guest can resend an older saved state (see [`data-model.md`](data-model.md)) ([#719]). An open age question still works ([#675], [#679], [#733], [#734]).
 - When a workspace limit or the credit stops Crux, a guest sees the month's line and the video. Anthropic refuses the calls, so a mini check cannot finish. It is dropped, since guests keep nothing ([#734], [#802]).
 - The owner page has a switch for guest mode (see [`live-faults.md`](live-faults.md)) ([#678]).
 
@@ -75,7 +75,7 @@ If the day's emails have run out, an invite or decline waits for Resend's next d
 - Error reports carry no learner text.
 - "On a trial link, your browser remembers your theme choice (Match my device, Light or Dark). Crux never receives it." ([#779])
 - The dated under-18 count exists.
-- The link keeps its checks started and pages read this week, for the limits, and whether its latest action came from an allowed country, never the country. Both go with the link ([#802]).
+- The link keeps its checks started and pages read this week, for the limits, and each objective's hidden "fixed slip" note until the objective passes its check, and whether its latest action came from an allowed country, never the country. Both go with the link ([#802]).
 - A refused message's text is erased when it is refused. Only "Refused by our AI provider" and its date stay ([#802]).
 - Network addresses: wrong-link counts for an hour, the burst guard, and hand blocks for 12 to 36 hours, longer only while the daily job is down or a lift fails; the owner reads Cloudflare's request analytics only to find a network to block ([#770]).
 - A decline saves its date, kind and place in its session, for as long as [`misuse.md`](misuse.md) sets out ([#719]).

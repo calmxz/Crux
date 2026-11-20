@@ -17,7 +17,7 @@ Someone who uses Crux on the public link without an account, before Crux opens, 
 _Avoid_: visitor, anonymous user
 
 **Trial link**:
-The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within a learner's tutoring limit. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, the holder taps Yes to Crux's age question, or the holder erases the link.
+The private link that Crux emails to someone when the owner approves their request to join the trial before Crux opens. It gives every step of the learning loop, with files and photo answers, within an account's limits. Crux keeps the sessions under the link until the trial ends, the owner switches the link off, the holder taps Yes to Crux's age question, or the holder erases the link.
 _Avoid_: invite, code, password
 
 **Link code**:

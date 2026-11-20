@@ -53,7 +53,7 @@ The tools are in [`operations.md`](operations.md) ([#717]).
 
 **Before the trial, on the owner's own sittings** ([#678]):
 
-- A week of Crux's spend count against Google's bill. More than 10% apart tightens the limits by the gap.
+- Crux's spend count against the Console's Usage page, compared by hand each month. More than 10% apart tightens the limits by the gap ([#802]).
 - The cost per reply of the note at 40 mastered topics, and the cost of a lookup reply. If either is too costly, the owner decides then, as a recorded change ([#732]).
 
 **During the trial, from trial-link users** ([#678], [#679], [#717]):
@@ -70,7 +70,7 @@ These settle how the AI provider behaves, while that part is built:
 - whether Claude reads each listed image format ([#732], [#802]);
 - how Crux sends a topic's pages to Claude, within the 100,000-token rule ([#716], [#802]);
 - whether Anthropic bills more for a broken reply than Crux counted (see [`ai-layer.md`](ai-layer.md)) ([#771]);
-- the smoke test: the model-call-only role is enough for the service accounts, after which the Express API keys are deleted ([#716]).
+- the smoke test: workspace spend limits work on the individual account ([#716], [#802]).
 
 ## The repo
 
@@ -96,20 +96,19 @@ These settle how the AI provider behaves, while that part is built:
 | The real-phone tests for the trial ([#717]) | owner |
 | The spend, note and lookup measures ([#678]) | owner |
 | The fidelity test on real decks: Word equations, SmartArt, speaker notes ([#716], [#722]) | check |
-| The build checks, and the smoke test with the Express keys deleted ([#716], [#732], [#735]) | check |
+| The build checks, and the smoke test of the workspace limits ([#716], [#732], [#735], [#802]) | check |
 | A deliberate error reaches the owner's phone within minutes, which also proves the request-log filter keeps Crux's own logs ([#717]) | owner |
 | An uptime alert and a new-request push reach the phone, and so do two requests 2 minutes apart. The Google Cloud app receives a push ([#717], [#735], [#762]) | owner |
 | The breach plan, with how the NPC takes breach notices confirmed ([#678], [#762]) | owner |
 | A test restore of a dump that replays the log ([#716], [#735]) | check |
 | The Trial Terms and Trial Privacy Notice published ([#677], [#717]) | owner |
-| The spend caps set: the Crux and Crux tests projects, and Cloud Run on live and staging ([#679], [#716]) | owner |
+| The Cloud Run spend caps set on live and staging ([#716], [#802]) | owner |
 | The domain bought and verified with Resend, and Email Routing to the Crux Gmail ([#717]) | owner |
 | The three Anthropic workspaces and their limits set, workspace limits confirmed on the individual account, and Anthropic's supported-countries page re-checked ([#802]) | owner |
 | Essential Contacts set ([#717]) | owner |
 | Push protection on ([#717]) | check |
-| The processor terms of Google Cloud, Cloudflare, Supabase and Resend accepted ([#717]) | owner |
+| The processor terms of Anthropic, Google Cloud, Cloudflare, Supabase and Resend accepted ([#717], [#802]) | owner |
 | Two-step sign-in on the Resend account ([#717]) | owner |
-| Anthropic's supported-countries page re-checked ([#802]) | owner |
 | The owner's keyboard and screen-reader pass over every screen, the owner pages included ([#769]) | owner |
 | The live headers check: the headers on the live address, and only scripts the build made on the landing page and a legal page (see [`security.md`](security.md)) ([#769]) | check |
 | Turnstile's hostname check proven on staging, with real keys (see [`security.md`](security.md)) ([#769]) | check |

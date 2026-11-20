@@ -80,6 +80,7 @@ The address is privacy@ the domain (see [`terms-and-policy.md`](terms-and-policy
 
 ## Gaps
 
+- **Two sessions sharing a name** when a learner asks by email to erase one by its exact name, under a misuse lock or during a closing: older than [#802], and more frequent now that a refused first request shows "New session" ([#802]).
 - **Resend's figures on every reply:** Resend's page says only that "the API returns headers that track your email sending quotas". Checked at the build's first real send, a refusal included. If they are missing, how Crux counts comes back as a recorded change ([#763]).
 - **Retry mechanics, a build check:** how retries avoid double sends, including after a restore; stale dates in a retried email; email that can never be sent; and a daily email still waiting when the next is due, with the stop records it covers ([#763]).
 

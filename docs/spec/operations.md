@@ -44,7 +44,7 @@ A push comes from a marked log line and an alert rule ([#717]). It goes:
 
 New kinds of error and uptime alerts push too (see above). That covers the Cloud Run cap and a missed daily job, since no log line can be written then ([#735]).
 
-There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]). Beside them, two metric alerts on Crux's logs push when `/api` calls run high. The owner is also told when a hand block's lift fails, a block outlives 36 hours, or the list holds anything but single addresses (see [`security.md`](security.md)) ([#770]).
+There are two alert rules: one for access requests, and one for everything else. Each rule can send at most 20 notifications a day, so a flood of requests cannot silence an urgent message. Anything past 20 still shows on the owner page and in the daily email ([#735]). The pushes capped at once a day come to at most 7: the ceiling, Resend down, the email day, the email month, the two distress pots, and a guest session ended on the tutor's report ([#802]). Beside them, two metric alerts on Crux's logs push when `/api` calls run high. The owner is also told when a hand block's lift fails, a block outlives 36 hours, or the list holds anything but single addresses (see [`security.md`](security.md)) ([#770]).
 
 ### The daily email
 

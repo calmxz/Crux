@@ -42,7 +42,7 @@ A refused check call follows the rule for its job, with no retry. It is never a 
 
 ### Reading a file
 
-A harm-category refusal counts as a harmful file. Any other follows the failed-read rule in [`files.md`](files.md). Overload, a limit or a stop never uses up a read's tries ([#735], [#802]).
+A harm-category refusal, or one in a category Crux doesn't know, counts as a harmful file. Any other follows the failed-read rule in [`files.md`](files.md). Overload, a limit or a stop never uses up a read's tries ([#735], [#802]).
 
 ## The distress check
 

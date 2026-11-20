@@ -8,7 +8,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 
 - Sign-up is off during the trial. Sign-in by Google or code works only for the owner's own email addresses ([#677], [#717], [#728] Answer 5). A test address goes on the same list (see [`feedback.md`](feedback.md)) ([#734]).
 - No learner signs in during the trial. Trial-link users return through the link only (see [`trial-links.md`](trial-links.md)) ([#717], [#728] Answer 5).
-- During the trial the landing page has no "Sign in", and the owner opens the sign-in page by its address. An email not on the list, by code or by Google, is refused before any code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link." From the EU or the UK, it gets the region message instead (see [`landing-screens.md`](landing-screens.md)) ([#754]).
+- During the trial the landing page has no "Sign in", and the owner opens the sign-in page by its address. An email not on the list, by code or by Google, is refused before any code is sent: "Sign-up isn't open yet. To try Crux, use guest mode or ask for a trial link." From a barred country, it gets the region message instead (see [`landing-screens.md`](landing-screens.md)) ([#754]).
 - The rest of this file holds from opening.
 
 ## Ways in

@@ -45,7 +45,7 @@ These are the tests the closed tickets sent here, by area.
 - No lookup runs while a check problem is open, and none of a session's teaching is reachable then. The lookup runs during reteaching after a refresh miss, even with checks switched off, and is off during the refresh, the end step and any paused check.
 - Deleting a session removes its entries from "What you've mastered".
 - A sealed session is unreachable by lookup, share, background answer or re-mark.
-- The session search finds only the learner's own sessions; finds a sealed session by its name only; skips a check's hidden teaching and files, finds them during reteaching, and skips them again before the next problem; skips messages Google blocked and Crux's own lines; and loses a deleted session at once.
+- The session search finds only the learner's own sessions; finds a sealed session by its name only; skips a check's hidden teaching and files, finds them during reteaching, and skips them again before the next problem; skips messages our AI provider refused and Crux's own lines; and loses a deleted session at once.
 
 **Files** ([#670], [#677], [#716], [#722], [#732])
 
@@ -121,7 +121,7 @@ These are the tests the closed tickets sent here, by area.
 **Switches and re-marks** ([#678], [#736])
 
 - Each switch does what [`live-faults.md`](live-faults.md) says, and is undone by switching back on.
-- A message sent while the whole tutor is off is kept, gets the distress check, and is answered on a refresh, a tap, another send or the next opening.
+- A message sent while the whole tutor is off is kept, gets no distress check, and is answered on a refresh, a tap, another send or the next opening.
 - A read under way when files go off is dropped, with no try used and no charge.
 - A re-mark covers every mark from the faulty period, in both directions, and gives what a correct marker would have given then. A wrong or unsure result undoes a pass, and the objective stays shown. Several checks on one objective: any right one passes it. Checks stay off until the re-marks finish.
 - An answer sent to an open check problem while the whole tutor is off is not kept, and the problem is swapped.
