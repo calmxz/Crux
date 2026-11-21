@@ -10,7 +10,7 @@ Supabase Free has no backups, so Crux makes its own ([#716]).
 
 - **Daily dump:** a `pg_dump` of live, in the daily job. It drops to weekly once the database passes about 100 MB, so Supabase's 5 GB a month of outgoing transfer is not used up.
 - **Before every live migration:** an automatic `pg_dump`.
-- **Who can read the data:** the dump runs as its own read-only role. It, the restore's role, which writes for a restore or a repair, and the migration role are the only Crux roles allowed past row-level security, and only the release script uses them. No Crux code connects as `postgres` or `service_role`. The owner uses `postgres` only to create Crux's roles ([#719], [#726], [#735]).
+- **Who can read the data:** the dump runs as its own read-only role. It, the restore's role, which writes for a restore or a repair, and the migration role are the only Crux roles allowed past row-level security, and only the release script uses them. On staging and live, no Crux code connects as `postgres` or `service_role`. The owner uses `postgres` only to create Crux's roles ([#719], [#726], [#735]).
 - **Where they go:** a Cloud Storage bucket with soft delete off, readable only by the release script's account.
 - **How long:** a lifecycle rule deletes each dump after 7 days, and Google applies it within about a day. The Privacy Policy says "deleted data may remain in a backup for up to 8 days", for every deletion (see [`privacy.md`](privacy.md) and [`terms-and-policy.md`](terms-and-policy.md)).
 - **Soft delete** is set to 0 on every Crux bucket, so deleting erases.
@@ -74,7 +74,7 @@ The tools the code is built with are in [`tools.md`](tools.md) ([#769]).
 - **The release's guest sitting:** each release then runs one scripted guest sitting on staging before live, through the gate. It checks only that replies stream back. When the open-path check fails, the sitting does not run. When the sitting fails, the release stops on staging and names the stop reason from Crux's reply, the region message, or no reply ([#726]).
 - The release runs from a machine in a country Crux serves ([#726]).
 - Migrations are backward-compatible: add first, remove in a later release. A one-step rollback still works ([#716]).
-- A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` as the migration role, used only by the release script. Staging's release migrates the same way ([#716], [#726], [#750]).
+- A live release takes the dump (see [Backups](#backups)), then runs `alembic upgrade head` as the migration role, used only by the release script. Staging's release also migrates as the migration role ([#716], [#726], [#750]).
 
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#679]: https://github.com/calmxz/Crux/issues/679

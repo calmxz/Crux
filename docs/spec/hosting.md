@@ -36,8 +36,8 @@ All of this comes from [#716].
 - **At full use,** at 512 MiB, estimated ([#726]):
   - Live: the learners' and owner's AI time, the converter and the uptime checks come to about USD 9.26 to 10.58 gross, so live's cap can trip in the month's last days at the highest sitting rate.
   - Staging's USD 2 cap holds while staging's AI use stays under about USD 6.49 to 7.28 a month.
-  - Past the free tier, the credit pays about USD 6.30 to 9.55: live's AI time, the converter, Cloud Storage, alerting and up to staging's USD 2. With the planned USD 30 budget, about 7.60 to 11.02. An all-day minimum instance passes the credit. Past the credit, the billing account's payment method pays.
-  - Outbound data for file turns is not in these sums (see [Gaps](#gaps)).
+  - Past the free tier, the credit pays about USD 6.30 to 9.55: live's AI time, the converter, Cloud Storage, alerting from no sooner than September 2027, and up to staging's USD 2. With the planned USD 30 budget, about 7.60 to 11.02, so it can pass the credit by about USD 1. An all-day minimum instance passes the credit. Past the credit, the billing account's payment method pays.
+  - Outbound data for file turns is not in these sums (see [Gaps](#gaps)). If live's cap counts it, the cap trips earlier.
 - Cloud Storage takes no spend cap. Its cost is bounded by the 20 GB store total in [`files.md`](files.md), about USD 0.40 a month at full, though accepted files may pass it ([#716], [#732]).
 - Other hosting costs outside the AI budget are the domain (below), a minimum instance if the fallback is needed (below), alerting (see [`operations.md`](operations.md)), and Workspace once the owner forms a one person corporation (see [`email.md`](email.md)) ([#675], [#716], [#717]).
 
@@ -95,7 +95,7 @@ A domain is bought through Cloudflare's registrar before the trial, about USD 10
 - Row-level security is on every table holding a learner's data. The backend connects as a role without the bypass and sets the home (the account or trial link, see [`data-model.md`](data-model.md)) for each transaction, or the rules never run ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups read through rules that name what each may see, not by passing row-level security ([#719]).
 - Through Supabase's pooler, each request sets the home with `set_config(..., true)` or `SET LOCAL` inside one explicit transaction. No code runs a session-level `SET` or `set_config(..., false)`. Policies read it as `nullif(current_setting('app.home_id', true), '')`. The setting's name is a draft for the build ([#726]).
 - The driver turns prepared statements off and pipelines no queries. Every view is made with `security_invoker`, and no function on a table with row-level security is `SECURITY DEFINER` ([#726]).
-- The backend's role owns no table and has no bypass. An ordinary test proves it with a catalog query (see [`ordinary-tests.md`](ordinary-tests.md)). The dump's, restore's and migration roles are the only Crux roles allowed past row-level security. No Crux code connects as `postgres` or `service_role`. The owner uses `postgres` only to create Crux's roles (see [`backups-and-releases.md`](backups-and-releases.md)) ([#726]).
+- The backend's role owns no table and has no bypass. An ordinary test proves it with a catalog query (see [`ordinary-tests.md`](ordinary-tests.md)). The dump's, restore's and migration roles are the only Crux roles allowed past row-level security. On staging and live, no Crux code connects as `postgres` or `service_role`. The owner uses `postgres` only to create Crux's roles (see [`backups-and-releases.md`](backups-and-releases.md)) ([#726]).
 - Every lookup search is limited to the learner's own sessions, in the query and by row-level security (see [`sessions.md`](sessions.md)) ([#716]).
 - The outside check keeps Supabase from pausing (see [`operations.md`](operations.md)) ([#716]).
 - Another database host is out of scope (see the map's Out of scope list) ([#716]).
@@ -136,7 +136,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 - **Whether hosted Supabase's `postgres` role has the bypass,** as the local stack's does. The three Crux roles past row-level security need `postgres` to grant it ([#726]).
 - **Whether the Cloud Run caps count gross or net use,** and Cloud Run's CPU speed and network time: the first month's billing report ([#726]).
 - **Where the release script runs.** It must be a machine in a country Crux serves, so a GitHub-hosted job, whose region GitHub does not state, cannot be relied on ([#726]).
-- **Outbound data for file turns,** about USD 3.60 a month at full use: see [`files.md`](files.md) ([#726]).
+- **Outbound data for file turns.** Each call re-sends the topic's pages: about 0.18 GiB per 20-page file sitting, about USD 0.021 at Google's Premium Tier rate of USD 0.12 per GiB, close to that sitting's AI cost of about USD 0.023. At full use with every sitting a 20-page file topic, about USD 3.60 a month. It adds to the credit's sum, which can then pass the credit, and it may or may not count in Cloud Run's cap. Whether pages go once through Anthropic's Files API is open on [#805] (see [`files.md`](files.md)) ([#726]).
 - **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in [`quality-bar.md`](quality-bar.md) ([#678], [#716]).
 
 ## On screen
@@ -162,3 +162,4 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#771]: https://github.com/calmxz/Crux/issues/771
 [#781]: https://github.com/calmxz/Crux/issues/781
 [#802]: https://github.com/calmxz/Crux/issues/802
+[#805]: https://github.com/calmxz/Crux/issues/805

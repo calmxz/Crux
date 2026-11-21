@@ -18,7 +18,7 @@ This file covers how someone gets an account and comes back to it, from opening 
 - There is no separate email-verification step ([#674]).
 - The same email by code and by Google is one account, matched on the email ([#674]).
 - Crux's own backend runs both ways in. There is no sign-in service, and Supabase never sees the browser ([#717]).
-- Nothing is typed to the tutor without an account, and there is no guest mode on live. It stays in the code, on in staging, for the release's guest sitting (see [`trial.md`](trial.md)) ([#674], [#677], [#726]).
+- Nothing is typed to the tutor on live without an account. After sign-up opens, there is no guest mode on live. It stays in the code, on in staging, for the release's guest sitting (see [`trial.md`](trial.md)) ([#674], [#677], [#726]).
 - The landing page shows a pre-written example: a request, the tutor's narrowing questions and the learning objectives it proposes, written once, with no AI call ([#674], [#677]). The demo video stays beside it ([#754]).
 
 ### Continue with Google

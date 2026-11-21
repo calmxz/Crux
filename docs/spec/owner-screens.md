@@ -69,7 +69,7 @@ The Trial area leaves the menu when the trial ends.
 
 ## Money and switches
 
-- **A raise** in the money opens a dialog: "Raise Crux's workspace limit in the Console, and live's Cloud Run cap in Google Cloud's billing, first. Set them to about USD 37 and USD 11.", with the amounts worked out from the new totals (the learners' budget, the owner's share and the margin). Raise works only once "I raised the limits" is ticked ([#726], [#802]). "Start the window" for a re-run asks the same.
+- **A raise** in the money opens a dialog: "Raise Crux's workspace limit in the Console, and live's Cloud Run cap in Google Cloud's billing, first. Set them to about USD 37 and USD 11.", with the amounts worked out: the limit from the new totals (the learners' budget, the owner's share and the margin), and the cap at about USD 0.31 for each AI dollar added (see [`hosting.md`](hosting.md)). Raise works only once "I raised the limits" is ticked ([#726], [#802]). "Start the window" for a re-run asks the same.
 - **Switching a part off** asks first, naming what learners will see.
 - **Switching a part on** needs "A fix passed the test" ticked. While re-marks run, the checks switch is greyed until they finish.
 

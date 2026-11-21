@@ -137,7 +137,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 ## Gaps
 
 - **Whether the 20 GB store holds with trial links uploading:** open on [#675]. Every new link can hold 200 MB, and a lost link stays until the trial ends. At 100 full links, uploads stop for everyone ([#722]).
-- **Outbound data for file turns:** each call re-sends the topic's pages, about USD 0.021 per 20-page file sitting and USD 3.60 a month at full use, in or out of Cloud Run's cap. Open on [#805] ([#726]).
+- **Outbound data for file turns:** see [`hosting.md`](hosting.md). Whether pages go once through Anthropic's Files API instead is open on [#805] ([#726]).
 - **Whether added ranges go as separate PDF parts:** unpruned, a fourth part of about 41 MB would pass the 128 MB request limit; pruned, they stay small ([#726]).
 - **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]). The outline read in parts is untested too ([#802]).
 - **How Crux sends a topic's pages to Claude,** within the 100,000-token rule: a build check, open on [#678] ([#716], [#802]).
