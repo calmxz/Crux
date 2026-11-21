@@ -1,0 +1,13 @@
+== machine
+cpu: AMD Ryzen 9 8945HS w/ Radeon 780M Graphics
+os: Windows-11-10.0.26200-SP0
+docker: 29.8.2, 16 CPUs, cgroup v1, kernel 5.15.167.4-microsoft-standard-WSL2
+[OK] key loaded from repo .env (value not shown)
+== worst-case-100-slides.pptx.pdf
+1 pages: plain copy 40829320 base64 chars, 1726 tokens; pruned 548784 base64 chars, 1726 tokens
+20 pages: plain copy 40871236 base64 chars, 34823 tokens; pruned 8241336 base64 chars, 34823 tokens
+50 pages: plain copy 40938152 base64 chars, 87028 tokens; pruned 20559088 base64 chars, 87028 tokens
+== worst-case-100-pages.docx.pdf
+1 pages: plain copy 42224968 base64 chars, 1648 tokens; pruned 592820 base64 chars, 1648 tokens
+20 pages: plain copy 42251592 base64 chars, 33989 tokens; pruned 8515600 base64 chars, 33989 tokens
+50 pages: plain copy 42292872 base64 chars, 84920 tokens; pruned 21235968 base64 chars, 84920 tokens

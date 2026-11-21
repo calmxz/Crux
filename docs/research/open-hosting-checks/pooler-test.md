@@ -1,6 +1,6 @@
 # Item 1 hands-on test: row-level security through Supavisor in transaction mode (#726)
 
-This is the hands-on test that `open-hosting-checks.md` lists under "Still to do" for item 1. It ran on a local Supabase stack on **2026-11-21**.
+This is the hands-on test that the first version of `open-hosting-checks.md` listed under "Still to do" for item 1. Its docs-only finding is now in [`pooler-docs.md`](pooler-docs.md). It ran on a local Supabase stack on **2026-11-21**.
 
 Every figure below points to a line in a log in [`pooler-test/`](pooler-test/). `run:57` means line 57 of `run-2026-11-21.log`. `leak:81` means line 81 of `leak-action-2026-11-21.log`.
 
@@ -21,7 +21,7 @@ Every figure below points to a line in a log in [`pooler-test/`](pooler-test/). 
 | Postgres image | `public.ecr.aws/supabase/postgres:17.12.0.000` | `run:7` |
 | Postgres server | PostgreSQL 17.12 | `run:9` |
 | Supavisor image | `public.ecr.aws/supabase/supavisor:2.10.1` | `run:6` |
-| Driver | psycopg 3.3.4, `prepare_threshold=None`, `autocommit=True` | `run:5` |
+| Driver | psycopg 3.3.4, `prepare_threshold=None`, `autocommit=True` | `run:5` (version), `pooler_rls_test.py:70` (settings) |
 | Docker | 29.8.2 | `versions-2026-11-21.log` |
 
 Setup:
@@ -31,7 +31,7 @@ Setup:
 - The local tenant is `pooler-dev`, with pool size 1, `txn_mode_leak_action = 'ignore'`, and `server_reset_query = 'DISCARD ALL'` (`run:11`).
 - The `DISCARD ALL` reset did not run between transaction-mode clients in this run. Steps 5a and 5b show the session state surviving.
 - Both clients log in as `crux_app.pooler-dev` on port 54329, the local transaction port. The hosted form is `crux_app.<project-ref>`.
-- The tenant has `require_user = False` (`run:11`), so Supavisor looks up each role's password with an auth query. The container's tenant script sets it to `pgbouncer.get_auth`. No extra pooler user was needed for `crux_app`.
+- The tenant has `require_user = False` (`run:11`), so Supavisor looks up each role's password with an auth query. No extra pooler user was needed for `crux_app`.
 - Ana's home is `aaaaaaaa-...-0001`, with 3 sessions. Ben's is `bbbbbbbb-...-0002`, with 2. A leak therefore shows as a count of 3 where 0 or 2 is expected.
 
 The files:
@@ -122,9 +122,9 @@ Two driver mistakes were also checked:
 
 | Value | Session-level `SET` | `set_config(..., false)` | Safe pattern | Log |
 |---|---|---|---|---|
-| `ignore` | Runs. B reads Ana, 3 rows. Nothing logged. | Runs. B reads Ana, 3 rows. | A: Ben, 2 rows. B: `''`, 0 rows. | `leak:7` to `leak:30` |
-| `log` | Runs. B reads Ana, 3 rows. Logs `[warning] received session-level SET statement in transaction mode`. | Runs. B reads Ana, 3 rows. Logs a matching warning. | Same as above. | `leak:39` to `leak:66` |
-| `error` | Rejected: `(ESESSIONLEAK) session-level SET statement is not allowed in transaction mode`. The pooler closes A's connection. B reads NULL, 0 rows. | Rejected the same way. | Same as above. Not flagged. | `leak:75` to `leak:108` |
+| `ignore` | Runs. B reads Ana, 3 rows. Nothing logged. | Runs. B reads Ana, 3 rows. | A: Ben, 2 rows. B: `''`, 0 rows. | `leak:7` to `leak:31` |
+| `log` | Runs. B reads Ana, 3 rows. Logs `[warning] received session-level SET statement in transaction mode`. | Runs. B reads Ana, 3 rows. Logs a matching warning. | Same as above. | `leak:39` to `leak:67` |
+| `error` | Rejected: `(ESESSIONLEAK) session-level SET statement is not allowed in transaction mode`. The pooler closes A's connection. B reads NULL, 0 rows. | Rejected the same way. | Same as above. Not flagged. | `leak:75` to `leak:109` |
 
 - Only `error` stops the leak. `log` warns but still lets B read Ana's rows.
 - Under `error`, the safe pattern ran unchanged, so the setting does not get in its way.
@@ -143,7 +143,7 @@ Condition 5 matters because the pooler does not clean up between clients on this
 
 On the hosted pooler, an `error` leak action would enforce condition 5. Whether Supabase sets it, or lets a project set it, is not shown here.
 
-This confirms the docs-only finding in `open-hosting-checks.md`, section 1. It adds three points:
+This confirms the docs-only finding in [`pooler-docs.md`](pooler-docs.md). It adds three points:
 
 - The `nullif` is required, not optional.
 - Local `postgres` has `BYPASSRLS`.

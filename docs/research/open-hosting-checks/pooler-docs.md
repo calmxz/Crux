@@ -8,7 +8,7 @@ The ticket's case: Ana's and Ben's requests share one pooled connection. Ben's q
 
 ### What clears a transaction-local setting
 
-- `set_config(name, value, true)` applies "only during the current transaction" [1].
+- `set_config(name, value, true)` "will only apply during the current transaction" [1].
 - `SET LOCAL` effects "last only till the end of the current transaction, whether committed or not" [2].
 - A rollback to an earlier savepoint also cancels `SET` and `SET LOCAL` [2].
 - So Ana's setting cannot stay behind. Postgres drops it at commit or rollback.
@@ -62,7 +62,7 @@ Whether an unset custom setting reads as NULL or as an empty string on a reused 
 ### Answer
 
 - The #716 rule holds on Supabase Free, under the conditions above. No connection rule changes.
-- #719 records the role: a custom role without the bypass, not the table owner, or `FORCE ROW LEVEL SECURITY` on every table.
+- The role still needs recording, where the ticket names #719: a custom role without the bypass, not the table owner, or `FORCE ROW LEVEL SECURITY` on every table. No spec line records it yet.
 
 ## Sources (all read 2026-11-02)
 

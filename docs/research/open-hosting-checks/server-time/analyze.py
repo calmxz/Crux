@@ -20,11 +20,13 @@ VOID_TIME = {"v3_haiku_medium_A3_slice20", "v3_haiku_medium_B3_slice20"}
 # Prices and allowances, from cloud-run-billing.md (Singapore, Tier 2, request-based).
 CPU_S = 0.0000336      # USD per vCPU-second
 GIB_S = 0.0000035      # USD per GiB-second
-FREE_S = 128_571       # free instance-seconds at 1 vCPU (reading 1: CPU part, 4.32 / 0.0000336)
+FREE_CPU_S = 128_571   # reading 1: the CPU part, 4.32 / 0.0000336
+FREE_GIB_S = 257_143   # reading 1: the memory part, 0.90 / 0.0000035
 LIVE_CAP, STAGING_CAP, DEV_CREDIT = 6.0, 2.0, 10.0  # hosting.md
-AI_LIVE = {"learners": 25.0, "owner's share": 8.0}  # README.md "Money"
-TESTS_AI = 20.0
-SITTING_WORTH = 0.0084  # spending.md
+LEARNERS, OWNER, TESTS_AI = 25.0, 8.0, 20.0         # README.md "Money"
+SITTING_WORTH = 0.0084                              # spending.md
+DAY_LIMIT = 2 * SITTING_WORTH                       # spending.md: 2 sittings' worth a day
+TICKET_SITTINGS = (180, 240)                        # #726's question: "180 to 240 sittings"
 
 
 def pct(a, p):
@@ -47,45 +49,79 @@ def per_second(mem_gib):
     return CPU_S + mem_gib * GIB_S
 
 
+def past_free_tier(secs, mem_gib):
+    """Reading 1: separate CPU and memory allowances; each part bills only past its own allowance."""
+    return max(0.0, secs - FREE_CPU_S) * CPU_S + max(0.0, secs * mem_gib - FREE_GIB_S) * GIB_S
+
+
+def sittings():
+    by = collections.defaultdict(list)
+    for r in jl(os.path.join(HLOGS, "timed_*.jsonl")):
+        by[r["tag"]].append(r)
+    out = {}
+    for tag, rs in by.items():
+        rs.sort(key=lambda r: r["t"])
+        cum, cross = 0.0, None
+        for r in rs:
+            cum += r["cost"]
+            if cross is None and cum > DAY_LIMIT:
+                cross = r["turn"]
+        first = rs[0]["usage"]
+        turn_s = collections.defaultdict(float)
+        for r in rs:
+            turn_s[r["turn"]] += r["call_s"]
+        out[tag] = {
+            "start": rs[0]["t"], "cost": cum, "cross": cross, "calls": [r["call_s"] for r in rs],
+            "first_events": [r["first_event_s"] for r in rs if r.get("first_event_s")],
+            "first_write": first["write_1h"] + first["write_5m"], "first_read": first["cache_read"],
+            "cache": "warm" if first["cache_read"] > 0 else "cold",
+            "heavy": "slice20" in tag, "timed": tag not in VOID_TIME,
+            "turns": dict(turn_s), "open_s": sum(turn_s.values()),
+        }
+    return out
+
+
 def main():
-    print("== Haiku 5.5 tutor turns (timed_*.jsonl), effort medium, 1-hour cache")
-    recs = list(jl(os.path.join(HLOGS, "timed_*.jsonl")))
-    turn_s = collections.defaultdict(float)
-    cost = collections.defaultdict(float)
-    for r in recs:
-        cost[r["tag"]] += r["cost"]
-        if r["tag"] not in VOID_TIME:
-            turn_s[(r["tag"], r["turn"])] += r["call_s"]
-    groups = {"plain": [t for t in cost if "slice" not in t],
-              "slice20": [t for t in cost if "slice20" in t]}
-    s_per_usd = {}
+    S = sittings()
+    print("== Haiku 5.5 tutor sittings (timed_*.jsonl), effort medium, 1-hour cache")
+    print(f"   a day's limit = 2 x USD {SITTING_WORTH} = USD {DAY_LIMIT:.4f}")
+    for tag, s in sorted(S.items(), key=lambda kv: kv[1]["start"]):
+        print(f"   {tag}: {s['cache']} cache (first call wrote {s['first_write']}, read {s['first_read']} tokens); "
+              f"cost USD {s['cost']:.5f} = {s['cost'] / SITTING_WORTH:.2f} sittings' worth; "
+              f"day's limit crossed at reply {s['cross']}"
+              + (f"; open {s['open_s']:.1f} s, {s['open_s'] / s['cost']:.0f} s per USD" if s["timed"] else "; time void"))
+    groups = collections.OrderedDict()
+    for heavy in (False, True):
+        for cache in ("cold", "warm"):
+            tags = [t for t, s in S.items() if s["heavy"] == heavy and s["cache"] == cache]
+            if tags:
+                groups[("page-heavy" if heavy else "plain") + ", " + cache] = tags
+    print()
     for g, tags in groups.items():
-        timed = [t for t in tags if t not in VOID_TIME]
-        turns = [v for (t, _), v in turn_s.items() if t in timed]
-        sit_s = [sum(v for (t, _), v in turn_s.items() if t == tag) for tag in timed]
-        costs = [cost[t] for t in tags]
-        print(f"-- {g}: sittings costed {len(tags)}, timed {len(timed)}")
-        for t in sorted(tags):
-            ts = sum(v for (x, _), v in turn_s.items() if x == t)
-            print(f"   {t}: tutor cost USD {cost[t]:.5f}" + ("" if t in VOID_TIME else f", open {ts:.1f} s"))
-        print(f"   cost per sitting: mean USD {st.mean(costs):.5f} (min {min(costs):.5f}, max {max(costs):.5f}); "
-              f"vs spending.md USD {SITTING_WORTH}: x{st.mean(costs) / SITTING_WORTH:.2f}")
-        if turns:
-            print(f"   turn open time: n {len(turns)}, median {pct(turns, .5):.1f} s, p90 {pct(turns, .9):.1f} s, "
-                  f"max {max(turns):.1f} s")
-            print(f"   sitting open time: mean {st.mean(sit_s):.1f} s (min {min(sit_s):.1f}, max {max(sit_s):.1f})")
-            spu = sum(sit_s) / sum(cost[t] for t in timed)
-            s_per_usd[g] = spu
-            print(f"   open seconds per USD of tutoring: {spu:.0f}")
-    calls = [r["call_s"] for r in recs if r["tag"] not in VOID_TIME]
-    firsts = [r["first_event_s"] for r in recs if r["tag"] not in VOID_TIME and r.get("first_event_s")]
-    print(f"   calls {len(calls)}: median {pct(calls, .5):.2f} s, p90 {pct(calls, .9):.2f} s; "
-          f"first stream event median {pct(firsts, .5):.2f} s")
+        costs = [S[t]["cost"] for t in tags]
+        line = (f"-- {g}: {len(tags)} sittings, cost mean USD {st.mean(costs):.5f} "
+                f"(x{st.mean(costs) / SITTING_WORTH:.2f} of USD {SITTING_WORTH})")
+        print(line)
+    for name, pick in (("plain", lambda s: not s["heavy"]), ("page-heavy, timed", lambda s: s["heavy"] and s["timed"])):
+        tags = [t for t, s in S.items() if pick(s) and s["timed"]]
+        turns = [v for t in tags for v in S[t]["turns"].values()]
+        calls = [v for t in tags for v in S[t]["calls"]]
+        firsts = [v for t in tags for v in S[t]["first_events"]]
+        opens = [S[t]["open_s"] for t in tags]
+        spus = [S[t]["open_s"] / S[t]["cost"] for t in tags]
+        print(f"-- {name} ({len(tags)} sittings): turn open median {pct(turns, .5):.1f} s, p90 {pct(turns, .9):.1f} s, "
+              f"max {max(turns):.1f} s over {len(turns)} turns; call median {pct(calls, .5):.2f} s over {len(calls)} calls; "
+              f"first event median {pct(firsts, .5):.2f} s")
+        print(f"   sitting open mean {st.mean(opens):.1f} s (min {min(opens):.1f}, max {max(opens):.1f}); "
+              f"s per USD pooled {sum(opens) / sum(S[t]['cost'] for t in tags):.0f}, per sitting {min(spus):.0f} to {max(spus):.0f}")
+    plain = [t for t, s in S.items() if not s["heavy"]]
+    spu_pooled = sum(S[t]["open_s"] for t in plain) / sum(S[t]["cost"] for t in plain)
+    spu_max = max(S[t]["open_s"] / S[t]["cost"] for t in plain)
+    plain_open = st.mean([S[t]["open_s"] for t in plain])
 
     print("\n== Outline reads (outline_*.jsonl), effort low, no cache")
-    orecs = list(jl(os.path.join(HLOGS, "outline_*.jsonl")))
     by = collections.defaultdict(list)
-    for r in orecs:
+    for r in jl(os.path.join(HLOGS, "outline_*.jsonl")):
         by[r["tag"]].append(r)
     o_spu = []
     for tag, rs in sorted(by.items()):
@@ -97,86 +133,84 @@ def main():
                           f"out {r['usage']['output_tokens']})" for r in rs)
         print(f"   {tag}: {pages} pages in {len(rs)} parts [{parts}]; {secs:.1f} s, USD {c:.5f}, "
               f"USD {c / pages * 100:.5f} per 100 pages, {secs / c:.0f} s per USD")
-    if o_spu:
-        print(f"   open seconds per USD of reading: {min(o_spu):.0f} to {max(o_spu):.0f}")
+    read_100 = st.mean([sum(r["cost"] for r in rs) / sum(r["pages"] for r in rs) * 100 for rs in by.values()])
+    print(f"   mean USD {read_100:.5f} per 100 pages; open seconds per USD {min(o_spu):.0f} to {max(o_spu):.0f}")
 
     print("\n== Converter (Gotenberg), wall s / container CPU s / peak MiB")
-    crecs = [r for r in jl(os.path.join(CLOGS, "bench-*.jsonl")) if "header" not in r]
-    for h in jl(os.path.join(CLOGS, "bench-*.jsonl")):
+    allc = list(jl(os.path.join(CLOGS, "bench-*.jsonl")))
+    for h in allc:
         if "header" in h:
             print(f"   header: {h['header']}")
+    crecs = [r for r in allc if "header" not in r]
+    print(f"   source files: " + ", ".join(sorted({f"{r['file']} {r['file_mb']} MB" for r in crecs})))
+    print(f"   output PDFs: " + ", ".join(sorted({f"{r['file']} -> {r['pdf_bytes'] / 1e6:.1f} MB, {r['pdf_pages']} pages"
+                                                  for r in crecs if r['pdf_bytes']})))
     cell = collections.defaultdict(list)
     for r in crecs:
         cell[(r["cpus"], r["memory"], r["file"])].append(r)
     for (cpus, mem, f), rs in sorted(cell.items()):
         ok = [r for r in rs if r["status"] == 200]
         bad = [r for r in rs if r["status"] != 200]
-        line = f"   {cpus} vCPU {mem} {f}: {len(ok)} ok"
+        line = f"   {cpus} vCPU {mem} {f}: {len(ok)} of {len(rs)} ok"
         if ok:
             line += (f", wall {min(r['wall_s'] for r in ok)}-{max(r['wall_s'] for r in ok)} s, "
                      f"cpu {min(r['cpu_s'] for r in ok)}-{max(r['cpu_s'] for r in ok)} s, "
                      f"peak up to {max(r['mem_peak_mib'] or 0 for r in ok)} MiB")
         if bad:
-            line += f"; {len(bad)} failed ({', '.join(r['run'] + ' ' + str(r['status']) for r in bad)})"
+            line += f"; failed: {', '.join(r['run'] + ' ' + str(r['status']) for r in bad)}"
         print(line)
     two = [r["wall_s"] for r in crecs if r["status"] == 200 and r["cpus"] == "1" and r["memory"] == "2g"]
     conv_wall = max(two)
     print(f"   1 vCPU 2 GiB: wall max {conv_wall} s, median {pct(two, .5):.2f} s over {len(two)} conversions")
 
-    print("\n== Re-cost: Cloud Run, gross, list price, Singapore")
-    spu_max = max(s_per_usd.values())
+    print("\n== Re-cost: Cloud Run, gross, list price, Singapore, no overlap between requests")
+    print(f"   plain sittings: {spu_pooled:.0f} s per USD pooled, {spu_max:.0f} s per USD for the highest single sitting")
     for mem in (0.5, 1.0):
         ps = per_second(mem)
-        print(f"-- backend 1 vCPU, {mem} GiB: USD {ps:.8f} per open second; free tier {FREE_S} s; "
-              f"live cap USD {LIVE_CAP} = {LIVE_CAP / ps:.0f} s; staging cap USD {STAGING_CAP} = {STAGING_CAP / ps:.0f} s")
-        for label, usd in [("learners only", AI_LIVE["learners"]), ("learners + owner's share", sum(AI_LIVE.values()))]:
-            secs = usd * spu_max
-            gross = secs * ps
-            net = max(0.0, (secs - FREE_S)) * ps
-            print(f"   all of {label} (USD {usd:.0f}) at {spu_max:.0f} s/USD, no overlap: {secs:.0f} s, "
-                  f"gross USD {gross:.2f} (cap {'TRIPS' if gross > LIVE_CAP else 'holds'}), "
-                  f"after free tier USD {net:.2f} (Developer credit USD {DEV_CREDIT:.0f} "
-                  f"{'covers' if net <= DEV_CREDIT else 'does not cover'})")
-        for n in (180, 240):
-            secs = n * st.mean([sum(v for (t, _), v in turn_s.items() if t == tag) for tag in groups["plain"]])
-            print(f"   {n} plain sittings: {secs:.0f} s, gross USD {secs * ps:.2f}")
-        trip = LIVE_CAP / ps / spu_max
-        print(f"   AI spend through live at which the cap trips (no overlap): USD {trip:.2f}")
-        print(f"   tests' USD {TESTS_AI:.0f}, if it all ran through staging: {TESTS_AI * spu_max:.0f} s, "
-              f"gross USD {TESTS_AI * spu_max * ps:.2f} vs staging cap USD {STAGING_CAP}")
-    print("\n== Re-cost: the AI month for one learner at every limit (31-day month)")
-    weeks = 31 / 7
-    tutoring = 17 * SITTING_WORTH  # spending.md: at most about 17 sittings' worth a month
-    # Per problem, Haiku writing and marking with Opus's independent check: claude-anthropic-api-check.md (#802 research)
-    per_problem = (0.0042, 0.0090)
-    read_100 = st.mean([sum(r["cost"] for r in rs) / sum(r["pages"] for r in rs) * 100 for rs in by.values()])
-    plain_mean = st.mean([cost[t] for t in groups["plain"]])
-    heavy_mean = st.mean([cost[t] for t in groups["slice20"]])
-    print(f"   tutoring: 17 x USD {SITTING_WORTH} = USD {tutoring:.3f} (money, so fixed); buys {tutoring / plain_mean:.1f} "
-          f"plain sittings at USD {plain_mean:.5f}, or {tutoring / heavy_mean:.1f} page-heavy at USD {heavy_mean:.5f}")
-    day = 2 * SITTING_WORTH
-    print(f"   a day's limit (2 x {SITTING_WORTH} = USD {day:.4f}) is {day / heavy_mean:.0%} of one page-heavy sitting "
-          f"(about {15 * day / heavy_mean:.0f} of its 15 replies), and {day / (2 * plain_mean):.0%} of two plain sittings")
-    for n in (2, 6, 10):
-        lo, hi = n * per_problem[0], n * per_problem[1]
-        print(f"   checks of {n} problems: USD {lo:.4f} to {hi:.4f} each; 2 a week = {2 * weeks:.2f} a month = "
-              f"USD {2 * weeks * lo:.3f} to {2 * weeks * hi:.3f}")
-    reading = 100 * weeks / 100 * read_100
-    print(f"   reading: USD {read_100:.5f} per 100 pages; 100 pages a week = USD {reading:.3f} a month; with the "
-          f"overrun (a file starting at page 99 read in full, up to 199 pages a week) up to USD {reading * 1.99:.3f}")
-    for n in (6, 10):
-        worst = tutoring + 2 * weeks * n * per_problem[1] + reading * 1.99
-        print(f"   one learner at every limit, {n}-problem checks at the high end, with overruns: USD {worst:.3f}; "
-              f"x25 learners = USD {25 * worst:.2f} vs the learners' USD 25")
-
+        print(f"-- backend 1 vCPU, {mem} GiB: USD {ps:.8f} per open second; live cap USD {LIVE_CAP} = {LIVE_CAP / ps:.0f} s; "
+              f"staging cap USD {STAGING_CAP} = {STAGING_CAP / ps:.0f} s")
+        for label, usd in (("the learners' USD 25", LEARNERS), ("the learners' and the owner's USD 33", LEARNERS + OWNER)):
+            for rate_name, rate in (("pooled", spu_pooled), ("highest sitting", spu_max)):
+                secs = usd * rate
+                print(f"   all of {label}, {rate_name} {rate:.0f} s/USD: {secs:.0f} s; gross USD {secs * ps:.2f} "
+                      f"({'trips' if secs * ps > LIVE_CAP else 'under'} the cap); past the free tier USD "
+                      f"{past_free_tier(secs, mem):.2f}, if live had the whole free tier")
+        for n in TICKET_SITTINGS:
+            secs = n * plain_open
+            print(f"   {n} plain sittings: {secs:.0f} s = {secs / FREE_CPU_S:.1%} of the free tier's CPU part; gross USD {secs * ps:.2f}")
+        for rate_name, rate in (("pooled", spu_pooled), ("highest sitting", spu_max)):
+            print(f"   AI spend through live at which the cap trips, {rate_name}: USD {LIVE_CAP / ps / rate:.2f}")
+        print(f"   tests' USD {TESTS_AI:.0f} through staging, pooled: {TESTS_AI * spu_pooled:.0f} s, "
+              f"gross USD {TESTS_AI * spu_pooled * ps:.2f} vs staging cap USD {STAGING_CAP}")
     pages_month = 25 * 100 * 31 / 7
     files = pages_month / 100
     ps2 = per_second(2.0)
     for scale in (1, 2):
         per_file = (conv_wall * scale + 10) * ps2
-        print(f"-- converter at 2 GiB, laptop time x{scale} + 10 s shutdown per file: USD {per_file:.5f} per 100-page file; "
-              f"{files:.0f} files a month (25 learners x 100 pages x 31/7 weeks) = USD {per_file * files:.2f}, "
-              f"twice that with overruns USD {2 * per_file * files:.2f}")
+        print(f"-- converter at 2 GiB, longest laptop time x{scale} + 10 s shutdown: USD {per_file:.5f} per 100-page file; "
+              f"{files:.0f} files a month (25 x 100 pages x 31/7 weeks) = USD {per_file * files:.2f}; "
+              f"with every read overrunning USD {2 * per_file * files:.2f}")
+
+    print("\n== Re-cost: the AI month for one learner at every limit (31-day month)")
+    weeks = 31 / 7
+    tutoring = 17 * SITTING_WORTH  # spending.md: at most about 17 sittings' worth a month
+    # Per problem, maths to worded, Haiku writing and marking with Opus's independent check:
+    # claude-anthropic-api-check.md (#802 research)
+    per_problem = (0.0042, 0.0090)
+    for g, tags in groups.items():
+        m = st.mean([S[t]["cost"] for t in tags])
+        print(f"   17 sittings' worth (USD {tutoring:.3f}) buys {tutoring / m:.1f} sittings of the {g} kind")
+    for n in (2, 6, 10):
+        lo, hi = n * per_problem[0], n * per_problem[1]
+        print(f"   checks of {n} problems: USD {lo:.4f} (maths) to {hi:.4f} (worded) each; 2 a week = {2 * weeks:.2f} "
+              f"a month = USD {2 * weeks * lo:.3f} to {2 * weeks * hi:.3f}")
+    reading = weeks * read_100
+    print(f"   reading 100 pages a week = USD {reading:.3f} a month; with the overrun (up to 199 pages a week) "
+          f"USD {reading * 1.99:.3f}")
+    for n in (6, 10):
+        worst = tutoring + 2 * weeks * n * per_problem[1] + reading * 1.99
+        print(f"   one learner at every limit, {n}-problem worded checks, every read overrunning: USD {worst:.3f}; "
+              f"x25 = USD {25 * worst:.2f} vs the learners' USD 25")
 
 
 if __name__ == "__main__":

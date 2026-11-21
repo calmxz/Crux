@@ -50,7 +50,7 @@ Points per month = output time series x execution periods per month.
 - 86,400 periods = 30 days x 24 hours x 60 minutes x 2 periods a minute.
 - In a 31-day month, each condition returns 89,280 points, or USD 0.0446.
 - Monthly total: 4 metric references x USD 0.35 = USD 1.40. Points: 2 x USD 0.0432 = USD 0.0864. Total: about USD 1.49.
-- So the ticket's "about USD 0.05 for each new metric condition" is about right. The exact figure is about USD 0.04.
+- So the ticket's "about USD 0.05 of points for each new condition" is about right. The exact figure is about USD 0.04.
 
 ### What the one-series assumption needs
 
