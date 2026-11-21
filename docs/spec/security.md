@@ -67,7 +67,7 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 
 ### Staging and releases
 
-- **Staging's gate:** staging's copy of the no-session rule also refuses every request to the staging host, pages included, unless it carries a long random secret. The open-path check sends it in a header. The owner's browser holds it in a cookie, set once from one staging page left open for pasting it (draft). So no one else spends the shared 100,000 or the test budget through staging ([#770]).
+- **Staging's gate:** staging's copy of the no-session rule also refuses every request to the staging host, pages included, unless it carries a long random secret. The open-path check and the release's guest sitting send it in a header ([#726]). The owner's browser holds it in a cookie, set once from one staging page left open for pasting it (draft). So no one else spends the shared 100,000 or the test budget through staging ([#770]).
 - The secret is a GitHub secret, filled into the rule when the rule is applied, so it sits in Cloudflare's rule text, never in the repo ([#770]). The committed rule text holds a placeholder in its place ([#781]).
 - The burst guard, both copies of the no-session rule and the hand-block rule live in the repo, in `cloudflare/` (see [`tools.md`](tools.md)). The open paths come from the API contract's public routes ([#770], [#781]).
 - A generator writes the open paths from the contract's public routes into a committed file in `cloudflare/`. CI fails when that file and `docs/api/openapi.yaml` disagree ([#781]).
@@ -79,7 +79,7 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 
 - Custom rules in use: 3 of Free's 5 (live's copy, staging's copy with the gate, the hand-block rule). The hand-block list is Free's one custom list, of up to 10,000 entries. The burst guard is Free's one rate limiting rule ([#770]).
 - Staging shares live's 100,000 a day, since the allowance is the Cloudflare account's, and shares the per-network burst count ([#770]).
-- A flood that the burst guard lets through and nobody blocks reaches Cloud Run, up to the 100,000 a day. At about 100 ms a call (Cloud Run rounds up to 100 ms; a slower call bills more), about 13 such days spend the free credit, and about 15 reach the USD 6 cap. The first month's billing report settles the real cost ([#726], [#770]).
+- A flood that the burst guard lets through and nobody blocks reaches Cloud Run, up to the 100,000 a day. At about 100 ms a call (Cloud Run rounds up to 100 ms; a slower call bills more), about 13 such days use the free tier's CPU part, and about 25 reach the USD 10 cap, fewer with normal use. The first month's billing report settles the real cost ([#726], [#770]).
 
 ## The content security policy
 

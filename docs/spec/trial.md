@@ -100,7 +100,7 @@ If the day's emails have run out, an invite or decline waits for Resend's next d
 - Once set, the date can move later or be taken back, never earlier. A date set after a take-back is never earlier than the one taken back. Link holders see a fresh notice at their next visit ([#755]).
 - Every trial link dies, with any flag still waiting and any notice not yet seen. The anonymous feedback answers and quote permissions stay as [`feedback.md`](feedback.md) sets out ([#677], [#719], [#722], [#733], [#734]). The stubs are erased, and any old link shows "The trial has ended". A sealed session marked "Reported" with no answer recorded stays ([#719], [#777]).
 - Waiting requests are declined with the email above. An invite still waiting to send gets the decline email in its place ([#717], [#733]).
-- Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
+- Request access goes. Guest mode stays until sign-up opens, or for good if Crux stays a portfolio project ([#677], [#733]). After sign-up opens, guest mode stays in the code, off on live and on in staging, for the release's guest sitting (see [`backups-and-releases.md`](backups-and-releases.md)) ([#726]). When sign-up opens, the landing page shows the pre-written example (see [`accounts.md`](accounts.md)) ([#677]).
 - Nothing from the trial is carried into an account ([#677]).
 
 ## The advisory opinion
@@ -128,6 +128,7 @@ The landing page, guest mode, the entry ticks and the trial link notice, the Req
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734

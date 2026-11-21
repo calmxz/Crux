@@ -49,7 +49,7 @@ All of these come from [#802]. Each job runs at the lowest effort that passes it
 - A build test sends the beta header and fails on any `thinking_mismatch_allowed` entry ([#802]).
 - **Size:** every Haiku prompt stays under 100,000 tokens. When one would pass it, Crux drops the least recently used added ranges until the prompt is under about 75,000. A dropped page asked about again is re-sent from storage. The limit of 20 added pages stays. If the slice and the conversation alone pass 100,000, that reply costs 5 times as much, and is counted as usual ([#802]).
 - **Caching:** the 1-hour cache is used on every call except file reads, which use no cache ([#802]).
-- **A quiet line in the thread** appears while the session is open, 50 minutes after the tutor's last reply, outside a check, when re-writing the cache would cost more than a whole sitting's worth, which is about 44,000 tokens. It talks of "today's tutoring", never money. Its wording is drafted in the build for the owner ([#802]).
+- **A quiet line in the thread** appears while the session is open, 50 minutes after the tutor's last reply, outside a check, when re-writing the cache would cost more than a whole sitting's worth, which is about 49,000 tokens. It talks of "today's tutoring", never money. Its wording is drafted in the build for the owner ([#726], [#802]).
 - The tutor writes maths as LaTeX, using only what KaTeX draws, which the prompt names. It writes session and topic names without LaTeX ([#771]).
 - The tutor's instruction is in [`teaching.md`](teaching.md). The outline, the topic slice and the added pages are in [`files.md`](files.md). The note is in [`sessions.md`](sessions.md).
 
@@ -108,7 +108,6 @@ A broken reply is one whose stream ends before the reply is complete, for any re
 - **Which Anthropic errors count as overload,** a build check. A spend limit's 429 (`enforced_spend_limit_reached`) is a stop, not overload ([#802]).
 - **Build checks on the prompt:** counting a prompt's tokens before sending it, for the 100,000-token rule; whether dropping earlier thinking avoids the binding error; and how long the report and the practice check add before the first word ([#802]).
 - **Whether the topic slice keeps the file rules on real decks,** and the outline read in parts, untested: see [`files.md`](files.md).
-- **The 1-hour cache's cost** is arithmetic only: see [`spending.md`](spending.md).
 
 ## On screen
 
@@ -118,6 +117,7 @@ The session screen is in [`learning-screen.md`](learning-screen.md): "The tutor 
 [#678]: https://github.com/calmxz/Crux/issues/678
 [#679]: https://github.com/calmxz/Crux/issues/679
 [#716]: https://github.com/calmxz/Crux/issues/716
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#735]: https://github.com/calmxz/Crux/issues/735

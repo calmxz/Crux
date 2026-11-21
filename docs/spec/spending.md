@@ -18,12 +18,14 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 - The month is a calendar month and resets on the 1st ([#675]).
 - Money unspent on a quiet day stays in the month. It does not raise a later day's ceiling. The worst case is four ceiling days in a row, which empties the month ([#675]).
 - The budget and the ceiling count guests and trial links. They do not count the owner's own use or re-marks (see the main file's "Money") ([#677], [#679], [#728] Answer 1).
-- A re-run's bigger budget is in [`feedback.md`](feedback.md). During a re-run, the ceiling becomes a quarter of the bigger budget, even if the owner had set it by hand, and the owner can still change it. The limits do not change. The bigger budget and its ceiling start when the owner presses "Start the window" (see [`feedback.md`](feedback.md)), after raising Crux's workspace limit, and that press sends the "it's back" emails. They last to the end of the calendar month the re-run ends in. On the 1st, both return to what they were, and the owner lowers the workspace limit ([#734], [#802]).
+- At every limit for a 31-day month, one learner spends about USD 0.80 with 6-problem worded checks and USD 1.11 with 10-problem ones, every read overrunning. 25 learners plus the guests' USD 2 spend USD 21.88 and USD 29.85. In the second case the month's budget runs out about day 26 ([#726]).
+- A re-run's bigger budget is in [`feedback.md`](feedback.md). During a re-run, the ceiling becomes a quarter of the bigger budget, even if the owner had set it by hand, and the owner can still change it. The limits do not change. The bigger budget and its ceiling start when the owner presses "Start the window" (see [`feedback.md`](feedback.md)), after raising Crux's workspace limit and live's Cloud Run cap, and that press sends the "it's back" emails. They last to the end of the calendar month the re-run ends in. On the 1st, both return to what they were, and the owner lowers the workspace limit and live's Cloud Run cap ([#726], [#734], [#802]).
 
 ## Each learner's tutoring limit
 
 - **2 sittings' worth a day and 4 a week,** whichever runs out first ([#675], [#679]).
-- A sitting's worth is an amount of money: the cost of a typical sitting, about 15 learner replies, on the model that teaches. That is about USD 0.0084 on Haiku 5.5 at `medium` with the 1-hour cache, teaching only, estimated from 6 sittings at a 5-minute cache, times 1.1 (see [Gaps](#gaps)) ([#675], [#802]).
+- A sitting's worth is an amount of money: the cost of a typical sitting, about 15 learner replies, on the model that teaches. That is about USD 0.0093 on Haiku 5.5 at `medium` with the 1-hour cache, teaching only, measured as the mean of 3 sittings with nothing cached, since a learner's sittings are usually more than an hour apart ([#675], [#726], [#802]).
+- Teaching from a file costs more per reply, since the topic's pages go with every turn: about USD 0.0007 a page per sitting (measured on a 20-page slice: 2.5 sittings' worth with nothing cached, 1.74 within the hour). A cold sitting on a topic of more than about 13 pages fills a day by itself ([#726]).
 - A week runs Monday to Sunday ([#675]).
 - A short sitting uses less than a sitting's worth, so a learner can come back several times a day ([#675]).
 - A learner can use at most about 17 sittings' worth a month ([#675]).
@@ -74,7 +76,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 ## The owner's share
 
 - At the share, Crux stops only the owner's account, re-marks and the distress checks. The owner sees "You've used your owner share this month", where the chat box was (see [`at-a-limit.md`](at-a-limit.md)) ([#679], [#734], [#802]).
-- The owner raises it on the owner page, which asks them to raise Crux's workspace limit in the Console first and tick "I raised the limit" ([#679], [#755], [#802]).
+- The owner raises it on the owner page, which asks them to raise Crux's workspace limit in the Console and live's Cloud Run cap first, and tick "I raised the limits" ([#679], [#726], [#755], [#802]).
 - Re-marks and the distress pots spend from the share ([#728] Answer 1, [#734], [#802]). If every pot is used up each day, the pots take USD 0.12 a day (0.05 + 0.05 + 0.02), about USD 3.72 of the 8 in a 31-day month, which leaves about USD 4.28 for re-marks and the owner's own use ([#802]).
 - At the share, re-marks pause. They resume when the share refills on the 1st, or sooner if the owner raises it. A pass stands until it is re-marked. The owner's own check pauses as half-done at the share, and resumes the same way ([#734]).
 - Crux's workspace limit covers the share too, so when it trips the owner is stopped as well ([#679], [#802]).
@@ -84,7 +86,7 @@ When a learner sends a reply, a request or a file, Crux checks in this order: th
 - The AI spend comes from the owner's Max plan API credit, USD 100 a month, arriving about the 11th and expiring at the end of its cycle. Prepaid credit with auto-reload off and no bought credit is the hard stop: requests stop at zero, and no card is charged ([#802]).
 - Anthropic workspaces set the hard monthly limits. Crux's workspace has a monthly spend limit of about USD 34: the learners' 25, the owner's share of 8, and a margin of about 1. Crux tests' workspace has USD 20. "Crux research", for research runs and the owner's computer, has a monthly limit the owner sets, about USD 10. Nothing runs in the Default Workspace ([#802]).
 - That commits about 64 of the 100 a month. One credit cycle can see two months' limits, since the credit renews about the 11th and the limits reset on the 1st: at worst 2 x 64 = 128 against the 100. Then the credit-stop rules below apply ([#802]).
-- The owner sets each limit by hand in the Console. Before any raise in the money (the budget, a re-run's budget, the owner's share), the owner page names the limit to set, and the raise waits for the tick "I raised the limit" ([#679], [#755], [#802]).
+- The owner sets each limit by hand in the Console. Before any raise in the money (the budget, a re-run's budget, the owner's share), the owner page names the limit to set and live's Cloud Run cap, which moves at about USD 0.31 for each AI dollar (see [`hosting.md`](hosting.md)), and the raise waits for the tick "I raised the limits" ([#679], [#726], [#755], [#802]).
 - Crux's month stays on the 1st. The owner enters the credit's renewal day once on the owner page, and updates it if the billing day changes ([#802]).
 - **When a workspace limit or the credit stops Crux,** learners see the month's message, with the renewal date when the credit ran out. A started check pauses as half-done, and the owner gets the urgent push ([#675], [#802]).
 - After a credit stop, the small call testing whether Anthropic accepts calls again runs hourly from the stop until calls succeed, since a refused call isn't billed. A workspace-limit stop reopens on the 1st or at the owner's raise ([#802]).
@@ -123,7 +125,7 @@ How long per-account spend, the check and reading counts, and the "email me" add
 
 ## Gaps
 
-- **A sitting's worth on page-heavy topics,** and the overrun when a file read in full passes the 100 pages, are re-costed by [#726]. The 1-hour cache's cost is arithmetic only ([#802]).
+- **A sitting's worth on page-heavy topics:** the 1-hour cache's cost is measured, and so is a sitting's worth on a 20-page slice. The cost per page is a straight-line guess from it ([#726], [#802]).
 - **Workspace spend limits on an individual account,** to confirm in the smoke test. If they aren't available, that's a recorded change then ([#802]).
 - **Telling a credit stop from a workspace-limit stop** by Anthropic's error, a build check. If Crux can't tell them apart, the build opens a spec change and does not guess ([#802]).
 - **Measures that can change the limits:** Crux's count against the Console's Usage page, and sittings per mastery in the trial. See [`quality-bar.md`](quality-bar.md) ([#678], [#802]).

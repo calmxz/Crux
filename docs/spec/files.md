@@ -103,7 +103,7 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 ## Pages sent to the tutor
 
 - **Outline:** each file is read once on upload into an outline of where each topic sits ("chain rule: slides 28-36") ([#679]). It is read in parts, each under 100,000 tokens, carrying the outline so far forward, with no cache ([#802]).
-- **Topic slice:** while a topic is taught, its pages go in full with every turn, with the outline. Crux splits the pages from the PDF ([#679], [#716]).
+- **Topic slice:** while a topic is taught, its pages go in full with every turn, with the outline. Crux splits the pages from the PDF, pruning each page to the images it draws before copying. A build check confirms that a 20-page part of a converted test file carries only its own pages' images: about 8 MB, against about 41 MB unpruned ([#679], [#716], [#726]).
 - The tutor can ask Crux for another page range, when the learner names a page or the tutor needs one. The range stays until the topic ends ([#679]).
 - A topic has at most 20 added pages. Past that, the least recently used added range drops out ([#679]). A Haiku prompt also stays under 100,000 tokens: Crux drops the least recently used added ranges until it is under about 75,000, and a dropped page asked about again is re-sent from storage (see [`ai-layer.md`](ai-layer.md)) ([#802]).
 - Pages are read again from Crux's own storage whenever needed ([#679]).
@@ -137,7 +137,8 @@ Text in a file is material, never instructions (see the main file's "Crux decide
 ## Gaps
 
 - **Whether the 20 GB store holds with trial links uploading:** open on [#675]. Every new link can hold 200 MB, and a lost link stays until the trial ends. At 100 full links, uploads stop for everyone ([#722]).
-- **Whether the Cloud Run credit holds with file work in the trial:** open on [#675] ([#722]).
+- **Outbound data for file turns:** see [`hosting.md`](hosting.md). Whether pages go once through Anthropic's Files API instead is open on [#805] ([#726]).
+- **Whether added ranges go as separate PDF parts:** unpruned, a fourth part of about 41 MB would pass the 128 MB request limit; pruned, they stay small ([#726]).
 - **Whether the topic slice keeps the file rules on real decks:** notation, "as on slide 31", flagged mistakes, and added pages. Open on [#678] ([#679]). The outline read in parts is untested too ([#802]).
 - **How Crux sends a topic's pages to Claude,** within the 100,000-token rule: a build check, open on [#678] ([#716], [#802]).
 - **Whether Claude reads each listed image format:** a build check. Crux converts any it cannot read ([#732]).
@@ -158,6 +159,7 @@ The files and their mistake marks show in the objectives panel (see [`learning-s
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#722]: https://github.com/calmxz/Crux/issues/722
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#734]: https://github.com/calmxz/Crux/issues/734
@@ -167,3 +169,4 @@ The files and their mistake marks show in the objectives panel (see [`learning-s
 [#752]: https://github.com/calmxz/Crux/issues/752
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#802]: https://github.com/calmxz/Crux/issues/802
+[#805]: https://github.com/calmxz/Crux/issues/805

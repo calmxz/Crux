@@ -10,7 +10,7 @@ This file covers what Crux stores, what each item belongs to, where it lives, wh
 - What only an account has (its email, sign-in codes, the 7-day undo, copies) sits on the account. What only a trial link has (its scrambled key, browsers, switched-off state) sits on the link ([#719]).
 - A file belongs to its session. The storage allowance is still counted per home (see [`files.md`](files.md)) ([#719]).
 - Guests have no home, and Crux stores nothing for them (see [Guests](#guests)) ([#719]).
-- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind, flag number and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755], [#777]). Two roles pass row-level security, both used only by the release script: the read-only dump role, and the restore's role, which writes for a restore or a repair (see [`backups-and-releases.md`](backups-and-releases.md)) ([#719]).
+- Row-level security keys on the home: the backend sets the home for each transaction ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups (an account by its email, a link by its key) read through rules that name what each may see. The owner page sees flagged and shared sessions, feedback, a Reported session's date, kind, flag number and email, and the dead-link list. For an entered request, it can find an account by an email the owner pastes, and match a session or file name on it ([#755], [#777]). Three Crux roles pass row-level security, all used only by the release script: the read-only dump role, the restore's role, which writes for a restore or a repair, and the migration role (see [`backups-and-releases.md`](backups-and-releases.md)) ([#719], [#726]).
 
 ## What belongs to what
 
@@ -197,6 +197,7 @@ The backend splits by area. Only an item's module writes it. The one exception i
 
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#719]: https://github.com/calmxz/Crux/issues/719
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#755]: https://github.com/calmxz/Crux/issues/755
 [#762]: https://github.com/calmxz/Crux/issues/762
 [#763]: https://github.com/calmxz/Crux/issues/763

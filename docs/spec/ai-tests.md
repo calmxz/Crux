@@ -18,7 +18,8 @@ These are test and build terms, so they stay out of the glossary ([#678]).
 - The boundaries are enforced in server code wherever code can. Where the boundary is the model's own judgement, such as marking, the harm line, or noticing an age statement, the AI test is the only check ([#678]).
 - Rules Crux enforces itself are ordinary tests (see [`ordinary-tests.md`](ordinary-tests.md)). Examples are when the lookup runs during a check, none of the teaching reachable while a problem is open, the menu order, a file reordering the menu, the age question's tap, and the maths library's checks ([#678], [#679], [#732]).
 - Mermaid text that does not parse, and a graph function SymPy cannot read, draw nothing and fall back to words. These are ordinary tests ([#751]).
-- AI tests run in the Crux tests workspace, on the live models and instructions, with scripted situations only. They never touch live Crux or a learner's data ([#679], [#716]).
+- AI tests run in the Crux tests workspace, on the live models and instructions, with scripted situations only. They call Anthropic directly from CI, running the backend's own code in-process, never through staging's Cloud Run. They never touch live Crux or a learner's data ([#679], [#716], [#726]).
+- The AI rounds' Crux tests key is a GitHub environment secret. Only the hand-started and monthly round workflows read it. Runs on `main`, the monthly round included, need no approval. A run started from another branch waits for the owner's approval ([#726]).
 
 ## The tiers
 
@@ -170,7 +171,9 @@ flowchart TD
 
 ### What stops a round
 
-When the Crux tests workspace's limit is reached, rounds stop, and with them releases of changes that need a round, until the owner raises it ([#678], [#679]).
+When the Crux tests workspace's limit is reached, rounds stop, and with them every release, since the release's guest sitting spends from that workspace (see [`backups-and-releases.md`](backups-and-releases.md)), until the owner raises it ([#678], [#679], [#726]).
+
+At full use, 4 full rounds, the monthly round and 30 releases' guest sittings in a month come to about USD 3.3 to 6.4. A deep round adds 2 to 4, and staging's own AI use, up to its cap's 6.49 to 7.28, spends from the same workspace: at most about 17.7 of the 20. Estimates ([#726]).
 
 [#666]: https://github.com/calmxz/Crux/issues/666
 [#667]: https://github.com/calmxz/Crux/issues/667
@@ -184,6 +187,7 @@ When the Crux tests workspace's limit is reached, rounds stop, and with them rel
 [#680]: https://github.com/calmxz/Crux/issues/680
 [#681]: https://github.com/calmxz/Crux/issues/681
 [#716]: https://github.com/calmxz/Crux/issues/716
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733
