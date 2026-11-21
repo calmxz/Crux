@@ -77,7 +77,7 @@ There is no daily bill comparison, since an individual Anthropic account has no 
 
 ## Gaps
 
-- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month. The two rules and the two metric alerts are about USD 1.40, plus about USD 0.10 for the points the alerts return, so about USD 1.50 a month ([#717], [#762], [#770]).
+- **Whether alerting starts to cost:** Google may charge from no sooner than 1 September 2027. Google's pricing bills a log-based rule as a metric reference, about USD 0.35 a month. The two rules and the two metric alerts are about USD 1.40, plus the points the alerts return, about USD 0.04 per condition, so about USD 1.49 a month ([#717], [#726], [#762], [#770]).
 
 ## On screen
 
@@ -86,6 +86,7 @@ The daily email's layout and the owner page are in [`owner-screens.md`](owner-sc
 [#675]: https://github.com/calmxz/Crux/issues/675
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734

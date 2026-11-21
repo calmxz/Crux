@@ -21,6 +21,7 @@ These are the tests the closed tickets sent here, by area.
 - On every page and request, another learner's, guest's or trial link's session, file or Record gives "not found".
 - The owner page turns away every other account, test addresses included, and anyone signed out, including at its direct address, with "Page not found" ([#755]).
 - Feedback text shows there as plain text.
+- A catalog query shows that the backend's role owns no table and has no bypass of row-level security, in CI too ([#726]).
 
 **Sign-up and sign-in** ([#674], [#678], [#717], [#733])
 
@@ -170,6 +171,7 @@ These are the tests the closed tickets sent here, by area.
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733

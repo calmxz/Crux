@@ -79,7 +79,7 @@ Free Cloudflare rules guard `/api/` before the Worker. No per-network count runs
 
 - Custom rules in use: 3 of Free's 5 (live's copy, staging's copy with the gate, the hand-block rule). The hand-block list is Free's one custom list, of up to 10,000 entries. The burst guard is Free's one rate limiting rule ([#770]).
 - Staging shares live's 100,000 a day, since the allowance is the Cloudflare account's, and shares the per-network burst count ([#770]).
-- A flood that the burst guard lets through and nobody blocks reaches Cloud Run, up to the 100,000 a day. At about 100 ms a call (Cloud Run rounds up to 100 ms; a slower call bills more), about 13 such days spend the free credit, and about 15 reach the USD 6 cap. The first month's billing report settles the real cost ([#726], [#770]).
+- A flood that the burst guard lets through and nobody blocks reaches Cloud Run, up to the 100,000 a day. At about 100 ms a call (Cloud Run rounds up to 100 ms; a slower call bills more), about 13 such days use the free tier's CPU part, and about 25 reach the USD 10 cap, fewer with normal use. The first month's billing report settles the real cost ([#726], [#770]).
 
 ## The content security policy
 

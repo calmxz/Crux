@@ -29,9 +29,15 @@ All of this comes from [#716].
 
 ### Cost
 
-- Cloud Run's free tier is a dollar credit valued at Tier 1 prices, about USD 5.22 a month, shared across the billing account. The tests project, staging, the tasks service and the converter draw on it too. In Singapore it covers about 128,000 busy CPU-seconds ([#716]).
-- The owner's USD 10 monthly Developer Program credit may pay what is left after it ([#716], [#802]).
-- **Spend caps:** USD 6 a month on live, USD 2 on staging. That cap counts "gross" use, read as before the free credit and any credits. The first month's billing report settles that reading ([#716], [#726]).
+- Cloud Run's free tier is 180,000 vCPU-seconds, 360,000 GiB-seconds and 2 million requests a month, the first two valued at Tier 1 prices (USD 4.32 and 0.90), shared across the billing account. The tests project, staging, the tasks service and the converter draw on it too. In Singapore, read as each part on its own, it covers about 128,571 vCPU-seconds and 257,143 GiB-seconds. The first month's billing report settles that reading ([#716], [#726]).
+- The owner's USD 10 monthly Developer Program credit, which covers all of Google Cloud, pays what is left after it ([#716], [#726], [#802]).
+- **Spend caps:** USD 10 a month on live, USD 2 on staging. That cap counts "gross" use, read as before the free tier and any credits. The first month's billing report settles that reading ([#716], [#726]).
+- Live's Cloud Run cap moves with Crux's workspace limit: whenever the owner page names a change to that limit, it names the cap's too, at about USD 0.31 for each AI dollar added or removed (see [`spending.md`](spending.md)) ([#726]).
+- **At full use,** at 512 MiB, estimated ([#726]):
+  - Live: the learners' and owner's AI time, the converter and the uptime checks come to about USD 9.26 to 10.58 gross, so live's cap can trip in the month's last days at the highest sitting rate.
+  - Staging's USD 2 cap holds while staging's AI use stays under about USD 6.49 to 7.28 a month.
+  - Past the free tier, the credit pays about USD 6.30 to 9.55: live's AI time, the converter, Cloud Storage, alerting and up to staging's USD 2. With the planned USD 30 budget, about 7.60 to 11.02. An all-day minimum instance passes the credit. Past the credit, the billing account's payment method pays.
+  - Outbound data for file turns is not in these sums (see [Gaps](#gaps)).
 - Cloud Storage takes no spend cap. Its cost is bounded by the 20 GB store total in [`files.md`](files.md), about USD 0.40 a month at full, though accepted files may pass it ([#716], [#732]).
 - Other hosting costs outside the AI budget are the domain (below), a minimum instance if the fallback is needed (below), alerting (see [`operations.md`](operations.md)), and Workspace once the owner forms a one person corporation (see [`email.md`](email.md)) ([#675], [#716], [#717]).
 
@@ -54,9 +60,9 @@ The rule is in the main file's "Speed". Crux tries these first ([#716]):
 
 Only if the owner's phone test still fails after all four ([#716]):
 
-- One minimum instance at peak hours only, switched on and off by Cloud Scheduler through Cloud Run's service-level setting, so no new revisions. The cap rises to about USD 8. The peak hours are seen first, from use, before the window is set.
-- If off-peak still fails, the minimum instance runs all day, about USD 10 a month after the free credit, with a cap of about USD 16.
-- Either one is a recorded change to the main file's free-hosting rule.
+- One minimum instance at peak hours only, switched on and off by Cloud Scheduler through Cloud Run's service-level setting, so no new revisions. The cap rises by the instance's gross cost: about USD 0.59 a month for each hour of the daily window at 512 MiB, about 0.78 at 1 GiB ([#726]). The peak hours are seen first, from use, before the window is set.
+- If off-peak still fails, the minimum instance runs all day, and the cap rises by about USD 14 a month at 512 MiB, about 19 at 1 GiB ([#726]).
+- Either one is a recorded change to the main file's free-hosting rule. The recorded change that turns the instance on sets the cap's figure ([#726]).
 
 ### Background answers
 
@@ -86,7 +92,10 @@ A domain is bought through Cloudflare's registrar before the trial, about USD 10
 ## The database
 
 - Supabase Free Postgres in Singapore, reached only by the backend. Supabase never sees the browser ([#716], [#717]).
-- Row-level security is on every table holding a learner's data. The backend connects as a role without the bypass and sets the home (the account or trial link, see [`data-model.md`](data-model.md)) for each transaction, or the rules never run ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups read through rules that name what each may see, not by passing row-level security ([#719]). The safe pattern through Supabase's pooler is a research finding on [#726], for [#719].
+- Row-level security is on every table holding a learner's data. The backend connects as a role without the bypass and sets the home (the account or trial link, see [`data-model.md`](data-model.md)) for each transaction, or the rules never run ([#716], [#719]). The owner page, the daily job's scans and the sign-in lookups read through rules that name what each may see, not by passing row-level security ([#719]).
+- Through Supabase's pooler, each request sets the home with `set_config(..., true)` or `SET LOCAL` inside one explicit transaction. No code runs a session-level `SET` or `set_config(..., false)`. Policies read it as `nullif(current_setting('app.home_id', true), '')`. The setting's name is a draft for the build ([#726]).
+- The driver turns prepared statements off and pipelines no queries. Every view is made with `security_invoker`, and no function on a table with row-level security is `SECURITY DEFINER` ([#726]).
+- The backend's role owns no table and has no bypass. An ordinary test proves it with a catalog query (see [`ordinary-tests.md`](ordinary-tests.md)). The dump's, restore's and migration roles are the only Crux roles allowed past row-level security. No Crux code connects as `postgres` or `service_role`. The owner uses `postgres` only to create Crux's roles (see [`backups-and-releases.md`](backups-and-releases.md)) ([#726]).
 - Every lookup search is limited to the learner's own sessions, in the query and by row-level security (see [`sessions.md`](sessions.md)) ([#716]).
 - The outside check keeps Supabase from pausing (see [`operations.md`](operations.md)) ([#716]).
 - Another database host is out of scope (see the map's Out of scope list) ([#716]).
@@ -107,7 +116,7 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 
 - It is IAM-only, invoked only by the tasks service's own service account.
 - Its own service account has no permissions and no secrets.
-- It runs at most 1 instance, with 1 to 2 GiB of memory, only while converting.
+- It runs at most 1 instance, with 4 GiB of memory and 1 vCPU, only while converting. 2 GiB held 12 worst-case files in a row, with its peak at the limit ([#726]).
 - It has a short timeout.
 - Size, uncompressed size and page limits are checked before conversion.
 - Gotenberg's version is pinned.
@@ -123,8 +132,11 @@ Gotenberg (LibreOffice) converts PowerPoint and Word to PDF (see [`files.md`](fi
 ## Gaps
 
 - **The UK regulator's guidance on travellers** is unchecked. The EU's is checked: a traveller using a service that doesn't target the EU is outside its law ([#802]).
-- **Open hosting checks on [#726]:** the pooler test, and server time per sitting and per upload. The research reads the Cloud Run cap as gross use, so a month of USD 4.80 could trip staging's USD 2 cap at a bill of 0. The first month's report settles it.
-- **Whether the Cloud Run credit holds** with file work in the trial, and how busy a sitting is: open on [#675] ([#716], [#722]).
+- **The hosted pooler's leak-check setting,** which Supabase does not state. The rules above do not depend on it ([#726]).
+- **Whether hosted Supabase's `postgres` role has the bypass,** as the local stack's does. The three Crux roles past row-level security need `postgres` to grant it ([#726]).
+- **Whether the Cloud Run caps count gross or net use,** and Cloud Run's CPU speed and network time: the first month's billing report ([#726]).
+- **Where the release script runs.** It must be a machine in a country Crux serves, so a GitHub-hosted job, whose region GitHub does not state, cannot be relied on ([#726]).
+- **Outbound data for file turns,** about USD 3.60 a month at full use: see [`files.md`](files.md) ([#726]).
 - **Whether warm-on-open meets the 5 seconds off-peak:** a phone test, in [`quality-bar.md`](quality-bar.md) ([#678], [#716]).
 
 ## On screen
@@ -136,7 +148,6 @@ What the landing page shows while the backend wakes, or when it cannot be reache
 [#716]: https://github.com/calmxz/Crux/issues/716
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
-[#722]: https://github.com/calmxz/Crux/issues/722
 [#726]: https://github.com/calmxz/Crux/issues/726
 [#732]: https://github.com/calmxz/Crux/issues/732
 [#733]: https://github.com/calmxz/Crux/issues/733

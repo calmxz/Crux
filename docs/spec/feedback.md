@@ -150,8 +150,8 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 - A budget-caused miss does not use up the one retry. The window is re-run: the same bar, counted from zero, for 8 weeks, on a bigger budget the owner fixes before it starts. Only the budget changes, and other fixes wait for the normal retry ([#676]).
 - What a re-run does to the ceiling, and how long its budget lasts, is in [`spending.md`](spending.md) ([#734]).
 - There is at most one budget re-run in the whole effort, in either window. A second budget-caused miss counts as a normal miss ([#676]).
-- Before a re-run, the owner raises the budget and Crux's workspace limit ([#675], [#679], [#802]).
-- On the current budget, Haiku 5.5 gives about 2,980 sittings' worth a month (25 / 0.0084), against the bar's 40 to 60 over the window ([#802]). The owner raises the learner cap during a window when it fills and people are waiting ([#679]).
+- Before a re-run, the owner raises the budget, Crux's workspace limit and live's Cloud Run cap ([#675], [#679], [#726], [#802]).
+- On the current budget, Haiku 5.5 gives about 2,690 sittings' worth a month (25 / 0.0093), against the bar's 40 to 60 over the window ([#726], [#802]). The owner raises the learner cap during a window when it fills and people are waiting ([#679]).
 
 ## The owner page
 
@@ -164,7 +164,7 @@ Go starts the paid-launch effort, which is separate from this spec ([#676]).
 
 ## Gaps
 
-- **Whether the bar is reachable on real costs:** a sitting's worth on page-heavy topics, and sittings per mastery, are not measured ([#802]). See [`spending.md`](spending.md) and [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
+- **Whether the bar is reachable on real costs:** sittings per mastery are not measured, and a sitting's worth on page-heavy topics is a guess from one 20-page slice ([#726], [#802]). See [`spending.md`](spending.md) and [`quality-bar.md`](quality-bar.md) ([#678], [#679]).
 
 ## On screen
 
@@ -180,6 +180,7 @@ The after-first-mastery notice is a pinned line above the chat box (see [`learni
 [#717]: https://github.com/calmxz/Crux/issues/717
 [#719]: https://github.com/calmxz/Crux/issues/719
 [#722]: https://github.com/calmxz/Crux/issues/722
+[#726]: https://github.com/calmxz/Crux/issues/726
 [#728]: https://github.com/calmxz/Crux/issues/728
 [#733]: https://github.com/calmxz/Crux/issues/733
 [#734]: https://github.com/calmxz/Crux/issues/734
