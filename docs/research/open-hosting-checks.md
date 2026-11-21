@@ -42,4 +42,4 @@ This research reports facts. Each choice belongs to the owner.
 - Items 1 to 4, the #770 and #772 questions, and Cloud Run's prices come from primary sources: Google Cloud, Supabase, PostgreSQL, Supavisor and Zoho pages. Each file lists its sources.
 - Item 1's test ran on the Supabase CLI's local stack, with the pooler forced to one connection.
 - Item 5's runs used the #802 teaching harness, Haiku 5.5 through the Anthropic API, and Gotenberg 8.40.0 in Docker. They cost USD 0.24.
-- A fresh agent checked every figure and quote against its log or page before publication.
+- A fresh agent checked every figure and quote against its log or page before publication. Two Zoho help-page quotes could only be read through a fetch tool, since the page renders with JavaScript. The copied #802 harness matches its source files, apart from `common.py`'s key path.

@@ -31,7 +31,7 @@ Prices and the free tier come from [`cloud-run-billing.md`](cloud-run-billing.md
 
 Cloud Run bills an instance for every second that at least one request is open, in 100 ms steps [cloud-run-billing.md, C3]. A streamed reply keeps its request open until the last byte. So the figure that matters is wall-clock time with the request open, not CPU used.
 
-- **Tutor turns.** [`timed_sitting.py`](server-time/haiku/scripts/timed_sitting.py) reruns the #802 teaching harness, copied unchanged, with each tutor call streamed and timed. A turn can take several calls, because tool calls report results and the tutor then carries on. A turn's time is the sum of its calls.
+- **Tutor turns.** [`timed_sitting.py`](server-time/haiku/scripts/timed_sitting.py) reruns the #802 teaching harness, copied unchanged apart from how `common.py` finds the key, with each tutor call streamed and timed. A turn can take several calls, because tool calls report results and the tutor then carries on. A turn's time is the sum of its calls.
 - **Outline reads.** [`outline_read.py`](server-time/haiku/scripts/outline_read.py) fits each part to the most pages under 95,000 counted tokens, then streams the call at `low` with no cache. Its instruction is a research stand-in, not Crux's prompt.
 - **Converter.** [`gotenberg_bench.py`](server-time/converter/gotenberg_bench.py) runs Gotenberg in Docker, limited to a chosen number of vCPUs and memory. Each size gets a fresh container: one cold conversion, then two warm ones.
 - **The files.** [`make_worst_case_files.py`](server-time/converter/make_worst_case_files.py) builds a 100-slide PowerPoint file (30.6 MB) and a 100-page Word file (30.2 MB). 80 of every 100 pages carry a full-size photo, and the rest hold charts, tables, equations and mixed layouts. Word charts are images, since python-docx cannot write native charts.
@@ -66,7 +66,7 @@ Here, the first learner message carried a 20-page topic slice from a converted w
 | A4 | the deck | warm: read A3's slice | USD 0.01579 | not reached | 111.2 s |
 | B4 | the Word file | warm: read B3's slice | USD 0.01655 | not reached | 113.6 s |
 
-- **The first sitting on a file is the cold case.** Its first call wrote about 40,000 tokens to the cache. A learner's slice is their own, so nobody else warms it.
+- **The first sitting on a file is the cold case.** Its first call wrote about 40,000 tokens to the cache. A learner's slice is their own, so nobody else warms it. This is a reading of the spec, not a measurement.
 - Cold: USD 0.0233 on average, 2.77 sittings' worth. A day's limit is 2 sittings' worth, USD 0.0168 [`spending.md`]. The two cold runs crossed it at replies 10 and 9.
 - Warm: USD 0.0162, 1.92 sittings' worth. That case is a second sitting on the same topic within the hour. Neither warm run reached a day's limit.
 - A month's 17 sittings' worth, USD 0.143, buys about 6.1 cold page-heavy sittings, against 15.4 cold plain ones.
