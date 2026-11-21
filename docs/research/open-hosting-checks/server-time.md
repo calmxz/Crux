@@ -22,7 +22,7 @@ Prices and the free tier come from [`cloud-run-billing.md`](cloud-run-billing.md
 | What a plain sitting costs | USD 0.00927 when the instructions are not yet cached, USD 0.00820 when they are. The spec's USD 0.0084 sits between. |
 | Page-heavy sitting (a 20-page topic slice) | The first sitting on a file pays to cache its pages: USD 0.0233, or 2.77 sittings' worth. A day's limit ends at reply 9 or 10 of 15. |
 | Outline read of a 100-page file | 2 parts, 14 to 22 s, about USD 0.018. |
-| Converter, 100-page worst-case files | 6 to 10 s at 1 vCPU. 1 GiB fails on a later conversion in the same instance; 2 GiB holds every one, peaking at 1.0 to 1.7 GiB. |
+| Converter, 100-page worst-case files | 6 to 10 s at 1 vCPU. 1 GiB fails on a later conversion in the same instance. 2 GiB held 12 in a row, but its high-water mark reached the full 2 GiB. |
 | Does the free tier hold? | At 180 to 240 sittings a month, yes: 9.5% to 12.7% of its CPU part. At full use of the learners' USD 25, no. |
 | Does the live cap hold? | Not at full use. The USD 6 gross cap trips at about USD 19 to 22 of AI spend through live in a month. |
 | Does the AI month fit USD 25 at every limit? | With 6-problem checks, yes: USD 19.49 for 25 learners. With 10-problem worded checks, no: USD 27.46. |
@@ -106,7 +106,13 @@ Gotenberg 8.40.0 (`gotenberg/gotenberg@sha256:53073e79...`). It ran on the owner
 
 - **1 GiB fails on a later conversion in the same instance.** It failed on the deck's second conversion and on the Word file's third, in both passes.
 - In each failure, the container hit its memory limit and Gotenberg answered 500: "LibreOffice failed to convert the document". The first conversion in a fresh container passed.
-- **2 GiB held** every conversion, peaking at 1.0 to 1.7 GiB.
+- **2 GiB held** every conversion, peaking at 1.0 to 1.7 GiB over 3 conversions per container.
+- **Twelve in a row.** [`long_run.py`](server-time/converter/long_run.py) then ran 12 conversions of each file in one 1 vCPU, 2 GiB container ([`long-run-12.txt`](server-time/converter/logs/long-run-12.txt)). All 24 converted.
+  - Current memory climbed for 3 conversions, then held at about 1.35 GiB on the deck and 1.2 to 1.4 GiB on the Word file.
+  - It fell to 0.17 to 0.33 GiB at the 10th conversion. Gotenberg restarts LibreOffice after 10 conversions by default (`--libreoffice-restart-after`, "default 10", from the image's `--help`).
+  - The high-water mark reached the full 2,048 MiB: at the deck's 10th conversion and the Word file's 7th. Nothing was killed.
+  - Under cgroup v1, that mark includes reclaimable file cache. So how much headroom 2 GiB leaves is not shown.
+  - Reading: on Cloud Run, files written inside the container also use memory, so the 30 MB upload and its PDF add to the total there.
 - **A second vCPU did not help.** Wall time stayed about the same, and the CPU-seconds used stayed close to the wall time.
 - **No timeout.** Every conversion finished well inside Gotenberg's default request timeout. A second pass with a 600 s timeout gave the same results.
 - **The machine is fast.** A Cloud Run vCPU may be slower than this laptop's cores, so the re-cost below also doubles these times.

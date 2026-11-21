@@ -23,7 +23,7 @@ This research reports facts. Each choice belongs to the owner.
 |---|---|
 | At full use of the learners' USD 25, the USD 6 gross live cap trips. It trips at about USD 19 to 22 of AI spend through live in a month. If live had the whole free tier, USD 2.21 to 3.00 would be left to pay; the owner's USD 10 Developer Program credit may pay it. | #716's caps, #675's hosting costs, the map's constraints line |
 | If all of the tests' USD 20 ran through staging, staging's USD 2 cap would trip. | #716's staging cap, #678's tests |
-| The converter needs 2 GiB: at 1 GiB, a later conversion in the same instance failed. | #716's converter, "1 to 2 GiB" in `hosting.md` |
+| The converter needs at least 2 GiB: at 1 GiB, a later conversion in the same instance failed. 2 GiB held 12 in a row, but its high-water mark reached the full 2 GiB. | #716's converter, "1 to 2 GiB" in `hosting.md` |
 | The first sitting on a 20-page photo-heavy slice costs 2.77 sittings' worth, so a day's limit ends at reply 9 or 10 of 15. | #675's tutoring limit, #802's sitting's worth |
 | A plain sitting costs USD 0.00927 with nothing cached and USD 0.00820 with the instructions cached, around the spec's USD 0.0084. | #802's sitting's worth, in `spending.md`'s Gaps |
 | At every limit, with 10-problem worded checks, 25 learners would spend USD 27.46 a month, past the USD 25. With 6-problem checks, USD 19.49. | #802's re-cost, #675's limits |
