@@ -1,0 +1,68 @@
+== Haiku 5.5 tutor turns (timed_*.jsonl), effort medium, 1-hour cache
+-- plain: sittings costed 6, timed 6
+   v3_haiku_medium_A1: tutor cost USD 0.00983, open 80.7 s
+   v3_haiku_medium_A2: tutor cost USD 0.00785, open 58.3 s
+   v3_haiku_medium_B1: tutor cost USD 0.00815, open 71.0 s
+   v3_haiku_medium_B2: tutor cost USD 0.00747, open 54.3 s
+   v3_haiku_medium_C1: tutor cost USD 0.00983, open 77.7 s
+   v3_haiku_medium_C2: tutor cost USD 0.00929, open 65.2 s
+   cost per sitting: mean USD 0.00874 (min 0.00747, max 0.00983); vs spending.md USD 0.0084: x1.04
+   turn open time: n 90, median 4.2 s, p90 6.6 s, max 15.4 s
+   sitting open time: mean 67.9 s (min 54.3, max 80.7)
+   open seconds per USD of tutoring: 7770
+-- slice20: sittings costed 4, timed 2
+   v3_haiku_medium_A3_slice20: tutor cost USD 0.02291
+   v3_haiku_medium_A4_slice20: tutor cost USD 0.01579, open 111.2 s
+   v3_haiku_medium_B3_slice20: tutor cost USD 0.02365
+   v3_haiku_medium_B4_slice20: tutor cost USD 0.01655, open 113.6 s
+   cost per sitting: mean USD 0.01972 (min 0.01579, max 0.02365); vs spending.md USD 0.0084: x2.35
+   turn open time: n 30, median 8.2 s, p90 9.7 s, max 14.4 s
+   sitting open time: mean 112.4 s (min 111.2, max 113.6)
+   open seconds per USD of tutoring: 6950
+   calls 184: median 3.06 s, p90 5.54 s; first stream event median 1.13 s
+
+== Outline reads (outline_*.jsonl), effort low, no cache
+   docx_r1: 100 pages in 2 parts [1-55 (93585 tok, 8.4 s, out 234), 56-100 (76836 tok, 11.9 s, out 1653)]; 20.3 s, USD 0.01799, USD 0.01799 per 100 pages, 1128 s per USD
+   docx_r2: 100 pages in 2 parts [1-55 (93585 tok, 6.3 s, out 235), 56-100 (76837 tok, 7.5 s, out 781)]; 13.8 s, USD 0.01755, USD 0.01755 per 100 pages, 785 s per USD
+   pptx_r1: 100 pages in 2 parts [1-54 (94248 tok, 8.2 s, out 263), 55-100 (80398 tok, 10.0 s, out 808)]; 18.2 s, USD 0.01800, USD 0.01800 per 100 pages, 1010 s per USD
+   pptx_r2: 100 pages in 2 parts [1-54 (94248 tok, 8.6 s, out 250), 55-100 (80385 tok, 13.5 s, out 1740)]; 22.0 s, USD 0.01846, USD 0.01846 per 100 pages, 1194 s per USD
+   open seconds per USD of reading: 785 to 1194
+
+== Converter (Gotenberg), wall s / container CPU s / peak MiB
+   header: {'image': 'gotenberg/gotenberg:8', 'pulled': 'docker.io/gotenberg/gotenberg:8', 'repo_digest': 'gotenberg/gotenberg@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996', 'gotenberg_version_output': '8.40.0', 'api_timeout': '600s', 'started': '2026-11-21 14:47:00'}
+   header: {'image': 'gotenberg/gotenberg:8', 'pulled': 'docker.io/gotenberg/gotenberg:8', 'repo_digest': 'gotenberg/gotenberg@sha256:53073e798c8ef39ea2187e44cb67bab77894ea2509100b94c4fe3b461f7b2996', 'gotenberg_version_output': '8.40.0', 'api_timeout': 'default', 'started': '2026-11-21 14:44:30'}
+   1 vCPU 1g worst-case-100-pages.docx: 4 ok, wall 6.08-7.47 s, cpu 5.97-7.37 s, peak up to 1024.0 MiB; 2 failed (warm2 500, warm2 500)
+   1 vCPU 1g worst-case-100-slides.pptx: 2 ok, wall 8.67-8.88 s, cpu 8.33-8.57 s, peak up to 1024.0 MiB; 2 failed (warm1 500, warm1 500)
+   1 vCPU 2g worst-case-100-pages.docx: 6 ok, wall 6.08-7.52 s, cpu 5.99-7.21 s, peak up to 1645.8 MiB
+   1 vCPU 2g worst-case-100-slides.pptx: 6 ok, wall 7.14-10.09 s, cpu 7.11-9.77 s, peak up to 1432.2 MiB
+   2 vCPU 2g worst-case-100-pages.docx: 6 ok, wall 5.65-7.57 s, cpu 5.74-7.58 s, peak up to 1042.2 MiB
+   2 vCPU 2g worst-case-100-slides.pptx: 6 ok, wall 7.24-9.01 s, cpu 7.33-9.06 s, peak up to 1703.4 MiB
+   1 vCPU 2 GiB: wall max 10.09 s, median 7.14 s over 12 conversions
+
+== Re-cost: Cloud Run, gross, list price, Singapore
+-- backend 1 vCPU, 0.5 GiB: USD 0.00003535 per open second; free tier 128571 s; live cap USD 6.0 = 169731 s; staging cap USD 2.0 = 56577 s
+   all of learners only (USD 25) at 7770 s/USD, no overlap: 194260 s, gross USD 6.87 (cap TRIPS), after free tier USD 2.32 (Developer credit USD 10 covers)
+   all of learners + owner's share (USD 33) at 7770 s/USD, no overlap: 256423 s, gross USD 9.06 (cap TRIPS), after free tier USD 4.52 (Developer credit USD 10 covers)
+   180 plain sittings: 12219 s, gross USD 0.43
+   240 plain sittings: 16292 s, gross USD 0.58
+   AI spend through live at which the cap trips (no overlap): USD 21.84
+   tests' USD 20, if it all ran through staging: 155408 s, gross USD 5.49 vs staging cap USD 2.0
+-- backend 1 vCPU, 1.0 GiB: USD 0.00003710 per open second; free tier 128571 s; live cap USD 6.0 = 161725 s; staging cap USD 2.0 = 53908 s
+   all of learners only (USD 25) at 7770 s/USD, no overlap: 194260 s, gross USD 7.21 (cap TRIPS), after free tier USD 2.44 (Developer credit USD 10 covers)
+   all of learners + owner's share (USD 33) at 7770 s/USD, no overlap: 256423 s, gross USD 9.51 (cap TRIPS), after free tier USD 4.74 (Developer credit USD 10 covers)
+   180 plain sittings: 12219 s, gross USD 0.45
+   240 plain sittings: 16292 s, gross USD 0.60
+   AI spend through live at which the cap trips (no overlap): USD 20.81
+   tests' USD 20, if it all ran through staging: 155408 s, gross USD 5.77 vs staging cap USD 2.0
+
+== Re-cost: the AI month for one learner at every limit (31-day month)
+   tutoring: 17 x USD 0.0084 = USD 0.143 (money, so fixed); buys 16.3 plain sittings at USD 0.00874, or 7.2 page-heavy at USD 0.01972
+   a day's limit (2 x 0.0084 = USD 0.0168) is 85% of one page-heavy sitting (about 13 of its 15 replies), and 96% of two plain sittings
+   checks of 2 problems: USD 0.0084 to 0.0180 each; 2 a week = 8.86 a month = USD 0.074 to 0.159
+   checks of 6 problems: USD 0.0252 to 0.0540 each; 2 a week = 8.86 a month = USD 0.223 to 0.478
+   checks of 10 problems: USD 0.0420 to 0.0900 each; 2 a week = 8.86 a month = USD 0.372 to 0.797
+   reading: USD 0.01800 per 100 pages; 100 pages a week = USD 0.080 a month; with the overrun (a file starting at page 99 read in full, up to 199 pages a week) up to USD 0.159
+   one learner at every limit, 6-problem checks at the high end, with overruns: USD 0.780; x25 learners = USD 19.49 vs the learners' USD 25
+   one learner at every limit, 10-problem checks at the high end, with overruns: USD 1.099; x25 learners = USD 27.46 vs the learners' USD 25
+-- converter at 2 GiB, laptop time x1 + 10 s shutdown per file: USD 0.00082 per 100-page file; 111 files a month (25 learners x 100 pages x 31/7 weeks) = USD 0.09, twice that with overruns USD 0.18
+-- converter at 2 GiB, laptop time x2 + 10 s shutdown per file: USD 0.00123 per 100-page file; 111 files a month (25 learners x 100 pages x 31/7 weeks) = USD 0.14, twice that with overruns USD 0.27

@@ -1,0 +1,17 @@
+[OK] key loaded from repo .env (value not shown)
+[turn 1] 1 call(s), 15.5 s
+[turn 2] 1 call(s), 11.9 s
+[turn 3] 2 call(s), 23.2 s
+[turn 4] 2 call(s), 23.6 s
+[turn 5] 1 call(s), 12.4 s
+[turn 6] 2 call(s), 24.3 s
+[turn 7] 2 call(s), 22.5 s
+[turn 8] 1 call(s), 12.5 s
+[turn 9] 2 call(s), 24.6 s
+[turn 10] 2 call(s), 21.8 s
+[turn 11] 1 call(s), 10.8 s
+[turn 12] 2 call(s), 22.9 s
+[turn 13] 1 call(s), 11.2 s
+[turn 14] 2 call(s), 22.0 s
+[turn 15] 1 call(s), 11.7 s
+[OK] v3_haiku_medium_B3_slice20: 15 turns, tutor cost 0.02365, records 8

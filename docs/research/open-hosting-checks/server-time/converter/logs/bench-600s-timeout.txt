@@ -1,0 +1,17 @@
+[1 vCPU 2g] worst-case-100-slides.pptx cold: status 200 wall 8.35 s cpu 8.06 s peak 1019.4 MiB pages 100 false true
+[1 vCPU 2g] worst-case-100-slides.pptx warm1: status 200 wall 7.14 s cpu 7.11 s peak 1395.0 MiB pages 100 false true
+[1 vCPU 2g] worst-case-100-slides.pptx warm2: status 200 wall 7.15 s cpu 7.12 s peak 1431.3 MiB pages 100 false true
+[1 vCPU 2g] worst-case-100-pages.docx cold: status 200 wall 6.95 s cpu 6.83 s peak 917.7 MiB pages 100 false true
+[1 vCPU 2g] worst-case-100-pages.docx warm1: status 200 wall 6.46 s cpu 6.41 s peak 1025.5 MiB pages 100 false true
+[1 vCPU 2g] worst-case-100-pages.docx warm2: status 200 wall 6.76 s cpu 6.65 s peak 1645.8 MiB pages 100 false true
+[1 vCPU 1g] worst-case-100-slides.pptx cold: status 200 wall 8.67 s cpu 8.33 s peak 1024.0 MiB pages 100 false true
+[1 vCPU 1g] worst-case-100-slides.pptx warm1: status 500 wall 5.51 s cpu 5.56 s peak 1024.0 MiB pages None true true
+[1 vCPU 1g] worst-case-100-pages.docx cold: status 200 wall 7.47 s cpu 7.37 s peak 923.0 MiB pages 100 false true
+[1 vCPU 1g] worst-case-100-pages.docx warm1: status 200 wall 6.28 s cpu 6.18 s peak 1024.0 MiB pages 100 false true
+[1 vCPU 1g] worst-case-100-pages.docx warm2: status 500 wall 2.58 s cpu 2.62 s peak 1024.0 MiB pages None true true
+[2 vCPU 2g] worst-case-100-slides.pptx cold: status 200 wall 9.01 s cpu 9.06 s peak 1023.3 MiB pages 100 false true
+[2 vCPU 2g] worst-case-100-slides.pptx warm1: status 200 wall 7.43 s cpu 7.52 s peak 1396.6 MiB pages 100 false true
+[2 vCPU 2g] worst-case-100-slides.pptx warm2: status 200 wall 7.47 s cpu 7.51 s peak 1423.7 MiB pages 100 false true
+[2 vCPU 2g] worst-case-100-pages.docx cold: status 200 wall 7.44 s cpu 7.42 s peak 918.0 MiB pages 100 false true
+[2 vCPU 2g] worst-case-100-pages.docx warm1: status 200 wall 6.03 s cpu 6.07 s peak 1027.0 MiB pages 100 false true
+[2 vCPU 2g] worst-case-100-pages.docx warm2: status 200 wall 5.87 s cpu 5.93 s peak 1042.2 MiB pages 100 false true

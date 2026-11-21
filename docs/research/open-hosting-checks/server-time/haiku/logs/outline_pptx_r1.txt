@@ -1,0 +1,15 @@
+[OK] key loaded from repo .env (value not shown)
+[pptx_r1] part 1: pages 1-54 (54), counted 94248 tokens, 8.2 s, cost 0.00956 USD, stop end_turn
+[pptx_r1] part 2: pages 55-100 (46), counted 80398 tokens, 10.0 s, cost 0.00844 USD, stop end_turn
+[OK] pptx_r1: 2 parts, 55.4 s wall incl. counting
+[outline]
+Series: pages 55, 65, 75, 85, 95
+Vectors: pages 56, 66, 76, 86, 96
+Matrices: pages 57, 67, 77, 87, 97
+Probability: pages 58, 68, 78, 88, 98
+Statistics: pages 59, 69, 79, 89, 99
+Kinematics: pages 60, 70, 80, 90, 100
+Limits: pages 61, 71, 81, 91
+Derivatives: pages 62, 72, 82, 92
+Chain rule: pages 63, 73, 83, 93
+Integrals: pages 64, 74, 84, 94

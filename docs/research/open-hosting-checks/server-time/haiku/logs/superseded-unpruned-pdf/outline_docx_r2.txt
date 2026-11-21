@@ -1,0 +1,2 @@
+[OK] key loaded from repo .env (value not shown)
+[ERROR] one page at 1 passes 95000 tokens
