@@ -108,10 +108,10 @@ Gotenberg 8.40.0 (`gotenberg/gotenberg@sha256:53073e79...`). It ran on the owner
 - In each failure, the container hit its memory limit and Gotenberg answered 500: "LibreOffice failed to convert the document". The first conversion in a fresh container passed.
 - **2 GiB held** every conversion, peaking at 1.0 to 1.7 GiB over 3 conversions per container.
 - **Twelve in a row.** [`long_run.py`](server-time/converter/long_run.py) then ran 12 conversions of each file in one 1 vCPU, 2 GiB container ([`long-run-12.txt`](server-time/converter/logs/long-run-12.txt)). All 24 converted.
-  - Current memory climbed for 3 conversions, then held at about 1.35 GiB on the deck and 1.2 to 1.4 GiB on the Word file.
-  - It fell to 0.17 to 0.33 GiB at the 10th conversion. Gotenberg restarts LibreOffice after 10 conversions by default (`--libreoffice-restart-after`, "default 10", from the image's `--help`).
+  - Current memory climbed for 3 conversions on the deck and 5 on the Word file. It then held at about 1.35 GiB on the deck and 1.2 to 1.4 GiB on the Word file.
+  - It fell to 0.17 to 0.33 GiB at the 10th conversion. Gotenberg restarts LibreOffice after 10 conversions by default (`--libreoffice-restart-after`, "default 10", from the image's `--help`). Reading: the drop is that restart; the log shows the drop, not the restart.
   - The high-water mark reached the full 2,048 MiB: at the deck's 10th conversion and the Word file's 7th. Nothing was killed.
-  - Under cgroup v1, that mark includes reclaimable file cache. So how much headroom 2 GiB leaves is not shown.
+  - Reading: under cgroup v1, that mark also counts file cache the kernel can free. If so, how much headroom 2 GiB leaves is not shown.
   - Reading: on Cloud Run, files written inside the container also use memory, so the 30 MB upload and its PDF add to the total there.
 - **A second vCPU did not help.** Wall time stayed about the same, and the CPU-seconds used stayed close to the wall time.
 - **No timeout.** Every conversion finished well inside Gotenberg's default request timeout. A second pass with a 600 s timeout gave the same results.
